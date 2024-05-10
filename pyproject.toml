@@ -23,9 +23,10 @@ classifiers=[
 ]
 
 dependencies = [
-    "torch>=2.0",
     "einops>=0.8.0",
-    "einx>=0.2.2"
+    "einx>=0.2.2",
+    "torch>=2.0",
+    "jaxtyping>=0.2.28"
 ]
 
 [project.urls]
