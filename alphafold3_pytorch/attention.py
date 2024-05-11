@@ -37,7 +37,8 @@ class Attention(Module):
         dim_head = 64,
         heads = 8,
         dropout = 0.,
-        flash = True
+        flash = True,
+        gate_output = False
     ):
         super().__init__()
         """
@@ -62,6 +63,17 @@ class Attention(Module):
         self.to_kv = nn.Linear(dim, dim_inner * 2, bias = False)
         self.to_out = nn.Linear(dim_inner, dim, bias = False)
 
+        # used in alphafold2
+
+        self.to_gates = None
+
+        if gate_output:
+            gate_linear = nn.Linear(dim, dim_inner)
+            nn.init.zeros_(gate_linear.weight)
+            nn.init.constant_(gate_linear.bias, 1.)
+
+            self.to_gates = gate_linear
+
     def forward(
         self,
         seq,
@@ -78,6 +90,11 @@ class Attention(Module):
         out = self.attend(q, k, v, mask = mask)
 
         out = self.merge_heads(out)
+
+        if exists(self.to_gates):
+            gates = self.to_gates(seq)
+            out = out * gates.sigmoid()
+
         return self.to_out(out)
 
 # attending, both vanilla as well as in-built flash attention
