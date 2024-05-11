@@ -37,8 +37,9 @@ class Attention(Module):
         dim_head = 64,
         heads = 8,
         dropout = 0.,
+        gate_output = False,
         flash = True,
-        gate_output = False
+        efficient_attn_config: Config = Config(True, True, True)
     ):
         super().__init__()
         """
@@ -54,7 +55,11 @@ class Attention(Module):
 
         dim_inner = dim_head * heads
 
-        self.attend = Attend(flash = flash, dropout = dropout)
+        self.attend = Attend(
+            flash = flash,
+            dropout = dropout,
+            attn_config = efficient_attn_config
+        )
 
         self.split_heads = Rearrange('b n (h d) -> b h n d', h = heads)
         self.merge_heads = Rearrange('b h n d -> b n (h d)')
