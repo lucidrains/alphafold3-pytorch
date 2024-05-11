@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import NamedTuple
 
 import torch
@@ -8,6 +9,8 @@ from torch.nn import Module
 import einx
 from einops import einsum, repeat
 from einops.layers.torch import Rearrange
+
+from alphafold3_pytorch.typing import Float, Int, Bool
 
 # constants
 
@@ -129,7 +132,13 @@ class Attend(Module):
         self.attn_config = attn_config
         self.attn_dropout = nn.Dropout(dropout)
 
-    def flash_attn(self, q, k, v, mask = None):
+    def flash_attn(
+        self,
+        q: Float['b h i d'],
+        k: Float['b h j d'],
+        v: Float['b h j d'],
+        mask: Bool['b j'] | None = None
+    ):
         _, heads, seq_len, _ = q.shape
 
         attn_mask = None
@@ -147,7 +156,13 @@ class Attend(Module):
 
         return out
 
-    def forward(self, q, k, v, mask = None):
+    def forward(
+        self,
+        q: Float['b h i d'],
+        k: Float['b h j d'],
+        v: Float['b h j d'],
+        mask: Bool['b j'] | None = None
+    ):
 
         if self.flash:
             return self.flash_attn(q, k, v, mask = mask)

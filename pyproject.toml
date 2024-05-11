@@ -43,6 +43,14 @@ test = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff]
+line-length = 1000
+
+ignore = [
+    "F722", # for jaxtyping shape annotation
+    "F401"
+]
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
