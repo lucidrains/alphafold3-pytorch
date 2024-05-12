@@ -6,11 +6,10 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn import Module
 
-import einx
 from einops import einsum, repeat
 from einops.layers.torch import Rearrange
 
-from alphafold3_pytorch.typing import Float, Int, Bool
+from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
 
 # constants
 
@@ -82,6 +81,7 @@ class Attention(Module):
 
             self.to_gates = gate_linear
 
+    @typecheck
     def forward(
         self,
         seq: Float['b i d'],
@@ -133,6 +133,7 @@ class Attend(Module):
         self.attn_config = attn_config
         self.attn_dropout = nn.Dropout(dropout)
 
+    @typecheck
     def flash_attn(
         self,
         q: Float['b h i d'],
@@ -158,6 +159,7 @@ class Attend(Module):
 
         return out
 
+    @typecheck
     def forward(
         self,
         q: Float['b h i d'],
@@ -181,7 +183,8 @@ class Attend(Module):
 
         if exists(mask):
             mask_value = max_neg_value(sim)
-            sim = einx.where('b j, b h i j, -> b h i j', mask, sim, mask_value)
+            mask = rearrange(mask, 'b j -> b 1 1 j')
+            sim = sim.masked_fill(~mask, mask_value)
 
         # attention
 
