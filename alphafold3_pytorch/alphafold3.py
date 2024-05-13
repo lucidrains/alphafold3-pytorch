@@ -27,7 +27,7 @@ def default(v, d):
 # they name this 'transition' in their paper
 # Algorithm 11
 
-class GEGLU(Module):
+class SwiGLU(Module):
     @typecheck
     def forward(
         self,
@@ -35,7 +35,7 @@ class GEGLU(Module):
     ) -> Float['b n (d//2)']:
 
         x, gates = x.chunk(2, dim = -1)
-        return F.gelu(gates) * x
+        return F.silu(gates) * x
 
 class Transition(Module):
     def __init__(
@@ -49,7 +49,7 @@ class Transition(Module):
 
         self.ff = Sequential(
             LinearNoBias(dim, dim_inner * 2),
-            GEGLU(),
+            SwiGLU(),
             LinearNoBias(dim_inner, dim)
         )
 
