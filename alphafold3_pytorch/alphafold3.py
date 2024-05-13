@@ -114,7 +114,7 @@ class AdaptiveLayerNorm(Module):
             nn.Sigmoid()
         )
 
-        self.to_beta = nn.Linear(dim_cond, dim, bias = False)
+        self.to_beta = LinearNoBias(dim_cond, dim)
 
     @typecheck
     def forward(
@@ -259,7 +259,7 @@ class AttentionPairBias(Module):
 
         # line 8 of Algorithm 24
 
-        to_attn_bias_linear = nn.Linear(dim_pairwise_repr, heads, bias = False)
+        to_attn_bias_linear = LinearNoBias(dim_pairwise_repr, heads)
         nn.init.zeros_(to_attn_bias_linear.weight)
 
         self.to_attn_bias = nn.Sequential(
@@ -308,7 +308,7 @@ class TriangleAttention(Module):
         self.attn = Attention(dim = dim, heads = heads, **attn_kwargs)
 
         self.to_attn_bias = nn.Sequential(
-            nn.Linear(dim, heads, bias = False),
+            LinearNoBias(dim, heads),
             Rearrange('... i j h -> ... h i j')
         )
 
