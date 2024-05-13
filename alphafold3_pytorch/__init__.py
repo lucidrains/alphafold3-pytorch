@@ -4,6 +4,9 @@ from alphafold3_pytorch.attention import (
 )
 
 from alphafold3_pytorch.alphafold3 import (
+    PreLayerNorm,
+    AdaptiveLayerNorm,
+    ConditionWrapper,
     Transition,
     Alphafold3
 )
@@ -11,6 +14,9 @@ from alphafold3_pytorch.alphafold3 import (
 __all__ = [
     Attention,
     Attend,
+    PreLayerNorm,
+    AdaptiveLayerNorm,
+    ConditionWrapper,
     Transition,
     Alphafold3
 ]
