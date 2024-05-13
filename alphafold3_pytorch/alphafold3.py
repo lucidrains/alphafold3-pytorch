@@ -18,7 +18,8 @@ from alphafold3_pytorch.typing import (
 
 from alphafold3_pytorch.attention import Attention
 
-from einops import rearrange, einsum
+from einops import rearrange, repeat, einsum, pack, unpack
+from einops.layers.torch import Rearrange
 
 # constants
 
@@ -77,7 +78,7 @@ class PreLayerNorm(Module):
     @typecheck
     def __init__(
         self,
-        fn: Attention | Transition,
+        fn: Attention | Transition | TriangleAttention | AttentionPairBias,
         *,
         dim,
     ):
@@ -135,7 +136,7 @@ class ConditionWrapper(Module):
     @typecheck
     def __init__(
         self,
-        fn: Attention | Transition,
+        fn: Attention | Transition | TriangleAttention |  AttentionPairBias,
         *,
         dim,
         dim_cond,
@@ -239,6 +240,112 @@ class TriangleMultiplicativeModule(Module):
         out = self.to_out_norm(out)
         out = out * out_gate
         return self.to_out(out)
+
+# there are two types of attention in this paper, triangle and attention-pair-bias
+# they differ by how the attention bias is computed
+# triangle is axial attention w/ itself projected for bias
+
+class AttentionPairBias(Module):
+    def __init__(
+        self,
+        *,
+        heads,
+        dim_pairwise_repr,
+        max_seq_len = 16384,
+        **attn_kwargs
+    ):
+        super().__init__()
+        self.attn = Attention(heads = heads, **attn_kwargs)
+
+        # line 8 of Algorithm 24
+
+        to_attn_bias_linear = nn.Linear(dim_pairwise_repr, heads, bias = False)
+        nn.init.zeros_(to_attn_bias_linear.weight)
+
+        self.to_attn_bias = nn.Sequential(
+            nn.LayerNorm(dim_pairwise_repr),
+            to_attn_bias_linear,
+            Rearrange('... i j h -> ... h i j')
+        )
+
+        self.max_seq_len = max_seq_len
+        self.attn_bias_bias = nn.Parameter(torch.zeros(max_seq_len, max_seq_len))
+
+    @typecheck
+    def forward(
+        self,
+        single_repr: Float['b n ds'],
+        *,
+        pairwise_repr: Float['b n n dp'],
+        **kwargs
+    ) -> Float['b n ds']:
+
+        seq = single_repr.shape[1]
+        assert seq <= self.max_seq_len
+
+        attn_bias = self.to_attn_bias(pairwise_repr) + self.attn_bias_bias[:seq, :seq]
+
+        out = self.attn(
+            single_repr,
+            attn_bias = attn_bias,
+            **kwargs
+        )
+
+        return out
+
+class TriangleAttention(Module):
+    def __init__(
+        self,
+        *,
+        dim,
+        heads,
+        node_type: Literal['starting', 'ending'],
+        **attn_kwargs
+    ):
+        super().__init__()
+        self.need_transpose = node_type == 'ending'
+
+        self.attn = Attention(dim = dim, heads = heads, **attn_kwargs)
+
+        self.to_attn_bias = nn.Sequential(
+            nn.Linear(dim, heads, bias = False),
+            Rearrange('... i j h -> ... h i j')
+        )
+
+    @typecheck
+    def forward(
+        self,
+        pairwise_repr: Float['b n n d'],
+        mask: Bool['b n'] | None = None,
+        **kwargs
+    ) -> Float['b n n d']:
+
+        if self.need_transpose:
+            pairwise_repr = rearrange(pairwise_repr, 'b i j d -> b j i d')
+
+        attn_bias = self.to_attn_bias(pairwise_repr)
+
+        batch_repeat = pairwise_repr.shape[1]
+        attn_bias = repeat(attn_bias, 'b ... -> (b r) ...', r = batch_repeat)
+
+        if exists(mask):
+            mask = repeat(mask, 'b ... -> (b r) ...', r = batch_repeat)
+
+        pairwise_repr, packed_shape = pack([pairwise_repr], '* n d')
+
+        out = self.attn(
+            pairwise_repr,
+            mask = mask,
+            attn_bias = attn_bias,
+            **kwargs
+        )
+
+        out, = unpack(out, packed_shape, '* n d')
+
+        if self.need_transpose:
+            out = rearrange(out, 'b j i d -> b i j d')
+
+        return out
 
 # main class
 

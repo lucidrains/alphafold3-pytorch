@@ -7,6 +7,8 @@ from alphafold3_pytorch.alphafold3 import (
     PreLayerNorm,
     AdaptiveLayerNorm,
     ConditionWrapper,
+    AttentionPairBias,
+    TriangleAttention,
     Transition,
     Alphafold3
 )
@@ -17,6 +19,8 @@ __all__ = [
     PreLayerNorm,
     AdaptiveLayerNorm,
     ConditionWrapper,
+    AttentionPairBias,
+    TriangleAttention,
     Transition,
     Alphafold3
 ]

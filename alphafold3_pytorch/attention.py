@@ -43,9 +43,7 @@ class Attention(Module):
         gate_output = True,
         query_bias = True,
         flash = True,
-        efficient_attn_config: Config = Config(True, True, True),
-        dim_pairwise_repr: int | None = None,
-        max_seq_len: int = 8192
+        efficient_attn_config: Config = Config(True, True, True)
     ):
         super().__init__()
         """
@@ -87,34 +85,13 @@ class Attention(Module):
 
             self.to_gates = gate_linear
 
-        # for projecting features to attn bias
-
-        self.accept_feature_to_bias_attn = exists(dim_pairwise_repr)
-
-        if self.accept_feature_to_bias_attn:
-            self.max_seq_len = max_seq_len
-
-            # line 8 of Algorithm 24
-
-            to_attn_bias_linear = nn.Linear(dim_pairwise_repr, heads, bias = False)
-            nn.init.zeros_(to_attn_bias_linear.weight)
-
-            self.to_attn_bias = nn.Sequential(
-                nn.LayerNorm(dim_pairwise_repr),
-                to_attn_bias_linear,
-                Rearrange('... i j h -> ... h i j')
-            )
-
-            self.attn_bias_bias = nn.Parameter(torch.zeros(max_seq_len, max_seq_len))
-
     @typecheck
     def forward(
         self,
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
-        attn_bias: Float['... i j'] | None = None,
-        input_to_bias_attn: Float['b i j e'] | None = None,
+        attn_bias: Float['... i j'] | None = None
 
     ) -> Float['b i d']:
 
@@ -124,18 +101,6 @@ class Attention(Module):
         k, v = self.to_kv(context_seq).chunk(2, dim = -1)
 
         q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
-
-        # inputs to project into attn bias - for alphafold3, pairwise rep
-
-        assert not (exists(input_to_bias_attn) ^ self.accept_feature_to_bias_attn), 'if passing in pairwise representation, must set dim_pairwise_repr on Attention.__init__'
-
-        if self.accept_feature_to_bias_attn:
-            i, j = q.shape[-2], k.shape[-2]
-
-            assert not exists(attn_bias)
-            assert i <= self.max_seq_len and j <= self.max_seq_len
-
-            attn_bias = self.to_attn_bias(input_to_bias_attn) + self.attn_bias_bias[:i, :j]
 
         # attention
 
