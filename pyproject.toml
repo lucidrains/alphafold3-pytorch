@@ -44,6 +44,11 @@ test = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
+
 [tool.ruff]
 line-length = 1000
 
