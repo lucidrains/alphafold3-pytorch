@@ -362,6 +362,8 @@ class TriangleAttention(Module):
 # pairformer stack
 
 class PairformerStack(Module):
+    """ Algorithm 17 """
+
     def __init__(
         self,
         *,
