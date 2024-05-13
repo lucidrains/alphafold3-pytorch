@@ -39,7 +39,8 @@ class Attention(Module):
         dim_head = 64,
         heads = 8,
         dropout = 0.,
-        gate_output = False,
+        gate_output = True,
+        query_bias = True,
         flash = True,
         efficient_attn_config: Config = Config(True, True, True)
     ):
@@ -66,7 +67,7 @@ class Attention(Module):
         self.split_heads = Rearrange('b n (h d) -> b h n d', h = heads)
         self.merge_heads = Rearrange('b h n d -> b n (h d)')
 
-        self.to_q = nn.Linear(dim, dim_inner, bias = False)
+        self.to_q = nn.Linear(dim, dim_inner, bias = query_bias)
         self.to_kv = nn.Linear(dim, dim_inner * 2, bias = False)
         self.to_out = nn.Linear(dim_inner, dim, bias = False)
 
