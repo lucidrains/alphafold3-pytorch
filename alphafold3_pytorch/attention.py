@@ -96,9 +96,12 @@ class Attention(Module):
 
             # line 8 of Algorithm 24
 
+            to_attn_bias_linear = nn.Linear(dim_pairwise_repr, heads, bias = False)
+            nn.init.zeros_(to_attn_bias_linear.weight)
+
             self.to_attn_bias = nn.Sequential(
                 nn.LayerNorm(dim_pairwise_repr),
-                nn.Linear(dim_pairwise_repr, heads, bias = False),
+                to_attn_bias_linear,
                 Rearrange('... i j h -> ... h i j')
             )
 
@@ -111,7 +114,7 @@ class Attention(Module):
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
         attn_bias: Float['... i j'] | None = None,
-        input_to_bias_attn: Float['... i j e'] | None = None,
+        input_to_bias_attn: Float['b i j e'] | None = None,
 
     ) -> Float['b i d']:
 
