@@ -86,6 +86,7 @@ class Attention(Module):
         self,
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
+        attn_bias: Float['b h i j'] | None = None,
         context: Float['b j d'] | None = None
     ) -> Float['b i d']:
 
@@ -96,7 +97,11 @@ class Attention(Module):
 
         q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
 
-        out = self.attend(q, k, v, mask = mask)
+        out = self.attend(
+            q, k, v,
+            attn_bias = attn_bias,
+            mask = mask
+        )
 
         out = self.merge_heads(out)
 
@@ -165,10 +170,13 @@ class Attend(Module):
         q: Float['b h i d'],
         k: Float['b h j d'],
         v: Float['b h j d'],
+        attn_bias: Float['b h i j'] | None = None,
         mask: Bool['b j'] | None = None
     ) -> Float['b h i d']:
 
-        if self.flash:
+        can_use_flash = self.flash and not exists(attn_bias), 'flash attention does not support attention bias with gradients'
+
+        if can_use_flash:
             return self.flash_attn(q, k, v, mask = mask)
 
         scale = default(self.scale, q.shape[-1] ** -0.5)
@@ -178,6 +186,11 @@ class Attend(Module):
         # similarity
 
         sim = einsum(q, k, "b h i d, b h j d -> b h i j")
+
+        # attn bias
+
+        if exists(attn_bias):
+            sim = sim + attn_bias
 
         # masking
 
