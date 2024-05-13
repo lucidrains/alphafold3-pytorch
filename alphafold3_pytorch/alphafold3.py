@@ -139,8 +139,7 @@ class ConditionWrapper(Module):
         *,
         dim,
         dim_cond,
-        adaln_zero_bias_init_value = -2.,
-        adaln_zero_has_bias = True
+        adaln_zero_bias_init_value = -2.
     ):
         super().__init__()
         self.fn = fn
@@ -155,11 +154,6 @@ class ConditionWrapper(Module):
             nn.Sigmoid()
         )
 
-        self.adaln_zero_has_bias = adaln_zero_has_bias
-
-        if adaln_zero_has_bias:
-            self.to_adaln_zero_beta = nn.Linear(dim_cond, dim, bias = False)
-
     @typecheck
     def forward(
         self,
@@ -173,13 +167,7 @@ class ConditionWrapper(Module):
         out = self.fn(x, **kwargs)
 
         gamma = self.to_adaln_zero_gamma(cond)
-        out = out * gamma
-
-        if not self.adaln_zero_has_bias:
-            return
-
-        beta = self.to_adaln_zero_beta(cond)
-        return out + beta
+        return out * gamma
 
 # triangle multiplicative module
 # seems to be unchanged from alphafold2
