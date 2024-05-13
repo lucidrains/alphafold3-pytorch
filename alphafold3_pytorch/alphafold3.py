@@ -88,9 +88,10 @@ class PreLayerNorm(Module):
     @typecheck
     def forward(
         self,
-        x: Tensor,
+        x: Float['... n d'],
         **kwargs
-    ):
+    ) -> Float['... n d']:
+
         x = self.norm(x)
         return self.fn(x, **kwargs)
 
@@ -117,9 +118,10 @@ class AdaptiveLayerNorm(Module):
     @typecheck
     def forward(
         self,
-        x: Tensor,
+        x: Float['... n d'],
         cond: Tensor
-    ):
+    ) -> Float['... n d']:
+
         normed = self.norm(x)
         normed_cond = self.norm_cond(cond)
 
@@ -157,11 +159,11 @@ class ConditionWrapper(Module):
     @typecheck
     def forward(
         self,
-        x: Tensor,
+        x: Float['... n d'],
         *,
         cond: Tensor,
         **kwargs
-    ):
+    ) -> Float['... n d']:
         x = self.adaptive_norm(x, cond = cond)
 
         out = self.fn(x, **kwargs)
@@ -214,7 +216,8 @@ class TriangleMultiplicativeModule(Module):
         self,
         x: Float['b n n d'],
         mask: Float['b n n'] | None = None
-    ):
+    ) -> Float['b n n d']:
+
         if exists(mask):
             mask = rearrange(mask, '... -> ... 1')
 
