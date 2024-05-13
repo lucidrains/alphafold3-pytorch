@@ -6,7 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn import Module
 
-from einops import einsum, repeat
+from einops import einsum, repeat, rearrange
 from einops.layers.torch import Rearrange
 
 from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
