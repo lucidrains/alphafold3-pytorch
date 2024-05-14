@@ -13,6 +13,7 @@ from alphafold3_pytorch.alphafold3 import (
     AttentionPairBias,
     TriangleAttention,
     Transition,
+    MSAModule,
     PairformerStack,
     Alphafold3
 )
@@ -29,6 +30,7 @@ __all__ = [
     AttentionPairBias,
     TriangleAttention,
     Transition,
+    MSAModule,
     PairformerStack,
     Alphafold3
 ]
