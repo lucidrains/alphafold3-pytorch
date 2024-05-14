@@ -502,6 +502,8 @@ class MSAPairWeightedAveraging(Module):
         return self.to_out(out)
 
 class MSAModule(Module):
+    """ Algorithm 8 """
+
     def __init__(
         self,
         *,
