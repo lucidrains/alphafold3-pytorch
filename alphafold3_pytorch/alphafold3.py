@@ -379,15 +379,15 @@ class OuterProductMean(Module):
     def __init__(
         self,
         *,
-        dim,
-        dim_pairwise_repr,
+        dim_msa = 64,
+        dim_pairwise_repr = 128,
         dim_hidden = 32,
         eps = 1e-5
     ):
         super().__init__()
         self.eps = eps
-        self.norm = nn.LayerNorm(dim)
-        self.to_hidden = LinearNoBias(dim, dim_hidden * 2)
+        self.norm = nn.LayerNorm(dim_msa)
+        self.to_hidden = LinearNoBias(dim_msa, dim_hidden * 2)
         self.to_pairwise_repr = nn.Linear(dim_hidden ** 2, dim_pairwise_repr)
 
     @typecheck
@@ -440,8 +440,8 @@ class MSAPairWeightedAveraging(Module):
     def __init__(
         self,
         *,
-        dim_msa,
-        dim_pairwise_repr,
+        dim_msa = 64,
+        dim_pairwise_repr = 128,
         dim_head = 32,
         heads = 8
     ):
@@ -504,8 +504,8 @@ class MSAModule(Module):
         self,
         *,
         dim_single,
-        dim_pairwise,
-        dim_msa,
+        dim_pairwise = 128,
+        dim_msa = 64,
         depth = 4
     ):
         super().__init__()
@@ -529,7 +529,7 @@ class PairformerStack(Module):
         self,
         *,
         dim_single,
-        dim_pairwise,
+        dim_pairwise = 128,
         depth = 48,
         tri_mult_dim_hidden = None,
         tri_attn_dim_head = 32,
