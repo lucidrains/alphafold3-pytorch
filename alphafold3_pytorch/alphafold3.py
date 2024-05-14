@@ -10,6 +10,7 @@ from torch.nn import (
     Module,
     ModuleList,
     Linear,
+    Dropout,
     Sequential,
 )
 
@@ -193,7 +194,8 @@ class TriangleMultiplication(Module):
         *,
         dim,
         dim_hidden = None,
-        mix: Literal["incoming", "outgoing"] = 'incoming'
+        mix: Literal["incoming", "outgoing"] = 'incoming',
+        dropout = 0.
     ):
         super().__init__()
 
@@ -219,7 +221,11 @@ class TriangleMultiplication(Module):
             self.mix_einsum_eq = '... k j d, ... k i d -> ... i j d'
 
         self.to_out_norm = nn.LayerNorm(dim_hidden)
-        self.to_out = Linear(dim_hidden, dim)
+
+        self.to_out = Sequential(
+            Linear(dim_hidden, dim),
+            Dropout(dropout)
+        )
 
     @typecheck
     def forward(
@@ -312,12 +318,15 @@ class TriangleAttention(Module):
         dim,
         heads,
         node_type: Literal['starting', 'ending'],
+        dropout = 0.,
         **attn_kwargs
     ):
         super().__init__()
         self.need_transpose = node_type == 'ending'
 
         self.attn = Attention(dim = dim, heads = heads, **attn_kwargs)
+
+        self.dropout = nn.Dropout(dropout)
 
         self.to_attn_bias = nn.Sequential(
             LinearNoBias(dim, heads),
@@ -357,7 +366,7 @@ class TriangleAttention(Module):
         if self.need_transpose:
             out = rearrange(out, 'b j i d -> b i j d')
 
-        return out
+        return self.dropout(out)
 
 # pairformer stack
 
@@ -400,26 +409,20 @@ class PairformerStack(Module):
         )
 
         for _ in range(depth):
-            dropout_row = nn.Dropout(dropout_row_prob)
-            dropout_col = nn.Dropout(dropout_col_prob)
 
             pairwise_pre_ln = partial(PreLayerNorm, dim = dim_pairwise)
-
-            tri_mult_outgoing = TriangleMultiplication(mix = 'outgoing', **tri_mult_kwargs)
-            tri_mult_incoming = TriangleMultiplication(mix = 'incoming', **tri_mult_kwargs)
-            tri_attn_starting = TriangleAttention(node_type = 'starting', **tri_attn_kwargs)
-            tri_attn_ending = TriangleAttention(node_type = 'ending', **tri_attn_kwargs)
-
-            pairwise_transition = Transition(dim = dim_pairwise)
-
             single_pre_ln = partial(PreLayerNorm, dim = dim_single)
+
+            tri_mult_outgoing = TriangleMultiplication(mix = 'outgoing', dropout = dropout_row_prob, **tri_mult_kwargs)
+            tri_mult_incoming = TriangleMultiplication(mix = 'incoming', dropout = dropout_row_prob, **tri_mult_kwargs)
+            tri_attn_starting = TriangleAttention(node_type = 'starting', dropout = dropout_row_prob, **tri_attn_kwargs)
+            tri_attn_ending = TriangleAttention(node_type = 'ending', dropout = dropout_col_prob, **tri_attn_kwargs)
+            pairwise_transition = Transition(dim = dim_pairwise)
 
             pair_bias_attn = AttentionPairBias(**pair_bias_attn_kwargs)
             single_transition = Transition(dim = dim_single)
 
             layers.append(ModuleList([
-                dropout_row,
-                dropout_col,
                 pairwise_pre_ln(tri_mult_outgoing),
                 pairwise_pre_ln(tri_mult_incoming),
                 pairwise_pre_ln(tri_attn_starting),
@@ -441,12 +444,12 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
-        for dropout_row, dropout_col, tri_mult_outgoing, tri_mult_incoming, tri_attn_starting, tri_attn_ending, pairwise_transition, pair_bias_attn, single_transition in self.layers:
+        for tri_mult_outgoing, tri_mult_incoming, tri_attn_starting, tri_attn_ending, pairwise_transition, pair_bias_attn, single_transition in self.layers:
 
-            pairwise_repr = dropout_row(tri_mult_outgoing(pairwise_repr, mask = mask)) + pairwise_repr
-            pairwise_repr = dropout_row(tri_mult_incoming(pairwise_repr, mask = mask)) + pairwise_repr
-            pairwise_repr = dropout_row(tri_attn_starting(pairwise_repr, mask = mask)) + pairwise_repr
-            pairwise_repr = dropout_col(tri_attn_ending(pairwise_repr, mask = mask)) + pairwise_repr
+            pairwise_repr = tri_mult_outgoing(pairwise_repr, mask = mask) + pairwise_repr
+            pairwise_repr = tri_mult_incoming(pairwise_repr, mask = mask) + pairwise_repr
+            pairwise_repr = tri_attn_starting(pairwise_repr, mask = mask) + pairwise_repr
+            pairwise_repr = tri_attn_ending(pairwise_repr, mask = mask) + pairwise_repr
 
             pairwise_repr, packed_shape = pack_one(pairwise_repr, 'b * d')
             pairwise_repr = pairwise_transition(pairwise_repr) + pairwise_repr
