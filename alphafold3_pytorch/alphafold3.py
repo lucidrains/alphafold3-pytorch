@@ -25,7 +25,7 @@ from alphafold3_pytorch.typing import (
 
 from alphafold3_pytorch.attention import Attention
 
-from einops import rearrange, repeat, einsum, pack, unpack
+from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
 
 # constants
@@ -367,6 +367,89 @@ class TriangleAttention(Module):
             out = rearrange(out, 'b j i d -> b i j d')
 
         return self.dropout(out)
+
+# msa module
+
+class OuterProductMean(Module):
+    """ Algorithm 9 """
+
+    def __init__(
+        self,
+        *,
+        dim,
+        dim_pairwise_repr,
+        dim_hidden = 32,
+        eps = 1e-5
+    ):
+        super().__init__()
+        self.eps = eps
+        self.norm = nn.LayerNorm(dim)
+        self.to_hidden = LinearNoBias(dim, dim_hidden * 2)
+        self.to_pairwise_repr = nn.Linear(dim_hidden ** 2, dim_pairwise_repr)
+
+    @typecheck
+    def forward(
+        self,
+        msa: Float['b s n d'],
+        *,
+        mask: Bool['b n'] | None = None,
+        msa_mask: Bool['b s'] | None = None
+    ) -> Float['b n n dp']:
+
+        msa = self.norm(msa)
+
+        # line 2
+
+        a, b = self.to_hidden(msa).chunk(2, dim = -1)
+
+        outer_product = einsum(a, b, 'b s i d, b s j e -> b i j d e s')
+
+        # maybe masked mean for outer product
+
+        if exists(msa_mask):
+            msa_mask = rearrange(msa_mask, 'b s -> b 1 1 1 s')
+            outer_product = outer_product * msa_mask
+
+            num = reduce(outer_product, '... s -> ...', 'sum')
+            den = reduce(msa_mask.float(), '... s -> ...', 'sum')
+
+            outer_product_mean = num / den.clamp(min = self.eps)
+        else:
+            outer_product_mean = reduce(outer_product, '... s -> ...', 'mean')
+
+        # flatten
+
+        outer_product_mean = rearrange(outer_product_mean, '... d e -> ... (d e)')
+
+        # masking for pairwise repr
+
+        if exists(mask):
+            mask = rearrange(mask, 'b i -> b i 1 1') & rearrange(mask, 'b j -> b 1 j 1')
+            outer_product_mean = outer_product_mean * mask
+
+        pairwise_repr = self.to_pairwise_repr(outer_product_mean)
+        return pairwise_repr
+
+class MSAModule(Module):
+    def __init__(
+        self,
+        *,
+        dim_single,
+        dim_pairwise,
+        dim_msa,
+        depth = 4
+    ):
+        super().__init__()
+        raise NotImplementedError
+
+    def forward(
+        self,
+        *,
+        single_repr,
+        pairwise_repr,
+        msa
+    ):
+        raise NotImplementedError
 
 # pairformer stack
 
