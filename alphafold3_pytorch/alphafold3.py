@@ -40,6 +40,9 @@ def exists(v):
 def default(v, d):
     return v if exists(v) else d
 
+def max_neg_value(t: Tensor):
+    return -torch.finfo(t.dtype).max
+
 def pack_one(t, pattern):
     return pack([t], pattern)
 
@@ -429,6 +432,72 @@ class OuterProductMean(Module):
 
         pairwise_repr = self.to_pairwise_repr(outer_product_mean)
         return pairwise_repr
+
+
+class MSAPairWeightedAveraging(Module):
+    """ Algorithm 10 """
+
+    def __init__(
+        self,
+        *,
+        dim_msa,
+        dim_pairwise_repr,
+        dim_head = 32,
+        heads = 8
+    ):
+        super().__init__()
+        dim_inner = dim_head * heads
+
+        self.msa_to_values_and_gates = nn.Sequential(
+            nn.LayerNorm(dim_msa),
+            LinearNoBias(dim_msa, dim_inner * 2),
+            Rearrange('b s n (gv h d) -> gv b h s n d', gv = 2, h = heads)
+        )
+
+        self.pairwise_repr_to_attn = nn.Sequential(
+            nn.LayerNorm(dim_pairwise_repr),
+            LinearNoBias(dim_pairwise_repr, heads),
+            Rearrange('b i j h -> b h i j')
+        )
+
+        self.to_out = nn.Sequential(
+            Rearrange('b h s n d -> b s n (h d)'),
+            LinearNoBias(dim_inner, dim_msa)
+        )
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        msa: Float['b s n d'],
+        pairwise_repr: Float['b n n dp'],
+        mask: Bool['b n'] | None = None,
+    ) -> Float['b s n d']:
+
+        values, gates = self.msa_to_values_and_gates(msa)
+        gates = gates.sigmoid()
+
+        # line 3
+
+        b = self.pairwise_repr_to_attn(pairwise_repr)
+
+        if exists(mask):
+            mask = rearrange(mask, 'b j -> b 1 1 j')
+            b = b.masked_fill(~mask, max_neg_value(b))
+
+        # line 5
+
+        weights = b.softmax(dim = -1)
+
+        # line 6
+
+        out = einsum(weights, values, 'b h i j, b h s j d -> b h s i d')
+
+        out = out * gates
+
+        # combine heads
+
+        return self.to_out(out)
 
 class MSAModule(Module):
     def __init__(
