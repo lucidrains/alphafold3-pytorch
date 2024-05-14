@@ -57,8 +57,8 @@ class SwiGLU(Module):
     @typecheck
     def forward(
         self,
-        x: Float['b n d']
-    ) -> Float['b n (d//2)']:
+        x: Float['... d']
+    ) -> Float['... (d//2)']:
 
         x, gates = x.chunk(2, dim = -1)
         return F.silu(gates) * x
@@ -82,8 +82,8 @@ class Transition(Module):
     @typecheck
     def forward(
         self,
-        x: Float['b n d']
-    ) -> Float['b n d']:
+        x: Float['... d']
+    ) -> Float['... d']:
 
         return self.ff(x)
 
@@ -614,10 +614,7 @@ class MSAModule(Module):
             pairwise_repr = outer_product_mean(msa, mask = mask, msa_mask = msa_mask) + pairwise_repr
 
             msa = msa_pair_weighted_avg(msa = msa, pairwise_repr = pairwise_repr, mask = mask) + msa
-
-            msa, msa_packed_shape = pack_one(msa, 'b * d')
-            msa = msa_transition(msa) + msa
-            msa = unpack_one(msa, msa_packed_shape, 'b * d')
+            msa = msa_transition(msa) + msa            
 
             # pairwise tri mult + attn + transition
 
@@ -626,9 +623,7 @@ class MSAModule(Module):
             pairwise_repr = tri_attn_starting(pairwise_repr, mask = mask) + pairwise_repr
             pairwise_repr = tri_attn_ending(pairwise_repr, mask = mask) + pairwise_repr
 
-            pairwise_repr, packed_shape = pack_one(pairwise_repr, 'b * d')
             pairwise_repr = pairwise_transition(pairwise_repr) + pairwise_repr
-            pairwise_repr = unpack_one(pairwise_repr, packed_shape, 'b * d')
 
         return pairwise_repr
 
@@ -723,9 +718,7 @@ class PairformerStack(Module):
             pairwise_repr = tri_attn_starting(pairwise_repr, mask = mask) + pairwise_repr
             pairwise_repr = tri_attn_ending(pairwise_repr, mask = mask) + pairwise_repr
 
-            pairwise_repr, packed_shape = pack_one(pairwise_repr, 'b * d')
             pairwise_repr = pairwise_transition(pairwise_repr) + pairwise_repr
-            pairwise_repr = unpack_one(pairwise_repr, packed_shape, 'b * d')
 
             single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
             single_repr = single_transition(single_repr) + single_repr
