@@ -135,9 +135,9 @@ class AdaptiveLayerNorm(Module):
     @typecheck
     def forward(
         self,
-        x: Float['b ... n d'],
-        cond: Float['b ... dc']
-    ) -> Float['b ... n d']:
+        x: Float['b n d'],
+        cond: Float['b n dc']
+    ) -> Float['b n d']:
 
         normed = self.norm(x)
         normed_cond = self.norm_cond(cond)
@@ -174,11 +174,11 @@ class ConditionWrapper(Module):
     @typecheck
     def forward(
         self,
-        x: Float['b ... n d'],
+        x: Float['b n d'],
         *,
-        cond: Float['b ... dc'],
+        cond: Float['b n dc'],
         **kwargs
-    ) -> Float['b ... n d']:
+    ) -> Float['b n d']:
         x = self.adaptive_norm(x, cond = cond)
 
         out = self.fn(x, **kwargs)
@@ -271,7 +271,7 @@ class AttentionPairBias(Module):
         self,
         *,
         heads,
-        dim_pairwise_repr,
+        dim_pairwise,
         max_seq_len = 16384,
         **attn_kwargs
     ):
@@ -280,11 +280,11 @@ class AttentionPairBias(Module):
 
         # line 8 of Algorithm 24
 
-        to_attn_bias_linear = LinearNoBias(dim_pairwise_repr, heads)
+        to_attn_bias_linear = LinearNoBias(dim_pairwise, heads)
         nn.init.zeros_(to_attn_bias_linear.weight)
 
         self.to_attn_bias = nn.Sequential(
-            nn.LayerNorm(dim_pairwise_repr),
+            nn.LayerNorm(dim_pairwise),
             to_attn_bias_linear,
             Rearrange('... i j h -> ... h i j')
         )
@@ -669,7 +669,7 @@ class PairformerStack(Module):
 
         pair_bias_attn_kwargs = dict(
             dim = dim_single,
-            dim_pairwise_repr = dim_pairwise,
+            dim_pairwise = dim_pairwise,
             heads = pair_bias_attn_heads,
             dim_head = pair_bias_attn_dim_head,
             dropout = dropout_row_prob
@@ -717,6 +717,84 @@ class PairformerStack(Module):
             single_repr = single_transition(single_repr) + single_repr
 
         return single_repr, pairwise_repr
+
+# diffusion related
+# both diffusion transformer as well as atom encoder / decoder
+
+class DiffusionTransformer(Module):
+    def __init__(
+        self,
+        *,
+        depth,
+        dim,
+        heads,
+        dim_pairwise = 128,
+        attn_pair_bias_kwargs: dict = dict()
+    ):
+        super().__init__()
+
+        layers = ModuleList([])
+
+        for _ in range(depth):
+
+            pair_bias_attn = AttentionPairBias(
+                dim = dim,
+                dim_pairwise = dim_pairwise,
+                heads = heads,
+                **attn_pair_bias_kwargs
+            )
+
+            transition = Transition(
+                dim = dim
+            )
+
+            conditionable_pair_bias = ConditionWrapper(
+                pair_bias_attn,
+                dim = dim,
+                dim_cond = dim
+            )
+
+            conditionable_transition = ConditionWrapper(
+                transition,
+                dim = dim,
+                dim_cond = dim
+            )
+
+            layers.append(ModuleList([
+                conditionable_pair_bias,
+                conditionable_transition
+            ]))
+
+        self.layers = layers
+
+    @typecheck
+    def forward(
+        self,
+        noised_repr: Float['b n ds'],
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'],
+        mask: Bool['b n'] | None = None
+    ):
+        for attn, transition in self.layers:
+
+            attn_out = attn(
+                noised_repr,
+                cond = single_repr,
+                pairwise_repr = pairwise_repr,
+                mask = mask
+            )
+
+            ff_out = transition(
+                noised_repr,
+                cond = single_repr
+            )
+
+            # interesting, they use parallel attention and feedforward modules
+
+            noised_repr = noised_repr + attn_out + ff_out
+
+        return noised_repr
 
 # main class
 

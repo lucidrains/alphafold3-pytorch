@@ -15,6 +15,7 @@ from alphafold3_pytorch.alphafold3 import (
     Transition,
     MSAModule,
     PairformerStack,
+    DiffusionTransformer,
     Alphafold3
 )
 
@@ -32,5 +33,6 @@ __all__ = [
     Transition,
     MSAModule,
     PairformerStack,
+    DiffusionTransformer,
     Alphafold3
 ]
