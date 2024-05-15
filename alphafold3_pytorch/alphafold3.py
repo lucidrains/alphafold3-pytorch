@@ -1,4 +1,5 @@
 from __future__ import annotations
+from math import pi
 from functools import partial
 
 import torch
@@ -721,7 +722,26 @@ class PairformerStack(Module):
 # diffusion related
 # both diffusion transformer as well as atom encoder / decoder
 
+class FourierEmbedding(Module):
+    """ Algorithm 22 """
+
+    def __init__(self, dim):
+        super().__init__()
+        self.proj = nn.Linear(dim, dim)
+        self.proj.requires_grad_(False)
+
+    @typecheck
+    def forward(
+        self,
+        times: Float['b t'],
+    ) -> Float['b d']:
+
+        times = self.proj(times)
+        return torch.cos(2 * pi * times)
+
 class DiffusionTransformer(Module):
+    """ Algorithm 23 """
+
     def __init__(
         self,
         *,
