@@ -6,7 +6,8 @@ import pytest
 
 from alphafold3_pytorch import (
     PairformerStack,
-    MSAModule
+    MSAModule,
+    DiffusionTransformer
 )
 
 def test_pairformer():
@@ -44,3 +45,24 @@ def test_msa_module():
     )
 
     assert pairwise.shape == pairwise_out.shape
+
+
+def test_diffusion_transformer():
+
+    single = torch.randn(2, 16, 384)
+    pairwise = torch.randn(2, 16, 16, 128)
+    mask = torch.randint(0, 2, (2, 16)).bool()
+
+    diffusion_transformer = DiffusionTransformer(
+        depth = 2,
+        heads = 16
+    )
+
+    single_out = diffusion_transformer(
+        single,
+        single_repr = single,
+        pairwise_repr = pairwise,
+        mask = mask
+    )
+
+    assert single.shape == single_out.shape

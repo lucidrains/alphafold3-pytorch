@@ -848,8 +848,8 @@ class DiffusionTransformer(Module):
         self,
         *,
         depth,
-        dim,
         heads,
+        dim = 384,
         dim_pairwise = 128,
         attn_pair_bias_kwargs: dict = dict()
     ):
