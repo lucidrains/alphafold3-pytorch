@@ -727,17 +727,18 @@ class FourierEmbedding(Module):
 
     def __init__(self, dim):
         super().__init__()
-        self.proj = nn.Linear(dim, dim)
+        self.proj = nn.Linear(1, dim)
         self.proj.requires_grad_(False)
 
     @typecheck
     def forward(
         self,
-        times: Float['b t'],
+        times: Float['b'],
     ) -> Float['b d']:
 
-        times = self.proj(times)
-        return torch.cos(2 * pi * times)
+        times = rearrange(times, 'b -> b 1')
+        rand_proj = self.proj(times)
+        return torch.cos(2 * pi * rand_proj)
 
 class DiffusionTransformer(Module):
     """ Algorithm 23 """
