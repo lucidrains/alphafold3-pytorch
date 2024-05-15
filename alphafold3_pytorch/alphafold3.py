@@ -559,7 +559,7 @@ class MSAModule(Module):
     def __init__(
         self,
         *,
-        dim_single,
+        dim_single = 384,
         dim_pairwise = 128,
         depth = 4,
         dim_msa = 64,
@@ -657,7 +657,7 @@ class PairformerStack(Module):
     def __init__(
         self,
         *,
-        dim_single,
+        dim_single = 384,
         dim_pairwise = 128,
         depth = 48,
         pair_bias_attn_dim_head = 64,
@@ -739,6 +739,44 @@ class FourierEmbedding(Module):
         times = rearrange(times, 'b -> b 1')
         rand_proj = self.proj(times)
         return torch.cos(2 * pi * rand_proj)
+
+class SingleConditioning(Module):
+    """ Algorithm 21 """
+    def __init__(
+        self,
+        *,
+        sigma_data,
+        dim_single_trunk,
+        dim_single_inputs,
+        dim_single = 384,
+        dim_fourier = 256,
+    ):
+        super().__init__()
+
+        self.norm_single = nn.LayerNorm(dim_single)
+
+        self.fourier_embed = FourierEmbedding(dim_fourier)
+        self.norm_fourier = nn.LayerNorm(dim_fourier)
+        self.fourier_to_single = LinearNoBias(dim_fourier, dim_single)
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        times: Float['b'],
+        single_trunk_repr: Float['b n dst'],
+        single_inputs_repr: Float['b n dsi'],
+    ) -> Float['b n ds']:
+
+        single_repr = torch.cat((single_trunk_repr, single_inputs_repr), dim = 1)
+
+        single_repr = self.norm_single(single_repr)
+
+        fourier_embed = self.fourier_embed(times)
+        normed_fourier = self.norm_fourier(fourier_embed)
+
+        single_repr = self.fourier_to_single(normed_fourier) + single_repr
+        return single_repr
 
 class DiffusionTransformer(Module):
     """ Algorithm 23 """
