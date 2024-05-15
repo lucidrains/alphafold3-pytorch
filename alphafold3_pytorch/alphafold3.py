@@ -740,20 +740,68 @@ class FourierEmbedding(Module):
         rand_proj = self.proj(times)
         return torch.cos(2 * pi * rand_proj)
 
+class PairwiseConditioning(Module):
+    """ Algorithm 21 """
+
+    def __init__(
+        self,
+        *,
+        dim_pairwise_trunk,
+        dim_pairwise_rel_pos_feats,
+        dim_pairwise = 128,
+        num_transitions = 2,
+        transition_expansion_factor = 2,
+    ):
+        super().__init__()
+
+        self.dim_pairwise_init_proj = nn.Sequential(
+            LinearNoBias(dim_pairwise_trunk + dim_pairwise_rel_pos_feats, dim_pairwise),
+            nn.LayerNorm(dim_pairwise)
+        )
+
+        transitions = ModuleList([])
+        for _ in range(num_transitions):
+            transition = PreLayerNorm(Transition(dim_single, expansion_factor = transition_expansion_factor), dim = dim_single)
+            transitions.append(transition)
+
+        self.transitions = transitions
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        pairwise_trunk: Float['b n n dpt'],
+        pairwise_rel_pos_feats: Float['b n n dpr'],
+    ) -> Float['b n n (dpt+dpr)']:
+
+        pairwise_repr = torch.cat((pairwise_trunk, pairwise_rel_pos_feats), dim = -1)
+
+        pairwise_repr = self.dim_pairwise_init_proj(pairwise_repr)
+
+        for transition in self.transitions:
+            pairwise_repr = transition(pairwise_repr) + pairwise_repr
+
+        return pairwise_repr
+
 class SingleConditioning(Module):
     """ Algorithm 21 """
 
     def __init__(
         self,
         *,
-        sigma_data,
+        sigma_data: float,
         dim_single = 384,
         dim_fourier = 256,
         num_transitions = 2,
-        transition_expansion_factor = 2
+        transition_expansion_factor = 2,
+        eps = 1e-20
     ):
         super().__init__()
+        self.eps = eps
+
         self.dim_single = dim_single
+        self.sigma_data = sigma_data
+
         self.norm_single = nn.LayerNorm(dim_single)
 
         self.fourier_embed = FourierEmbedding(dim_fourier)
@@ -776,13 +824,14 @@ class SingleConditioning(Module):
         single_inputs_repr: Float['b n dsi'],
     ) -> Float['b n (dst+dsi)']:
 
-        single_repr = torch.cat((single_trunk_repr, single_inputs_repr), dim = 1)
+        single_repr = torch.cat((single_trunk_repr, single_inputs_repr), dim = -1)
 
         assert single_repr.shape[-1] == self.dim_single
 
         single_repr = self.norm_single(single_repr)
 
-        fourier_embed = self.fourier_embed(times)
+        fourier_embed = self.fourier_embed(0.25 * (times / self.sigma_data).clamp(min = self.eps).log())
+
         normed_fourier = self.norm_fourier(fourier_embed)
 
         single_repr = self.fourier_to_single(normed_fourier) + single_repr
