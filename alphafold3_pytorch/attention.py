@@ -43,6 +43,7 @@ class Attention(Module):
         gate_output = True,
         query_bias = True,
         flash = True,
+        window_size = None,
         efficient_attn_config: Config = Config(True, True, True)
     ):
         super().__init__()
@@ -63,6 +64,7 @@ class Attention(Module):
         self.attend = Attend(
             flash = flash,
             dropout = dropout,
+            window_size = window_size,
             attn_config = efficient_attn_config
         )
 
@@ -131,6 +133,7 @@ class Attend(Module):
         self,
         dropout = 0.,
         flash = False,
+        window_size = None,
         scale: float | None = None,
         attn_config: Config = Config(True, True, True)
     ):
@@ -145,10 +148,14 @@ class Attend(Module):
         e - dimension (pairwise rep)
         i - source sequence
         j - context sequence
+        w - local attention windows
         """
 
         self.scale = scale
         self.dropout = dropout
+
+        self.is_local_attn = exists(window_size)
+        self.window_size = window_size
 
         self.flash = flash
         self.attn_config = attn_config
@@ -181,6 +188,74 @@ class Attend(Module):
         return out
 
     @typecheck
+    def local_attn(
+        self,
+        q: Float['b h n d'],
+        k: Float['b h n d'],
+        v: Float['b h n d'],
+        mask: Bool['b n'] | None = None
+    ) -> Float['b h n d']:
+        """
+        simple local attention with a radius of 1 window size
+        """
+
+        window_size, batch, seq_len, device = self.window_size, q.shape[0], q.shape[-2], q.device
+
+        # constitute mask if not given
+
+        if not exists(mask):
+            mask = torch.ones((batch, seq_len), device = device, dtype = torch.bool)
+
+        # pad to multiple of window size if needed
+
+        padding_needed = (window_size - (seq_len % window_size)) % window_size
+
+        print(padding_needed, seq_len, window_size)
+
+        if padding_needed > 0:
+            q, k, v = tuple(F.pad(t, (0, 0, 0, padding_needed), value = 0.) for t in (q, k, v))
+            mask = F.pad(mask, (0, padding_needed), value = False)
+
+        # break into windows
+
+        q, k, v = tuple(rearrange(t, 'b h (n w) d -> b h n w d', w = window_size) for t in (q, k, v))
+        mask = rearrange(mask, 'b (n w) -> b n w', w = window_size)
+
+        # just do radius of 1 for now
+        # perhaps not even necessary, and could try shifted windows (a la Swin)
+
+        k, v = tuple(F.pad(t, (0, 0, 1, 1)) for t in (k, v))
+        mask = F.pad(mask, (1, 1), value = False)
+
+        k, v = tuple(torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim = -2) for t in (k, v))
+        mask = torch.cat((mask[..., :-2], mask[..., 1:-1], mask[..., 2:]), dim = -1)
+
+        # carry out attention as usual
+
+        scale = q.shape[-1] ** -0.5
+
+        q = q * scale
+
+        sim = einsum(q, k, "... i d, ... j d -> ... i j")
+
+        mask = rearrange(mask, 'b n w -> b 1 n 1 w')
+        sim = sim.masked_fill(~mask, max_neg_value(sim))
+
+        attn = sim.softmax(dim = -1)
+
+        out = einsum(attn, v, "... i j, ... j d -> ... i d")
+
+        # un-window the output
+
+        out = rearrange(out, "b h n w d -> b h (n w) d")
+
+        # excise the padding for windowing
+
+        out = out[..., :seq_len, :]
+
+        return out
+
+    @typecheck
     def forward(
         self,
         q: Float['b h i d'],
@@ -190,10 +265,20 @@ class Attend(Module):
         attn_bias: Float['... i j'] | None = None,
     ) -> Float['b h i d']:
 
+        # local windowed attention
+        # todo (handle attn bias efficiently)
+
+        if self.is_local_attn:
+            return self.local_attn(q, k, v, mask = mask)
+
+        # forward to using flash attention if applicable
+
         can_use_flash = self.flash and not exists(attn_bias), 'flash attention does not support attention bias with gradients'
 
         if can_use_flash:
             return self.flash_attn(q, k, v, mask = mask)
+
+        # default attention
 
         scale = default(self.scale, q.shape[-1] ** -0.5)
 

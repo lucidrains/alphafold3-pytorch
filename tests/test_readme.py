@@ -7,7 +7,8 @@ import pytest
 from alphafold3_pytorch import (
     PairformerStack,
     MSAModule,
-    DiffusionTransformer
+    DiffusionTransformer,
+    Attention
 )
 
 def test_pairformer():
@@ -66,3 +67,16 @@ def test_diffusion_transformer():
     )
 
     assert single.shape == single_out.shape
+
+def test_sequence_local_attn():
+    atoms = torch.randn(2, 17, 32)
+
+    attn = Attention(
+        dim = 32,
+        dim_head = 16,
+        heads = 8,
+        window_size = 5
+    )
+
+    out = attn(atoms)
+    assert out.shape == atoms.shape
