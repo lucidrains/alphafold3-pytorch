@@ -6,7 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn import Module
 
-from einops import einsum, repeat, rearrange
+from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
 from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
@@ -28,6 +28,12 @@ def default(v, d):
 
 def max_neg_value(t):
     return -torch.finfo(t.dtype).max
+
+def pack_one(t, pattern):
+    return pack([t], pattern)
+
+def unpack_one(t, ps, pattern):
+    return unpack(t, ps, pattern)[0]
 
 # multi-head attention
 
@@ -242,10 +248,14 @@ class Attend(Module):
                 attn_bias[..., 2:, :, :]
             ), dim = -1)
 
-            diag_mask = torch.eye(attn_bias.shape[1], device = device, dtype = torch.bool)
+            attn_bias, ps = pack_one(attn_bias, '* i j w1 w2')
 
-            diag_mask = repeat(diag_mask, 'i j -> b i j', b = batch)
-            attn_bias = rearrange(attn_bias[diag_mask], '(b n) i j -> b n i j', b = batch)
+            merged_batch = attn_bias.shape[0]
+            diag_mask = torch.eye(attn_bias.shape[1], device = device, dtype = torch.bool)
+            diag_mask = repeat(diag_mask, 'i j -> b i j', b = merged_batch)
+
+            attn_bias = rearrange(attn_bias[diag_mask], '(b n) i j -> b n i j', b = merged_batch)
+            attn_bias = unpack_one(attn_bias, ps, '* n i j')
 
         # carry out attention as usual
 
@@ -256,7 +266,10 @@ class Attend(Module):
         sim = einsum(q, k, "... i d, ... j d -> ... i j")
 
         if exists(attn_bias):
-            attn_bias = rearrange(attn_bias, 'b ... -> b 1 ...')
+            if attn_bias.ndim == 4:
+                attn_bias = rearrange(attn_bias, 'b ... -> b 1 ...')
+
+            assert attn_bias.ndim == sim.ndim
             sim = sim + attn_bias
 
         mask = rearrange(mask, 'b n w -> b 1 n 1 w')

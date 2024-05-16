@@ -955,11 +955,19 @@ class DiffusionModule(Module):
         ),
         pairwise_cond_kwargs: dict = dict(
             num_transitions = 2
-        )
+        ),
+        atom_encoder_depth = 3,
+        atom_encoder_heads = 4,
+        token_transformer_depth = 24,
+        token_transformer_heads = 16,
+        atom_decoder_depth = 3,
+        atom_decoder_heads = 4
     ):
         super().__init__()
 
         self.atoms_per_window = atoms_per_window
+
+        # conditioning
 
         self.single_conditioner = SingleConditioning(
             sigma_data = sigma_data,
@@ -974,7 +982,44 @@ class DiffusionModule(Module):
             **pairwise_cond_kwargs
         )
 
+        # atom attention encoding related modules
+
         self.atom_pos_to_atom_feat_cond = LinearNoBias(3, dim_atom)
+
+        self.atom_encoder = DiffusionTransformer(
+            dim = dim_atom,
+            dim_single_cond = dim_atom,
+            dim_pairwise = dim_atompair,
+            attn_window_size = atoms_per_window,
+            depth = atom_encoder_depth,
+            heads = atom_encoder_heads
+        )
+
+        # token attention related modules
+
+        self.token_transformer = DiffusionTransformer(
+            dim = dim_atom,
+            dim_single_cond = dim_single,
+            dim_pairwise = dim_pairwise,
+            depth = token_transformer_depth,
+            heads = token_transformer_heads
+        )
+
+        # atom attention decoding related modules
+
+        self.atom_decoder = DiffusionTransformer(
+            dim = dim_atom,
+            dim_single_cond = dim_atom,
+            dim_pairwise = dim_atompair,
+            attn_window_size = atoms_per_window,
+            depth = atom_decoder_depth,
+            heads = atom_decoder_heads
+        )
+
+        self.atom_feat_to_atom_pos_update = nn.Sequential(
+            nn.LayerNorm(dim_atom),
+            LinearNoBias(dim_atom, 3)
+        )
 
     @typecheck
     def forward(
@@ -1003,9 +1048,31 @@ class DiffusionModule(Module):
             pairwise_rel_pos_feats = pairwise_rel_pos_feats
         )
 
+        # the most surprising part of the paper; no geometric biases!
+
         atom_feats = self.atom_pos_to_atom_feat_cond(noised_atom_pos) + atom_feats
 
-        return noised_atom_pos
+        # atom encoder
+
+        atom_feats = self.atom_encoder(
+            atom_feats,
+            mask = atom_mask,
+            single_repr = atom_feats,
+            pairwise_repr = atompair_feats
+        )
+
+        # atom decoder
+
+        atom_feats = self.atom_decoder(
+            atom_feats,
+            mask = atom_mask,
+            single_repr = atom_feats,
+            pairwise_repr = atompair_feats
+        )
+
+        atom_pos_update = self.atom_feat_to_atom_pos_update(atom_feats)
+
+        return atom_pos_update
 
 # main class
 
