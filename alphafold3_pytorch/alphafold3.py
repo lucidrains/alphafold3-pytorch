@@ -44,6 +44,9 @@ def default(v, d):
 def max_neg_value(t: Tensor):
     return -torch.finfo(t.dtype).max
 
+def divisible_by(num, den):
+    return (num % den) == 0
+
 def pack_one(t, pattern):
     return pack([t], pattern)
 
@@ -766,7 +769,7 @@ class PairwiseConditioning(Module):
 
         transitions = ModuleList([])
         for _ in range(num_transitions):
-            transition = PreLayerNorm(Transition(dim_pairwise, expansion_factor = transition_expansion_factor), dim = dim_pairwise)
+            transition = PreLayerNorm(Transition(dim = dim_pairwise, expansion_factor = transition_expansion_factor), dim = dim_pairwise)
             transitions.append(transition)
 
         self.transitions = transitions
@@ -777,7 +780,7 @@ class PairwiseConditioning(Module):
         *,
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
-    ) -> Float['b n n (dpt+dpr)']:
+    ) -> Float['b n n dp']:
 
         pairwise_repr = torch.cat((pairwise_trunk, pairwise_rel_pos_feats), dim = -1)
 
@@ -815,7 +818,7 @@ class SingleConditioning(Module):
 
         transitions = ModuleList([])
         for _ in range(num_transitions):
-            transition = PreLayerNorm(Transition(dim_single, expansion_factor = transition_expansion_factor), dim = dim_single)
+            transition = PreLayerNorm(Transition(dim = dim_single, expansion_factor = transition_expansion_factor), dim = dim_single)
             transitions.append(transition)
 
         self.transitions = transitions
@@ -839,7 +842,9 @@ class SingleConditioning(Module):
 
         normed_fourier = self.norm_fourier(fourier_embed)
 
-        single_repr = self.fourier_to_single(normed_fourier) + single_repr
+        fourier_to_single = self.fourier_to_single(normed_fourier)
+
+        single_repr = rearrange(fourier_to_single, 'b d -> b 1 d') + single_repr
 
         for transition in self.transitions:
             single_repr = transition(single_repr) + single_repr
@@ -924,6 +929,75 @@ class DiffusionTransformer(Module):
             noised_repr = noised_repr + attn_out + ff_out
 
         return noised_repr
+
+class DiffusionModule(Module):
+    """ Algorithm 20 """
+
+    @typecheck
+    def __init__(
+        self,
+        *,
+        dim_pairwise_trunk,
+        dim_pairwise_rel_pos_feats,
+        atoms_per_window = 27,  # for atom sequence, take the approach of (batch, seq, atoms, ..), where atom dimension is set to the residue or molecule with greatest number of atoms, the rest padded. atom_mask must be passed in - default to 27 for proteins, with tryptophan having 27 atoms
+        dim_pairwise = 128,
+        sigma_data = 16,
+        dim_atom = 128,
+        dim_atompair = 16,
+        dim_token = 768,
+        dim_single = 384,
+        dim_fourier = 256,
+        single_cond_kwargs: dict = dict(
+            num_transitions = 2,
+            transition_expansion_factor = 2,
+        ),
+        pairwise_cond_kwargs: dict = dict(
+            num_transitions = 2
+        )
+    ):
+        super().__init__()
+
+        self.atoms_per_window = atoms_per_window
+
+        self.single_conditioner = SingleConditioning(
+            sigma_data = sigma_data,
+            dim_single = dim_single,
+            dim_fourier = dim_fourier,
+            **single_cond_kwargs
+        )
+
+        self.pairwise_conditioner = PairwiseConditioning(
+            dim_pairwise_trunk = dim_pairwise_trunk,
+            dim_pairwise_rel_pos_feats = dim_pairwise_rel_pos_feats,
+            **pairwise_cond_kwargs
+        )
+
+    @typecheck
+    def forward(
+        self,
+        noised_atom_pos: Float['b m c'],
+        *,
+        times: Float['b'],
+        atom_mask: Bool['b m'],
+        single_trunk_repr: Float['b n dst'],
+        single_inputs_repr: Float['b n dsi'],
+        pairwise_trunk: Float['b n n dpt'],
+        pairwise_rel_pos_feats: Float['b n n dpr'],
+    ):
+        assert divisible_by(noised_atom_pos.shape[-2], self.atoms_per_window)
+
+        conditioned_single_repr = self.single_conditioner(
+            times = times,
+            single_trunk_repr = single_trunk_repr,
+            single_inputs_repr = single_inputs_repr
+        )
+
+        conditioned_pairwise_repr = self.pairwise_conditioner(
+            pairwise_trunk = pairwise_trunk,
+            pairwise_rel_pos_feats = pairwise_rel_pos_feats
+        )
+
+        return noised_atom_pos
 
 # main class
 

@@ -8,6 +8,7 @@ from alphafold3_pytorch import (
     PairformerStack,
     MSAModule,
     DiffusionTransformer,
+    DiffusionModule,
     Attention
 )
 
@@ -81,3 +82,32 @@ def test_sequence_local_attn():
 
     out = attn(atoms, attn_bias = attn_bias)
     assert out.shape == atoms.shape
+
+def test_diffusion_module():
+
+    noised_atom_pos = torch.randn(2, 27 * 16, 3)
+    atom_mask = torch.ones((2, 27 * 16)).bool()
+
+    times = torch.randn(2,)
+    single_trunk_repr = torch.randn(2, 16, 128)
+    single_inputs_repr = torch.randn(2, 16, 256)
+
+    pairwise_trunk = torch.randn(2, 16, 16, 128)
+    pairwise_rel_pos_feats = torch.randn(2, 16, 16, 12)
+
+    diffusion_module = DiffusionModule(
+        dim_pairwise_trunk = 128,
+        dim_pairwise_rel_pos_feats = 12
+    )
+
+    atom_pos_update = diffusion_module(
+        noised_atom_pos,
+        times = times,
+        atom_mask = atom_mask,
+        single_trunk_repr = single_trunk_repr,
+        single_inputs_repr = single_inputs_repr,
+        pairwise_trunk = pairwise_trunk,
+        pairwise_rel_pos_feats = pairwise_rel_pos_feats
+    )
+
+    assert noised_atom_pos.shape == atom_pos_update.shape
