@@ -761,7 +761,7 @@ class PairwiseConditioning(Module):
 
         transitions = ModuleList([])
         for _ in range(num_transitions):
-            transition = PreLayerNorm(Transition(dim_single, expansion_factor = transition_expansion_factor), dim = dim_single)
+            transition = PreLayerNorm(Transition(dim_pairwise, expansion_factor = transition_expansion_factor), dim = dim_pairwise)
             transitions.append(transition)
 
         self.transitions = transitions
