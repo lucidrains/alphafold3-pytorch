@@ -276,11 +276,16 @@ class AttentionPairBias(Module):
         *,
         heads,
         dim_pairwise,
-        max_seq_len = 16384,
+        window_size = None,
         **attn_kwargs
     ):
         super().__init__()
-        self.attn = Attention(heads = heads, **attn_kwargs)
+
+        self.attn = Attention(
+            heads = heads,
+            window_size = window_size,
+            **attn_kwargs
+        )
 
         # line 8 of Algorithm 24
 
@@ -293,8 +298,6 @@ class AttentionPairBias(Module):
             Rearrange('... i j h -> ... h i j')
         )
 
-        self.max_seq_len = max_seq_len
-
     @typecheck
     def forward(
         self,
@@ -304,9 +307,6 @@ class AttentionPairBias(Module):
         attn_bias: Float['b n n'] | None = None,
         **kwargs
     ) -> Float['b n ds']:
-
-        seq = single_repr.shape[1]
-        assert seq <= self.max_seq_len
 
         if exists(attn_bias):
             attn_bias = rearrange(attn_bias, 'b i j -> b 1 i j')
@@ -862,6 +862,7 @@ class DiffusionTransformer(Module):
         dim = 384,
         dim_single_cond = None,
         dim_pairwise = 128,
+        attn_window_size = None,
         attn_pair_bias_kwargs: dict = dict()
     ):
         super().__init__()
@@ -875,6 +876,7 @@ class DiffusionTransformer(Module):
                 dim = dim,
                 dim_pairwise = dim_pairwise,
                 heads = heads,
+                window_size = attn_window_size,
                 **attn_pair_bias_kwargs
             )
 
