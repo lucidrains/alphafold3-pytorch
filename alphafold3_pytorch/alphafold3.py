@@ -855,10 +855,12 @@ class DiffusionTransformer(Module):
         depth,
         heads,
         dim = 384,
+        dim_single_cond = None,
         dim_pairwise = 128,
         attn_pair_bias_kwargs: dict = dict()
     ):
         super().__init__()
+        dim_single_cond = default(dim_single_cond, dim)
 
         layers = ModuleList([])
 
@@ -878,13 +880,13 @@ class DiffusionTransformer(Module):
             conditionable_pair_bias = ConditionWrapper(
                 pair_bias_attn,
                 dim = dim,
-                dim_cond = dim
+                dim_cond = dim_single_cond
             )
 
             conditionable_transition = ConditionWrapper(
                 transition,
                 dim = dim,
-                dim_cond = dim
+                dim_cond = dim_single_cond
             )
 
             layers.append(ModuleList([
