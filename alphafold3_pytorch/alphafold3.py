@@ -972,13 +972,17 @@ class DiffusionModule(Module):
             **pairwise_cond_kwargs
         )
 
+        self.atom_pos_to_atom_feat_cond = LinearNoBias(3, dim_atom)
+
     @typecheck
     def forward(
         self,
         noised_atom_pos: Float['b m c'],
         *,
-        times: Float['b'],
+        atom_feats: Float['b m da'],
+        atompair_feats: Float['b m m dap'],
         atom_mask: Bool['b m'],
+        times: Float['b'],
         single_trunk_repr: Float['b n dst'],
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
@@ -996,6 +1000,8 @@ class DiffusionModule(Module):
             pairwise_trunk = pairwise_trunk,
             pairwise_rel_pos_feats = pairwise_rel_pos_feats
         )
+
+        atom_feats = self.atom_pos_to_atom_feat_cond(noised_atom_pos) + atom_feats
 
         return noised_atom_pos
 
