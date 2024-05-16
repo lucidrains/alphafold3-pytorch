@@ -208,9 +208,7 @@ class Attend(Module):
 
         # pad to multiple of window size if needed
 
-        padding_needed = (window_size - (seq_len % window_size)) % window_size
-
-        print(padding_needed, seq_len, window_size)
+        padding_needed = (window_size - (seq_len % window_size)) % window_size        
 
         if padding_needed > 0:
             q, k, v = tuple(F.pad(t, (0, 0, 0, padding_needed), value = 0.) for t in (q, k, v))
