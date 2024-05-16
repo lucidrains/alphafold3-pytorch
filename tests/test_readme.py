@@ -94,6 +94,7 @@ def test_diffusion_module():
     atom_mask = torch.ones((2, atom_seq_len)).bool()
 
     times = torch.randn(2,)
+    mask = torch.ones(2, seq_len).bool()
     single_trunk_repr = torch.randn(2, seq_len, 128)
     single_inputs_repr = torch.randn(2, seq_len, 256)
 
@@ -103,7 +104,10 @@ def test_diffusion_module():
     diffusion_module = DiffusionModule(
         atoms_per_window = 27,
         dim_pairwise_trunk = 128,
-        dim_pairwise_rel_pos_feats = 12
+        dim_pairwise_rel_pos_feats = 12,
+        atom_encoder_depth = 1,
+        atom_decoder_depth = 1,
+        token_transformer_depth = 1
     )
 
     atom_pos_update = diffusion_module(
@@ -112,6 +116,7 @@ def test_diffusion_module():
         atom_feats = atom_feats,
         atompair_feats = atompair_feats,
         atom_mask = atom_mask,
+        mask = mask,
         single_trunk_repr = single_trunk_repr,
         single_inputs_repr = single_inputs_repr,
         pairwise_trunk = pairwise_trunk,

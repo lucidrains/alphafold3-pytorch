@@ -906,7 +906,7 @@ class DiffusionTransformer(Module):
     @typecheck
     def forward(
         self,
-        noised_repr: Float['b n ds'],
+        noised_repr: Float['b n d'],
         *,
         single_repr: Float['b n ds'],
         pairwise_repr: Float['b n n dp'],
@@ -997,6 +997,11 @@ class DiffusionModule(Module):
 
         # token attention related modules
 
+        self.cond_tokens_with_cond_single = nn.Sequential(
+            nn.LayerNorm(dim_single),
+            LinearNoBias(dim_single, dim_atom)
+        )
+
         self.token_transformer = DiffusionTransformer(
             dim = dim_atom,
             dim_single_cond = dim_single,
@@ -1005,7 +1010,11 @@ class DiffusionModule(Module):
             heads = token_transformer_heads
         )
 
+        self.attended_token_norm = nn.LayerNorm(dim_atom)
+
         # atom attention decoding related modules
+
+        self.tokens_to_atom_decoder_input_cond = LinearNoBias(dim_atom, dim_atom)
 
         self.atom_decoder = DiffusionTransformer(
             dim = dim_atom,
@@ -1030,6 +1039,7 @@ class DiffusionModule(Module):
         atompair_feats: Float['b m m dap'],
         atom_mask: Bool['b m'],
         times: Float['b'],
+        mask: Bool['b n'],
         single_trunk_repr: Float['b n dst'],
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
@@ -1061,7 +1071,43 @@ class DiffusionModule(Module):
             pairwise_repr = atompair_feats
         )
 
+        atom_feats_skip = atom_feats
+
+        # masked mean pool the atom feats for each residue, for the token transformer
+        # this is basically a simple 2-level hierarchical transformer
+
+        w = self.atoms_per_window
+        windowed_atom_feats = rearrange(atom_feats, 'b (n w) da -> b n w da', w = w)
+        windowed_atom_mask = rearrange(atom_mask, 'b (n w) -> b n w', w = w)
+
+        assert windowed_atom_mask.any(dim = -1).all(), 'atom mask must contain one valid atom for each window'
+
+        windowed_atom_feats = windowed_atom_feats.masked_fill(windowed_atom_mask[..., None], 0.)
+
+        num = reduce(windowed_atom_feats, 'b n w d -> b n d', 'sum')
+        den = reduce(windowed_atom_mask.float(), 'b n w -> b n 1', 'sum')
+
+        tokens = num / den
+
+        # token transformer
+
+        tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
+
+        self.token_transformer(
+            tokens,
+            mask = mask,
+            single_repr = conditioned_single_repr,
+            pairwise_repr = conditioned_pairwise_repr,
+        )
+
+        tokens = self.attended_token_norm(tokens)
+
         # atom decoder
+
+        atom_decoder_input = self.tokens_to_atom_decoder_input_cond(tokens)
+        atom_decoder_input = repeat(atom_decoder_input, 'b n da -> b (n w) da', w = w)
+
+        atom_decoder_input = atom_decoder_input + atom_feats_skip
 
         atom_feats = self.atom_decoder(
             atom_feats,
