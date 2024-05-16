@@ -291,7 +291,6 @@ class AttentionPairBias(Module):
         )
 
         self.max_seq_len = max_seq_len
-        self.attn_bias_bias = nn.Parameter(torch.zeros(max_seq_len, max_seq_len))
 
     @typecheck
     def forward(
@@ -299,13 +298,19 @@ class AttentionPairBias(Module):
         single_repr: Float['b n ds'],
         *,
         pairwise_repr: Float['b n n dp'],
+        attn_bias: Float['b n n'] | None = None,
         **kwargs
     ) -> Float['b n ds']:
 
         seq = single_repr.shape[1]
         assert seq <= self.max_seq_len
 
-        attn_bias = self.to_attn_bias(pairwise_repr) + self.attn_bias_bias[:seq, :seq]
+        if exists(attn_bias):
+            attn_bias = rearrange(attn_bias, 'b i j -> b 1 i j')
+        else:
+            attn_bias = 0.
+
+        attn_bias = self.to_attn_bias(pairwise_repr) + attn_bias
 
         out = self.attn(
             single_repr,

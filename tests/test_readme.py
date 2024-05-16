@@ -70,6 +70,7 @@ def test_diffusion_transformer():
 
 def test_sequence_local_attn():
     atoms = torch.randn(2, 17, 32)
+    attn_bias = torch.randn(2, 17, 17)
 
     attn = Attention(
         dim = 32,
@@ -78,5 +79,5 @@ def test_sequence_local_attn():
         window_size = 5
     )
 
-    out = attn(atoms)
+    out = attn(atoms, attn_bias = attn_bias)
     assert out.shape == atoms.shape

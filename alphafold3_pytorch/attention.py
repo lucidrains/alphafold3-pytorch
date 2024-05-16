@@ -193,7 +193,8 @@ class Attend(Module):
         q: Float['b h n d'],
         k: Float['b h n d'],
         v: Float['b h n d'],
-        mask: Bool['b n'] | None = None
+        mask: Bool['b n'] | None = None,
+        attn_bias: Float['... n n'] | None = None
     ) -> Float['b h n d']:
         """
         simple local attention with a radius of 1 window size
@@ -228,6 +229,24 @@ class Attend(Module):
         k, v = tuple(torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim = -2) for t in (k, v))
         mask = torch.cat((mask[..., :-2], mask[..., 1:-1], mask[..., 2:]), dim = -1)
 
+        # handle attention bias (inefficiently)
+
+        if exists(attn_bias):
+            attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
+            attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
+            attn_bias = F.pad(attn_bias, (0, 0, 0, 0, 1, 1), value = 0.)
+
+            attn_bias = torch.cat((
+                attn_bias[..., :-2, :, :],
+                attn_bias[..., 1:-1, :, :],
+                attn_bias[..., 2:, :, :]
+            ), dim = -1)
+
+            diag_mask = torch.eye(attn_bias.shape[1], device = device, dtype = torch.bool)
+
+            diag_mask = repeat(diag_mask, 'i j -> b i j', b = batch)
+            attn_bias = rearrange(attn_bias[diag_mask], '(b n) i j -> b n i j', b = batch)
+
         # carry out attention as usual
 
         scale = q.shape[-1] ** -0.5
@@ -235,6 +254,10 @@ class Attend(Module):
         q = q * scale
 
         sim = einsum(q, k, "... i d, ... j d -> ... i j")
+
+        if exists(attn_bias):
+            attn_bias = rearrange(attn_bias, 'b ... -> b 1 ...')
+            sim = sim + attn_bias
 
         mask = rearrange(mask, 'b n w -> b 1 n 1 w')
         sim = sim.masked_fill(~mask, max_neg_value(sim))
@@ -267,7 +290,7 @@ class Attend(Module):
         # todo (handle attn bias efficiently)
 
         if self.is_local_attn:
-            return self.local_attn(q, k, v, mask = mask)
+            return self.local_attn(q, k, v, mask = mask, attn_bias = attn_bias)
 
         # forward to using flash attention if applicable
 
