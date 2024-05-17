@@ -1,3 +1,21 @@
+"""
+global ein notation:
+
+b - batch
+h - heads
+n - residue sequence length
+i - residue sequence length (source)
+j - residue sequence length (target)
+m - atom sequence length
+d - feature dimension
+ds - feature dimension (single)
+dp - feature dimension (pairwise)
+dap - feature dimension (atompair)
+da - feature dimensino (atom)
+t - templates
+m - msa
+"""
+
 from __future__ import annotations
 
 from math import pi, sqrt
@@ -648,7 +666,7 @@ class MSAModule(Module):
             msa_pair_weighted_avg,
             msa_transition,
             pairwise_block
-        )in self.layers:
+        ) in self.layers:
 
             # communication between msa and pairwise rep
 
