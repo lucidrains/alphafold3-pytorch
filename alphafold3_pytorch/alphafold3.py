@@ -1,5 +1,6 @@
 from __future__ import annotations
-from math import pi
+
+from math import pi, sqrt
 from functools import partial
 
 import torch
@@ -29,6 +30,8 @@ from alphafold3_pytorch.attention import Attention
 from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
 
+from tqdm import tqdm
+
 # constants
 
 LinearNoBias = partial(Linear, bias = False)
@@ -40,6 +43,9 @@ def exists(v):
 
 def default(v, d):
     return v if exists(v) else d
+
+def log(t, eps = 1e-20):
+    return torch.log(t.clamp(min = eps))
 
 def max_neg_value(t: Tensor):
     return -torch.finfo(t.dtype).max
@@ -62,7 +68,7 @@ class SwiGLU(Module):
     def forward(
         self,
         x: Float['... d']
-    ) -> Float['... (d//2)']:
+    ) -> Float[' ... (d//2)']:
 
         x, gates = x.chunk(2, dim = -1)
         return F.silu(gates) * x
@@ -741,7 +747,7 @@ class FourierEmbedding(Module):
     @typecheck
     def forward(
         self,
-        times: Float['b'],
+        times: Float[' b'],
     ) -> Float['b d']:
 
         times = rearrange(times, 'b -> b 1')
@@ -827,7 +833,7 @@ class SingleConditioning(Module):
     def forward(
         self,
         *,
-        times: Float['b'],
+        times: Float[' b'],
         single_trunk_repr: Float['b n dst'],
         single_inputs_repr: Float['b n dsi'],
     ) -> Float['b n (dst+dsi)']:
@@ -1062,7 +1068,7 @@ class DiffusionModule(Module):
         atom_feats: Float['b m da'],
         atompair_feats: Float['b m m dap'],
         atom_mask: Bool['b m'],
-        times: Float['b'],
+        times: Float[' b'],
         mask: Bool['b n'],
         single_trunk_repr: Float['b n dst'],
         single_inputs_repr: Float['b n dsi'],
@@ -1176,6 +1182,215 @@ class DiffusionModule(Module):
         atom_pos_update = self.atom_feat_to_atom_pos_update(atom_feats)
 
         return atom_pos_update
+
+# elucidated diffusion model adapted for atom position diffusing
+# from Karras et al.
+# https://arxiv.org/abs/2206.00364
+
+class ElucidatedAtomDiffusion(Module):
+    @typecheck
+    def __init__(
+        self,
+        net: DiffusionModule,
+        *,
+        num_sample_steps = 32, # number of sampling steps
+        sigma_min = 0.002,     # min noise level
+        sigma_max = 80,        # max noise level
+        sigma_data = 0.5,      # standard deviation of data distribution
+        rho = 7,               # controls the sampling schedule
+        P_mean = -1.2,         # mean of log-normal distribution from which noise is drawn for training
+        P_std = 1.2,           # standard deviation of log-normal distribution from which noise is drawn for training
+        S_churn = 80,          # parameters for stochastic sampling - depends on dataset, Table 5 in apper
+        S_tmin = 0.05,
+        S_tmax = 50,
+        S_noise = 1.003,
+    ):
+        super().__init__()
+        self.net = net
+
+        # parameters
+
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+        self.sigma_data = sigma_data
+
+        self.rho = rho
+
+        self.P_mean = P_mean
+        self.P_std = P_std
+
+        self.num_sample_steps = num_sample_steps  # otherwise known as N in the paper
+
+        self.S_churn = S_churn
+        self.S_tmin = S_tmin
+        self.S_tmax = S_tmax
+        self.S_noise = S_noise
+
+    @property
+    def device(self):
+        return next(self.net.parameters()).device
+
+    # derived preconditioning params - Table 1
+
+    def c_skip(self, sigma):
+        return (self.sigma_data ** 2) / (sigma ** 2 + self.sigma_data ** 2)
+
+    def c_out(self, sigma):
+        return sigma * self.sigma_data * (self.sigma_data ** 2 + sigma ** 2) ** -0.5
+
+    def c_in(self, sigma):
+        return 1 * (sigma ** 2 + self.sigma_data ** 2) ** -0.5
+
+    def c_noise(self, sigma):
+        return log(sigma) * 0.25
+
+    # preconditioned network output
+    # equation (7) in the paper
+
+    @typecheck
+    def preconditioned_network_forward(
+        self,
+        noised_atom_pos: Float['b m c'],
+        sigma: Float[' b'],
+        network_condition_kwargs: dict,
+        clamp = False,
+    ):
+        batch, device = noised_atom_pos.shape[0], noised_atom_pos.device
+
+        if isinstance(sigma, float):
+            sigma = torch.full((batch,), sigma, device = device)
+
+        padded_sigma = rearrange(sigma, 'b -> b 1 1')
+
+        net_out = self.net(
+            self.c_in(padded_sigma) * noised_atom_pos,
+            times = self.c_noise(sigma),
+            **network_condition_kwargs
+        )
+
+        out = self.c_skip(padded_sigma) * noised_atom_pos +  self.c_out(padded_sigma) * net_out
+
+        if clamp:
+            out = out.clamp(-1., 1.)
+
+        return out
+
+    # sampling
+
+    # sample schedule
+    # equation (5) in the paper
+
+    def sample_schedule(self, num_sample_steps = None):
+        num_sample_steps = default(num_sample_steps, self.num_sample_steps)
+
+        N = num_sample_steps
+        inv_rho = 1 / self.rho
+
+        steps = torch.arange(num_sample_steps, device = self.device, dtype = torch.float32)
+        sigmas = (self.sigma_max ** inv_rho + steps / (N - 1) * (self.sigma_min ** inv_rho - self.sigma_max ** inv_rho)) ** self.rho
+
+        sigmas = F.pad(sigmas, (0, 1), value = 0.) # last step is sigma value of 0.
+        return sigmas
+
+    @torch.no_grad()
+    def sample(
+        self,
+        atom_mask: Bool['b m'],
+        batch_size = 16,
+        num_sample_steps = None,
+        clamp = True,
+        **network_condition_kwargs
+    ):
+        num_sample_steps = default(num_sample_steps, self.num_sample_steps)
+
+        shape = (*atom_mask.shape, 3)
+
+        network_condition_kwargs.update(atom_mask = atom_mask)
+
+        # get the schedule, which is returned as (sigma, gamma) tuple, and pair up with the next sigma and gamma
+
+        sigmas = self.sample_schedule(num_sample_steps)
+
+        gammas = torch.where(
+            (sigmas >= self.S_tmin) & (sigmas <= self.S_tmax),
+            min(self.S_churn / num_sample_steps, sqrt(2) - 1),
+            0.
+        )
+
+        sigmas_and_gammas = list(zip(sigmas[:-1], sigmas[1:], gammas[:-1]))
+
+        # atom position is noise at the beginning
+
+        init_sigma = sigmas[0]
+
+        atom_pos = init_sigma * torch.randn(shape, device = self.device)
+
+        # gradually denoise
+
+        for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
+            sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
+
+            eps = self.S_noise * torch.randn(shape, device = self.device) # stochastic sampling
+
+            sigma_hat = sigma + gamma * sigma
+            atom_pos_hat = atom_pos + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
+
+            model_output = self.preconditioned_network_forward(atom_pos_hat, sigma_hat, clamp = clamp)
+            denoised_over_sigma = (atom_pos_hat - model_output) / sigma_hat
+
+            atom_pos_next = atom_pos_hat + (sigma_next - sigma_hat) * denoised_over_sigma
+
+            # second order correction, if not the last timestep
+
+            if sigma_next != 0:
+                self_cond = model_output if self.self_condition else None
+
+                model_output_next = self.preconditioned_network_forward(atom_pos_next, sigma_next, clamp = clamp)
+                denoised_prime_over_sigma = (atom_pos_next - model_output_next) / sigma_next
+                atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma)
+
+            atom_pos = atom_pos_next
+
+        atom_pos = atom_pos.clamp(-1., 1.)
+        return atom_pos
+
+    # training
+
+    def loss_weight(self, sigma):
+        return (sigma ** 2 + self.sigma_data ** 2) * (sigma * self.sigma_data) ** -2
+
+    def noise_distribution(self, batch_size):
+        return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp()
+
+    def forward(
+        self,
+        normalized_atom_pos: Float['b m d'],
+        atom_mask: Bool['b m'],
+        **network_condition_kwargs
+    ):
+        batch_size = normalized_atom_pos.shape[0]
+
+        sigmas = self.noise_distribution(batch_size)
+        padded_sigmas = rearrange(sigmas, 'b -> b 1 1')
+
+        noise = torch.randn_like(normalized_atom_pos)
+
+        noised_atom_pos = normalized_atom_pos + padded_sigmas * noise  # alphas are 1. in the paper
+
+        network_condition_kwargs.update(atom_mask = atom_mask)
+
+        denoised = self.preconditioned_network_forward(
+            noised_atom_pos,
+            sigmas,
+            network_condition_kwargs = network_condition_kwargs
+        )
+
+        losses = F.mse_loss(denoised, normalized_atom_pos, reduction = 'none')
+        losses = reduce(losses, 'b ... -> b', 'mean')
+
+        losses = losses * self.loss_weight(sigmas)
+
+        return losses.mean()
 
 # main class
 

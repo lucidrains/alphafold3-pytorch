@@ -17,6 +17,7 @@ from alphafold3_pytorch.alphafold3 import (
     PairformerStack,
     DiffusionTransformer,
     DiffusionModule,
+    ElucidatedAtomDiffusion,
     Alphafold3
 )
 
@@ -36,5 +37,6 @@ __all__ = [
     PairformerStack,
     DiffusionTransformer,
     DiffusionModule,
+    ElucidatedAtomDiffusion,
     Alphafold3
 ]

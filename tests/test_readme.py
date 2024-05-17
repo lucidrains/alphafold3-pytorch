@@ -9,6 +9,7 @@ from alphafold3_pytorch import (
     MSAModule,
     DiffusionTransformer,
     DiffusionModule,
+    ElucidatedAtomDiffusion,
     Attention
 )
 
@@ -124,3 +125,19 @@ def test_diffusion_module():
     )
 
     assert noised_atom_pos.shape == atom_pos_update.shape
+
+    edm = ElucidatedAtomDiffusion(diffusion_module)
+
+    loss = edm(
+        noised_atom_pos,
+        atom_feats = atom_feats,
+        atompair_feats = atompair_feats,
+        atom_mask = atom_mask,
+        mask = mask,
+        single_trunk_repr = single_trunk_repr,
+        single_inputs_repr = single_inputs_repr,
+        pairwise_trunk = pairwise_trunk,
+        pairwise_rel_pos_feats = pairwise_rel_pos_feats
+    )
+
+    assert loss.numel() == 1

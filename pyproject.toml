@@ -27,6 +27,7 @@ dependencies = [
     "einops>=0.8.0",
     "environs",
     "torch>=2.1",
+    "tqdm",
     "jaxtyping>=0.2.28"
 ]
 
