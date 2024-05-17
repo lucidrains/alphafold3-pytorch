@@ -984,7 +984,31 @@ class DiffusionModule(Module):
 
         # atom attention encoding related modules
 
-        self.atom_pos_to_atom_feat_cond = LinearNoBias(3, dim_atom)
+        self.atom_pos_to_atom_feat = LinearNoBias(3, dim_atom)
+
+        self.single_repr_to_atom_feat_cond = nn.Sequential(
+            nn.LayerNorm(dim_single),
+            LinearNoBias(dim_single, dim_atom)
+        )
+
+        self.pairwise_repr_to_atompair_feat_cond = nn.Sequential(
+            nn.LayerNorm(dim_pairwise),
+            LinearNoBias(dim_pairwise, dim_atompair)
+        )
+
+        self.single_repr_to_atompair_feat_cond = nn.Sequential(
+            nn.LayerNorm(dim_single),
+            LinearNoBias(dim_single, dim_atompair * 2),
+            nn.ReLU()
+        )
+
+        self.atompair_feats_mlp = nn.Sequential(
+            LinearNoBias(dim_atompair, dim_atompair),
+            nn.ReLU(),
+            LinearNoBias(dim_atompair, dim_atompair),
+            nn.ReLU(),
+            LinearNoBias(dim_atompair, dim_atompair),
+        )
 
         self.atom_encoder = DiffusionTransformer(
             dim = dim_atom,
@@ -1045,7 +1069,12 @@ class DiffusionModule(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
     ):
-        assert divisible_by(noised_atom_pos.shape[-2], self.atoms_per_window)
+        w = self.atoms_per_window
+
+        # in the paper, it seems they pack the atom feats
+        # but in this impl, will just use windows for simplicity when communicating between atom and residue resolutions. bit less efficient
+
+        assert divisible_by(noised_atom_pos.shape[-2], w)
 
         conditioned_single_repr = self.single_conditioner(
             times = times,
@@ -1058,16 +1087,45 @@ class DiffusionModule(Module):
             pairwise_rel_pos_feats = pairwise_rel_pos_feats
         )
 
+        # lines 7-14 in Algorithm 5
+
+        atom_feats_cond = atom_feats
+
         # the most surprising part of the paper; no geometric biases!
 
-        atom_feats = self.atom_pos_to_atom_feat_cond(noised_atom_pos) + atom_feats
+        atom_feats = self.atom_pos_to_atom_feat(noised_atom_pos) + atom_feats
+
+        # condition atom feats cond (cl) with single repr
+
+        single_repr_cond = self.single_repr_to_atom_feat_cond(conditioned_single_repr)
+
+        single_repr_cond = repeat(single_repr_cond, 'b n ds -> b (n w) ds', w = w)
+        atom_feats_cond = single_repr_cond + atom_feats_cond
+
+        # condition atompair feats with pairwise repr
+
+        pairwise_repr_cond = self.pairwise_repr_to_atompair_feat_cond(conditioned_pairwise_repr)
+        pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
+        atompair_feats = pairwise_repr_cond + atompair_feats
+
+        # condition atompair feats further with single repr
+
+        single_repr_cond_i, single_repr_cond_j = self.single_repr_to_atompair_feat_cond(conditioned_single_repr).chunk(2, dim = -1)
+        single_repr_cond_i = repeat(single_repr_cond_i, 'b i dap -> b (i w) 1 dap', w = w)
+        single_repr_cond_j = repeat(single_repr_cond_j, 'b j dap -> b 1 (j w) dap', w = w)
+
+        atompair_feats = single_repr_cond_i + single_repr_cond_j + atompair_feats
+
+        # furthermore, they did one more MLP on the atompair feats for attention biasing in atom transformer
+
+        atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
 
         # atom encoder
 
         atom_feats = self.atom_encoder(
             atom_feats,
             mask = atom_mask,
-            single_repr = atom_feats,
+            single_repr = atom_feats_cond,
             pairwise_repr = atompair_feats
         )
 
@@ -1076,7 +1134,6 @@ class DiffusionModule(Module):
         # masked mean pool the atom feats for each residue, for the token transformer
         # this is basically a simple 2-level hierarchical transformer
 
-        w = self.atoms_per_window
         windowed_atom_feats = rearrange(atom_feats, 'b (n w) da -> b n w da', w = w)
         windowed_atom_mask = rearrange(atom_mask, 'b (n w) -> b n w', w = w)
 
@@ -1112,7 +1169,7 @@ class DiffusionModule(Module):
         atom_feats = self.atom_decoder(
             atom_decoder_input,
             mask = atom_mask,
-            single_repr = atom_feats,
+            single_repr = atom_feats_cond,
             pairwise_repr = atompair_feats
         )
 
