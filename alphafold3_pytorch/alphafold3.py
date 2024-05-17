@@ -733,6 +733,91 @@ class PairformerStack(Module):
 
         return single_repr, pairwise_repr
 
+# embedding related
+
+class TemplateEmbedder(Module):
+    """ Algorithm 16 """
+
+    def __init__(
+        self,
+        *,
+        dim_template_feats,
+        dim = 64,
+        dim_pairwise = 128,
+        pairformer_stack_depth = 2,
+        pairwise_block_kwargs: dict = dict(),
+        eps = 1e-5
+    ):
+        super().__init__()
+        self.eps = eps
+
+        self.template_feats_to_embed_input = LinearNoBias(dim_template_feats, dim)
+
+        self.pairwise_to_embed_input = nn.Sequential(
+            nn.LayerNorm(dim_pairwise),
+            LinearNoBias(dim_pairwise, dim)
+        )
+
+        layers = ModuleList([])
+        for _ in range(pairformer_stack_depth):
+            block = PairwiseBlock(
+                dim_pairwise = dim,
+                **pairwise_block_kwargs
+            )
+
+            layers.append(block)
+
+        self.pairformer_stack = layers
+
+        self.final_norm = nn.LayerNorm(dim)
+
+        # final projection of mean pooled repr -> out
+
+        self.to_out = nn.Sequential(
+            LinearNoBias(dim, dim),
+            nn.ReLU()
+        )
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        templates: Float['b t n n dt'],
+        template_mask: Bool['b t'],
+        pairwise_repr: Float['b n n dp'],
+        mask: Bool['b n'] | None = None,
+    ) -> Float['b n n d']:
+
+        num_templates = templates.shape[1]
+
+        pairwise_repr = self.pairwise_to_embed_input(pairwise_repr)
+        pairwise_repr = rearrange(pairwise_repr, 'b i j d -> b 1 i j d')
+
+        v = self.template_feats_to_embed_input(templates) + pairwise_repr
+
+        v, merged_batch_ps = pack_one(v, '* i j d')
+
+        mask = repeat(mask, 'b n -> (b t) n', t = num_templates)
+
+        for block in self.pairformer_stack:
+            v = block(
+                pairwise_repr = v,
+                mask = mask
+            ) + v
+
+        u = self.final_norm(v)
+
+        u = unpack_one(u, merged_batch_ps, '* i jk d')
+
+        # masked mean pool template repr
+
+        num = reduce(u, 'b t i j d -> b i j d', 'sum')
+        den = reduce(template_mask.float(), 'b t -> b 1 1 1', 'sum')
+
+        avg_template_repr = num / den.clamp(min = self.eps)
+
+        return self.to_out(avg_template_repr)
+
 # diffusion related
 # both diffusion transformer as well as atom encoder / decoder
 

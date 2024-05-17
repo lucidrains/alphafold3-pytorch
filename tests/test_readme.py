@@ -10,6 +10,7 @@ from alphafold3_pytorch import (
     DiffusionTransformer,
     DiffusionModule,
     ElucidatedAtomDiffusion,
+    TemplateEmbedder,
     Attention
 )
 
@@ -157,3 +158,21 @@ def test_diffusion_module():
     )
 
     assert sampled_atom_pos.shape == noised_atom_pos.shape
+
+def test_template_embed():
+    template_feats = torch.randn(2, 2, 16, 16, 77)
+    template_mask = torch.ones((2, 2)).bool()
+
+    pairwise_repr = torch.randn(2, 16, 16, 128)
+    mask = torch.ones((2, 16)).bool()
+
+    embedder = TemplateEmbedder(
+        dim_template_feats = 77
+    )
+
+    template_embed = embedder(
+        templates = template_feats,
+        template_mask = template_mask,
+        pairwise_repr = pairwise_repr,
+        mask = mask
+    )
