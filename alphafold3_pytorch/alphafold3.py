@@ -1251,7 +1251,7 @@ class ElucidatedAtomDiffusion(Module):
     def preconditioned_network_forward(
         self,
         noised_atom_pos: Float['b m c'],
-        sigma: Float[' b'],
+        sigma: Float[' b'] | Float[' '] | float,
         network_condition_kwargs: dict,
         clamp = False,
     ):
@@ -1296,7 +1296,6 @@ class ElucidatedAtomDiffusion(Module):
     def sample(
         self,
         atom_mask: Bool['b m'],
-        batch_size = 16,
         num_sample_steps = None,
         clamp = True,
         **network_condition_kwargs
@@ -1335,7 +1334,7 @@ class ElucidatedAtomDiffusion(Module):
             sigma_hat = sigma + gamma * sigma
             atom_pos_hat = atom_pos + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
 
-            model_output = self.preconditioned_network_forward(atom_pos_hat, sigma_hat, clamp = clamp)
+            model_output = self.preconditioned_network_forward(atom_pos_hat, sigma_hat, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
             denoised_over_sigma = (atom_pos_hat - model_output) / sigma_hat
 
             atom_pos_next = atom_pos_hat + (sigma_next - sigma_hat) * denoised_over_sigma
@@ -1343,9 +1342,7 @@ class ElucidatedAtomDiffusion(Module):
             # second order correction, if not the last timestep
 
             if sigma_next != 0:
-                self_cond = model_output if self.self_condition else None
-
-                model_output_next = self.preconditioned_network_forward(atom_pos_next, sigma_next, clamp = clamp)
+                model_output_next = self.preconditioned_network_forward(atom_pos_next, sigma_next, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
                 denoised_prime_over_sigma = (atom_pos_next - model_output_next) / sigma_next
                 atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma)
 

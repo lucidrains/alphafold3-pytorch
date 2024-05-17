@@ -126,7 +126,10 @@ def test_diffusion_module():
 
     assert noised_atom_pos.shape == atom_pos_update.shape
 
-    edm = ElucidatedAtomDiffusion(diffusion_module)
+    edm = ElucidatedAtomDiffusion(
+        diffusion_module,
+        num_sample_steps = 2
+    )
 
     loss = edm(
         noised_atom_pos,
@@ -141,3 +144,16 @@ def test_diffusion_module():
     )
 
     assert loss.numel() == 1
+
+    sampled_atom_pos = edm.sample(
+        atom_mask = atom_mask,
+        atom_feats = atom_feats,
+        atompair_feats = atompair_feats,
+        mask = mask,
+        single_trunk_repr = single_trunk_repr,
+        single_inputs_repr = single_inputs_repr,
+        pairwise_trunk = pairwise_trunk,
+        pairwise_rel_pos_feats = pairwise_rel_pos_feats
+    )
+
+    assert sampled_atom_pos.shape == noised_atom_pos.shape
