@@ -1110,7 +1110,7 @@ class DiffusionModule(Module):
         atom_decoder_input = atom_decoder_input + atom_feats_skip
 
         atom_feats = self.atom_decoder(
-            atom_feats,
+            atom_decoder_input,
             mask = atom_mask,
             single_repr = atom_feats,
             pairwise_repr = atompair_feats
