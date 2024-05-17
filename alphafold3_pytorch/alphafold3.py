@@ -811,6 +811,11 @@ class TemplateEmbedder(Module):
 
         # masked mean pool template repr
 
+        u = u.masked_fill(
+            ~rearrange(template_mask, 'b t -> b t 1 1 1'),
+            0.
+        )
+
         num = reduce(u, 'b t i j d -> b i j d', 'sum')
         den = reduce(template_mask.float(), 'b t -> b 1 1 1', 'sum')
 
