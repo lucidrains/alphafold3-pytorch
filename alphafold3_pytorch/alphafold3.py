@@ -1047,6 +1047,50 @@ class DiffusionTransformer(Module):
 
         return noised_repr
 
+class AtomToTokenPooler(Module):
+    def __init__(
+        self,
+        dim,
+        dim_out = None,
+        atoms_per_window = 27
+    ):
+        super().__init__()
+        dim_out = default(dim, dim_out)
+
+        self.proj = nn.Sequential(
+            LinearNoBias(dim, dim_out),
+            nn.ReLU()
+        )
+
+        self.atoms_per_window = atoms_per_window
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        atom_feats: Float['b m da'],
+        atom_mask: Bool['b m']
+    ):
+        w = self.atoms_per_window
+
+        atom_feats = self.proj(atom_feats)
+
+        # masked mean pool the atom feats for each residue, for the token transformer
+        # this is basically a simple 2-level hierarchical transformer
+
+        windowed_atom_feats = rearrange(atom_feats, 'b (n w) da -> b n w da', w = w)
+        windowed_atom_mask = rearrange(atom_mask, 'b (n w) -> b n w', w = w)
+
+        assert windowed_atom_mask.any(dim = -1).all(), 'atom mask must contain one valid atom for each window'
+
+        windowed_atom_feats = windowed_atom_feats.masked_fill(windowed_atom_mask[..., None], 0.)
+
+        num = reduce(windowed_atom_feats, 'b n w d -> b n d', 'sum')
+        den = reduce(windowed_atom_mask.float(), 'b n w -> b n 1', 'sum')
+
+        tokens = num / den
+        return tokens
+
 class DiffusionModule(Module):
     """ Algorithm 20 """
 
@@ -1132,6 +1176,10 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_encoder_depth,
             heads = atom_encoder_heads
+        )
+
+        self.atom_feats_to_pooled_token = AtomToTokenPooler(
+            dim = dim_atom
         )
 
         # token attention related modules
@@ -1246,20 +1294,10 @@ class DiffusionModule(Module):
 
         atom_feats_skip = atom_feats
 
-        # masked mean pool the atom feats for each residue, for the token transformer
-        # this is basically a simple 2-level hierarchical transformer
-
-        windowed_atom_feats = rearrange(atom_feats, 'b (n w) da -> b n w da', w = w)
-        windowed_atom_mask = rearrange(atom_mask, 'b (n w) -> b n w', w = w)
-
-        assert windowed_atom_mask.any(dim = -1).all(), 'atom mask must contain one valid atom for each window'
-
-        windowed_atom_feats = windowed_atom_feats.masked_fill(windowed_atom_mask[..., None], 0.)
-
-        num = reduce(windowed_atom_feats, 'b n w d -> b n d', 'sum')
-        den = reduce(windowed_atom_mask.float(), 'b n w -> b n 1', 'sum')
-
-        tokens = num / den
+        tokens = self.atom_feats_to_pooled_token(
+            atom_feats = atom_feats,
+            atom_mask = atom_mask
+        )
 
         # token transformer
 
