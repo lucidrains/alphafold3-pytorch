@@ -206,7 +206,7 @@ def test_input_embedder():
 
     atom_inputs = torch.randn(2, 16 * 27, 77)
     atom_mask = torch.ones((2, 16 * 27)).bool()
-    atompair_feats = torch.randn(2 * 16, 27, 27, 16)
+    atompair_feats = torch.randn(2, 16, 27, 27, 16)
     additional_residue_feats = torch.randn(2, 16, 33)
 
     embedder = InputFeatureEmbedder(

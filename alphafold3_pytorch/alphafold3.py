@@ -1581,7 +1581,7 @@ class InputFeatureEmbedder(Module):
         *,
         atom_inputs: Float['b m dai'],
         atom_mask: Bool['b m'],
-        atompair_feats: Float['bn w w dap'],
+        atompair_feats: Float['b n w w dap'],
         additional_residue_feats: Float['b n rf'],
     ) -> Float['b n ds']:
 
@@ -1591,6 +1591,8 @@ class InputFeatureEmbedder(Module):
 
         atom_feats = rearrange(atom_feats, 'b (n w) d -> b n w d', w = w)
         atom_feats, merged_batch_ps = pack_one(atom_feats, '* w d')
+
+        atompair_feats = rearrange(atompair_feats, 'b n ... -> (b n) ...')
 
         atom_feats = self.atom_transformer(
             atom_feats,
