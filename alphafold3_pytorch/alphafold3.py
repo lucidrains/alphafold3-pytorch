@@ -1179,7 +1179,9 @@ class DiffusionModule(Module):
         )
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
-            dim = dim_atom
+            dim = dim_atom,
+            dim_out = dim_atom,
+            atoms_per_window = atoms_per_window
         )
 
         # token attention related modules
@@ -1536,11 +1538,84 @@ class ElucidatedAtomDiffusion(Module):
 
         return losses.mean()
 
+# input embedder
+
+class InputFeatureEmbedder(Module):
+    """ Algorithm 2 """
+
+    def __init__(
+        self,
+        *,
+        dim_atom_inputs,
+        atoms_per_window = 27,
+        dim_atom = 128,
+        dim_atompair = 16,
+        dim_token = 384,
+        atom_transformer_blocks = 3,
+        atom_transformer_heads = 4,
+        atom_transformer_kwargs: dict = dict()
+    ):
+        super().__init__()
+        self.atoms_per_window = atoms_per_window
+
+        self.to_atom_feats = LinearNoBias(dim_atom_inputs, dim_atom)
+
+        self.atom_transformer = DiffusionTransformer(
+            depth = atom_transformer_blocks,
+            heads = atom_transformer_heads,
+            dim = dim_atom,
+            dim_single_cond = dim_atom,
+            dim_pairwise = dim_atompair,
+            **atom_transformer_kwargs
+        )
+
+        self.atom_feats_to_pooled_token = AtomToTokenPooler(
+            dim = dim_atom,
+            dim_out = dim_token,
+            atoms_per_window = atoms_per_window
+        )
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        atom_inputs: Float['b m dai'],
+        atom_mask: Bool['b m'],
+        atompair_feats: Float['bn w w dap'],
+        additional_residue_feats: Float['b n rf'],
+    ) -> Float['b n ds']:
+
+        w = self.atoms_per_window
+
+        atom_feats = self.to_atom_feats(atom_inputs)
+
+        atom_feats = rearrange(atom_feats, 'b (n w) d -> b n w d', w = w)
+        atom_feats, merged_batch_ps = pack_one(atom_feats, '* w d')
+
+        atom_feats = self.atom_transformer(
+            atom_feats,
+            single_repr = atom_feats,
+            pairwise_repr = atompair_feats
+        )
+
+        atom_feats = unpack_one(atom_feats, merged_batch_ps, '* w d')
+        atom_feats = rearrange(atom_feats, 'b n w d -> b (n w) d')
+
+        tokens = self.atom_feats_to_pooled_token(
+            atom_feats = atom_feats,
+            atom_mask = atom_mask
+        )
+
+        tokens = torch.cat((tokens, additional_residue_feats), dim = -1)
+        return tokens
+
 # confidence head
 
 ConfidenceHeadReturn = namedtuple('ConfidenceHeadReturn', ['pae', 'pdt', 'plddt', 'resolved'])
 
 class ConfidenceHead(Module):
+    """ Algorithm 31 """
+
     @typecheck
     def __init__(
         self,

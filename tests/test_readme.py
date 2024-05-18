@@ -12,6 +12,7 @@ from alphafold3_pytorch import (
     ElucidatedAtomDiffusion,
     TemplateEmbedder,
     Attention,
+    InputFeatureEmbedder,
     ConfidenceHead,
 )
 
@@ -199,4 +200,22 @@ def test_confidence_head():
         pairwise_repr = pairwise_repr,
         pred_atom_pos = pred_atom_pos,
         mask = mask
+    )
+
+def test_input_embedder():
+
+    atom_inputs = torch.randn(2, 16 * 27, 77)
+    atom_mask = torch.ones((2, 16 * 27)).bool()
+    atompair_feats = torch.randn(2 * 16, 27, 27, 16)
+    additional_residue_feats = torch.randn(2, 16, 33)
+
+    embedder = InputFeatureEmbedder(
+        dim_atom_inputs = 77
+    )
+
+    embedder(
+        atom_inputs = atom_inputs,
+        atom_mask = atom_mask,
+        atompair_feats = atompair_feats,
+        additional_residue_feats = additional_residue_feats
     )
