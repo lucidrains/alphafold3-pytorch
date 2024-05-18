@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from math import pi, sqrt
 from functools import partial
+from collections import namedtuple
 
 import torch
 from torch import nn
@@ -1497,8 +1498,114 @@ class ElucidatedAtomDiffusion(Module):
 
         return losses.mean()
 
+# confidence head
+
+ConfidenceHeadReturn = namedtuple('ConfidenceHeadReturn', ['pae', 'pdt', 'plddt', 'resolved'])
+
+class ConfidenceHead(Module):
+    @typecheck
+    def __init__(
+        self,
+        *,
+        dim_single_inputs,
+        atompair_dist_bins: Float['d'],
+        dim_single = 384,
+        dim_pairwise = 128,
+        num_plddt_bins = 50,
+        num_pde_bins = 64,
+        num_pae_bins = 64,
+        pairformer_depth = 4,
+        pairformer_kwargs: dict = dict()
+    ):
+        super().__init__()
+
+        self.register_buffer('atompair_dist_bins', atompair_dist_bins)
+
+        num_dist_bins = atompair_dist_bins.shape[-1]
+        self.num_dist_bins = num_dist_bins
+
+        self.dist_bin_pairwise_embed = nn.Embedding(num_dist_bins, dim_pairwise)
+        self.single_inputs_to_pairwise = LinearNoBias(dim_single_inputs, dim_pairwise * 2)
+
+        # pairformer stack
+
+        self.pairformer_stack = PairformerStack(
+            dim_single = dim_single,
+            dim_pairwise = dim_pairwise,
+            depth = pairformer_depth,
+            **pairformer_kwargs
+        )
+
+        # to predictions
+
+        self.to_pae_logits = LinearNoBias(dim_pairwise, num_pae_bins)
+        self.to_pde_logits = LinearNoBias(dim_pairwise, num_pde_bins)
+        self.to_plddt_logits = LinearNoBias(dim_single, num_plddt_bins)
+        self.to_resolved_logits = LinearNoBias(dim_single, 2)
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        single_inputs_repr: Float['b n dsi'],
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'],
+        pred_atom_pos: Float['b n c'],
+        mask: Bool['b n'] | None = None,
+    ) -> Tuple[
+        Float['b n n pae'],
+        Float['b n n pde'],
+        Float['b n plddt'],
+        Float['b n resolved']
+    ]:
+
+        single_to_pairwise_i, single_to_pairwise_j = self.single_inputs_to_pairwise(single_inputs_repr).chunk(2, dim = -1)
+        pairwise_repr = pairwise_repr + rearrange(single_to_pairwise_i, 'b i d -> b i 1 d') + rearrange(single_to_pairwise_j, 'b j d -> b 1 j d')
+
+        # interatomic distances - embed and add to pairwise
+
+        interatom_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
+
+        dist_bin_indices = (interatom_dist[..., None] - self.atompair_dist_bins).abs().argmin(dim = -1)
+        pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
+
+        # pairformer stack
+
+        single_repr, pairwise_repr = self.pairformer_stack(
+            single_repr = single_repr,
+            pairwise_repr = pairwise_repr,
+            mask = mask
+        )
+
+        # to logits
+
+        pae_logits = self.to_pae_logits(pairwise_repr)
+
+        symmetric_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
+        pde_logits = self.to_pde_logits(symmetric_pairwise_repr)
+
+        plddt_logits = self.to_plddt_logits(single_repr)
+        resolved_logits = self.to_resolved_logits(single_repr)
+
+        return ConfidenceHeadReturn(pae_logits, pde_logits, plddt_logits, resolved_logits)
+
 # main class
 
 class Alphafold3(Module):
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        loss_confidence_weight = 1e-4,
+        loss_distogram_weight = 1e-2,
+        loss_diffusion = 4.
+    ):
         super().__init__()
+
+
+    @typecheck
+    def forward(
+        self,
+        *,
+        include_pae_loss = False # turned on in latter part of training
+    ):
+        return

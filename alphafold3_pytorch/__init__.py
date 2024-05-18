@@ -19,6 +19,7 @@ from alphafold3_pytorch.alphafold3 import (
     DiffusionTransformer,
     DiffusionModule,
     ElucidatedAtomDiffusion,
+    ConfidenceHead,
     Alphafold3
 )
 
@@ -40,5 +41,6 @@ __all__ = [
     DiffusionTransformer,
     DiffusionModule,
     ElucidatedAtomDiffusion,
+    ConfidenceHead,
     Alphafold3
 ]

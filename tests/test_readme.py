@@ -11,7 +11,8 @@ from alphafold3_pytorch import (
     DiffusionModule,
     ElucidatedAtomDiffusion,
     TemplateEmbedder,
-    Attention
+    Attention,
+    ConfidenceHead,
 )
 
 def test_pairformer():
@@ -174,5 +175,28 @@ def test_template_embed():
         templates = template_feats,
         template_mask = template_mask,
         pairwise_repr = pairwise_repr,
+        mask = mask
+    )
+
+
+def test_confidence_head():
+    single_inputs_repr = torch.randn(2, 16, 77)
+    single_repr = torch.randn(2, 16, 384)
+    pairwise_repr = torch.randn(2, 16, 16, 128)
+    pred_atom_pos = torch.randn(2, 16, 3)
+    mask = torch.ones((2, 16)).bool()
+
+    confidence_head = ConfidenceHead(
+        dim_single_inputs = 77,
+        atompair_dist_bins = torch.linspace(3, 20, 37),
+        dim_single = 384,
+        dim_pairwise = 128,
+    )
+
+    confidence_head(
+        single_inputs_repr = single_inputs_repr,
+        single_repr = single_repr,
+        pairwise_repr = pairwise_repr,
+        pred_atom_pos = pred_atom_pos,
         mask = mask
     )
