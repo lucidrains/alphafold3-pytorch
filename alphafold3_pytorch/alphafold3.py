@@ -1223,9 +1223,9 @@ class DiffusionModule(Module):
             LinearNoBias(dim_pairwise, dim_atompair)
         )
 
-        self.single_repr_to_atompair_feat_cond = nn.Sequential(
-            nn.LayerNorm(dim_single),
-            LinearNoBiasThenOuterSum(dim_single, dim_atompair),
+        self.atom_repr_to_atompair_feat_cond = nn.Sequential(
+            nn.LayerNorm(dim_atom),
+            LinearNoBiasThenOuterSum(dim_atom, dim_atompair),
             nn.ReLU()
         )
 
@@ -1341,12 +1341,10 @@ class DiffusionModule(Module):
         pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
         atompair_feats = pairwise_repr_cond + atompair_feats
 
-        # condition atompair feats further with single repr
+        # condition atompair feats further with single atom repr
 
-        single_repr_cond = self.single_repr_to_atompair_feat_cond(conditioned_single_repr)
-        single_repr_cond = repeat(single_repr_cond, 'b i j dap -> b (i w1) (j w2) dap', w1 = w, w2 = w)
-
-        atompair_feats = single_repr_cond + atompair_feats
+        atom_repr_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
+        atompair_feats = atom_repr_cond + atompair_feats
 
         # furthermore, they did one more MLP on the atompair feats for attention biasing in atom transformer
 
