@@ -1662,7 +1662,11 @@ class InputFeatureEmbedder(Module):
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float['b n rf'],
-    ) -> Float['b n ds']:
+    ) -> Tuple[
+        Float['b n ds'],
+        Float['b m da'],
+        Float['b m m dap']
+    ]:
 
         w = self.atoms_per_window
 
@@ -1685,7 +1689,8 @@ class InputFeatureEmbedder(Module):
         )
 
         tokens = torch.cat((tokens, additional_residue_feats), dim = -1)
-        return tokens
+
+        return tokens, atom_feats, atompair_feats
 
 # distogram head
 
