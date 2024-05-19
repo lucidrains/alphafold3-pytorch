@@ -1696,10 +1696,25 @@ class ConfidenceHead(Module):
 
         # to predictions
 
-        self.to_pae_logits = LinearNoBias(dim_pairwise, num_pae_bins)
-        self.to_pde_logits = LinearNoBias(dim_pairwise, num_pde_bins)
-        self.to_plddt_logits = LinearNoBias(dim_single, num_plddt_bins)
-        self.to_resolved_logits = LinearNoBias(dim_single, 2)
+        self.to_pae_logits = nn.Sequential(
+            LinearNoBias(dim_pairwise, num_pae_bins),
+            Rearrange('b ... l -> b l ...')
+        )
+
+        self.to_pde_logits = nn.Sequential(
+            LinearNoBias(dim_pairwise, num_pde_bins),
+            Rearrange('b ... l -> b l ...')
+        )
+
+        self.to_plddt_logits = nn.Sequential(
+            LinearNoBias(dim_single, num_plddt_bins),
+            Rearrange('b ... l -> b l ...')
+        )
+
+        self.to_resolved_logits = nn.Sequential(
+            LinearNoBias(dim_single, 2),
+            Rearrange('b ... l -> b l ...')
+        )
 
     @typecheck
     def forward(
@@ -1711,10 +1726,10 @@ class ConfidenceHead(Module):
         pred_atom_pos: Float['b n c'],
         mask: Bool['b n'] | None = None,
     ) -> Tuple[
-        Float['b n n pae'],
-        Float['b n n pde'],
-        Float['b n plddt'],
-        Float['b n resolved']
+        Float['b pae n n'],
+        Float['b pde n n'],
+        Float['b plddt n'],
+        Float['b resolved n']
     ]:
 
         single_to_pairwise_i, single_to_pairwise_j = self.single_inputs_to_pairwise(single_inputs_repr).chunk(2, dim = -1)
