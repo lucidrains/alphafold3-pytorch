@@ -12,9 +12,9 @@ d - feature dimension
 ds - feature dimension (single)
 dp - feature dimension (pairwise)
 dap - feature dimension (atompair)
-da - feature dimensino (atom)
+da - feature dimension (atom)
 t - templates
-m - msa
+s - msa
 """
 
 from __future__ import annotations
@@ -822,6 +822,101 @@ class PairformerStack(Module):
         return single_repr, pairwise_repr
 
 # embedding related
+
+"""
+additional_residue_feats: [*, rf]:
+    0: residue_index
+    1: token_index
+    2: asym_id
+    3: entity_id
+    4: sym_id 
+    5: restype (must be one hot encoded to 32)
+    6: is_protein
+    7: is_rna
+    8: is_dna
+    9: is_ligand
+"""
+
+class RelativePositionEncoding(Module):
+    """ Algorithm 3 """
+    
+    def __init__(
+        self,
+        r_max = 32,
+        s_max = 2,
+        out_dim = 128
+    ):
+        super().__init__()
+        self.r_max = r_max
+        self.s_max = s_max
+        
+        input_dim = (2*r_max+2) + (2*r_max+2) + 1 + (2*s_max+2)
+        self.out_embedder = LinearNoBias(input_dim, out_dim)
+    
+    @typecheck
+    def forward(
+        self,
+        *,
+        additional_residue_feats: Float['b n rf']
+    ) -> Float['b n n dp']:
+        
+        res_idx = additional_residue_feats[..., 0]
+        token_idx = additional_residue_feats[..., 1]
+        asym_id = additional_residue_feats[..., 2]
+        entity_id = additional_residue_feats[..., 3]
+        sym_id = additional_residue_feats[..., 4]
+        
+        diff_res_idx = rearrange(res_idx, 'b n -> b n 1') \
+            - rearrange(res_idx, 'b n -> b 1 n')
+        diff_token_idx = rearrange(token_idx, 'b n -> b n 1') \
+            - rearrange(token_idx, 'b n -> b 1 n')
+        diff_sym_id = rearrange(sym_id, 'b n -> b n 1') \
+            - rearrange(sym_id, 'b n -> b 1 n')
+        mask_same_chain = rearrange(asym_id, 'b n -> b n 1') \
+            - rearrange(asym_id, 'b n -> b 1 n') == 0
+        mask_same_res = diff_res_idx == 0
+        mask_same_entity = (rearrange(entity_id, 'b n -> b n 1') \
+            - rearrange(entity_id, 'b n -> b 1 n') == 0).unsqueeze(-1)
+        
+        d_res = torch.where(
+            mask_same_chain, 
+            torch.clip(diff_res_idx + self.r_max, 0, 2*self.r_max),
+            2*self.r_max + 1
+        )
+        d_token = torch.where(
+            mask_same_chain * mask_same_res, 
+            torch.clip(diff_token_idx + self.r_max, 0, 2*self.r_max),
+            2*self.r_max + 1
+        )
+        d_chain = torch.where(
+            ~mask_same_chain, 
+            torch.clip(diff_sym_id + self.s_max, 0, 2*self.s_max),
+            2*self.s_max + 1
+        )
+        
+        def onehot(x, bins):
+            _, indexes = (x.view(-1, 1) - bins.view(1, -1)).abs().min(dim=1)
+            indexes = indexes.type(torch.int64).view(-1, 1)
+            one_hots = torch.zeros(indexes.shape[0], len(bins)).scatter_(1, indexes, 1)
+            out = rearrange(one_hots, '(b n k) d -> b n k d', n=x.shape[1], k=x.shape[2])
+            return out
+        
+        a_rel_pos = onehot(d_res, torch.arange(2*self.r_max + 2))
+        a_rel_token = onehot(d_token, torch.arange(2*self.r_max + 2))
+        a_rel_chain = onehot(d_chain, torch.arange(2*self.s_max + 2))
+        
+        p = self.out_embedder(
+                torch.cat([
+                    a_rel_pos,
+                    a_rel_token,
+                    mask_same_entity,
+                    a_rel_chain
+                ], dim=-1)
+            )
+        
+        return p
+        
+        
 
 class TemplateEmbedder(Module):
     """ Algorithm 16 """

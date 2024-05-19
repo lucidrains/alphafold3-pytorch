@@ -4,6 +4,7 @@ from alphafold3_pytorch.attention import (
 )
 
 from alphafold3_pytorch.alphafold3 import (
+    RelativePositionEncoding,
     TemplateEmbedder,
     PreLayerNorm,
     AdaptiveLayerNorm,
@@ -28,6 +29,7 @@ from alphafold3_pytorch.alphafold3 import (
 __all__ = [
     Attention,
     Attend,
+    RelativePositionEncoding,
     TemplateEmbedder,
     PreLayerNorm,
     AdaptiveLayerNorm,

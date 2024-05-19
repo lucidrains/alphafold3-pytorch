@@ -10,12 +10,13 @@ from alphafold3_pytorch import (
     DiffusionTransformer,
     DiffusionModule,
     ElucidatedAtomDiffusion,
+    RelativePositionEncoding,
     TemplateEmbedder,
     Attention,
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3
+    Alphafold3,
 )
 
 def test_pairformer():
@@ -162,6 +163,15 @@ def test_diffusion_module():
     )
 
     assert sampled_atom_pos.shape == noised_atom_pos.shape
+    
+def test_relative_position_encoding():
+    additional_residue_feats = torch.randn(8, 100, 10)
+
+    embedder = RelativePositionEncoding()
+
+    rpe_embed = embedder(
+        additional_residue_feats = additional_residue_feats
+    )
 
 def test_template_embed():
     template_feats = torch.randn(2, 2, 16, 16, 77)
