@@ -1720,11 +1720,13 @@ class InputFeatureEmbedder(Module):
 # distogram head
 
 class DistogramHead(Module):
+
+    @typecheck
     def __init__(
         self,
         *,
         dim_pairwise = 128,
-        num_dist_bins = 38   # think it is 38?
+        num_dist_bins = 38,   # think it is 38?
     ):
         super().__init__()
 
@@ -1737,9 +1739,9 @@ class DistogramHead(Module):
     def forward(
         self,
         pairwise_repr: Float['b n n d']
-    ):
-        logits = self.to_distogram_logits(pairwise_repr)
+    ) -> Float['b l n n']:
 
+        logits = self.to_distogram_logits(pairwise_repr)
         return logits
 
 # confidence head
