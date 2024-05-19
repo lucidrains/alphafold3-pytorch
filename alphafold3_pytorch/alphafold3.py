@@ -1624,6 +1624,20 @@ class InputFeatureEmbedder(Module):
 
         self.to_atom_feats = LinearNoBias(dim_atom_inputs, dim_atom)
 
+        self.atom_repr_to_atompair_feat_cond = nn.Sequential(
+            nn.LayerNorm(dim_atom),
+            LinearNoBiasThenOuterSum(dim_atom, dim_atompair),
+            nn.ReLU()
+        )
+
+        self.atompair_feats_mlp = nn.Sequential(
+            LinearNoBias(dim_atompair, dim_atompair),
+            nn.ReLU(),
+            LinearNoBias(dim_atompair, dim_atompair),
+            nn.ReLU(),
+            LinearNoBias(dim_atompair, dim_atompair),
+        )
+
         self.atom_transformer = DiffusionTransformer(
             depth = atom_transformer_blocks,
             heads = atom_transformer_heads,
@@ -1654,11 +1668,16 @@ class InputFeatureEmbedder(Module):
 
         atom_feats = self.to_atom_feats(atom_inputs)
 
+        atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
+        atompair_feats = atom_feats_cond + atompair_feats
+
         atom_feats = self.atom_transformer(
             atom_feats,
             single_repr = atom_feats,
             pairwise_repr = atompair_feats
         )
+
+        atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
 
         tokens = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
