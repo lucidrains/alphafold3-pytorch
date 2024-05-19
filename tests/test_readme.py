@@ -213,7 +213,8 @@ def test_input_embedder():
     additional_residue_feats = torch.randn(2, 16, 33)
 
     embedder = InputFeatureEmbedder(
-        dim_atom_inputs = 77
+        dim_atom_inputs = 77,
+        dim_additional_residue_feats = 33
     )
 
     embedder(

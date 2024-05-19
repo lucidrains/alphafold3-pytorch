@@ -1604,6 +1604,14 @@ class ElucidatedAtomDiffusion(Module):
 
 # input embedder
 
+EmbeddedInputs = namedtuple('EmbeddedInputs', [
+    'single_inputs',
+    'single_init',
+    'pairwise_init',
+    'atom_feats',
+    'atompair_feats'
+])
+
 class InputFeatureEmbedder(Module):
     """ Algorithm 2 """
 
@@ -1611,10 +1619,13 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         dim_atom_inputs,
+        dim_additional_residue_feats,
         atoms_per_window = 27,
         dim_atom = 128,
         dim_atompair = 16,
         dim_token = 384,
+        dim_single = 384,
+        dim_pairwise = 128,
         atom_transformer_blocks = 3,
         atom_transformer_heads = 4,
         atom_transformer_kwargs: dict = dict()
@@ -1654,6 +1665,13 @@ class InputFeatureEmbedder(Module):
             atoms_per_window = atoms_per_window
         )
 
+        dim_single_input = dim_token + dim_additional_residue_feats
+
+        self.dim_additional_residue_feats = dim_additional_residue_feats
+
+        self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
+        self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
+
     @typecheck
     def forward(
         self,
@@ -1662,11 +1680,15 @@ class InputFeatureEmbedder(Module):
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float['b n rf'],
-    ) -> Tuple[
+    ) -> EmbeddedInputs[
         Float['b n ds'],
+        Float['b n ds'],
+        Float['b n n dp'],
         Float['b m da'],
         Float['b m m dap']
     ]:
+
+        assert additional_residue_feats.shape[-1] == self.dim_additional_residue_feats
 
         w = self.atoms_per_window
 
@@ -1683,14 +1705,17 @@ class InputFeatureEmbedder(Module):
 
         atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
 
-        tokens = self.atom_feats_to_pooled_token(
+        single_inputs = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
             atom_mask = atom_mask
         )
 
-        tokens = torch.cat((tokens, additional_residue_feats), dim = -1)
+        single_inputs = torch.cat((single_inputs, additional_residue_feats), dim = -1)
 
-        return tokens, atom_feats, atompair_feats
+        single_init = self.single_input_to_single_init(single_inputs)
+        pairwise_init = self.single_input_to_pairwise_init(single_inputs)
+
+        return EmbeddedInputs(single_inputs, single_init, pairwise_init, atom_feats, atompair_feats)
 
 # distogram head
 
