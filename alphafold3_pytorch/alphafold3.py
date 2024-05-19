@@ -1055,7 +1055,7 @@ class AtomToTokenPooler(Module):
         atoms_per_window = 27
     ):
         super().__init__()
-        dim_out = default(dim, dim_out)
+        dim_out = default(dim_out, dim)
 
         self.proj = nn.Sequential(
             LinearNoBias(dim, dim_out),
@@ -1070,7 +1070,7 @@ class AtomToTokenPooler(Module):
         *,
         atom_feats: Float['b m da'],
         atom_mask: Bool['b m']
-    ):
+    ) -> Float['b n ds']:
         w = self.atoms_per_window
 
         atom_feats = self.proj(atom_feats)
@@ -1180,7 +1180,7 @@ class DiffusionModule(Module):
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
             dim = dim_atom,
-            dim_out = dim_atom,
+            dim_out = dim_token,
             atoms_per_window = atoms_per_window
         )
 
@@ -1188,22 +1188,22 @@ class DiffusionModule(Module):
 
         self.cond_tokens_with_cond_single = nn.Sequential(
             nn.LayerNorm(dim_single),
-            LinearNoBias(dim_single, dim_atom)
+            LinearNoBias(dim_single, dim_token)
         )
 
         self.token_transformer = DiffusionTransformer(
-            dim = dim_atom,
+            dim = dim_token,
             dim_single_cond = dim_single,
             dim_pairwise = dim_pairwise,
             depth = token_transformer_depth,
             heads = token_transformer_heads
         )
 
-        self.attended_token_norm = nn.LayerNorm(dim_atom)
+        self.attended_token_norm = nn.LayerNorm(dim_token)
 
         # atom attention decoding related modules
 
-        self.tokens_to_atom_decoder_input_cond = LinearNoBias(dim_atom, dim_atom)
+        self.tokens_to_atom_decoder_input_cond = LinearNoBias(dim_token, dim_atom)
 
         self.atom_decoder = DiffusionTransformer(
             dim = dim_atom,
@@ -1300,7 +1300,6 @@ class DiffusionModule(Module):
             atom_feats = atom_feats,
             atom_mask = atom_mask
         )
-
         # token transformer
 
         tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
