@@ -116,6 +116,45 @@ class Transition(Module):
 
         return self.ff(x)
 
+# dropout
+# they seem to be using structured dropout - row / col wise in triangle modules
+
+class Dropout(Module):
+    @typecheck
+    def __init__(
+        self,
+        prob: float,
+        *,
+        dropout_type: Literal['row', 'col'] | None = None
+    ):
+        super().__init__()
+        self.dropout = nn.Dropout(prob)
+        self.dropout_type = dropout_type
+
+    @typecheck
+    def forward(
+        self,
+        t: Tensor
+    ) -> Tensor:
+
+        if self.dropout_type in {'row', 'col'}:
+            assert t.ndim == 4, 'tensor must be 4 dimensions for row / col structured dropout'
+
+        if not exists(self.dropout_type):
+            return self.dropout(t)
+
+        if self.dropout_type == 'row':
+            batch, row, _, _ = t.shape
+            ones_shape = (batch, row, 1, 1)
+
+        elif self.dropout_type == 'col':
+            batch, _, col, _ = t.shape
+            ones_shape = (batch, 1, col, 1)
+
+        ones = t.new_ones(ones_shape)
+        dropped = self.dropout(ones)
+        return t * dropped
+
 # normalization
 # both pre layernorm as well as adaptive layernorm wrappers
 
@@ -227,7 +266,8 @@ class TriangleMultiplication(Module):
         dim,
         dim_hidden = None,
         mix: Literal["incoming", "outgoing"] = 'incoming',
-        dropout = 0.
+        dropout = 0.,
+        dropout_type: Literal['row', 'col'] | None = None
     ):
         super().__init__()
 
@@ -256,7 +296,7 @@ class TriangleMultiplication(Module):
 
         self.to_out = Sequential(
             Linear(dim_hidden, dim),
-            Dropout(dropout)
+            Dropout(dropout, dropout_type = dropout_type)
         )
 
     @typecheck
@@ -356,6 +396,7 @@ class TriangleAttention(Module):
         heads,
         node_type: Literal['starting', 'ending'],
         dropout = 0.,
+        dropout_type: Literal['row', 'col'] | None = None,
         **attn_kwargs
     ):
         super().__init__()
@@ -363,7 +404,7 @@ class TriangleAttention(Module):
 
         self.attn = Attention(dim = dim, heads = heads, **attn_kwargs)
 
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = Dropout(dropout, dropout_type = dropout_type)
 
         self.to_attn_bias = nn.Sequential(
             LinearNoBias(dim, heads),
@@ -435,10 +476,10 @@ class PairwiseBlock(Module):
             dim_head = tri_attn_dim_head
         )
 
-        self.tri_mult_outgoing = pre_ln(TriangleMultiplication(mix = 'outgoing', dropout = dropout_row_prob, **tri_mult_kwargs))
-        self.tri_mult_incoming = pre_ln(TriangleMultiplication(mix = 'incoming', dropout = dropout_row_prob, **tri_mult_kwargs))
-        self.tri_attn_starting = pre_ln(TriangleAttention(node_type = 'starting', dropout = dropout_row_prob, **tri_attn_kwargs))
-        self.tri_attn_ending = pre_ln(TriangleAttention(node_type = 'ending', dropout = dropout_col_prob, **tri_attn_kwargs))
+        self.tri_mult_outgoing = pre_ln(TriangleMultiplication(mix = 'outgoing', dropout = dropout_row_prob, dropout_type = 'row', **tri_mult_kwargs))
+        self.tri_mult_incoming = pre_ln(TriangleMultiplication(mix = 'incoming', dropout = dropout_row_prob, dropout_type = 'row', **tri_mult_kwargs))
+        self.tri_attn_starting = pre_ln(TriangleAttention(node_type = 'starting', dropout = dropout_row_prob, dropout_type = 'row', **tri_attn_kwargs))
+        self.tri_attn_ending = pre_ln(TriangleAttention(node_type = 'ending', dropout = dropout_col_prob, dropout_type = 'col', **tri_attn_kwargs))
         self.pairwise_transition = pre_ln(Transition(dim = dim_pairwise))
 
     @typecheck
@@ -529,7 +570,8 @@ class MSAPairWeightedAveraging(Module):
         dim_pairwise = 128,
         dim_head = 32,
         heads = 8,
-        dropout = 0.
+        dropout = 0.,
+        dropout_type: Literal['row', 'col'] | None = None
     ):
         super().__init__()
         dim_inner = dim_head * heads
@@ -549,7 +591,7 @@ class MSAPairWeightedAveraging(Module):
         self.to_out = nn.Sequential(
             Rearrange('b h s n d -> b s n (h d)'),
             LinearNoBias(dim_inner, dim_msa),
-            Dropout(dropout)
+            Dropout(dropout, dropout_type = dropout_type)
         )
 
     @typecheck
@@ -625,7 +667,9 @@ class MSAModule(Module):
                 dim_msa = dim_msa,
                 dim_pairwise = dim_pairwise,
                 heads = msa_pwa_heads,
-                dim_head = msa_pwa_dim_head
+                dim_head = msa_pwa_dim_head,
+                dropout = msa_pwa_dropout_row_prob,
+                dropout_type = 'row'
             )
 
             msa_transition = Transition(dim = dim_msa)
