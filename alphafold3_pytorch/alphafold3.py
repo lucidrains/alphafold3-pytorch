@@ -331,7 +331,7 @@ class TriangleMultiplication(Module):
     ) -> Float['b n n d']:
 
         if exists(mask):
-            mask = rearrange(mask, 'b i -> b i 1 1') & rearrange(mask, 'b j -> b 1 j 1')
+            mask = einx.logical_and('b i, b j -> b i j 1', mask, mask)
 
         x = self.norm(x)
 
@@ -577,7 +577,7 @@ class OuterProductMean(Module):
         # masking for pairwise repr
 
         if exists(mask):
-            mask = rearrange(mask, 'b i -> b i 1 1') & rearrange(mask, 'b j -> b 1 j 1')
+            mask = einx.logical_and('b i , b j -> b i j 1', mask, mask)
             outer_product_mean = outer_product_mean * mask
 
         pairwise_repr = self.to_pairwise_repr(outer_product_mean)
@@ -1021,7 +1021,7 @@ class SingleConditioning(Module):
 
         single_repr = self.norm_single(single_repr)
 
-        fourier_embed = self.fourier_embed(0.25 * (times / self.sigma_data).clamp(min = self.eps).log())
+        fourier_embed = self.fourier_embed(0.25 * log(times / self.sigma_data, eps = self.eps))
 
         normed_fourier = self.norm_fourier(fourier_embed)
 
