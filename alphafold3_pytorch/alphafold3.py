@@ -1632,6 +1632,7 @@ class InputFeatureEmbedder(Module):
             dim = dim_atom,
             dim_single_cond = dim_atom,
             dim_pairwise = dim_atompair,
+            attn_window_size = atoms_per_window,
             **atom_transformer_kwargs
         )
 
@@ -1647,7 +1648,7 @@ class InputFeatureEmbedder(Module):
         *,
         atom_inputs: Float['b m dai'],
         atom_mask: Bool['b m'],
-        atompair_feats: Float['b n w w dap'],
+        atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float['b n rf'],
     ) -> Float['b n ds']:
 
@@ -1655,19 +1656,11 @@ class InputFeatureEmbedder(Module):
 
         atom_feats = self.to_atom_feats(atom_inputs)
 
-        atom_feats = rearrange(atom_feats, 'b (n w) d -> b n w d', w = w)
-        atom_feats, merged_batch_ps = pack_one(atom_feats, '* w d')
-
-        atompair_feats = rearrange(atompair_feats, 'b n ... -> (b n) ...')
-
         atom_feats = self.atom_transformer(
             atom_feats,
             single_repr = atom_feats,
             pairwise_repr = atompair_feats
         )
-
-        atom_feats = unpack_one(atom_feats, merged_batch_ps, '* w d')
-        atom_feats = rearrange(atom_feats, 'b n w d -> b (n w) d')
 
         tokens = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,

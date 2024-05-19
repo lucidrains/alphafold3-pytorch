@@ -206,9 +206,10 @@ def test_confidence_head():
 
 def test_input_embedder():
 
-    atom_inputs = torch.randn(2, 16 * 27, 77)
-    atom_mask = torch.ones((2, 16 * 27)).bool()
-    atompair_feats = torch.randn(2, 16, 27, 27, 16)
+    atom_seq_len = 16 * 27
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atom_mask = torch.ones((2, atom_seq_len)).bool()
+    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     additional_residue_feats = torch.randn(2, 16, 33)
 
     embedder = InputFeatureEmbedder(
