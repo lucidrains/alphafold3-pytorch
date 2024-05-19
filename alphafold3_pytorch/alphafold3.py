@@ -1677,6 +1677,31 @@ class InputFeatureEmbedder(Module):
         tokens = torch.cat((tokens, additional_residue_feats), dim = -1)
         return tokens
 
+# distogram head
+
+class DistogramHead(Module):
+    def __init__(
+        self,
+        *,
+        dim_pairwise = 128,
+        num_dist_bins = 38   # think it is 38?
+    ):
+        super().__init__()
+
+        self.to_distogram_logits = nn.Sequential(
+            LinearNoBias(dim_pairwise, num_dist_bins),
+            Rearrange('b ... l -> b l ...')
+        )
+
+    @typecheck
+    def forward(
+        self,
+        pairwise_repr: Float['b n n d']
+    ):
+        logits = self.to_distogram_logits(pairwise_repr)
+
+        return logits
+
 # confidence head
 
 ConfidenceHeadReturn = namedtuple('ConfidenceHeadReturn', ['pae', 'pdt', 'plddt', 'resolved'])
@@ -1761,7 +1786,8 @@ class ConfidenceHead(Module):
 
         interatom_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
 
-        dist_bin_indices = (interatom_dist[..., None] - self.atompair_dist_bins).abs().argmin(dim = -1)
+        dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', interatom_dist, self.atompair_dist_bins).abs()
+        dist_bin_indices = dist_from_dist_bins.argmin(dim = -1)
         pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
 
         # pairformer stack

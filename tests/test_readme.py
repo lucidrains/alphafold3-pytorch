@@ -14,6 +14,8 @@ from alphafold3_pytorch import (
     Attention,
     InputFeatureEmbedder,
     ConfidenceHead,
+    DistogramHead,
+    Alphafold3
 )
 
 def test_pairformer():
@@ -219,3 +221,10 @@ def test_input_embedder():
         atompair_feats = atompair_feats,
         additional_residue_feats = additional_residue_feats
     )
+
+def test_distogram_head():
+    pairwise_repr = torch.randn(2, 16, 16, 128)
+
+    distogram_head = DistogramHead(dim_pairwise = 128)
+
+    logits = distogram_head(pairwise_repr)

@@ -21,6 +21,7 @@ from alphafold3_pytorch.alphafold3 import (
     ElucidatedAtomDiffusion,
     InputFeatureEmbedder,
     ConfidenceHead,
+    DistogramHead,
     Alphafold3
 )
 
@@ -44,5 +45,6 @@ __all__ = [
     ElucidatedAtomDiffusion,
     InputFeatureEmbedder,
     ConfidenceHead,
+    DistogramHead,
     Alphafold3
 ]
