@@ -1719,7 +1719,7 @@ class DistogramHead(Module):
 
 # confidence head
 
-ConfidenceHeadReturn = namedtuple('ConfidenceHeadReturn', ['pae', 'pdt', 'plddt', 'resolved'])
+ConfidenceHeadLogits = namedtuple('ConfidenceHeadLogits', ['pae', 'pdt', 'plddt', 'resolved'])
 
 class ConfidenceHead(Module):
     """ Algorithm 31 """
@@ -1788,8 +1788,10 @@ class ConfidenceHead(Module):
         pairwise_repr: Float['b n n dp'],
         pred_atom_pos: Float['b n c'],
         mask: Bool['b n'] | None = None,
-    ) -> Tuple[
-        Float['b pae n n'],
+        calc_pae_logits_and_loss = True
+
+    ) -> ConfidenceHeadLogits[
+        Float['b pae n n'] | None,
         Float['b pde n n'],
         Float['b plddt n'],
         Float['b resolved n']
@@ -1815,15 +1817,22 @@ class ConfidenceHead(Module):
 
         # to logits
 
-        pae_logits = self.to_pae_logits(pairwise_repr)
-
         symmetric_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
         pde_logits = self.to_pde_logits(symmetric_pairwise_repr)
 
         plddt_logits = self.to_plddt_logits(single_repr)
         resolved_logits = self.to_resolved_logits(single_repr)
 
-        return ConfidenceHeadReturn(pae_logits, pde_logits, plddt_logits, resolved_logits)
+        # they only incorporate pae at some stage of training
+
+        pae_logits = None
+
+        if calc_pae_logits_and_loss:
+            pae_logits = self.to_pae_logits(pairwise_repr)
+
+        # return all logits
+
+        return ConfidenceHeadLogits(pae_logits, pde_logits, plddt_logits, resolved_logits)
 
 # main class
 
