@@ -6,6 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn import Module
 
+import einx
 from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
@@ -272,8 +273,10 @@ class Attend(Module):
             assert attn_bias.ndim == sim.ndim
             sim = sim + attn_bias
 
-        mask = rearrange(mask, 'b n w -> b 1 n 1 w')
-        sim = sim.masked_fill(~mask, max_neg_value(sim))
+        sim = einx.where(
+            'b n j, b h n i j, -> b h n i j',
+            mask, sim, max_neg_value(sim)
+        )
 
         attn = sim.softmax(dim = -1)
 
@@ -330,9 +333,10 @@ class Attend(Module):
         # masking
 
         if exists(mask):
-            mask_value = max_neg_value(sim)
-            mask = rearrange(mask, 'b j -> b 1 1 j')
-            sim = sim.masked_fill(~mask, mask_value)
+            sim = einx.where(
+                'b j, b h i j, -> b h i j',
+                mask, sim, max_neg_value(sim)
+            )
 
         # attention
 
