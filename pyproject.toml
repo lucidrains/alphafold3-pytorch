@@ -25,6 +25,7 @@ classifiers=[
 dependencies = [
     "beartype",
     "einops>=0.8.0",
+    "einx>=0.2.2",
     "environs",
     "torch>=2.1",
     "tqdm",

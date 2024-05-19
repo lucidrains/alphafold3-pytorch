@@ -46,6 +46,7 @@ from alphafold3_pytorch.typing import (
 
 from alphafold3_pytorch.attention import Attention
 
+import einx
 from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
 
@@ -77,6 +78,29 @@ def pack_one(t, pattern):
 
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
+
+# linear and outer sum
+# for single repr -> pairwise pattern throughout this architecture
+
+class LinearNoBiasThenOuterSum(Module):
+    def __init__(
+        self,
+        dim,
+        dim_out = None
+    ):
+        super().__init__()
+        dim_out = default(dim_out, dim)
+        self.proj = LinearNoBias(dim, dim_out * 2)
+
+    @typecheck
+    def forward(
+        self,
+        t: Float['b n ds']
+    ) -> Float['b n n dp']:
+
+        single_i, single_j = self.proj(t).chunk(2, dim = -1)
+        out = einx.add('b i d, b j d -> b i j d', single_i, single_j)
+        return out
 
 # classic feedforward, SwiGLU variant
 # they name this 'transition' in their paper
@@ -1201,7 +1225,7 @@ class DiffusionModule(Module):
 
         self.single_repr_to_atompair_feat_cond = nn.Sequential(
             nn.LayerNorm(dim_single),
-            LinearNoBias(dim_single, dim_atompair * 2),
+            LinearNoBiasThenOuterSum(dim_single, dim_atompair),
             nn.ReLU()
         )
 
@@ -1319,11 +1343,10 @@ class DiffusionModule(Module):
 
         # condition atompair feats further with single repr
 
-        single_repr_cond_i, single_repr_cond_j = self.single_repr_to_atompair_feat_cond(conditioned_single_repr).chunk(2, dim = -1)
-        single_repr_cond_i = repeat(single_repr_cond_i, 'b i dap -> b (i w) 1 dap', w = w)
-        single_repr_cond_j = repeat(single_repr_cond_j, 'b j dap -> b 1 (j w) dap', w = w)
+        single_repr_cond = self.single_repr_to_atompair_feat_cond(conditioned_single_repr)
+        single_repr_cond = repeat(single_repr_cond, 'b i j dap -> b (i w1) (j w2) dap', w1 = w, w2 = w)
 
-        atompair_feats = single_repr_cond_i + single_repr_cond_j + atompair_feats
+        atompair_feats = single_repr_cond + atompair_feats
 
         # furthermore, they did one more MLP on the atompair feats for attention biasing in atom transformer
 
@@ -1683,7 +1706,7 @@ class ConfidenceHead(Module):
         self.num_dist_bins = num_dist_bins
 
         self.dist_bin_pairwise_embed = nn.Embedding(num_dist_bins, dim_pairwise)
-        self.single_inputs_to_pairwise = LinearNoBias(dim_single_inputs, dim_pairwise * 2)
+        self.single_inputs_to_pairwise = LinearNoBiasThenOuterSum(dim_single_inputs, dim_pairwise)
 
         # pairformer stack
 
@@ -1732,8 +1755,7 @@ class ConfidenceHead(Module):
         Float['b resolved n']
     ]:
 
-        single_to_pairwise_i, single_to_pairwise_j = self.single_inputs_to_pairwise(single_inputs_repr).chunk(2, dim = -1)
-        pairwise_repr = pairwise_repr + rearrange(single_to_pairwise_i, 'b i d -> b i 1 d') + rearrange(single_to_pairwise_j, 'b j d -> b 1 j d')
+        pairwise_repr = pairwise_repr + self.single_inputs_to_pairwise(single_inputs_repr)
 
         # interatomic distances - embed and add to pairwise
 
