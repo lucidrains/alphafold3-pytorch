@@ -46,3 +46,45 @@ class SmoothLDDTLoss(torch.nn.Module):
         lddt = lddt_sum / lddt_count.clamp(min=1)
 
         return 1 - lddt.mean()
+    
+
+class WeightedRigidAlign(torch.nn.Module):
+    """Alg 28"""
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, pred_coords, true_coords, weights):
+        """
+        pred_coords: predicted coordinates (b, n, 3)
+        true_coords: true coordinates (b, n, 3)
+        weights: weights for each atom (b, n)
+        """
+        # Compute weighted centroids
+        pred_centroid = (pred_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
+        true_centroid = (true_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
+
+        # Center the coordinates
+        pred_coords_centered = pred_coords - pred_centroid.unsqueeze(1)
+        true_coords_centered = true_coords - true_centroid.unsqueeze(1)
+
+        # Compute the weighted covariance matrix
+        cov_matrix = torch.einsum('bni,bnj->bij', true_coords_centered * weights.unsqueeze(-1), pred_coords_centered)
+
+        # Compute the SVD of the covariance matrix
+        U, _, V = torch.svd(cov_matrix)
+
+        # Compute the rotation matrix
+        rot_matrix = torch.einsum('bij,bjk->bik', U, V)
+
+        # Ensure proper rotation matrix with determinant 1
+        det = torch.det(rot_matrix)
+        det_mask = det < 0
+        V_fixed = V.clone()
+        V_fixed[det_mask, :, -1] *= -1
+        rot_matrix[det_mask] = torch.einsum('bij,bjk->bik', U[det_mask], V_fixed[det_mask])
+
+        # Apply the rotation and translation
+        aligned_coords = torch.einsum('bni,bij->bnj', pred_coords_centered, rot_matrix) + true_centroid.unsqueeze(1)
+
+        return aligned_coords.detach()
