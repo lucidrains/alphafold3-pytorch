@@ -257,7 +257,12 @@ def test_alphafold3():
     msa = torch.randn(2, 7, seq_len, 64)
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
+
     distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -276,7 +281,11 @@ def test_alphafold3():
         templates = template_feats,
         template_mask = template_mask,
         atom_pos = atom_pos,
-        distance_labels = distance_labels
+        distance_labels = distance_labels,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels
     )
 
     loss.backward()

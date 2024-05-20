@@ -1668,10 +1668,12 @@ class ElucidatedAtomDiffusion(Module):
 
     def forward(
         self,
-        normalized_atom_pos: Float['b m d'],
+        normalized_atom_pos: Float['b m 3'],
         atom_mask: Bool['b m'],
+        return_denoised_pos = False,
         **network_condition_kwargs
-    ):
+    ) -> Float[''] | Tuple[Float[''], Float['b m 3']]:
+
         batch_size = normalized_atom_pos.shape[0]
 
         sigmas = self.noise_distribution(batch_size)
@@ -1694,7 +1696,12 @@ class ElucidatedAtomDiffusion(Module):
 
         losses = losses * self.loss_weight(sigmas)
 
-        return losses.mean()
+        loss = losses.mean()
+
+        if not return_denoised_pos:
+            return loss
+
+        return loss, denoised
 
 # input embedder
 
@@ -1840,7 +1847,12 @@ class DistogramHead(Module):
 
 # confidence head
 
-ConfidenceHeadLogits = namedtuple('ConfidenceHeadLogits', ['pae', 'pdt', 'plddt', 'resolved'])
+ConfidenceHeadLogits = namedtuple('ConfidenceHeadLogits', [
+    'pae',
+    'pde',
+    'plddt',
+    'resolved'
+])
 
 class ConfidenceHead(Module):
     """ Algorithm 31 """
@@ -1960,7 +1972,7 @@ class ConfidenceHead(Module):
 LossBreakdown = namedtuple('LossBreakdown', [
     'distogram',
     'pae',
-    'pdt',
+    'pde',
     'plddt',
     'resolved'
 ])
@@ -2281,8 +2293,10 @@ class Alphafold3(Module):
 
         atom_pos_given = exists(atom_pos)
 
-        labels = (distance_labels, pae_labels, pde_labels, plddt_labels, resolved_labels)
-        has_labels = any([*map(exists, labels)])
+        confidence_head_labels = (pae_labels, pde_labels, plddt_labels, resolved_labels)
+        all_labels = (distance_labels, *confidence_head_labels)
+
+        has_labels = any([*map(exists, all_labels)])
 
         return_loss = atom_pos_given or has_labels
 
@@ -2309,11 +2323,13 @@ class Alphafold3(Module):
         diffusion_loss = self.zero
 
         if exists(atom_pos):
-            diffusion_loss = self.edm(atom_pos, **diffusion_cond)
+            diffusion_loss, denoised_atom_pos = self.edm(atom_pos, return_denoised_pos = True, **diffusion_cond)
 
         # calculate all logits and losses
 
         ignore = self.ignore_index
+
+        # distogram head
 
         distogram_loss = self.zero
 
@@ -2322,9 +2338,53 @@ class Alphafold3(Module):
             distogram_logits = self.distogram_head(pairwise)
             distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
 
+        # confidence head
+
+        should_call_confidence_head = any([*map(exists, confidence_head_labels)])
+        return_pae_logits = exists(pae_labels)
+
+        confidence_loss = pae_loss = pde_loss = plddt_loss = resolved_loss = self.zero
+
+        if should_call_confidence_head:
+            assert exists(atom_pos), 'diffusion module needs to have been called'
+
+            # fix this to accept representative atom indices for each residue
+
+            pred_atom_pos = rearrange(denoised_atom_pos, 'b (n w) d -> b n w d', w = w)[..., 0, :]
+
+            logits = self.confidence_head(
+                single_repr = single,
+                single_inputs_repr = single_inputs,
+                pairwise_repr = pairwise,
+                pred_atom_pos = pred_atom_pos,
+                mask = mask,
+                return_pae_logits = return_pae_logits
+            )
+
+            if exists(pae_labels):
+                pae_labels = torch.where(pairwise_mask, pae_labels, ignore)
+                pae_loss = F.cross_entropy(logits.pae, pae_labels, ignore_index = ignore)
+
+            if exists(pde_labels):
+                pde_labels = torch.where(pairwise_mask, pde_labels, ignore)
+                pde_loss = F.cross_entropy(logits.pde, pde_labels, ignore_index = ignore)
+
+            if exists(plddt_labels):
+                plddt_labels = torch.where(mask, plddt_labels, ignore)
+                plddt_loss = F.cross_entropy(logits.plddt, plddt_labels, ignore_index = ignore)
+
+            if exists(resolved_labels):
+                resolved_labels = torch.where(mask, resolved_labels, ignore)
+                resolved_loss = F.cross_entropy(logits.resolved, resolved_labels, ignore_index = ignore)
+
+            confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
+
+        # combine all the losses
+
         loss = (
             distogram_loss * self.loss_distogram_weight +
-            diffusion_loss * self.loss_diffusion_weight
+            diffusion_loss * self.loss_diffusion_weight +
+            confidence_loss * self.loss_confidence_weight
         )
 
         return loss
