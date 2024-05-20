@@ -2350,9 +2350,7 @@ class Alphafold3(Module):
 
             assert exists(residue_atom_indices)
 
-            windowed_denoised_atom_pos = rearrange(denoised_atom_pos, 'b (n w) c -> b n w c', w = w)
-
-            pred_atom_pos = einx.get_at('b n [w] c, b n -> b n c', windowed_denoised_atom_pos, residue_atom_indices)
+            pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
                 single_repr = single,
