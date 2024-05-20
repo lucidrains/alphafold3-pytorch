@@ -78,6 +78,35 @@ def pack_one(t, pattern):
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
 
+# Loss functions
+
+def smoothlddtloss(
+    denoised: Float['b m 3'], 
+    ground_truth: Float['b m 3'], 
+    is_rna_per_atom: Float['b m'],
+    is_dna_per_atom: Float['b m']
+) -> Float['b']:
+    from torch import sigmoid
+    
+    m = is_rna_per_atom.shape[-1]
+    
+    dx_denoised = torch.cdist(denoised, denoised)
+    dx_gt = torch.cdist(ground_truth, ground_truth)
+    
+    ddx = torch.abs(dx_gt - dx_denoised)
+    eps = 0.25 * (
+        sigmoid(0.5 - ddx) + sigmoid(1 - ddx) + sigmoid(2 - ddx) + sigmoid(4 - ddx)
+    )
+    
+    is_nuc = is_rna_per_atom + is_dna_per_atom
+    mask = einx.multiply('b i, b j -> b i j', is_nuc, is_nuc)
+    c = (dx_gt < 30) * mask + (dx_gt < 15) * (1 - mask)
+    
+    num = einx.sum('b [...]', c * eps * (1 - torch.eye(m))) / (m**2 - m)
+    den = einx.sum('b [...]', c * (1 - torch.eye(m))) / (m**2 - m)
+    
+    return 1 - num/den
+
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
 
