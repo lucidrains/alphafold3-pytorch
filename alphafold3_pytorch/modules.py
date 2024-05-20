@@ -1,14 +1,24 @@
 import torch
 import torch.nn.functional as F
 
+from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
+
 class SmoothLDDTLoss(torch.nn.Module):
     """Alg 27"""
-    def __init__(self, nucleic_acid_cutoff=30.0, other_cutoff=15.0):
+    @typecheck
+    def __init__(self, nucleic_acid_cutoff: float = 30.0, other_cutoff: float = 15.0):
         super().__init__()
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
 
-    def forward(self, pred_coords, true_coords, is_dna, is_rna):
+    @typecheck
+    def forward(
+        self,
+        pred_coords: Float['b n 3'],
+        true_coords: Float['b n 3'],
+        is_dna: Bool['b n'],
+        is_rna: Bool['b n']
+    ) -> Float['']:
         """
         pred_coords: predicted coordinates (b, n, 3)
         true_coords: true coordinates (b, n, 3)
@@ -49,11 +59,16 @@ class SmoothLDDTLoss(torch.nn.Module):
 
 class WeightedRigidAlign(torch.nn.Module):
     """Alg 28"""
-
     def __init__(self):
         super().__init__()
 
-    def forward(self, pred_coords, true_coords, weights):
+    @typecheck
+    def forward(
+        self,
+        pred_coords: Float['b n 3'],
+        true_coords: Float['b n 3'],
+        weights: Float['b n']
+    ) -> Float['b n 3']:
         """
         pred_coords: predicted coordinates (b, n, 3)
         true_coords: true coordinates (b, n, 3)
@@ -89,11 +104,16 @@ class WeightedRigidAlign(torch.nn.Module):
         return aligned_coords.detach()
 
 class ExpressCoordinatesInFrame(torch.nn.Module):
-    """ Alg 29"""
+    """Alg 29"""
     def __init__(self):
         super().__init__()
 
-    def forward(self, coords, frame):
+    @typecheck
+    def forward(
+        self,
+        coords: Float['b 3'],
+        frame: Float['b 3 3']
+    ) -> Float['b 3']:
         """
         coords: coordinates to be expressed in the given frame (b, 3)
         frame: frame defined by three points (b, 3, 3)
@@ -116,17 +136,26 @@ class ExpressCoordinatesInFrame(torch.nn.Module):
 
         return transformed_coords
 
-    def _normalize(self, v, eps=1e-8):
+    @typecheck
+    def _normalize(self, v: Float['b 3'], eps: float = 1e-8) -> Float['b 3']:
         return v / (v.norm(dim=-1, keepdim=True) + eps)
 
 class ComputeAlignmentError(torch.nn.Module):
-    """ Alg 30"""
-    def __init__(self, eps=1e-8):
+    """Alg 30"""
+    @typecheck
+    def __init__(self, eps: float = 1e-8):
         super().__init__()
         self.eps = eps
         self.express_coordinates_in_frame = ExpressCoordinatesInFrame()
 
-    def forward(self, pred_coords, true_coords, pred_frames, true_frames):
+    @typecheck
+    def forward(
+        self,
+        pred_coords: Float['b n 3'],
+        true_coords: Float['b n 3'],
+        pred_frames: Float['b n 3 3'],
+        true_frames: Float['b n 3 3']
+    ) -> Float['b n']:
         """
         pred_coords: predicted coordinates (b, n, 3)
         true_coords: true coordinates (b, n, 3)
@@ -146,13 +175,16 @@ class ComputeAlignmentError(torch.nn.Module):
 
         return alignment_errors
 
+
 class CentreRandomAugmentation(torch.nn.Module):
-    """ Alg 19"""
-    def __init__(self, trans_scale=1.0):
+    """Alg 19"""
+    @typecheck
+    def __init__(self, trans_scale: float = 1.0):
         super().__init__()
         self.trans_scale = trans_scale
 
-    def forward(self, coords):
+    @typecheck
+    def forward(self, coords: Float['b n 3']) -> Float['b n 3']:
         """
         coords: coordinates to be augmented (b, n, 3)
         """
@@ -170,7 +202,8 @@ class CentreRandomAugmentation(torch.nn.Module):
 
         return augmented_coords
 
-    def _random_rotation_matrix(self, device):
+    @typecheck
+    def _random_rotation_matrix(self, device: torch.device) -> Float['3 3']:
         # Generate random rotation angles
         angles = torch.rand(3, device=device) * 2 * torch.pi
 
@@ -192,7 +225,8 @@ class CentreRandomAugmentation(torch.nn.Module):
 
         return rotation_matrix
 
-    def _random_translation_vector(self, device):
+    @typecheck
+    def _random_translation_vector(self, device: torch.device) -> Float['3']:
         # Generate random translation vector
         translation_vector = torch.randn(3, device=device) * self.trans_scale
         return translation_vector
