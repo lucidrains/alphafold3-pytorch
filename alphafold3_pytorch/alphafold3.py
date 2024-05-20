@@ -2195,6 +2195,7 @@ class Alphafold3(Module):
         templates: Float['b t n n dt'],
         template_mask: Bool['b t'],
         num_recycling_steps: int = 1,
+        residue_atom_indices: Int['b n'] | None = None,
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
         distance_labels: Int['b n n'] | None = None,
@@ -2347,9 +2348,11 @@ class Alphafold3(Module):
         if should_call_confidence_head:
             assert exists(atom_pos), 'diffusion module needs to have been called'
 
-            # fix this to accept representative atom indices for each residue
+            assert exists(residue_atom_indices)
 
-            pred_atom_pos = rearrange(denoised_atom_pos, 'b (n w) d -> b n w d', w = w)[..., 0, :]
+            windowed_denoised_atom_pos = rearrange(denoised_atom_pos, 'b (n w) c -> b n w c', w = w)
+
+            pred_atom_pos = einx.get_at('b n [w] c, b n -> b n c', windowed_denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
                 single_repr = single,

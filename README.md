@@ -46,7 +46,13 @@ msa = torch.randn(2, 7, seq_len, 64)
 # required for training, but omitted on inference
 
 atom_pos = torch.randn(2, atom_seq_len, 3)
+residue_atom_indices = torch.randint(0, 27, (2, seq_len))
+
 distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
+pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+plddt_labels = torch.randint(0, 50, (2, seq_len))
+resolved_labels = torch.randint(0, 2, (2, seq_len))
 
 # train
 
@@ -60,7 +66,12 @@ loss = alphafold3(
     templates = template_feats,
     template_mask = template_mask,
     atom_pos = atom_pos,
-    distance_labels = distance_labels
+    residue_atom_indices = residue_atom_indices,
+    distance_labels = distance_labels,
+    pae_labels = pae_labels,
+    pde_labels = pde_labels,
+    plddt_labels = plddt_labels,
+    resolved_labels = resolved_labels
 )
 
 loss.backward()

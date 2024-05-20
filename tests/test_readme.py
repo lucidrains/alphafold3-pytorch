@@ -257,6 +257,7 @@ def test_alphafold3():
     msa = torch.randn(2, 7, seq_len, 64)
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
+    residue_atom_indices = torch.randint(0, 27, (2, seq_len))
 
     distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
     pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
@@ -281,6 +282,7 @@ def test_alphafold3():
         templates = template_feats,
         template_mask = template_mask,
         atom_pos = atom_pos,
+        residue_atom_indices = residue_atom_indices,
         distance_labels = distance_labels,
         pae_labels = pae_labels,
         pde_labels = pde_labels,
