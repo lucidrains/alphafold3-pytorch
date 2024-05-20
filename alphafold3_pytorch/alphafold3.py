@@ -23,7 +23,7 @@ from functools import partial
 from collections import namedtuple
 
 import torch
-from torch import nn
+from torch import nn, sigmoid
 from torch import Tensor
 import torch.nn.functional as F
 
@@ -80,15 +80,15 @@ def unpack_one(t, ps, pattern):
 
 # Loss functions
 
-def smoothlddtloss(
+@typecheck
+def calc_smooth_lddt_loss(
     denoised: Float['b m 3'], 
     ground_truth: Float['b m 3'], 
     is_rna_per_atom: Float['b m'],
     is_dna_per_atom: Float['b m']
-) -> Float['b']:
-    from torch import sigmoid
+) -> Float[' b']:
     
-    m = is_rna_per_atom.shape[-1]
+    m, device = is_rna_per_atom.shape[-1], denoised.device
     
     dx_denoised = torch.cdist(denoised, denoised)
     dx_gt = torch.cdist(ground_truth, ground_truth)
@@ -102,10 +102,11 @@ def smoothlddtloss(
     mask = einx.multiply('b i, b j -> b i j', is_nuc, is_nuc)
     c = (dx_gt < 30) * mask + (dx_gt < 15) * (1 - mask)
     
-    num = einx.sum('b [...]', c * eps * (1 - torch.eye(m))) / (m**2 - m)
-    den = einx.sum('b [...]', c * (1 - torch.eye(m))) / (m**2 - m)
-    
-    return 1 - num/den
+    eye = torch.eye(m, device = device)
+    num = einx.sum('b [...]', c * eps * (1 - eye)) / (m**2 - m)
+    den = einx.sum('b [...]', c * (1 - eye)) / (m**2 - m)
+
+    return 1. - num/den
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -1699,6 +1700,8 @@ class ElucidatedAtomDiffusion(Module):
         normalized_atom_pos: Float['b m 3'],
         atom_mask: Bool['b m'],
         return_denoised_pos = False,
+        additional_residue_feats: Float['b n rf'] | None = None,
+        add_smooth_lddt_loss = False,
         **network_condition_kwargs
     ) -> Float[''] | Tuple[Float[''], Float['b m 3']]:
 
@@ -1725,6 +1728,22 @@ class ElucidatedAtomDiffusion(Module):
         losses = losses * self.loss_weight(sigmas)
 
         loss = losses.mean()
+
+        if add_smooth_lddt_loss:
+            assert exists(additional_residue_feats)
+            w = self.net.atoms_per_window
+
+            is_dna, is_rna = additional_residue_feats[..., 7], additional_residue_feats[..., 8]
+            atom_is_dna, atom_is_rna = tuple(repeat(t, 'b n -> b (n w)', w = w) for t in (is_dna, is_rna))
+
+            smooth_lddt_loss = calc_smooth_lddt_loss(
+                denoised,
+                normalized_atom_pos,
+                atom_is_dna,
+                atom_is_rna
+            ).mean()
+
+            loss = loss + smooth_lddt_loss
 
         if not return_denoised_pos:
             return loss
@@ -2354,7 +2373,13 @@ class Alphafold3(Module):
         # otherwise, noise and make it learn to denoise
 
         if exists(atom_pos):
-            diffusion_loss, denoised_atom_pos = self.edm(atom_pos, return_denoised_pos = True, **diffusion_cond)
+            diffusion_loss, denoised_atom_pos = self.edm(
+                atom_pos,
+                additional_residue_feats = additional_residue_feats,
+                add_smooth_lddt_loss = True,
+                return_denoised_pos = True,
+                **diffusion_cond
+            )
 
         # calculate all logits and losses
 

@@ -8,7 +8,7 @@ Getting a fair number of emails. You can chat with me about this work <a href="h
 
 ## Appreciation
 
-- <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the relative positional encoding module!
+- <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
 
 ## Install
 
