@@ -79,6 +79,47 @@ def pack_one(t, pattern):
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
 
+# Loss functions
+"""
+additional_residue_feats: [*, rf]:
+    0: residue_index
+    1: token_index
+    2: asym_id
+    3: entity_id
+    4: sym_id 
+    5: restype (must be one hot encoded to 32)
+    6: is_protein
+    7: is_rna
+    8: is_dna
+    9: is_ligand
+"""
+
+def smoothlddtloss(
+    denoised: Float['b m 3'], 
+    ground_truth: Float['b m 3'], 
+    is_rna_per_atom: Float['b m'],
+    is_dna_per_atom: Float['b m']
+) -> Float['b']:
+    from torch import sigmoid
+    
+    dx_denoised = torch.cdist(denoised, denoised)
+    dx_gt = torch.cdist(ground_truth, ground_truth)
+    
+    ddx = torch.abs(dx_gt - dx_denoised)
+    eps = 0.25 * (
+        sigmoid(0.5 - ddx) + sigmoid(1 - ddx) + sigmoid(2 - ddx) + sigmoid(4 - ddx)
+    )
+    
+    is_nuc = is_rna_per_atom + is_dna_per_atom
+    mask = einx.multiply('b i, b j -> b i j', is_nuc, is_nuc)
+    c = (dx_gt < 30) * mask + (dx_gt < 15) * (1 - mask)
+    
+    num = einx.sum('b [...]', c * eps) / (c.shape[-1]**2 - c.shape[-1])
+    den = einx.sum('b [...]', c) / (c.shape[-1]**2 - c.shape[-1])
+    lddt = num / den
+    
+    return lddt
+
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
 
@@ -821,20 +862,6 @@ class PairformerStack(Module):
         return single_repr, pairwise_repr
 
 # embedding related
-
-"""
-additional_residue_feats: [*, rf]:
-    0: residue_index
-    1: token_index
-    2: asym_id
-    3: entity_id
-    4: sym_id 
-    5: restype (must be one hot encoded to 32)
-    6: is_protein
-    7: is_rna
-    8: is_dna
-    9: is_ligand
-"""
 
 class RelativePositionEncoding(Module):
     """ Algorithm 3 """

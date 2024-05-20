@@ -19,6 +19,18 @@ from alphafold3_pytorch import (
     Alphafold3,
 )
 
+from alphafold3_pytorch.alphafold3 import smoothlddtloss
+
+def test_smoothlddtloss():
+    is_rna_per_atom = torch.randn(8, 100)
+    is_dna_per_atom = torch.randn(8, 100)
+    denoised = torch.randn(8, 100, 3)
+    ground_truth = torch.randn(8, 100, 3)
+    
+    loss = smoothlddtloss(denoised, ground_truth, is_rna_per_atom, is_dna_per_atom)
+    
+    assert all(loss <= 1) and all(loss >= 0)
+
 def test_pairformer():
     single = torch.randn(2, 16, 384)
     pairwise = torch.randn(2, 16, 16, 128)
