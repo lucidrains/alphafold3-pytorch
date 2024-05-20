@@ -246,10 +246,13 @@ def test_alphafold3():
 
     msa = torch.randn(2, 7, seq_len, 64)
 
+    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
+
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
         dim_additional_residue_feats = 33,
-        dim_template_feats = 44
+        dim_template_feats = 44,
+        num_dist_bins = 38
     )
 
     loss = alphafold3(
@@ -260,7 +263,8 @@ def test_alphafold3():
         additional_residue_feats = additional_residue_feats,
         msa = msa,
         templates = template_feats,
-        template_mask = template_mask
+        template_mask = template_mask,
+        distance_labels = distance_labels
     )
 
-    print(loss)
+    loss.backward()

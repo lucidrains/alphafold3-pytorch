@@ -2011,6 +2011,12 @@ class Alphafold3(Module):
         self.loss_confidence_weight = loss_confidence_weight
         self.loss_diffusion_weight = loss_diffusion_weight
 
+        self.register_buffer('dummy', torch.tensor(0), persistent = False)
+
+    @property
+    def device(self):
+        return self.dummy.device
+
     @typecheck
     def forward(
         self,
@@ -2048,6 +2054,7 @@ class Alphafold3(Module):
         w = self.atoms_per_window
 
         mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
+        pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
 
         # init recycled single and pairwise
 
@@ -2107,6 +2114,22 @@ class Alphafold3(Module):
         # otherwise will sample the atomic coordinates
 
         labels = (distance_labels, pae_labels, pde_labels, plddt_labels, resolved_labels)
-        return_loss = any([*filter(exists, labels)])
+        return_loss = any([*map(exists, labels)])
 
-        return torch.tensor(0.)
+        if not return_loss:
+            return torch.randn((*atom_inputs.shape[:2], 3), device = self.device)
+
+        # calculate all logits and losses
+
+        ignore = self.ignore_index
+
+        if exists(distance_labels):
+            distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
+            distogram_logits = self.distogram_head(pairwise)
+            distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
+
+        loss = (
+            distogram_loss * self.loss_distogram_weight
+        )
+
+        return loss
