@@ -20,8 +20,11 @@ from alphafold3_pytorch import (
 )
 
 from alphafold3_pytorch.alphafold3 import (
-    calc_smooth_lddt_loss
+    calc_smooth_lddt_loss,
+    weighted_rigid_align
 )
+
+from alphafold3_pytorch.geom_utils import random_rotations
 
 def test_calc_smooth_lddt_loss():
     denoised = torch.randn(8, 100, 3)
@@ -37,6 +40,22 @@ def test_calc_smooth_lddt_loss():
     )
 
     assert torch.all(loss <= 1) and torch.all(loss >= 0)
+    
+def test_weighted_rigid_align():
+    R = random_rotations(8)
+    t = torch.randn(8, 1, 3)
+    ground_truth = torch.randn(8, 100, 3)
+    denoised = torch.matmul(ground_truth, R.transpose(1,2)) + t
+    weights = torch.ones(8, 100) / 100.
+
+    aligned = weighted_rigid_align(
+        ground_truth, denoised, weights 
+    )
+    
+    print(aligned)
+    print(denoised)
+
+    assert(torch.allclose(aligned, denoised, atol=1e-06)) 
 
 def test_pairformer():
     single = torch.randn(2, 16, 384)

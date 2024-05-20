@@ -86,7 +86,7 @@ def calc_smooth_lddt_loss(
     ground_truth: Float['b m 3'], 
     is_rna_per_atom: Float['b m'],
     is_dna_per_atom: Float['b m']
-) -> Float[' b']:
+) -> Float['b']:
     
     m, device = is_rna_per_atom.shape[-1], denoised.device
     
@@ -107,6 +107,38 @@ def calc_smooth_lddt_loss(
     den = einx.sum('b [...]', c * (1 - eye)) / (m**2 - m)
 
     return 1. - num/den
+
+# Utils
+
+@typecheck
+def weighted_rigid_align(
+    ground_truth: Float['b m 3'], 
+    denoised: Float['b m 3'], 
+    weights: Float['b m']
+) -> Float['b m 3']:
+    
+    weighted_gt = ground_truth * weights.unsqueeze(-1)
+    weighted_denoised = denoised * weights.unsqueeze(-1)
+       
+    mu_gt = einx.divide('b m, b -> b 1 m', weighted_gt.mean(dim=1), weights.mean(dim=1))
+    mu_denoised = einx.divide('b m, b -> b 1 m', weighted_denoised.mean(dim=1), weights.mean(dim=1))
+    centered_gt = ground_truth - mu_gt
+    centered_denoised = denoised - mu_denoised
+    
+    U, _, Vt  = torch.linalg.svd(
+        einsum(centered_gt, centered_denoised * weights.unsqueeze(-1), 'b m i, b m j -> b m i j').sum(dim=1)
+    )
+
+    d = torch.det(torch.matmul(Vt.transpose(1, 2), U.transpose(1, 2)))  
+    flip = d < 0.0
+    if flip.any().item():
+        Vt[flip, -1] *= -1.0
+
+    R = torch.matmul(Vt.transpose(1, 2), U.transpose(1, 2))
+    
+    aligned = torch.matmul(centered_gt, R.transpose(1, 2)) + mu_denoised
+
+    return aligned.detach()
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
