@@ -7,7 +7,6 @@ n - residue sequence length
 i - residue sequence length (source)
 j - residue sequence length (target)
 m - atom sequence length
-c - coordinates (3 for spatial)
 d - feature dimension
 ds - feature dimension (single)
 dp - feature dimension (pairwise)
@@ -1292,7 +1291,7 @@ class DiffusionModule(Module):
     @typecheck
     def forward(
         self,
-        noised_atom_pos: Float['b m c'],
+        noised_atom_pos: Float['b m 3'],
         *,
         atom_feats: Float['b m da'],
         atompair_feats: Float['b m m dap'],
@@ -1465,7 +1464,7 @@ class ElucidatedAtomDiffusion(Module):
     @typecheck
     def preconditioned_network_forward(
         self,
-        noised_atom_pos: Float['b m c'],
+        noised_atom_pos: Float['b m 3'],
         sigma: Float[' b'] | Float[' '] | float,
         network_condition_kwargs: dict,
         clamp = False,
@@ -1815,7 +1814,7 @@ class ConfidenceHead(Module):
         single_inputs_repr: Float['b n dsi'],
         single_repr: Float['b n ds'],
         pairwise_repr: Float['b n n dp'],
-        pred_atom_pos: Float['b n c'],
+        pred_atom_pos: Float['b n 3'],
         mask: Bool['b n'] | None = None,
         return_pae_logits = True
 
@@ -2034,7 +2033,7 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | None = None,
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
-    ) -> Float['b m c'] | Float['']:
+    ) -> Float['b m 3'] | Float['']:
 
         # embed inputs
 
