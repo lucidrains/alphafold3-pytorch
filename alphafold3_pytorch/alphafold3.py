@@ -2318,9 +2318,11 @@ class Alphafold3(Module):
         if not return_loss:
             return self.edm.sample(num_sample_steps = num_sample_steps, **diffusion_cond)
 
-        # otherwise, noise and make it learn to denoise
+        # losses default to 0
 
-        diffusion_loss = self.zero
+        distogram_loss = diffusion_loss = confidence_loss = pae_loss = pde_loss = plddt_loss = resolved_loss = self.zero
+
+        # otherwise, noise and make it learn to denoise
 
         if exists(atom_pos):
             diffusion_loss, denoised_atom_pos = self.edm(atom_pos, return_denoised_pos = True, **diffusion_cond)
@@ -2330,8 +2332,6 @@ class Alphafold3(Module):
         ignore = self.ignore_index
 
         # distogram head
-
-        distogram_loss = self.zero
 
         if exists(distance_labels):
             distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
@@ -2343,7 +2343,6 @@ class Alphafold3(Module):
         should_call_confidence_head = any([*map(exists, confidence_head_labels)])
         return_pae_logits = exists(pae_labels)
 
-        confidence_loss = pae_loss = pde_loss = plddt_loss = resolved_loss = self.zero
 
         if should_call_confidence_head:
             assert exists(atom_pos), 'diffusion module needs to have been called'
