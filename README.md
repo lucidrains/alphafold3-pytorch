@@ -93,6 +93,20 @@ sampled_atom_pos = alphafold3(
 sampled_atom_pos.shape # (2, 16 * 27, 3)
 ```
 
+## Contributing
+
+At the project root, run
+
+```bash
+$ sh ./contribute.sh
+```
+
+Then, add your module to `alphafold3_pytorch/alphafold3.py`, add your tests to `tests/test_af3.py`, and submit a pull request. You can run the tests locally with
+
+```bash
+$ pytest tests/
+```
+
 ## Citations
 
 ```bibtex

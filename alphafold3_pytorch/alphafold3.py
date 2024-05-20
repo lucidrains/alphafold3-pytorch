@@ -31,7 +31,6 @@ from torch.nn import (
     Module,
     ModuleList,
     Linear,
-    Dropout,
     Sequential,
 )
 
