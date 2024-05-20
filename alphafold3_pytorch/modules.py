@@ -46,7 +46,6 @@ class SmoothLDDTLoss(torch.nn.Module):
         lddt = lddt_sum / lddt_count.clamp(min=1)
 
         return 1 - lddt.mean()
-    
 
 class WeightedRigidAlign(torch.nn.Module):
     """Alg 28"""
@@ -88,3 +87,112 @@ class WeightedRigidAlign(torch.nn.Module):
         aligned_coords = torch.einsum('bni,bij->bnj', pred_coords_centered, rot_matrix) + true_centroid.unsqueeze(1)
 
         return aligned_coords.detach()
+
+class ExpressCoordinatesInFrame(torch.nn.Module):
+    """ Alg 29"""
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, coords, frame):
+        """
+        coords: coordinates to be expressed in the given frame (b, 3)
+        frame: frame defined by three points (b, 3, 3)
+        """
+        # Extract frame points
+        a, b, c = frame[:, 0], frame[:, 1], frame[:, 2]
+
+        # Compute unit vectors of the frame
+        e1 = self._normalize(a - b)
+        e2 = self._normalize(c - b)
+        e3 = torch.cross(e1, e2, dim=-1)
+
+        # Express coordinates in the frame basis
+        v = coords - b
+        transformed_coords = torch.stack([
+            torch.einsum('bi,bi->b', v, e1),
+            torch.einsum('bi,bi->b', v, e2),
+            torch.einsum('bi,bi->b', v, e3)
+        ], dim=-1)
+
+        return transformed_coords
+
+    def _normalize(self, v, eps=1e-8):
+        return v / (v.norm(dim=-1, keepdim=True) + eps)
+
+class ComputeAlignmentError(torch.nn.Module):
+    """ Alg 30"""
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.eps = eps
+        self.express_coordinates_in_frame = ExpressCoordinatesInFrame()
+
+    def forward(self, pred_coords, true_coords, pred_frames, true_frames):
+        """
+        pred_coords: predicted coordinates (b, n, 3)
+        true_coords: true coordinates (b, n, 3)
+        pred_frames: predicted frames (b, n, 3, 3)
+        true_frames: true frames (b, n, 3, 3)
+        """
+        # Express predicted coordinates in predicted frames
+        pred_coords_transformed = self.express_coordinates_in_frame(pred_coords, pred_frames)
+
+        # Express true coordinates in true frames
+        true_coords_transformed = self.express_coordinates_in_frame(true_coords, true_frames)
+
+        # Compute alignment errors
+        alignment_errors = torch.sqrt(
+            torch.sum((pred_coords_transformed - true_coords_transformed) ** 2, dim=-1) + self.eps
+        )
+
+        return alignment_errors
+
+class CentreRandomAugmentation(torch.nn.Module):
+    """ Alg 19"""
+    def __init__(self, trans_scale=1.0):
+        super().__init__()
+        self.trans_scale = trans_scale
+
+    def forward(self, coords):
+        """
+        coords: coordinates to be augmented (b, n, 3)
+        """
+        # Center the coordinates
+        centered_coords = coords - coords.mean(dim=1, keepdim=True)
+
+        # Generate random rotation matrix
+        rotation_matrix = self._random_rotation_matrix(coords.device)
+
+        # Generate random translation vector
+        translation_vector = self._random_translation_vector(coords.device)
+
+        # Apply rotation and translation
+        augmented_coords = torch.einsum('bni,ij->bnj', centered_coords, rotation_matrix) + translation_vector
+
+        return augmented_coords
+
+    def _random_rotation_matrix(self, device):
+        # Generate random rotation angles
+        angles = torch.rand(3, device=device) * 2 * torch.pi
+
+        # Compute sine and cosine of angles
+        sin_angles = torch.sin(angles)
+        cos_angles = torch.cos(angles)
+
+        # Construct rotation matrix
+        rotation_matrix = torch.eye(3, device=device)
+        rotation_matrix[0, 0] = cos_angles[0] * cos_angles[1]
+        rotation_matrix[0, 1] = cos_angles[0] * sin_angles[1] * sin_angles[2] - sin_angles[0] * cos_angles[2]
+        rotation_matrix[0, 2] = cos_angles[0] * sin_angles[1] * cos_angles[2] + sin_angles[0] * sin_angles[2]
+        rotation_matrix[1, 0] = sin_angles[0] * cos_angles[1]
+        rotation_matrix[1, 1] = sin_angles[0] * sin_angles[1] * sin_angles[2] + cos_angles[0] * cos_angles[2]
+        rotation_matrix[1, 2] = sin_angles[0] * sin_angles[1] * cos_angles[2] - cos_angles[0] * sin_angles[2]
+        rotation_matrix[2, 0] = -sin_angles[1]
+        rotation_matrix[2, 1] = cos_angles[1] * sin_angles[2]
+        rotation_matrix[2, 2] = cos_angles[1] * cos_angles[2]
+
+        return rotation_matrix
+
+    def _random_translation_vector(self, device):
+        # Generate random translation vector
+        translation_vector = torch.randn(3, device=device) * self.trans_scale
+        return translation_vector
