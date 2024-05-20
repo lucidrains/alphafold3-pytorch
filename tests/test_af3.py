@@ -19,6 +19,25 @@ from alphafold3_pytorch import (
     Alphafold3,
 )
 
+from alphafold3_pytorch.alphafold3 import (
+    calc_smooth_lddt_loss
+)
+
+def test_calc_smooth_lddt_loss():
+    denoised = torch.randn(8, 100, 3)
+    ground_truth = torch.randn(8, 100, 3)
+    is_rna_per_atom = torch.randint(0, 2, (8, 100)).float()
+    is_dna_per_atom = torch.randint(0, 2, (8, 100)).float()
+    
+    loss = calc_smooth_lddt_loss(
+        denoised, 
+        ground_truth, 
+        is_rna_per_atom, 
+        is_dna_per_atom
+    )
+
+    assert torch.all(loss <= 1) and torch.all(loss >= 0)
+
 def test_pairformer():
     single = torch.randn(2, 16, 384)
     pairwise = torch.randn(2, 16, 16, 128)
@@ -269,7 +288,24 @@ def test_alphafold3():
         dim_atom_inputs = 77,
         dim_additional_residue_feats = 33,
         dim_template_feats = 44,
-        num_dist_bins = 38
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
     )
 
     loss = alphafold3(
