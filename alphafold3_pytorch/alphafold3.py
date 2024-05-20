@@ -1982,12 +1982,14 @@ class Alphafold3(Module):
         dim_input_embedder_token = 384,
         dim_single = 384,
         dim_pairwise = 128,
+        dim_token = 768,
         atompair_dist_bins: Float[' dist_bins'] = torch.linspace(3, 20, 37),
         ignore_index = -1,
         num_dist_bins = 38,
         num_plddt_bins = 50,
         num_pde_bins = 64,
         num_pae_bins = 64,
+        sigma_data = 16,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
         loss_diffusion_weight = 4.,
@@ -2023,6 +2025,32 @@ class Alphafold3(Module):
         relative_position_encoding_kwargs: dict = dict(
             r_max = 32,
             s_max = 2,
+        ),
+        diffusion_module_kwargs: dict = dict(
+            single_cond_kwargs = dict(
+                num_transitions = 2,
+                transition_expansion_factor = 2,
+            ),
+            pairwise_cond_kwargs = dict(
+                num_transitions = 2
+            ),
+            atom_encoder_depth = 3,
+            atom_encoder_heads = 4,
+            token_transformer_depth = 24,
+            token_transformer_heads = 16,
+            atom_decoder_depth = 3,
+            atom_decoder_heads = 4
+        ),
+        edm_kwargs: dict = dict(
+            sigma_min = 0.002,
+            sigma_max = 80,
+            rho = 7,
+            P_mean = -1.2,
+            P_std = 1.2,
+            S_churn = 80,
+            S_tmin = 0.05,
+            S_tmax = 50,
+            S_noise = 1.003,
         )
     ):
         super().__init__()
@@ -2091,6 +2119,27 @@ class Alphafold3(Module):
             LinearNoBias(dim_pairwise, dim_pairwise)
         )
 
+        # diffusion
+
+        self.diffusion_module = DiffusionModule(
+            dim_pairwise_trunk = dim_pairwise,
+            dim_pairwise_rel_pos_feats = dim_pairwise,
+            atoms_per_window = atoms_per_window,
+            dim_pairwise = dim_pairwise,
+            sigma_data = sigma_data,
+            dim_atom = dim_atom,
+            dim_atompair = dim_atompair,
+            dim_token = dim_token,
+            dim_single = dim_single + dim_single_inputs,
+            **diffusion_module_kwargs
+        )
+
+        self.edm = ElucidatedAtomDiffusion(
+            self.diffusion_module,
+            sigma_data = sigma_data,
+            **edm_kwargs
+        )
+
         # logit heads
 
         self.distogram_head = DistogramHead(
@@ -2116,11 +2165,11 @@ class Alphafold3(Module):
         self.loss_confidence_weight = loss_confidence_weight
         self.loss_diffusion_weight = loss_diffusion_weight
 
-        self.register_buffer('dummy', torch.tensor(0), persistent = False)
+        self.register_buffer('zero', torch.tensor(0.), persistent = False)
 
     @property
     def device(self):
-        return self.dummy.device
+        return self.zero.device
 
     @typecheck
     def forward(
@@ -2134,6 +2183,8 @@ class Alphafold3(Module):
         templates: Float['b t n n dt'],
         template_mask: Bool['b t'],
         num_recycling_steps: int = 1,
+        num_sample_steps: int | None = None,
+        atom_pos: Float['b m 3'] | None = None,
         distance_labels: Int['b n n'] | None = None,
         pae_labels: Int['b n n'] | None = None,
         pde_labels: Int['b n n'] | None = None,
@@ -2228,15 +2279,43 @@ class Alphafold3(Module):
         # determine whether to return loss if any labels were to be passed in
         # otherwise will sample the atomic coordinates
 
+        atom_pos_given = exists(atom_pos)
+
         labels = (distance_labels, pae_labels, pde_labels, plddt_labels, resolved_labels)
-        return_loss = any([*map(exists, labels)])
+        has_labels = any([*map(exists, labels)])
+
+        return_loss = atom_pos_given or has_labels
+
+        # setup all the data necessary for conditioning the diffusion module
+
+        diffusion_cond = dict(
+            atom_feats = atom_feats,
+            atompair_feats = atompair_feats,
+            atom_mask = atom_mask,
+            mask = mask,
+            single_trunk_repr = single,
+            single_inputs_repr = single_inputs,
+            pairwise_trunk = pairwise,
+            pairwise_rel_pos_feats = relative_position_encoding
+        )
+
+        # if neither atom positions or any labels are passed in, sample a structure and return
 
         if not return_loss:
-            return torch.randn((*atom_inputs.shape[:2], 3), device = self.device)
+            return self.edm.sample(num_sample_steps = num_sample_steps, **diffusion_cond)
+
+        # otherwise, noise and make it learn to denoise
+
+        diffusion_loss = self.zero
+
+        if exists(atom_pos):
+            diffusion_loss = self.edm(atom_pos, **diffusion_cond)
 
         # calculate all logits and losses
 
         ignore = self.ignore_index
+
+        distogram_loss = self.zero
 
         if exists(distance_labels):
             distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
@@ -2244,7 +2323,8 @@ class Alphafold3(Module):
             distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
 
         loss = (
-            distogram_loss * self.loss_distogram_weight
+            distogram_loss * self.loss_distogram_weight +
+            diffusion_loss * self.loss_diffusion_weight
         )
 
         return loss

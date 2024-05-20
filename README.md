@@ -43,6 +43,11 @@ template_mask = torch.ones((2, 2)).bool()
 
 msa = torch.randn(2, 7, seq_len, 64)
 
+# required for training, but omitted on inference
+
+atom_pos = torch.randn(2, atom_seq_len, 3)
+distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
+
 # train
 
 loss = alphafold3(
@@ -53,11 +58,28 @@ loss = alphafold3(
     additional_residue_feats = additional_residue_feats,
     msa = msa,
     templates = template_feats,
-    template_mask = template_mask
+    template_mask = template_mask,
+    atom_pos = atom_pos,
+    distance_labels = distance_labels
 )
 
 loss.backward()
 
+# after much training ...
+
+sampled_atom_pos = alphafold3(
+    num_recycling_steps = 4,
+    num_sample_steps = 16,
+    atom_inputs = atom_inputs,
+    atom_mask = atom_mask,
+    atompair_feats = atompair_feats,
+    additional_residue_feats = additional_residue_feats,
+    msa = msa,
+    templates = template_feats,
+    template_mask = template_mask
+)
+
+sampled_atom_pos.shape # (2, 16 * 27, 3)
 ```
 
 ## Citations
@@ -83,7 +105,7 @@ loss.backward()
               {\v Z}{\'\i}dek, Augustin and Bapst, Victor and Kohli, Pushmeet
               and Jaderberg, Max and Hassabis, Demis and Jumper, John M",
   journal  = "Nature",
-  month    =  may,
+  month    = "May",
   year     =  2024
 }
 ```
