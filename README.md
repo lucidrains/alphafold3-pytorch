@@ -6,6 +6,10 @@ Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">A
 
 Getting a fair number of emails. You can chat with me about this work <a href="https://discord.gg/x6FuzQPQXY">here</a>
 
+## Appreciation
+
+- <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the relative positional encoding module!
+
 ## Install
 
 ```bash

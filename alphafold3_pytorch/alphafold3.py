@@ -841,52 +841,50 @@ class RelativePositionEncoding(Module):
     
     def __init__(
         self,
+        *,
         r_max = 32,
         s_max = 2,
-        out_dim = 128
+        dim_out = 128
     ):
         super().__init__()
         self.r_max = r_max
         self.s_max = s_max
         
-        input_dim = (2*r_max+2) + (2*r_max+2) + 1 + (2*s_max+2)
-        self.out_embedder = LinearNoBias(input_dim, out_dim)
-    
+        dim_input = (2*r_max+2) + (2*r_max+2) + 1 + (2*s_max+2)
+        self.out_embedder = LinearNoBias(dim_input, dim_out)
+
     @typecheck
     def forward(
         self,
         *,
         additional_residue_feats: Float['b n rf']
     ) -> Float['b n n dp']:
+
+        device = additional_residue_feats.device
+        assert additional_residue_feats.shape[-1] >= 5
+
+        res_idx, token_idx, asym_id, entity_id, sym_id = additional_residue_feats[..., :5].unbind(dim = -1)
         
-        res_idx = additional_residue_feats[..., 0]
-        token_idx = additional_residue_feats[..., 1]
-        asym_id = additional_residue_feats[..., 2]
-        entity_id = additional_residue_feats[..., 3]
-        sym_id = additional_residue_feats[..., 4]
-        
-        diff_res_idx = rearrange(res_idx, 'b n -> b n 1') \
-            - rearrange(res_idx, 'b n -> b 1 n')
-        diff_token_idx = rearrange(token_idx, 'b n -> b n 1') \
-            - rearrange(token_idx, 'b n -> b 1 n')
-        diff_sym_id = rearrange(sym_id, 'b n -> b n 1') \
-            - rearrange(sym_id, 'b n -> b 1 n')
-        mask_same_chain = rearrange(asym_id, 'b n -> b n 1') \
-            - rearrange(asym_id, 'b n -> b 1 n') == 0
+        diff_res_idx = einx.subtract('b i, b j -> b i j', res_idx, res_idx)
+        diff_token_idx = einx.subtract('b i, b j -> b i j', token_idx, token_idx)
+        diff_sym_id = einx.subtract('b i, b j -> b i j', sym_id, sym_id)
+
+        mask_same_chain = einx.subtract('b i, b j -> b i j', asym_id, asym_id) == 0
         mask_same_res = diff_res_idx == 0
-        mask_same_entity = (rearrange(entity_id, 'b n -> b n 1') \
-            - rearrange(entity_id, 'b n -> b 1 n') == 0).unsqueeze(-1)
+        mask_same_entity = einx.subtract('b i, b j -> b i j 1', entity_id, entity_id) == 0
         
         d_res = torch.where(
             mask_same_chain, 
             torch.clip(diff_res_idx + self.r_max, 0, 2*self.r_max),
             2*self.r_max + 1
         )
+
         d_token = torch.where(
             mask_same_chain * mask_same_res, 
             torch.clip(diff_token_idx + self.r_max, 0, 2*self.r_max),
             2*self.r_max + 1
         )
+
         d_chain = torch.where(
             ~mask_same_chain, 
             torch.clip(diff_sym_id + self.s_max, 0, 2*self.s_max),
@@ -894,28 +892,28 @@ class RelativePositionEncoding(Module):
         )
         
         def onehot(x, bins):
-            _, indexes = (x.view(-1, 1) - bins.view(1, -1)).abs().min(dim=1)
-            indexes = indexes.type(torch.int64).view(-1, 1)
+            x, packed_shape = pack_one(x, '*')
+            dist_from_bins = einx.subtract('i, j -> i j', x, bins)
+            indexes = dist_from_bins.abs().min(dim = 1, keepdim = True).indices
+            indexes = rearrange(indexes.long(), 'i j -> (i j) 1')
             one_hots = torch.zeros(indexes.shape[0], len(bins)).scatter_(1, indexes, 1)
-            out = rearrange(one_hots, '(b n k) d -> b n k d', n=x.shape[1], k=x.shape[2])
-            return out
-        
-        a_rel_pos = onehot(d_res, torch.arange(2*self.r_max + 2))
-        a_rel_token = onehot(d_token, torch.arange(2*self.r_max + 2))
-        a_rel_chain = onehot(d_chain, torch.arange(2*self.s_max + 2))
-        
-        p = self.out_embedder(
-                torch.cat([
-                    a_rel_pos,
-                    a_rel_token,
-                    mask_same_entity,
-                    a_rel_chain
-                ], dim=-1)
-            )
-        
-        return p
-        
-        
+            return unpack_one(one_hots, packed_shape, '* d')
+
+        r_arange = torch.arange(2*self.r_max + 2, device = device)
+        s_arange = torch.arange(2*self.s_max + 2, device = device)
+
+        a_rel_pos = onehot(d_res, r_arange)
+        a_rel_token = onehot(d_token, r_arange)
+        a_rel_chain = onehot(d_chain, s_arange)
+
+        out, _ = pack((
+            a_rel_pos,
+            a_rel_token,
+            mask_same_entity,
+            a_rel_chain
+        ), 'b i j *')
+
+        return self.out_embedder(out)
 
 class TemplateEmbedder(Module):
     """ Algorithm 16 """
@@ -2021,6 +2019,10 @@ class Alphafold3(Module):
             pair_bias_attn_heads = 16,
             dropout_row_prob = 0.25,
             pairwise_block_kwargs = dict()
+        ),
+        relative_position_encoding_kwargs: dict = dict(
+            r_max = 32,
+            s_max = 2,
         )
     ):
         super().__init__()
@@ -2042,6 +2044,15 @@ class Alphafold3(Module):
         )
 
         dim_single_inputs = dim_input_embedder_token + dim_additional_residue_feats
+
+        # relative positional encoding
+        # used by pairwise in main alphafold2 trunk
+        # and also in the diffusion module separately from alphafold3
+
+        self.relative_position_encoding = RelativePositionEncoding(
+            dim_out = dim_pairwise,
+            **relative_position_encoding_kwargs
+        )
 
         # templates
 
@@ -2130,6 +2141,8 @@ class Alphafold3(Module):
         resolved_labels: Int['b n'] | None = None,
     ) -> Float['b m 3'] | Float['']:
 
+        w = self.atoms_per_window
+
         # embed inputs
 
         (
@@ -2145,7 +2158,15 @@ class Alphafold3(Module):
             additional_residue_feats = additional_residue_feats
         )
 
-        w = self.atoms_per_window
+        # relative positional encoding
+
+        relative_position_encoding = self.relative_position_encoding(
+            additional_residue_feats = additional_residue_feats
+        )
+
+        pairwise_init = pairwise_init + relative_position_encoding
+
+        # pairwise mask
 
         mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
