@@ -43,7 +43,7 @@ def test_calc_smooth_lddt_loss():
 
     assert torch.all(loss <= 1) and torch.all(loss >= 0)
 
-# ToDo
+# ToDo tests
 
 def test_smooth_lddt_loss():
     pred_coords = torch.randn(2, 100, 3)
@@ -67,13 +67,15 @@ def test_weighted_rigid_align():
     assert aligned_coords.shape == pred_coords.shape
 
 def test_express_coordinates_in_frame():
-    coords = torch.randn(2, 3)
-    frame = torch.randn(2, 3, 3)
+    batch_size = 2
+    num_coords = 100
+    coords = torch.randn(batch_size, num_coords, 3)
+    frame = torch.randn(batch_size, num_coords, 3, 3)
 
     express_fn = ExpressCoordinatesInFrame()
     transformed_coords = express_fn(coords, frame)
 
-    assert transformed_coords.shape == coords.shape
+    assert transformed_coords.shape == (batch_size, num_coords, 3)
 
 def test_compute_alignment_error():
     pred_coords = torch.randn(2, 100, 3)

@@ -1753,11 +1753,6 @@ class ElucidatedAtomDiffusion(Module):
 
 # modules todo
 
-import torch
-import torch.nn.functional as F
-
-from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
-
 class SmoothLDDTLoss(torch.nn.Module):
     """Alg 27"""
     @typecheck
@@ -1929,7 +1924,6 @@ class ComputeAlignmentError(torch.nn.Module):
         )
 
         return alignment_errors
-
 
 class CentreRandomAugmentation(torch.nn.Module):
     """Alg 19"""
