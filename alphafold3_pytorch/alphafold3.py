@@ -1865,12 +1865,15 @@ class ExpressCoordinatesInFrame(Module):
     def forward(
         self,
         coords: Float['b m 3'],
-        frame: Float['b m 3 3']
+        frame: Float['b m 3 3'] | Float['b 3 3']
     ) -> Float['b m 3']:
         """
         coords: coordinates to be expressed in the given frame (b, 3)
         frame: frame defined by three points (b, 3, 3)
         """
+
+        if frame.ndim == 3:
+            frame = rearrange(frame, 'b fr fc -> b 1 fr fc')
 
         # Extract frame points
         a, b, c = frame.unbind(dim = -1)

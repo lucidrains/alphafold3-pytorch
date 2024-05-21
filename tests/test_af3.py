@@ -75,6 +75,9 @@ def test_express_coordinates_in_frame():
     express_fn = ExpressCoordinatesInFrame()
     transformed_coords = express_fn(coords, frame)
 
+    broadcastable_frame = torch.randn(batch_size, 3, 3)
+    transformed_coords = express_fn(coords, broadcastable_frame)
+
     assert transformed_coords.shape == (batch_size, num_coords, 3)
 
 def test_compute_alignment_error():
