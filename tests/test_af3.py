@@ -311,11 +311,11 @@ def test_input_embedder():
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
     atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-    additional_residue_feats = torch.randn(2, 16, 33)
+    additional_residue_feats = torch.randn(2, 16, 10)
 
     embedder = InputFeatureEmbedder(
         dim_atom_inputs = 77,
-        dim_additional_residue_feats = 33
+        dim_additional_residue_feats = 10
     )
 
     embedder(
@@ -340,7 +340,7 @@ def test_alphafold3():
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
     atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-    additional_residue_feats = torch.randn(2, seq_len, 33)
+    additional_residue_feats = torch.randn(2, seq_len, 10)
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
     template_mask = torch.ones((2, 2)).bool()
@@ -358,7 +358,7 @@ def test_alphafold3():
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
-        dim_additional_residue_feats = 33,
+        dim_additional_residue_feats = 10,
         dim_template_feats = 44,
         num_dist_bins = 38,
         confidence_head_kwargs = dict(

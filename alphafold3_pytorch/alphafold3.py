@@ -907,7 +907,7 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_residue_feats: Float['b n rf']
+        additional_residue_feats: Float['b n 10']
     ) -> Float['b n n dp']:
 
         device = additional_residue_feats.device
@@ -1566,6 +1566,7 @@ class ElucidatedAtomDiffusionReturn(NamedTuple):
     loss: Float['']
     denoised_atom_pos: Float['b m 3']
     loss_breakdown: DiffusionLossBreakdown
+    noise_sigmas: Float[' b']
 
 class ElucidatedAtomDiffusion(Module):
     @typecheck
@@ -1751,9 +1752,11 @@ class ElucidatedAtomDiffusion(Module):
         normalized_atom_pos: Float['b m 3'],
         atom_mask: Bool['b m'],
         return_denoised_pos = False,
-        additional_residue_feats: Float['b n rf'] | None = None,
+        additional_residue_feats: Float['b n 10'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
+        nucleotide_loss_weight = 5.,
+        ligand_loss_weight = 10.,
         return_loss_breakdown = False,
         **network_condition_kwargs
     ) -> ElucidatedAtomDiffusionReturn:
@@ -1777,13 +1780,33 @@ class ElucidatedAtomDiffusion(Module):
 
         total_loss = 0.
 
+        # if additional residue feats is provided, get the mask for nucleotides and ligands
+
+        if exists(additional_residue_feats):
+            w = self.net.atoms_per_window
+
+            is_nucleotide_or_ligand_fields = additional_residue_feats[..., 7:] != 0.
+            atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in is_nucleotide_or_ligand_fields.unbind(dim = -1))
+
         # main diffusion mse loss
 
-        losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none')
+        losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none') / 3.
+
+        if exists(additional_residue_feats):
+            # section 3.7.1 equation 4
+
+            finetune_weight = torch.where(atom_is_dna | atom_is_rna, nucleotide_loss_weight, 1.)
+            finetune_weight = torch.where(atom_is_ligand, ligand_loss_weight, finetune_weight)
+
+            losses = einx.multiply('b m c, b m -> b m c',  losses, finetune_weight)
+
+        # regular loss weight as defined in EDM paper
 
         loss_weights = self.loss_weight(padded_sigmas)
 
         losses = losses * loss_weights
+
+        # account for atom mask
 
         mse_loss = losses[atom_mask].mean()
 
@@ -1812,10 +1835,6 @@ class ElucidatedAtomDiffusion(Module):
 
         if add_smooth_lddt_loss:
             assert exists(additional_residue_feats)
-            w = self.net.atoms_per_window
-
-            is_dna, is_rna = additional_residue_feats[..., 7], additional_residue_feats[..., 8]
-            atom_is_dna, atom_is_rna = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in (is_dna, is_rna))
 
             smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
@@ -1831,7 +1850,7 @@ class ElucidatedAtomDiffusion(Module):
 
         loss_breakdown = DiffusionLossBreakdown(mse_loss, bond_loss, smooth_lddt_loss)
 
-        return ElucidatedAtomDiffusionReturn(total_loss, denoised_atom_pos, loss_breakdown)
+        return ElucidatedAtomDiffusionReturn(total_loss, denoised_atom_pos, loss_breakdown, sigmas)
 
 # modules todo
 
@@ -2582,6 +2601,7 @@ class Alphafold3(Module):
         template_mask: Bool['b t'],
         num_recycling_steps: int = 1,
         diffusion_add_bond_loss: bool = False,
+        diffusion_add_smooth_lddt_loss: bool = False,
         residue_atom_indices: Int['b n'] | None = None,
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
@@ -2717,12 +2737,12 @@ class Alphafold3(Module):
         # otherwise, noise and make it learn to denoise
 
         if exists(atom_pos):
-            diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown = self.edm(
+            diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,
                 additional_residue_feats = additional_residue_feats,
-                add_smooth_lddt_loss = True,
-                return_denoised_pos = True,
+                add_smooth_lddt_loss = diffusion_add_smooth_lddt_loss,
                 add_bond_loss = diffusion_add_bond_loss,
+                return_denoised_pos = True,
                 **diffusion_cond
             )
 
