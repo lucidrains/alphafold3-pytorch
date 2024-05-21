@@ -1557,6 +1557,16 @@ class DiffusionModule(Module):
 # from Karras et al.
 # https://arxiv.org/abs/2206.00364
 
+class DiffusionLossBreakdown(NamedTuple):
+    mse: Float['']
+    bond: Float['']
+    smooth_lddt: Float['']
+
+class ElucidatedAtomDiffusionReturn(NamedTuple):
+    loss: Float['']
+    denoised_atom_pos: Float['b m 3']
+    loss_breakdown: DiffusionLossBreakdown
+
 class ElucidatedAtomDiffusion(Module):
     @typecheck
     def __init__(
@@ -1600,6 +1610,8 @@ class ElucidatedAtomDiffusion(Module):
         # smooth lddt loss
 
         self.smooth_lddt_loss = SmoothLDDTLoss(**smooth_lddt_loss_kwargs)
+
+        self.register_buffer('zero', torch.tensor(0.), persistent = False)
 
     @property
     def device(self):
@@ -1742,8 +1754,9 @@ class ElucidatedAtomDiffusion(Module):
         additional_residue_feats: Float['b n rf'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
+        return_loss_breakdown = False,
         **network_condition_kwargs
-    ) -> Float[''] | Tuple[Float[''], Float['b m 3']]:
+    ) -> ElucidatedAtomDiffusionReturn:
 
         batch_size = normalized_atom_pos.shape[0]
 
@@ -1762,6 +1775,8 @@ class ElucidatedAtomDiffusion(Module):
             network_condition_kwargs = network_condition_kwargs
         )
 
+        total_loss = 0.
+
         # main diffusion mse loss
 
         losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none')
@@ -1770,9 +1785,13 @@ class ElucidatedAtomDiffusion(Module):
 
         losses = losses * loss_weights
 
-        loss = losses[atom_mask].mean()
+        mse_loss = losses[atom_mask].mean()
+
+        total_loss = total_loss + mse_loss
 
         # proposed extra bond loss during finetuning
+
+        bond_loss = self.zero
 
         if add_bond_loss:
             atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
@@ -1785,9 +1804,11 @@ class ElucidatedAtomDiffusion(Module):
 
             bond_loss = bond_losses[atompair_mask].mean()
 
-            loss = loss + bond_loss
+            total_loss = total_loss + bond_loss
 
         # proposed auxiliary smooth lddt loss
+
+        smooth_lddt_loss = self.zero
 
         if add_smooth_lddt_loss:
             assert exists(additional_residue_feats)
@@ -1804,13 +1825,13 @@ class ElucidatedAtomDiffusion(Module):
                 coords_mask = atom_mask
             )
 
-            loss = loss + smooth_lddt_loss
+            total_loss = total_loss + smooth_lddt_loss
 
-        if not return_denoised_pos:
-            return loss
+        # calculate loss breakdown
 
-        return loss, denoised_atom_pos
+        loss_breakdown = DiffusionLossBreakdown(mse_loss, bond_loss, smooth_lddt_loss)
 
+        return ElucidatedAtomDiffusionReturn(total_loss, denoised_atom_pos, loss_breakdown)
 
 # modules todo
 
@@ -1826,6 +1847,8 @@ class SmoothLDDTLoss(Module):
         super().__init__()
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
+
+        self.register_buffer('zero', torch.tensor(0.), persistent = False)
 
     @typecheck
     def forward(
@@ -1873,6 +1896,10 @@ class SmoothLDDTLoss(Module):
         if exists(coords_mask):
             paired_coords_mask = einx.logical_and('b i, b j -> b i j', coords_mask, coords_mask)
             mask = mask & paired_coords_mask
+
+        # Account for an edge case
+        if (~mask).all():
+            return self.zero
 
         # Calculate masked averaging
         lddt_sum = (eps * mask).sum(dim=(-1, -2))
@@ -2334,6 +2361,7 @@ class LossBreakdown(NamedTuple):
     plddt: Float['']
     resolved: Float['']
     confidence: Float['']
+    diffusion_loss_breakdown: DiffusionLossBreakdown
 
 class Alphafold3(Module):
     """ Algorithm 1 """
@@ -2689,7 +2717,7 @@ class Alphafold3(Module):
         # otherwise, noise and make it learn to denoise
 
         if exists(atom_pos):
-            diffusion_loss, denoised_atom_pos = self.edm(
+            diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown = self.edm(
                 atom_pos,
                 additional_residue_feats = additional_residue_feats,
                 add_smooth_lddt_loss = True,
@@ -2766,7 +2794,8 @@ class Alphafold3(Module):
             resolved = resolved_loss,
             distogram = distogram_loss,
             diffusion = diffusion_loss,
-            confidence = confidence_loss
+            confidence = confidence_loss,
+            diffusion_loss_breakdown = diffusion_loss_breakdown
         )
 
         return loss, loss_breakdown

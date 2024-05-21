@@ -227,7 +227,7 @@ def test_diffusion_module():
         num_sample_steps = 2
     )
 
-    loss = edm(
+    edm_return = edm(
         noised_atom_pos,
         atom_feats = atom_feats,
         atompair_feats = atompair_feats,
@@ -240,7 +240,7 @@ def test_diffusion_module():
         add_bond_loss = True
     )
 
-    assert loss.numel() == 1
+    assert edm_return.loss.numel() == 1
 
     sampled_atom_pos = edm.sample(
         atom_mask = atom_mask,
