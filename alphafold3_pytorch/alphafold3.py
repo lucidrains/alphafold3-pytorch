@@ -1740,20 +1740,26 @@ class ElucidatedAtomDiffusion(Module):
 
         losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none')
 
-        losses = losses * self.loss_weight(padded_sigmas)
+        loss_weights = self.loss_weight(padded_sigmas)
+
+        losses = losses * loss_weights
 
         loss = losses[atom_mask].mean()
 
         # proposed extra bond loss during finetuning
 
         if add_bond_loss:
+            atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
+
             denoised_cdist = torch.cdist(denoised_atom_pos, denoised_atom_pos, p = 2)
             normalized_cdist = torch.cdist(normalized_atom_pos, normalized_atom_pos, p = 2)
 
             bond_losses = F.mse_loss(denoised_cdist, normalized_cdist, reduction = 'none')
-            atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
+            bond_losses = bond_losses * loss_weights
 
-            loss = loss + bond_losses[atompair_mask].mean()
+            bond_loss = bond_losses[atompair_mask].mean()
+
+            loss = loss + bond_loss
 
         # proposed auxiliary smooth lddt loss
 
