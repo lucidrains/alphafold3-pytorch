@@ -132,7 +132,9 @@ def test_msa_module():
     msa = torch.randn(2, 7, 16, 64)
     mask = torch.randint(0, 2, (2, 16)).bool()
 
-    msa_module = MSAModule()
+    msa_module = MSAModule(
+        max_num_msa = 3 # will randomly select 3 out of the MSAs, accounting for mask, using sample without replacement
+    )
 
     pairwise_out = msa_module(
         msa = msa,

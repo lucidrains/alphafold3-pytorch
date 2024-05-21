@@ -696,9 +696,12 @@ class MSAModule(Module):
         msa_pwa_dropout_row_prob = 0.15,
         msa_pwa_heads = 8,
         msa_pwa_dim_head = 32,
-        pairwise_block_kwargs: dict = dict()
+        pairwise_block_kwargs: dict = dict(),
+        max_num_msa: int | None = None
     ):
         super().__init__()
+
+        self.max_num_msa = default(max_num_msa, float('inf'))  # cap the number of MSAs, will do sample without replacement if exceeds
 
         self.msa_init_proj = LinearNoBias(dim_msa_input, dim_msa) if exists(dim_msa_input) else nn.Identity()
 
@@ -752,6 +755,24 @@ class MSAModule(Module):
         msa_mask: Bool['b s'] | None = None,
     ) -> Float['b n n dp']:
 
+        batch, num_msa, device = *msa.shape[:2], msa.device
+
+        # sample without replacement
+
+        if num_msa > self.max_num_msa:
+            rand = torch.randn((batch, num_msa), device = device)
+
+            if exists(msa_mask):
+                rand.masked_fill_(~msa_mask, max_neg_value(msa))
+
+            indices = rand.topk(self.max_num_msa, dim = -1).indices
+
+            msa = einx.get_at('b [s] n dm, b sampled -> b sampled n dm', msa, indices)
+
+            if exists(msa_mask):
+                msa_mask = einx.get_at('b [s], b sampled -> b sampled', msa_mask, indices)
+
+        # process msa
 
         msa = self.msa_init_proj(msa)
 
