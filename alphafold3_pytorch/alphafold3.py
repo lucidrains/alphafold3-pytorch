@@ -1169,7 +1169,8 @@ class DiffusionTransformer(Module):
         dim_single_cond = None,
         dim_pairwise = 128,
         attn_window_size = None,
-        attn_pair_bias_kwargs: dict = dict()
+        attn_pair_bias_kwargs: dict = dict(),
+        serial = False
     ):
         super().__init__()
         dim_single_cond = default(dim_single_cond, dim)
@@ -1209,6 +1210,8 @@ class DiffusionTransformer(Module):
 
         self.layers = layers
 
+        self.serial = serial
+
     @typecheck
     def forward(
         self,
@@ -1218,6 +1221,8 @@ class DiffusionTransformer(Module):
         pairwise_repr: Float['b n n dp'],
         mask: Bool['b n'] | None = None
     ):
+        serial = self.serial
+
         for attn, transition in self.layers:
 
             attn_out = attn(
@@ -1227,14 +1232,18 @@ class DiffusionTransformer(Module):
                 mask = mask
             )
 
+            if serial:
+                noised_repr = attn_out + noised_repr
+
             ff_out = transition(
                 noised_repr,
                 cond = single_repr
             )
 
-            # interesting, they use parallel attention and feedforward modules
+            if not serial:
+                ff_out = ff_out + attn_out
 
-            noised_repr = noised_repr + attn_out + ff_out
+            noised_repr = noised_repr + ff_out
 
         return noised_repr
 
@@ -1311,7 +1320,8 @@ class DiffusionModule(Module):
         token_transformer_depth = 24,
         token_transformer_heads = 16,
         atom_decoder_depth = 3,
-        atom_decoder_heads = 4
+        atom_decoder_heads = 4,
+        serial = False
     ):
         super().__init__()
 
@@ -1366,7 +1376,8 @@ class DiffusionModule(Module):
             dim_pairwise = dim_atompair,
             attn_window_size = atoms_per_window,
             depth = atom_encoder_depth,
-            heads = atom_encoder_heads
+            heads = atom_encoder_heads,
+            serial = serial
         )
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
@@ -1387,7 +1398,8 @@ class DiffusionModule(Module):
             dim_single_cond = dim_single,
             dim_pairwise = dim_pairwise,
             depth = token_transformer_depth,
-            heads = token_transformer_heads
+            heads = token_transformer_heads,
+            serial = serial
         )
 
         self.attended_token_norm = nn.LayerNorm(dim_token)
@@ -1402,7 +1414,8 @@ class DiffusionModule(Module):
             dim_pairwise = dim_atompair,
             attn_window_size = atoms_per_window,
             depth = atom_decoder_depth,
-            heads = atom_decoder_heads
+            heads = atom_decoder_heads,
+            serial = serial
         )
 
         self.atom_feat_to_atom_pos_update = nn.Sequential(
