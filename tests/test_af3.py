@@ -413,3 +413,49 @@ def test_alphafold3():
     )
 
     assert sampled_atom_pos.ndim == 3
+
+
+def test_token_bonds_embedding():
+    batch_size = 2
+    seq_len = 16
+    atom_seq_len = seq_len * 27
+
+    atom_inputs = torch.randn(batch_size, atom_seq_len, 77)
+    atom_mask = torch.ones((batch_size, atom_seq_len)).bool()
+    atompair_feats = torch.randn(batch_size, atom_seq_len, atom_seq_len, 16)
+    additional_residue_feats = torch.randn(batch_size, seq_len, 10)
+
+    # Test case 1: token_bonds is provided
+    token_bonds = torch.randint(0, 2, (batch_size, seq_len, seq_len)).float()
+
+    model = Alphafold3(
+        dim_atom_inputs=77,
+        dim_additional_residue_feats=10,
+        dim_pairwise=128,
+    )
+
+    output = model(
+        atom_inputs=atom_inputs,
+        atom_mask=atom_mask,
+        atompair_feats=atompair_feats,
+        additional_residue_feats=additional_residue_feats,
+        token_bonds=token_bonds,
+    )
+
+    assert output.shape == (batch_size, atom_seq_len, 3)
+
+    # Test case 2: token_bonds is not provided (default to single chain)
+    model = Alphafold3(
+        dim_atom_inputs=77,
+        dim_additional_residue_feats=10,
+        dim_pairwise=128,
+    )
+
+    output = model(
+        atom_inputs=atom_inputs,
+        atom_mask=atom_mask,
+        atompair_feats=atompair_feats,
+        additional_residue_feats=additional_residue_feats,
+    )
+
+    assert output.shape == (batch_size, atom_seq_len, 3)

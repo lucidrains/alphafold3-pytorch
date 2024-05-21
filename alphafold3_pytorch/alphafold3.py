@@ -2480,6 +2480,13 @@ class Alphafold3(Module):
             **relative_position_encoding_kwargs
         )
 
+        # f_tokenbond
+        self.token_bonds_embedder = nn.Sequential(
+                    nn.Linear(1, dim_pairwise),
+                    nn.ReLU(),
+                    nn.Linear(dim_pairwise, dim_pairwise)
+                )
+
         # templates
 
         self.template_embedder = TemplateEmbedder(
@@ -2581,6 +2588,7 @@ class Alphafold3(Module):
         templates: Float['b t n n dt'],
         template_mask: Bool['b t'],
         num_recycling_steps: int = 1,
+        token_bonds: Float['b n n'] | None = None,
         diffusion_add_bond_loss: bool = False,
         diffusion_add_smooth_lddt_loss: bool = False,
         residue_atom_indices: Int['b n'] | None = None,
@@ -2618,6 +2626,18 @@ class Alphafold3(Module):
         )
 
         pairwise_init = pairwise_init + relative_position_encoding
+
+        # Handle token_bonds embedding
+        if token_bonds is None:
+            # Default to a single chain if token_bonds is not provided
+            token_bonds = torch.eye(pairwise_init.shape[1], dtype=pairwise_init.dtype, device=pairwise_init.device)
+            token_bonds = token_bonds.unsqueeze(0).expand(pairwise_init.shape[0], -1, -1)
+        else:
+            token_bonds = token_bonds.to(pairwise_init.dtype).to(pairwise_init.device)
+
+        # Embed token_bonds and add it to pairwise_init
+        token_bonds_embed = self.token_bonds_embedder(token_bonds)
+        pairwise_init = pairwise_init + token_bonds_embed
 
         # pairwise mask
 
