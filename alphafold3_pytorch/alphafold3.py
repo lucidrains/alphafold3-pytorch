@@ -2102,13 +2102,12 @@ class CentreRandomAugmentation(Module):
 
 # input embedder
 
-EmbeddedInputs = namedtuple('EmbeddedInputs', [
-    'single_inputs',
-    'single_init',
-    'pairwise_init',
-    'atom_feats',
-    'atompair_feats'
-])
+class EmbeddedInputs(NamedTuple):
+    single_inputs: Float['b n ds']
+    single_init: Float['b n ds']
+    pairwise_init: Float['b n n dp']
+    atom_feats: Float['b m da']
+    atompair_feats: Float['b m m dap']
 
 class InputFeatureEmbedder(Module):
     """ Algorithm 2 """
@@ -2126,7 +2125,7 @@ class InputFeatureEmbedder(Module):
         dim_pairwise = 128,
         atom_transformer_blocks = 3,
         atom_transformer_heads = 4,
-        atom_transformer_kwargs: dict = dict()
+        atom_transformer_kwargs: dict = dict(),
     ):
         super().__init__()
         self.atoms_per_window = atoms_per_window
@@ -2178,13 +2177,7 @@ class InputFeatureEmbedder(Module):
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float['b n rf'],
-    ) -> EmbeddedInputs[
-        Float['b n ds'],
-        Float['b n ds'],
-        Float['b n n dp'],
-        Float['b m da'],
-        Float['b m m dap']
-    ]:
+    ) -> EmbeddedInputs:
 
         assert additional_residue_feats.shape[-1] == self.dim_additional_residue_feats
 
@@ -2244,12 +2237,11 @@ class DistogramHead(Module):
 
 # confidence head
 
-ConfidenceHeadLogits = namedtuple('ConfidenceHeadLogits', [
-    'pae',
-    'pde',
-    'plddt',
-    'resolved'
-])
+class ConfidenceHeadLogits(NamedTuple):
+    pae: Float['b pae n n'] | None
+    pde: Float['b pde n n']
+    plddt: Float['b plddt n']
+    resolved: Float['b 2 n']
 
 class ConfidenceHead(Module):
     """ Algorithm 31 """
@@ -2320,12 +2312,7 @@ class ConfidenceHead(Module):
         mask: Bool['b n'] | None = None,
         return_pae_logits = True
 
-    ) -> ConfidenceHeadLogits[
-        Float['b pae n n'] | None,
-        Float['b pde n n'],
-        Float['b plddt n'],
-        Float['b resolved n']
-    ]:
+    ) -> ConfidenceHeadLogits:
 
         pairwise_repr = pairwise_repr + self.single_inputs_to_pairwise(single_inputs_repr)
 
