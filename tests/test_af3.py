@@ -380,7 +380,7 @@ def test_alphafold3():
         ),
     )
 
-    loss = alphafold3(
+    loss, breakdown = alphafold3(
         num_recycling_steps = 2,
         atom_inputs = atom_inputs,
         atom_mask = atom_mask,
@@ -395,7 +395,8 @@ def test_alphafold3():
         pae_labels = pae_labels,
         pde_labels = pde_labels,
         plddt_labels = plddt_labels,
-        resolved_labels = resolved_labels
+        resolved_labels = resolved_labels,
+        return_loss_breakdown = True
     )
 
     loss.backward()

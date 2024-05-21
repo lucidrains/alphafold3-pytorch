@@ -34,7 +34,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Literal, Tuple
+from typing import Literal, Tuple, NamedTuple
 
 from alphafold3_pytorch.typing import (
     Float,
@@ -2326,13 +2326,14 @@ class ConfidenceHead(Module):
 
 # main class
 
-LossBreakdown = namedtuple('LossBreakdown', [
-    'distogram',
-    'pae',
-    'pde',
-    'plddt',
-    'resolved'
-])
+class LossBreakdown(NamedTuple):
+    diffusion: Float['']
+    distogram: Float['']
+    pae: Float['']
+    pde: Float['']
+    plddt: Float['']
+    resolved: Float['']
+    confidence: Float['']
 
 class Alphafold3(Module):
     """ Algorithm 1 """
@@ -2561,7 +2562,8 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | None = None,
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
-    ) -> Float['b m 3'] | Float['']:
+        return_loss_breakdown = False
+    ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
         w = self.atoms_per_window
 
@@ -2754,4 +2756,17 @@ class Alphafold3(Module):
             confidence_loss * self.loss_confidence_weight
         )
 
-        return loss
+        if not return_loss_breakdown:
+            return loss
+
+        loss_breakdown = LossBreakdown(
+            pae = pae_loss,
+            pde = pde_loss,
+            plddt = plddt_loss,
+            resolved = resolved_loss,
+            distogram = distogram_loss,
+            diffusion = diffusion_loss,
+            confidence = confidence_loss
+        )
+
+        return loss, loss_breakdown
