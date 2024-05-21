@@ -1723,11 +1723,10 @@ class ElucidatedAtomDiffusion(Module):
         )
 
         losses = F.mse_loss(denoised, normalized_atom_pos, reduction = 'none')
-        losses = reduce(losses, 'b ... -> b', 'mean')
 
-        losses = losses * self.loss_weight(sigmas)
+        losses = losses * self.loss_weight(padded_sigmas)
 
-        loss = losses.mean()
+        loss = losses[atom_mask].mean()
 
         if add_smooth_lddt_loss:
             assert exists(additional_residue_feats)
