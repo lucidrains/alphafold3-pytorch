@@ -75,8 +75,15 @@ def test_express_coordinates_in_frame():
     express_fn = ExpressCoordinatesInFrame()
     transformed_coords = express_fn(coords, frame)
 
-    broadcastable_frame = torch.randn(batch_size, 3, 3)
-    transformed_coords = express_fn(coords, broadcastable_frame)
+    assert transformed_coords.shape == (batch_size, num_coords, 3)
+
+    broadcastable_seq_frame = torch.randn(batch_size, 3, 3)
+    transformed_coords = express_fn(coords, broadcastable_seq_frame)
+
+    assert transformed_coords.shape == (batch_size, num_coords, 3)
+
+    broadcastable_batch_and_seq_frame = torch.randn(3, 3)
+    transformed_coords = express_fn(coords, broadcastable_batch_and_seq_frame)
 
     assert transformed_coords.shape == (batch_size, num_coords, 3)
 
