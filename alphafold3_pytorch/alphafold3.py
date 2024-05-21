@@ -1574,6 +1574,7 @@ class ElucidatedAtomDiffusion(Module):
         S_tmin = 0.05,
         S_tmax = 50,
         S_noise = 1.003,
+        smooth_lddt_loss_kwargs: dict = dict()
     ):
         super().__init__()
         self.net = net
@@ -1595,6 +1596,10 @@ class ElucidatedAtomDiffusion(Module):
         self.S_tmin = S_tmin
         self.S_tmax = S_tmax
         self.S_noise = S_noise
+
+        # smooth lddt loss
+
+        self.smooth_lddt_loss = SmoothLDDTLoss(**smooth_lddt_loss_kwargs)
 
     @property
     def device(self):
@@ -1789,14 +1794,15 @@ class ElucidatedAtomDiffusion(Module):
             w = self.net.atoms_per_window
 
             is_dna, is_rna = additional_residue_feats[..., 7], additional_residue_feats[..., 8]
-            atom_is_dna, atom_is_rna = tuple(repeat(t, 'b n -> b (n w)', w = w) for t in (is_dna, is_rna))
+            atom_is_dna, atom_is_rna = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in (is_dna, is_rna))
 
-            smooth_lddt_loss = calc_smooth_lddt_loss(
+            smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
                 normalized_atom_pos,
                 atom_is_dna,
-                atom_is_rna
-            ).mean()
+                atom_is_rna,
+                coords_mask = atom_mask
+            )
 
             loss = loss + smooth_lddt_loss
 
@@ -1812,7 +1818,11 @@ class SmoothLDDTLoss(Module):
     """ Algorithm 27 """
 
     @typecheck
-    def __init__(self, nucleic_acid_cutoff: float = 30.0, other_cutoff: float = 15.0):
+    def __init__(
+        self,
+        nucleic_acid_cutoff: float = 30.0,
+        other_cutoff: float = 15.0
+    ):
         super().__init__()
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
@@ -1823,7 +1833,8 @@ class SmoothLDDTLoss(Module):
         pred_coords: Float['b n 3'],
         true_coords: Float['b n 3'],
         is_dna: Bool['b n'],
-        is_rna: Bool['b n']
+        is_rna: Bool['b n'],
+        coords_mask: Bool['b n'] | None = None,
     ) -> Float['']:
         """
         pred_coords: predicted coordinates (b, n, 3)
@@ -1857,6 +1868,13 @@ class SmoothLDDTLoss(Module):
 
         # Compute mean, avoiding self term
         mask = torch.logical_and(inclusion_radius, torch.logical_not(torch.eye(pred_coords.shape[1], dtype=torch.bool, device=pred_coords.device)))
+
+        # Take into account variable lengthed atoms in batch
+        if exists(coords_mask):
+            paired_coords_mask = einx.logical_and('b i, b j -> b i j', coords_mask, coords_mask)
+            mask = mask & paired_coords_mask
+
+        # Calculate masked averaging
         lddt_sum = (eps * mask).sum(dim=(-1, -2))
         lddt_count = mask.sum(dim=(-1, -2))
         lddt = lddt_sum / lddt_count.clamp(min=1)
