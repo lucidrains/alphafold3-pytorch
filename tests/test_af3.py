@@ -234,7 +234,8 @@ def test_diffusion_module():
         single_trunk_repr = single_trunk_repr,
         single_inputs_repr = single_inputs_repr,
         pairwise_trunk = pairwise_trunk,
-        pairwise_rel_pos_feats = pairwise_rel_pos_feats
+        pairwise_rel_pos_feats = pairwise_rel_pos_feats,
+        add_bond_loss = True
     )
 
     assert loss.numel() == 1

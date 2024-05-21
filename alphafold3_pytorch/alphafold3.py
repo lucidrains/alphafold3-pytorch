@@ -1702,6 +1702,7 @@ class ElucidatedAtomDiffusion(Module):
         return_denoised_pos = False,
         additional_residue_feats: Float['b n rf'] | None = None,
         add_smooth_lddt_loss = False,
+        add_bond_loss = False,
         **network_condition_kwargs
     ) -> Float[''] | Tuple[Float[''], Float['b m 3']]:
 
@@ -1716,17 +1717,32 @@ class ElucidatedAtomDiffusion(Module):
 
         network_condition_kwargs.update(atom_mask = atom_mask)
 
-        denoised = self.preconditioned_network_forward(
+        denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
             sigmas,
             network_condition_kwargs = network_condition_kwargs
         )
 
-        losses = F.mse_loss(denoised, normalized_atom_pos, reduction = 'none')
+        # main diffusion mse loss
+
+        losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none')
 
         losses = losses * self.loss_weight(padded_sigmas)
 
         loss = losses[atom_mask].mean()
+
+        # proposed extra bond loss during finetuning
+
+        if add_bond_loss:
+            denoised_cdist = torch.cdist(denoised_atom_pos, denoised_atom_pos, p = 2)
+            normalized_cdist = torch.cdist(normalized_atom_pos, normalized_atom_pos, p = 2)
+
+            bond_losses = F.mse_loss(denoised_cdist, normalized_cdist, reduction = 'none')
+            atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
+
+            loss = loss + bond_losses[atompair_mask].mean()
+
+        # proposed auxiliary smooth lddt loss
 
         if add_smooth_lddt_loss:
             assert exists(additional_residue_feats)
@@ -1736,7 +1752,7 @@ class ElucidatedAtomDiffusion(Module):
             atom_is_dna, atom_is_rna = tuple(repeat(t, 'b n -> b (n w)', w = w) for t in (is_dna, is_rna))
 
             smooth_lddt_loss = calc_smooth_lddt_loss(
-                denoised,
+                denoised_atom_pos,
                 normalized_atom_pos,
                 atom_is_dna,
                 atom_is_rna
@@ -1747,7 +1763,7 @@ class ElucidatedAtomDiffusion(Module):
         if not return_denoised_pos:
             return loss
 
-        return loss, denoised
+        return loss, denoised_atom_pos
 
 
 # modules todo
@@ -1824,6 +1840,7 @@ class WeightedRigidAlign(Module):
         true_coords: true coordinates (b, n, 3)
         weights: weights for each atom (b, n)
         """
+
         # Compute weighted centroids
         pred_centroid = (pred_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
         true_centroid = (true_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
@@ -2477,6 +2494,7 @@ class Alphafold3(Module):
         templates: Float['b t n n dt'],
         template_mask: Bool['b t'],
         num_recycling_steps: int = 1,
+        diffusion_add_bond_loss: bool = False,
         residue_atom_indices: Int['b n'] | None = None,
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
@@ -2599,7 +2617,10 @@ class Alphafold3(Module):
         # if neither atom positions or any labels are passed in, sample a structure and return
 
         if not return_loss:
-            return self.edm.sample(num_sample_steps = num_sample_steps, **diffusion_cond)
+            return self.edm.sample(
+                num_sample_steps = num_sample_steps,
+                **diffusion_cond
+            )
 
         # losses default to 0
 
@@ -2613,6 +2634,7 @@ class Alphafold3(Module):
                 additional_residue_feats = additional_residue_feats,
                 add_smooth_lddt_loss = True,
                 return_denoised_pos = True,
+                add_bond_loss = diffusion_add_bond_loss,
                 **diffusion_cond
             )
 
@@ -2631,7 +2653,6 @@ class Alphafold3(Module):
 
         should_call_confidence_head = any([*map(exists, confidence_head_labels)])
         return_pae_logits = exists(pae_labels)
-
 
         if should_call_confidence_head:
             assert exists(atom_pos), 'diffusion module needs to have been called'
