@@ -1753,8 +1753,9 @@ class ElucidatedAtomDiffusion(Module):
 
 # modules todo
 
-class SmoothLDDTLoss(torch.nn.Module):
-    """Alg 27"""
+class SmoothLDDTLoss(Module):
+    """ Algorithm 27 """
+
     @typecheck
     def __init__(self, nucleic_acid_cutoff: float = 30.0, other_cutoff: float = 15.0):
         super().__init__()
@@ -1807,8 +1808,8 @@ class SmoothLDDTLoss(torch.nn.Module):
 
         return 1 - lddt.mean()
 
-class WeightedRigidAlign(torch.nn.Module):
-    """Alg 28"""
+class WeightedRigidAlign(Module):
+    """ Algorithm 28 """
     def __init__(self):
         super().__init__()
 
@@ -1853,45 +1854,45 @@ class WeightedRigidAlign(torch.nn.Module):
 
         return aligned_coords.detach()
 
-class ExpressCoordinatesInFrame(torch.nn.Module):
-    """Alg 29"""
-    def __init__(self):
+class ExpressCoordinatesInFrame(Module):
+    """ Algorithm  29 """
+
+    def __init__(self, eps = 1e-8):
         super().__init__()
+        self.eps = eps
 
     @typecheck
     def forward(
         self,
-        coords: Float['b 3'],
-        frame: Float['b 3 3']
-    ) -> Float['b 3']:
+        coords: Float['b m 3'],
+        frame: Float['b m 3 3']
+    ) -> Float['b m 3']:
         """
         coords: coordinates to be expressed in the given frame (b, 3)
         frame: frame defined by three points (b, 3, 3)
         """
+
         # Extract frame points
-        a, b, c = frame[:, 0], frame[:, 1], frame[:, 2]
+        a, b, c = frame.unbind(dim = -1)
 
         # Compute unit vectors of the frame
-        e1 = self._normalize(a - b)
-        e2 = self._normalize(c - b)
-        e3 = torch.cross(e1, e2, dim=-1)
+        e1 = F.normalize(a - b, dim = -1, eps = self.eps)
+        e2 = F.normalize(c - b, dim = -1, eps = self.eps)
+        e3 = torch.cross(e1, e2, dim = -1)
 
         # Express coordinates in the frame basis
         v = coords - b
+
         transformed_coords = torch.stack([
-            torch.einsum('bi,bi->b', v, e1),
-            torch.einsum('bi,bi->b', v, e2),
-            torch.einsum('bi,bi->b', v, e3)
-        ], dim=-1)
+            einsum(v, e1, '... i, ... i -> ...'),
+            einsum(v, e2, '... i, ... i -> ...'),
+            einsum(v, e3, '... i, ... i -> ...')
+        ], dim = -1)
 
         return transformed_coords
 
-    @typecheck
-    def _normalize(self, v: Float['b 3'], eps: float = 1e-8) -> Float['b 3']:
-        return v / (v.norm(dim=-1, keepdim=True) + eps)
-
-class ComputeAlignmentError(torch.nn.Module):
-    """Alg 30"""
+class ComputeAlignmentError(Module):
+    """ Algorithm 30 """
     @typecheck
     def __init__(self, eps: float = 1e-8):
         super().__init__()
@@ -1925,8 +1926,8 @@ class ComputeAlignmentError(torch.nn.Module):
 
         return alignment_errors
 
-class CentreRandomAugmentation(torch.nn.Module):
-    """Alg 19"""
+class CentreRandomAugmentation(Module):
+    """ Algorithm 19 """
     @typecheck
     def __init__(self, trans_scale: float = 1.0):
         super().__init__()
@@ -1979,8 +1980,6 @@ class CentreRandomAugmentation(torch.nn.Module):
         # Generate random translation vector
         translation_vector = torch.randn(3, device=device) * self.trans_scale
         return translation_vector
-
-
 
 # input embedder
 

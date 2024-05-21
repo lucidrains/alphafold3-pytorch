@@ -5,6 +5,11 @@ import torch
 import pytest
 
 from alphafold3_pytorch import (
+    SmoothLDDTLoss,
+    WeightedRigidAlign,
+    ExpressCoordinatesInFrame,
+    ComputeAlignmentError,
+    CentreRandomAugmentation,
     PairformerStack,
     MSAModule,
     DiffusionTransformer,
@@ -17,11 +22,6 @@ from alphafold3_pytorch import (
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
-    SmoothLDDTLoss,
-    WeightedRigidAlign,
-    ExpressCoordinatesInFrame,
-    ComputeAlignmentError,
-    CentreRandomAugmentation
 )
 
 from alphafold3_pytorch.alphafold3 import (

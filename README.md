@@ -10,6 +10,8 @@ Getting a fair number of emails. You can chat with me about this work <a href="h
 
 - <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
 
+- <a href="https://github.com/engelberger">Felipe</a> for contributing Weighted Rigid Align, Express Coordinates In Frame, Compute Alignment Error, and Centre Random Augmentation modules!
+
 ## Install
 
 ```bash

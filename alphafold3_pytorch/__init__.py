@@ -5,6 +5,11 @@ from alphafold3_pytorch.attention import (
 
 from alphafold3_pytorch.alphafold3 import (
     RelativePositionEncoding,
+    SmoothLDDTLoss,
+    WeightedRigidAlign,
+    ExpressCoordinatesInFrame,
+    ComputeAlignmentError,
+    CentreRandomAugmentation,
     TemplateEmbedder,
     PreLayerNorm,
     AdaptiveLayerNorm,
@@ -30,6 +35,11 @@ __all__ = [
     Attention,
     Attend,
     RelativePositionEncoding,
+    SmoothLDDTLoss,
+    WeightedRigidAlign,
+    ExpressCoordinatesInFrame,
+    ComputeAlignmentError,
+    CentreRandomAugmentation,
     TemplateEmbedder,
     PreLayerNorm,
     AdaptiveLayerNorm,
