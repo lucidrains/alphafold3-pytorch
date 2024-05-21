@@ -1867,8 +1867,6 @@ class SmoothLDDTLoss(Module):
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
 
-        self.register_buffer('zero', torch.tensor(0.), persistent = False)
-
     @typecheck
     def forward(
         self,
@@ -1915,10 +1913,6 @@ class SmoothLDDTLoss(Module):
         if exists(coords_mask):
             paired_coords_mask = einx.logical_and('b i, b j -> b i j', coords_mask, coords_mask)
             mask = mask & paired_coords_mask
-
-        # Account for an edge case
-        if (~mask).all():
-            return self.zero
 
         # Calculate masked averaging
         lddt_sum = (eps * mask).sum(dim=(-1, -2))
