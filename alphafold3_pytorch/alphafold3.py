@@ -2482,10 +2482,11 @@ class Alphafold3(Module):
 
         # f_tokenbond
         self.token_bonds_embedder = nn.Sequential(
-                    nn.Linear(1, dim_pairwise),
-                    nn.ReLU(),
-                    nn.Linear(dim_pairwise, dim_pairwise)
-                )
+            Rearrange('b n m -> b n m 1'),
+            nn.Linear(1, dim_pairwise),
+            nn.ReLU(),
+            nn.Linear(dim_pairwise, dim_pairwise)
+        )
 
         # templates
 
