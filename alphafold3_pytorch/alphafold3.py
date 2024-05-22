@@ -1593,6 +1593,7 @@ class ElucidatedAtomDiffusion(Module):
         S_tmax = 50,
         S_noise = 1.003,
         smooth_lddt_loss_kwargs: dict = dict(),
+        weighted_rigid_align_kwargs: dict = dict()
     ):
         super().__init__()
         self.net = net
@@ -1614,6 +1615,10 @@ class ElucidatedAtomDiffusion(Module):
         self.S_tmin = S_tmin
         self.S_tmax = S_tmax
         self.S_noise = S_noise
+
+        # weighted rigid align
+
+        self.weighted_rigid_align = WeightedRigidAlign(**weighted_rigid_align_kwargs)
 
         # smooth lddt loss
 
@@ -1756,7 +1761,7 @@ class ElucidatedAtomDiffusion(Module):
 
     def forward(
         self,
-        normalized_atom_pos: Float['b m 3'],
+        atom_pos_ground_truth: Float['b m 3'],
         atom_mask: Bool['b m'],
         atom_feats: Float['b m da'],
         atompair_feats: Float['b m m dap'],
@@ -1776,14 +1781,14 @@ class ElucidatedAtomDiffusion(Module):
 
         # diffusion loss
 
-        batch_size = normalized_atom_pos.shape[0]
+        batch_size = atom_pos_ground_truth.shape[0]
 
         sigmas = self.noise_distribution(batch_size)
         padded_sigmas = rearrange(sigmas, 'b -> b 1 1')
 
-        noise = torch.randn_like(normalized_atom_pos)
+        noise = torch.randn_like(atom_pos_ground_truth)
 
-        noised_atom_pos = normalized_atom_pos + padded_sigmas * noise  # alphas are 1. in the paper
+        noised_atom_pos = atom_pos_ground_truth + padded_sigmas * noise  # alphas are 1. in the paper
 
         denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
@@ -1802,7 +1807,10 @@ class ElucidatedAtomDiffusion(Module):
 
         total_loss = 0.
 
-        # if additional residue feats is provided, get the mask for nucleotides and ligands
+        # if additional residue feats is provided
+        # calculate the weights for mse loss (wl)
+
+        align_weights = atom_pos_ground_truth.new_ones(atom_pos_ground_truth.shape[:2])
 
         if exists(additional_residue_feats):
             w = self.net.atoms_per_window
@@ -1810,17 +1818,23 @@ class ElucidatedAtomDiffusion(Module):
             is_nucleotide_or_ligand_fields = additional_residue_feats[..., 7:] != 0.
             atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in is_nucleotide_or_ligand_fields.unbind(dim = -1))
 
-        # main diffusion mse loss
-
-        losses = F.mse_loss(denoised_atom_pos, normalized_atom_pos, reduction = 'none') / 3.
-
-        if exists(additional_residue_feats):
             # section 3.7.1 equation 4
 
-            finetune_weight = torch.where(atom_is_dna | atom_is_rna, nucleotide_loss_weight, 1.)
-            finetune_weight = torch.where(atom_is_ligand, ligand_loss_weight, finetune_weight)
+            align_weights = torch.where(atom_is_dna | atom_is_rna, nucleotide_loss_weight, align_weights)
+            align_weights = torch.where(atom_is_ligand, ligand_loss_weight, align_weights)
 
-            losses = einx.multiply('b m c, b m -> b m c',  losses, finetune_weight)
+        # section 3.7.1 equation 2 - weighted rigid aligned ground truth
+
+        atom_pos_aligned_ground_truth = self.weighted_rigid_align(
+            atom_pos_ground_truth,
+            denoised_atom_pos,
+            align_weights
+        )
+
+        # main diffusion mse loss
+
+        losses = F.mse_loss(denoised_atom_pos, atom_pos_aligned_ground_truth, reduction = 'none') / 3.
+        losses = einx.multiply('b m c, b m -> b m c',  losses, align_weights)
 
         # regular loss weight as defined in EDM paper
 
@@ -1842,7 +1856,7 @@ class ElucidatedAtomDiffusion(Module):
             atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
 
             denoised_cdist = torch.cdist(denoised_atom_pos, denoised_atom_pos, p = 2)
-            normalized_cdist = torch.cdist(normalized_atom_pos, normalized_atom_pos, p = 2)
+            normalized_cdist = torch.cdist(atom_pos_ground_truth, atom_pos_ground_truth, p = 2)
 
             bond_losses = F.mse_loss(denoised_cdist, normalized_cdist, reduction = 'none')
             bond_losses = bond_losses * loss_weights
