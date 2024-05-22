@@ -1347,7 +1347,7 @@ class DiffusionModule(Module):
         super().__init__()
 
         self.atoms_per_window = atoms_per_window
-
+        self.sigma_data = sigma_data
         # conditioning
 
         self.single_conditioner = SingleConditioning(
@@ -1477,6 +1477,9 @@ class DiffusionModule(Module):
             pairwise_rel_pos_feats = pairwise_rel_pos_feats
         )
 
+        # Line 2 : "Normalization": Scale positions to dimensionless vectors with approximately unit variance.
+        # noised_atom_pos = noised_atom_pos / sqrt(times**2 + self.sigma_data**2)
+
         # lines 7-14 in Algorithm 5
 
         atom_feats_cond = atom_feats
@@ -1548,6 +1551,10 @@ class DiffusionModule(Module):
             single_repr = atom_feats_cond,
             pairwise_repr = atompair_feats
         )
+
+        # Line 8: "De-normalization: Rescale updates to positions and combine with input positions.
+        # atom_pos_update = self.sigma_data**2 / (self.sigma_data**2 + times**2) * noised_atom_pos + self.sigma_data * times / sqrt(self.sigma_data**2 + times**2) * atom_pos_update
+
 
         atom_pos_update = self.atom_feat_to_atom_pos_update(atom_feats)
 
