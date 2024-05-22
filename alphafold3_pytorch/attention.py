@@ -266,14 +266,14 @@ class Attend(Module):
                 attn_bias[..., 2:, :, :]
             ), dim = -1)
 
-            attn_bias, ps = pack_one(attn_bias, '* i j w1 w2')
+            # get the diagonal
 
-            merged_batch = attn_bias.shape[0]
-            diag_mask = torch.eye(attn_bias.shape[1], device = device, dtype = torch.bool)
-            diag_mask = repeat(diag_mask, 'i j -> b i j', b = merged_batch)
+            n = torch.arange(attn_bias.shape[-3], device = device)
 
-            attn_bias = rearrange(attn_bias[diag_mask], '(b n) i j -> b n i j', b = merged_batch)
-            attn_bias = unpack_one(attn_bias, ps, '* n i j')
+            attn_bias = einx.get_at(
+                '... [i j] w1 w2, n, n -> ... n w1 w2',
+                attn_bias, n, n
+            )
 
         # carry out attention as usual
 
