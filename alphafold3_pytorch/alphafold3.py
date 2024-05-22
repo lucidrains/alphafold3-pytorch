@@ -1730,6 +1730,9 @@ class ElucidatedAtomDiffusion(Module):
             atom_pos_hat = atom_pos + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
 
             model_output = self.preconditioned_network_forward(atom_pos_hat, sigma_hat, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
+            # Not sure if normalization is requiered here :thinking face:
+            # model_output = self.preconditioned_network_forward(atom_pos_hat * sqrt(sigma_hat**2 + self.sigma_data**2), sigma_hat, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
+            denoised_over_sigma = (atom_pos_hat - model_output) / sigma_hat
             denoised_over_sigma = (atom_pos_hat - model_output) / sigma_hat
 
             atom_pos_next = atom_pos_hat + (sigma_next - sigma_hat) * denoised_over_sigma
