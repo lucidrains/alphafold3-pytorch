@@ -2,6 +2,7 @@
 global ein notation:
 
 b - batch
+ba - batch with augmentation
 h - heads
 n - residue sequence length
 i - residue sequence length (source)
@@ -19,7 +20,7 @@ s - msa
 from __future__ import annotations
 
 from math import pi, sqrt
-from functools import partial
+from functools import partial, wraps
 from collections import namedtuple
 
 import torch
@@ -77,6 +78,14 @@ def pack_one(t, pattern):
 
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
+
+def maybe(fn):
+    @wraps(fn)
+    def inner(t, *args, **kwargs):
+        if not exists(t):
+            return None
+        return fn(t, *args, **kwargs)
+    return inner
 
 # Loss functions
 
@@ -1562,9 +1571,9 @@ class DiffusionLossBreakdown(NamedTuple):
 
 class ElucidatedAtomDiffusionReturn(NamedTuple):
     loss: Float['']
-    denoised_atom_pos: Float['b m 3']
+    denoised_atom_pos: Float['ba m 3']
     loss_breakdown: DiffusionLossBreakdown
-    noise_sigmas: Float[' b']
+    noise_sigmas: Float[' ba']
 
 class ElucidatedAtomDiffusion(Module):
     @typecheck
@@ -1583,7 +1592,7 @@ class ElucidatedAtomDiffusion(Module):
         S_tmin = 0.05,
         S_tmax = 50,
         S_noise = 1.003,
-        smooth_lddt_loss_kwargs: dict = dict()
+        smooth_lddt_loss_kwargs: dict = dict(),
     ):
         super().__init__()
         self.net = net
@@ -1749,6 +1758,13 @@ class ElucidatedAtomDiffusion(Module):
         self,
         normalized_atom_pos: Float['b m 3'],
         atom_mask: Bool['b m'],
+        atom_feats: Float['b m da'],
+        atompair_feats: Float['b m m dap'],
+        mask: Bool['b n'],
+        single_trunk_repr: Float['b n dst'],
+        single_inputs_repr: Float['b n dsi'],
+        pairwise_trunk: Float['b n n dpt'],
+        pairwise_rel_pos_feats: Float['b n n dpr'],
         return_denoised_pos = False,
         additional_residue_feats: Float['b n 10'] | None = None,
         add_smooth_lddt_loss = False,
@@ -1756,8 +1772,9 @@ class ElucidatedAtomDiffusion(Module):
         nucleotide_loss_weight = 5.,
         ligand_loss_weight = 10.,
         return_loss_breakdown = False,
-        **network_condition_kwargs
     ) -> ElucidatedAtomDiffusionReturn:
+
+        # diffusion loss
 
         batch_size = normalized_atom_pos.shape[0]
 
@@ -1768,12 +1785,19 @@ class ElucidatedAtomDiffusion(Module):
 
         noised_atom_pos = normalized_atom_pos + padded_sigmas * noise  # alphas are 1. in the paper
 
-        network_condition_kwargs.update(atom_mask = atom_mask)
-
         denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
             sigmas,
-            network_condition_kwargs = network_condition_kwargs
+            network_condition_kwargs = dict(
+                atom_feats = atom_feats,
+                atom_mask = atom_mask,
+                atompair_feats = atompair_feats,
+                mask = mask,
+                single_trunk_repr = single_trunk_repr,
+                single_inputs_repr = single_inputs_repr,
+                pairwise_trunk = pairwise_trunk,
+                pairwise_rel_pos_feats = pairwise_rel_pos_feats,
+            )
         )
 
         total_loss = 0.
@@ -2386,6 +2410,7 @@ class Alphafold3(Module):
         num_pde_bins = 64,
         num_pae_bins = 64,
         sigma_data = 16,
+        diffusion_num_augmentations = 4,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
         loss_diffusion_weight = 4.,
@@ -2447,11 +2472,17 @@ class Alphafold3(Module):
             S_tmin = 0.05,
             S_tmax = 50,
             S_noise = 1.003,
-        )
+        ),
+        augment_kwargs: dict = dict()
     ):
         super().__init__()
 
         self.atoms_per_window = atoms_per_window
+
+        # augmentation
+
+        self.num_augmentations = diffusion_num_augmentations
+        self.augmenter = CentreRandomAugmentation(**augment_kwargs)
 
         # input feature embedder
 
@@ -2688,44 +2719,26 @@ class Alphafold3(Module):
 
         return_loss = atom_pos_given or has_labels
 
-        # setup all the data necessary for conditioning the diffusion module
-
-        diffusion_cond = dict(
-            atom_feats = atom_feats,
-            atompair_feats = atompair_feats,
-            atom_mask = atom_mask,
-            mask = mask,
-            single_trunk_repr = single,
-            single_inputs_repr = single_inputs,
-            pairwise_trunk = pairwise,
-            pairwise_rel_pos_feats = relative_position_encoding
-        )
-
         # if neither atom positions or any labels are passed in, sample a structure and return
 
         if not return_loss:
             return self.edm.sample(
                 num_sample_steps = num_sample_steps,
-                **diffusion_cond
+                atom_feats = atom_feats,
+                atompair_feats = atompair_feats,
+                atom_mask = atom_mask,
+                mask = mask,
+                single_trunk_repr = single,
+                single_inputs_repr = single_inputs,
+                pairwise_trunk = pairwise,
+                pairwise_rel_pos_feats = relative_position_encoding
             )
 
         # losses default to 0
 
         distogram_loss = diffusion_loss = confidence_loss = pae_loss = pde_loss = plddt_loss = resolved_loss = self.zero
 
-        # otherwise, noise and make it learn to denoise
-
-        if exists(atom_pos):
-            diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
-                atom_pos,
-                additional_residue_feats = additional_residue_feats,
-                add_smooth_lddt_loss = diffusion_add_smooth_lddt_loss,
-                add_bond_loss = diffusion_add_bond_loss,
-                return_denoised_pos = True,
-                **diffusion_cond
-            )
-
-        # calculate all logits and losses
+        # calculate distogram logits and losses
 
         ignore = self.ignore_index
 
@@ -2736,15 +2749,82 @@ class Alphafold3(Module):
             distogram_logits = self.distogram_head(pairwise)
             distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
 
+        # otherwise, noise and make it learn to denoise
+
+        calc_diffusion_loss = exists(atom_pos)
+
+        if calc_diffusion_loss:
+
+            num_augs = self.num_augmentations
+
+            # take care of augmentation
+            # they did 48 during training, as the trunk did the heavy lifting
+
+            if num_augs > 1:
+                (
+                    atom_pos,
+                    atom_mask,
+                    atom_feats,
+                    atompair_feats,
+                    mask,
+                    pairwise_mask,
+                    single,
+                    single_inputs,
+                    pairwise,
+                    relative_position_encoding,
+                    additional_residue_feats,
+                    residue_atom_indices,
+                    pae_labels,
+                    pde_labels,
+                    plddt_labels,
+                    resolved_labels,
+
+                ) = tuple(
+                    maybe(repeat)(t, 'b ... -> (b a) ...', a = num_augs)
+                    for t in (
+                        atom_pos,
+                        atom_mask,
+                        atom_feats,
+                        atompair_feats,
+                        mask,
+                        pairwise_mask,
+                        single,
+                        single_inputs,
+                        pairwise,
+                        relative_position_encoding,
+                        additional_residue_feats,
+                        residue_atom_indices,
+                        pae_labels,
+                        pde_labels,
+                        plddt_labels,
+                        resolved_labels
+                    )
+                )
+
+                atom_pos = self.augmenter(atom_pos)
+
+            diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
+                atom_pos,
+                additional_residue_feats = additional_residue_feats,
+                add_smooth_lddt_loss = diffusion_add_smooth_lddt_loss,
+                add_bond_loss = diffusion_add_bond_loss,
+                atom_feats = atom_feats,
+                atompair_feats = atompair_feats,
+                atom_mask = atom_mask,
+                mask = mask,
+                single_trunk_repr = single,
+                single_inputs_repr = single_inputs,
+                pairwise_trunk = pairwise,
+                pairwise_rel_pos_feats = relative_position_encoding,
+                return_denoised_pos = True,
+            )
+
         # confidence head
 
         should_call_confidence_head = any([*map(exists, confidence_head_labels)])
         return_pae_logits = exists(pae_labels)
 
-        if should_call_confidence_head:
-            assert exists(atom_pos), 'diffusion module needs to have been called'
-
-            assert exists(residue_atom_indices)
+        if calc_diffusion_loss and should_call_confidence_head:
 
             pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
