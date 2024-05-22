@@ -10,7 +10,12 @@ import einx
 from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
-from alphafold3_pytorch.typing import Float, Int, Bool, typecheck
+from alphafold3_pytorch.typing import (
+    Float,
+    Int,
+    Bool,
+    typecheck
+)
 
 # constants
 
@@ -35,6 +40,18 @@ def pack_one(t, pattern):
 
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
+
+@typecheck
+def pad_at_dim(
+    t,
+    pad: Tuple[int, int],
+    *,
+    dim = -1,
+    value = 0.
+):
+    dims_from_right = (- dim - 1) if dim < 0 else (t.ndim - dim - 1)
+    zeros = ((0, 0) * dims_from_right)
+    return F.pad(t, (*zeros, *pad), value = value)
 
 # multi-head attention
 
@@ -219,7 +236,7 @@ class Attend(Module):
         padding_needed = (window_size - (seq_len % window_size)) % window_size        
 
         if padding_needed > 0:
-            q, k, v = tuple(F.pad(t, (0, 0, 0, padding_needed), value = 0.) for t in (q, k, v))
+            q, k, v = tuple(pad_at_dim(t, (0, padding_needed), value = 0., dim = -2) for t in (q, k, v))
             mask = F.pad(mask, (0, padding_needed), value = False)
 
         # break into windows
@@ -230,7 +247,7 @@ class Attend(Module):
         # just do radius of 1 for now
         # perhaps not even necessary, and could try shifted windows (a la Swin)
 
-        k, v = tuple(F.pad(t, (0, 0, 1, 1)) for t in (k, v))
+        k, v = tuple(pad_at_dim(t, (1, 1), dim = -2) for t in (k, v))
         mask = F.pad(mask, (1, 1), value = False)
 
         k, v = tuple(torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim = -2) for t in (k, v))
@@ -241,7 +258,7 @@ class Attend(Module):
         if exists(attn_bias):
             attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
             attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
-            attn_bias = F.pad(attn_bias, (0, 0, 0, 0, 1, 1), value = 0.)
+            attn_bias = pad_at_dim(attn_bias, (1, 1), dim = -3, value = 0.)
 
             attn_bias = torch.cat((
                 attn_bias[..., :-2, :, :],
