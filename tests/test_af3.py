@@ -346,6 +346,7 @@ def test_alphafold3():
     template_mask = torch.ones((2, 2)).bool()
 
     msa = torch.randn(2, 7, seq_len, 64)
+    msa_mask = torch.ones((2, 7)).bool()
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     residue_atom_indices = torch.randint(0, 27, (2, seq_len))
@@ -387,6 +388,7 @@ def test_alphafold3():
         atompair_feats = atompair_feats,
         additional_residue_feats = additional_residue_feats,
         msa = msa,
+        msa_mask = msa_mask,
         templates = template_feats,
         template_mask = template_mask,
         atom_pos = atom_pos,
@@ -413,3 +415,63 @@ def test_alphafold3():
     )
 
     assert sampled_atom_pos.ndim == 3
+
+def test_alphafold3_without_msa_and_templates():
+    seq_len = 16
+    atom_seq_len = seq_len * 27
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atom_mask = torch.ones((2, atom_seq_len)).bool()
+    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
+    additional_residue_feats = torch.randn(2, seq_len, 10)
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    residue_atom_indices = torch.randint(0, 27, (2, seq_len))
+
+    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_additional_residue_feats = 10,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
+    )
+
+    loss, breakdown = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        atom_mask = atom_mask,
+        atompair_feats = atompair_feats,
+        additional_residue_feats = additional_residue_feats,
+        atom_pos = atom_pos,
+        residue_atom_indices = residue_atom_indices,
+        distance_labels = distance_labels,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels,
+        return_loss_breakdown = True
+    )
+
+    loss.backward()

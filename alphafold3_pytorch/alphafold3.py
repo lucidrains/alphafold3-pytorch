@@ -598,13 +598,12 @@ class OuterProductMean(Module):
         # maybe masked mean for outer product
 
         if exists(msa_mask):
-            msa_mask = rearrange(msa_mask, 'b s -> b 1 1 1 s')
-            outer_product = outer_product * msa_mask
+            outer_product = einx.multiply('b i j d e s, b s -> b i j d e s', outer_product, msa_mask.float())
 
             num = reduce(outer_product, '... s -> ...', 'sum')
             den = reduce(msa_mask.float(), '... s -> ...', 'sum')
 
-            outer_product_mean = num / den.clamp(min = self.eps)
+            outer_product_mean = einx.divide('b i j d e, b', num, den.clamp(min = self.eps))
         else:
             outer_product_mean = reduce(outer_product, '... s -> ...', 'mean')
 
@@ -1049,15 +1048,15 @@ class TemplateEmbedder(Module):
 
         # masked mean pool template repr
 
-        u = u.masked_fill(
-            ~rearrange(template_mask, 'b t -> b t 1 1 1'),
-            0.
+        u = einx.where(
+            'b t, b t ..., -> b t ...',
+            template_mask, u, 0.
         )
 
         num = reduce(u, 'b t i j d -> b i j d', 'sum')
-        den = reduce(template_mask.float(), 'b t -> b 1 1 1', 'sum')
+        den = reduce(template_mask.float(), 'b t -> b', 'sum')
 
-        avg_template_repr = num / den.clamp(min = self.eps)
+        avg_template_repr = einx.divide('b i j d, b -> b i j d', num, den.clamp(min = self.eps))
 
         return self.to_out(avg_template_repr)
 
@@ -2620,9 +2619,10 @@ class Alphafold3(Module):
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float['b n rf'],
-        msa: Float['b s n d'],
-        templates: Float['b t n n dt'],
-        template_mask: Bool['b t'],
+        msa: Float['b s n d'] | None = None,
+        msa_mask: Bool['b s'] | None = None,
+        templates: Float['b t n n dt'] | None = None,
+        template_mask: Bool['b t'] | None = None,
         num_recycling_steps: int = 1,
         diffusion_add_bond_loss: bool = False,
         diffusion_add_smooth_lddt_loss: bool = False,
@@ -2693,25 +2693,28 @@ class Alphafold3(Module):
 
             # templates
 
-            embedded_template = self.template_embedder(
-                templates = templates,
-                template_mask = template_mask,
-                pairwise_repr = pairwise,
-                mask = mask
-            )
+            if exists(templates):
+                embedded_template = self.template_embedder(
+                    templates = templates,
+                    template_mask = template_mask,
+                    pairwise_repr = pairwise,
+                    mask = mask
+                )
 
-            pairwise = embedded_template + pairwise
+                pairwise = embedded_template + pairwise
 
             # msa
 
-            embedded_msa = self.msa_module(
-                msa = msa,
-                single_repr = single,
-                pairwise_repr = pairwise,
-                mask = mask
-            )
+            if exists(msa):
+                embedded_msa = self.msa_module(
+                    msa = msa,
+                    single_repr = single,
+                    pairwise_repr = pairwise,
+                    mask = mask,
+                    msa_mask = msa_mask
+                )
 
-            pairwise = embedded_msa + pairwise
+                pairwise = embedded_msa + pairwise
 
             # main attention trunk (pairformer)
 
