@@ -780,6 +780,11 @@ class MSAModule(Module):
             if exists(msa_mask):
                 msa_mask = einx.get_at('b [s], b sampled -> b sampled', msa_mask, indices)
 
+        # account for no msa
+
+        if exists(msa_mask):
+            has_msa = reduce(msa_mask, 'b s -> b', 'any')
+
         # process msa
 
         msa = self.msa_init_proj(msa)
@@ -805,6 +810,12 @@ class MSAModule(Module):
             # pairwise block
 
             pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+
+        if exists(msa_mask):
+            pairwise_repr = einx.where(
+                'b, b ..., -> b ...',
+                has_msa, pairwise_repr, 0.
+            )
 
         return pairwise_repr
 
@@ -1033,6 +1044,8 @@ class TemplateEmbedder(Module):
 
         v, merged_batch_ps = pack_one(v, '* i j d')
 
+        has_templates = reduce(template_mask, 'b t -> b', 'any')
+
         if exists(mask):
             mask = repeat(mask, 'b n -> (b t) n', t = num_templates)
 
@@ -1058,7 +1071,14 @@ class TemplateEmbedder(Module):
 
         avg_template_repr = einx.divide('b i j d, b -> b i j d', num, den.clamp(min = self.eps))
 
-        return self.to_out(avg_template_repr)
+        out = self.to_out(avg_template_repr)
+
+        out = einx.where(
+            'b, b ..., -> b ...',
+            has_templates, out, 0.
+        )
+
+        return out
 
 # diffusion related
 # both diffusion transformer as well as atom encoder / decoder
