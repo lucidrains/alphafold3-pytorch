@@ -942,12 +942,10 @@ class RelativePositionEncoding(Module):
         )
         
         def onehot(x, bins):
-            x, packed_shape = pack_one(x, '*')
-            dist_from_bins = einx.subtract('i, j -> i j', x, bins)
-            indexes = dist_from_bins.abs().min(dim = 1, keepdim = True).indices
-            indexes = rearrange(indexes.long(), 'i j -> (i j) 1')
-            one_hots = torch.zeros(indexes.shape[0], len(bins)).scatter_(1, indexes, 1)
-            return unpack_one(one_hots, packed_shape, '* d')
+            dist_from_bins = einx.subtract('... i, j -> ... i j', x, bins)
+            indices = dist_from_bins.abs().min(dim = -1, keepdim = True).indices
+            one_hots = F.one_hot(indices.long(), num_classes = len(bins))
+            return one_hots.float()
 
         r_arange = torch.arange(2*self.r_max + 2, device = device)
         s_arange = torch.arange(2*self.s_max + 2, device = device)
