@@ -1984,26 +1984,32 @@ class WeightedRigidAlign(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b n 3'],
         true_coords: Float['b n 3'],
+        pred_coords: Float['b n 3'],
         weights: Float['b n']
     ) -> Float['b n 3']:
         """
-        pred_coords: predicted coordinates (b, n, 3)
         true_coords: true coordinates (b, n, 3)
+        pred_coords: predicted coordinates (b, n, 3)
         weights: weights for each atom (b, n)
         """
 
+        # (A seeming notational "typo" in the signature of Algorithm 28?
+        #  In equation (2) in 3.7.1 of the supplement, as well as in the calculation
+        #  of atom_pos_aligned_ground_truth above, the function is called with \vec{x}^{GT} first,
+        #  whereas the signature there has it second. The notation in this file should be consistent now...)
+
+
         # Compute weighted centroids
-        pred_centroid = (pred_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
         true_centroid = (true_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
+        pred_centroid = (pred_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
 
         # Center the coordinates
-        pred_coords_centered = pred_coords - pred_centroid.unsqueeze(1)
         true_coords_centered = true_coords - true_centroid.unsqueeze(1)
+        pred_coords_centered = pred_coords - pred_centroid.unsqueeze(1)
 
         # Compute the weighted covariance matrix
-        cov_matrix = torch.einsum('bni,bnj->bij', true_coords_centered * weights.unsqueeze(-1), pred_coords_centered)
+        cov_matrix = torch.einsum('bni,bnj->bij', pred_coords_centered * weights.unsqueeze(-1), true_coords_centered)
 
         # Compute the SVD of the covariance matrix
         U, _, V = torch.svd(cov_matrix)
@@ -2018,8 +2024,14 @@ class WeightedRigidAlign(Module):
         V_fixed[det_mask, :, -1] *= -1
         rot_matrix[det_mask] = torch.einsum('bij,bjk->bik', U[det_mask], V_fixed[det_mask])
 
-        # Apply the rotation and translation
-        aligned_coords = torch.einsum('bni,bij->bnj', pred_coords_centered, rot_matrix) + true_centroid.unsqueeze(1)
+        # (A seeming typo in line 11 of Algorithm 28?
+        #  The bias should be \vec{\mu}^{GT} in the notation there,
+        #  I think.)
+
+        # Left multiplication of the ground truth by the rotation
+        # and then translation by the centroid of the prediction
+        # to "align" ground truth with prediction
+        aligned_coords = torch.einsum('bnj,bij->bni', true_coords_centered, rot_matrix) + pred_centroid.unsqueeze(1)
 
         return aligned_coords.detach()
 
