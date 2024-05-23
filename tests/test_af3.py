@@ -27,23 +27,15 @@ from alphafold3_pytorch import (
 )
 
 from alphafold3_pytorch.alphafold3 import (
-    calc_smooth_lddt_loss
+    mean_pool_with_lens
 )
 
-def test_calc_smooth_lddt_loss():
-    denoised = torch.randn(8, 100, 3)
-    ground_truth = torch.randn(8, 100, 3)
-    is_rna_per_atom = torch.randint(0, 2, (8, 100)).float()
-    is_dna_per_atom = torch.randint(0, 2, (8, 100)).float()
-    
-    loss = calc_smooth_lddt_loss(
-        denoised, 
-        ground_truth, 
-        is_rna_per_atom, 
-        is_dna_per_atom
-    )
+def test_mean_pool_with_lens():
+    seq = torch.tensor([[[1.], [1.], [1.], [2.], [2.], [2.], [2.], [1.], [1.]]])
+    lens = torch.tensor([[3, 4, 2]]).long()
+    pooled = mean_pool_with_lens(seq, lens)
 
-    assert torch.all(loss <= 1) and torch.all(loss >= 0)
+    assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
 
 def test_smooth_lddt_loss():
     pred_coords = torch.randn(2, 100, 3)

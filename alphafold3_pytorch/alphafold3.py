@@ -87,35 +87,33 @@ def maybe(fn):
         return fn(t, *args, **kwargs)
     return inner
 
-# Loss functions
+# packed atom representation functions
 
 @typecheck
-def calc_smooth_lddt_loss(
-    denoised: Float['b m 3'], 
-    ground_truth: Float['b m 3'], 
-    is_rna_per_atom: Float['b m'],
-    is_dna_per_atom: Float['b m']
-) -> Float[' b']:
-    
-    m, device = is_rna_per_atom.shape[-1], denoised.device
-    
-    dx_denoised = torch.cdist(denoised, denoised)
-    dx_gt = torch.cdist(ground_truth, ground_truth)
-    
-    ddx = torch.abs(dx_gt - dx_denoised)
-    eps = 0.25 * (
-        sigmoid(0.5 - ddx) + sigmoid(1 - ddx) + sigmoid(2 - ddx) + sigmoid(4 - ddx)
-    )
-    
-    is_nuc = is_rna_per_atom + is_dna_per_atom
-    mask = einx.multiply('b i, b j -> b i j', is_nuc, is_nuc)
-    c = (dx_gt < 30) * mask + (dx_gt < 15) * (1 - mask)
-    
-    eye = torch.eye(m, device = device)
-    num = einx.sum('b [...]', c * eps * (1 - eye)) / (m**2 - m)
-    den = einx.sum('b [...]', c * (1 - eye)) / (m**2 - m)
+def mean_pool_with_lens(
+    feats: Float['b m d'],
+    lens: Int['b n']
+) -> Float['b n d']:
 
-    return 1. - num/den
+    seq_len = feats.shape[1]
+
+    mask = lens > 0
+    assert (lens.sum(dim = -1) <= seq_len).all(), 'one of the lengths given exceeds the total sequence length of the features passed in'
+
+    cumsum_feats = feats.cumsum(dim = 1)
+    cumsum_feats = F.pad(cumsum_feats, (0, 0, 1, 0), value = 0.)
+
+    cumsum_indices = lens.cumsum(dim = 1)
+    cumsum_indices = F.pad(cumsum_indices, (1, 0), value = 0)
+
+    sel_cumsum = einx.get_at('b [m] d, b n -> b n d', cumsum_feats, cumsum_indices)
+
+    # subtract cumsum at one index from the previous one
+    summed = sel_cumsum[:, 1:] - sel_cumsum[:, :-1]
+
+    avg = einx.divide('b n d, b n', summed, lens.clamp(min = 1))
+    avg = einx.where('b n, b n d, -> b n d', mask, avg, 0.)
+    return avg
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
