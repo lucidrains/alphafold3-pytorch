@@ -1847,7 +1847,8 @@ class ElucidatedAtomDiffusion(Module):
         atom_pos_aligned_ground_truth = self.weighted_rigid_align(
             atom_pos_ground_truth,
             denoised_atom_pos,
-            align_weights
+            align_weights,
+            mask = atom_mask
         )
 
         # main diffusion mse loss
@@ -1932,10 +1933,10 @@ class SmoothLDDTLoss(Module):
         coords_mask: Bool['b n'] | None = None,
     ) -> Float['']:
         """
-        pred_coords: predicted coordinates (b, n, 3)
-        true_coords: true coordinates (b, n, 3)
-        is_dna: boolean tensor indicating DNA atoms (b, n)
-        is_rna: boolean tensor indicating RNA atoms (b, n)
+        pred_coords: predicted coordinates
+        true_coords: true coordinates
+        is_dna: boolean tensor indicating DNA atoms
+        is_rna: boolean tensor indicating RNA atoms
         """
         # Compute distances between all pairs of atoms
         pred_dists = torch.cdist(pred_coords, pred_coords)
@@ -1954,7 +1955,8 @@ class SmoothLDDTLoss(Module):
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
-        is_nucleotide_pair = is_nucleotide.unsqueeze(-1) & is_nucleotide.unsqueeze(-2)
+        is_nucleotide_pair = einx.logical_and('b i, b j -> b i j', is_nucleotide, is_nucleotide)
+
         inclusion_radius = torch.where(
             is_nucleotide_pair,
             true_dists < self.nucleic_acid_cutoff,
@@ -1962,7 +1964,7 @@ class SmoothLDDTLoss(Module):
         )
 
         # Compute mean, avoiding self term
-        mask = torch.logical_and(inclusion_radius, torch.logical_not(torch.eye(pred_coords.shape[1], dtype=torch.bool, device=pred_coords.device)))
+        mask = inclusion_radius & ~torch.eye(pred_coords.shape[1], dtype=torch.bool, device=pred_coords.device)
 
         # Take into account variable lengthed atoms in batch
         if exists(coords_mask):
@@ -1974,59 +1976,68 @@ class SmoothLDDTLoss(Module):
         lddt_count = mask.sum(dim=(-1, -2))
         lddt = lddt_sum / lddt_count.clamp(min=1)
 
-        return 1 - lddt.mean()
+        return 1. - lddt.mean()
 
 class WeightedRigidAlign(Module):
     """ Algorithm 28 """
-    def __init__(self):
-        super().__init__()
 
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b n 3'],
-        true_coords: Float['b n 3'],
-        weights: Float['b n']
+        pred_coords: Float['b n 3'],       # predicted coordinates
+        true_coords: Float['b n 3'],       # true coordinates
+        weights: Float['b n'],             # weights for each atom
+        mask: Bool['b n'] | None = None    # mask for variable lengths
     ) -> Float['b n 3']:
-        """
-        pred_coords: predicted coordinates (b, n, 3)
-        true_coords: true coordinates (b, n, 3)
-        weights: weights for each atom (b, n)
-        """
+
+        if exists(mask):
+            # zero out all predicted and true coordinates where not an atom
+            pred_coords = einx.where('b n, b n c, -> b n c', mask, pred_coords, 0.)
+            true_coords = einx.where('b n, b n c, -> b n c', mask, true_coords, 0.)
+            weights = einx.where('b n, b n, -> b n', mask, weights, 0.)
+
+        # Take care of weights broadcasting for coordinate dimension
+        weights = rearrange(weights, 'b n -> b n 1')
 
         # Compute weighted centroids
-        pred_centroid = (pred_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
-        true_centroid = (true_coords * weights.unsqueeze(-1)).sum(dim=1) / weights.sum(dim=1, keepdim=True)
+        pred_centroid = (pred_coords * weights).sum(dim=1, keepdim=True) / weights.sum(dim=1, keepdim=True)
+        true_centroid = (true_coords * weights).sum(dim=1, keepdim=True) / weights.sum(dim=1, keepdim=True)
 
         # Center the coordinates
-        pred_coords_centered = pred_coords - pred_centroid.unsqueeze(1)
-        true_coords_centered = true_coords - true_centroid.unsqueeze(1)
+        pred_coords_centered = pred_coords - pred_centroid
+        true_coords_centered = true_coords - true_centroid
 
         # Compute the weighted covariance matrix
-        cov_matrix = torch.einsum('bni,bnj->bij', true_coords_centered * weights.unsqueeze(-1), pred_coords_centered)
+        weighted_true_coords_center = true_coords_centered * weights
+        cov_matrix = einsum(weighted_true_coords_center, pred_coords_centered, 'b n i, b n j -> b i j')
 
         # Compute the SVD of the covariance matrix
         U, _, V = torch.svd(cov_matrix)
 
         # Compute the rotation matrix
-        rot_matrix = torch.einsum('bij,bjk->bik', U, V)
+        rot_matrix = einsum(U, V, 'b i j, b j k -> b i k')
 
         # Ensure proper rotation matrix with determinant 1
         det = torch.det(rot_matrix)
         det_mask = det < 0
         V_fixed = V.clone()
         V_fixed[det_mask, :, -1] *= -1
-        rot_matrix[det_mask] = torch.einsum('bij,bjk->bik', U[det_mask], V_fixed[det_mask])
+
+        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b j k -> b i k')
 
         # Apply the rotation and translation
-        aligned_coords = torch.einsum('bni,bij->bnj', pred_coords_centered, rot_matrix) + true_centroid.unsqueeze(1)
+        aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b i j -> b n j') + true_centroid
+        aligned_coords.detach_()
 
-        return aligned_coords.detach()
+        return aligned_coords
 
 class ExpressCoordinatesInFrame(Module):
     """ Algorithm  29 """
 
-    def __init__(self, eps = 1e-8):
+    def __init__(
+        self,
+        eps = 1e-8
+    ):
         super().__init__()
         self.eps = eps
 
@@ -2037,8 +2048,8 @@ class ExpressCoordinatesInFrame(Module):
         frame: Float['b m 3 3'] | Float['b 3 3'] | Float['3 3']
     ) -> Float['b m 3']:
         """
-        coords: coordinates to be expressed in the given frame (b, 3)
-        frame: frame defined by three points (b, 3, 3)
+        coords: coordinates to be expressed in the given frame
+        frame: frame defined by three points
         """
 
         if frame.ndim == 2:
@@ -2067,8 +2078,12 @@ class ExpressCoordinatesInFrame(Module):
 
 class ComputeAlignmentError(Module):
     """ Algorithm 30 """
+
     @typecheck
-    def __init__(self, eps: float = 1e-8):
+    def __init__(
+        self,
+        eps: float = 1e-8
+    ):
         super().__init__()
         self.eps = eps
         self.express_coordinates_in_frame = ExpressCoordinatesInFrame()
@@ -2082,10 +2097,10 @@ class ComputeAlignmentError(Module):
         true_frames: Float['b n 3 3']
     ) -> Float['b n']:
         """
-        pred_coords: predicted coordinates (b, n, 3)
-        true_coords: true coordinates (b, n, 3)
-        pred_frames: predicted frames (b, n, 3, 3)
-        true_frames: true frames (b, n, 3, 3)
+        pred_coords: predicted coordinates
+        true_coords: true coordinates
+        pred_frames: predicted frames
+        true_frames: true frames
         """
         # Express predicted coordinates in predicted frames
         pred_coords_transformed = self.express_coordinates_in_frame(pred_coords, pred_frames)
@@ -2102,6 +2117,7 @@ class ComputeAlignmentError(Module):
 
 class CentreRandomAugmentation(Module):
     """ Algorithm 19 """
+
     @typecheck
     def __init__(self, trans_scale: float = 1.0):
         super().__init__()
@@ -2110,7 +2126,7 @@ class CentreRandomAugmentation(Module):
     @typecheck
     def forward(self, coords: Float['b n 3']) -> Float['b n 3']:
         """
-        coords: coordinates to be augmented (b, n, 3)
+        coords: coordinates to be augmented
         """
         # Center the coordinates
         centered_coords = coords - coords.mean(dim=1, keepdim=True)

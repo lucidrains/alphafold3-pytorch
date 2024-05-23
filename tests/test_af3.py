@@ -2,6 +2,8 @@ import os
 os.environ['TYPECHECK'] = 'True'
 
 import torch
+from torch.nn.utils.rnn import pad_sequence
+
 import pytest
 
 from alphafold3_pytorch import (
@@ -43,8 +45,6 @@ def test_calc_smooth_lddt_loss():
 
     assert torch.all(loss <= 1) and torch.all(loss >= 0)
 
-# ToDo tests
-
 def test_smooth_lddt_loss():
     pred_coords = torch.randn(2, 100, 3)
     true_coords = torch.randn(2, 100, 3)
@@ -65,6 +65,37 @@ def test_weighted_rigid_align():
     aligned_coords = align_fn(pred_coords, true_coords, weights)
 
     assert aligned_coords.shape == pred_coords.shape
+
+def test_weighted_rigid_align_with_mask():
+    pred_coords = torch.randn(2, 100, 3)
+    true_coords = torch.randn(2, 100, 3)
+    weights = torch.rand(2, 100)
+    mask = torch.randint(0, 2, (2, 100)).bool()
+
+    align_fn = WeightedRigidAlign()
+
+    # with mask
+
+    aligned_coords = align_fn(pred_coords, true_coords, weights, mask = mask)
+
+    # do it one sample at a time without make
+
+    all_aligned_coords = []
+
+    for one_mask, one_pred_coords, one_true_coords, one_weight in zip(mask, pred_coords, true_coords, weights):
+        one_aligned_coords = align_fn(
+            one_pred_coords[one_mask][None, ...],
+            one_true_coords[one_mask][None, ...],
+            one_weight[one_mask][None, ...]
+        )
+
+        all_aligned_coords.append(one_aligned_coords.squeeze(0))
+
+    aligned_coords_without_mask = torch.cat(all_aligned_coords, dim = 0)
+
+    # both ways should come out with about the same results
+
+    assert torch.allclose(aligned_coords[mask], aligned_coords_without_mask, atol=1e-5)
 
 def test_express_coordinates_in_frame():
     batch_size = 2
