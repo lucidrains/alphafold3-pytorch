@@ -2187,7 +2187,7 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         dim_atom_inputs,
-        dim_additional_residue_feats,
+        dim_additional_residue_feats = 10,
         atoms_per_window = 27,
         dim_atom = 128,
         dim_atompair = 16,
@@ -2558,6 +2558,14 @@ class Alphafold3(Module):
             **relative_position_encoding_kwargs
         )
 
+        # token bonds
+        # Algorithm 1 - line 5
+
+        self.token_bond_to_pairwise_feat = nn.Sequential(
+            Rearrange('... -> ... 1'),
+            LinearNoBias(1, dim_pairwise)
+        )
+
         # templates
 
         self.template_embedder = TemplateEmbedder(
@@ -2654,7 +2662,8 @@ class Alphafold3(Module):
         atom_inputs: Float['b m dai'],
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
-        additional_residue_feats: Float['b n rf'],
+        additional_residue_feats: Float['b n 10'],
+        token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
         msa_mask: Bool['b s'] | None = None,
         templates: Float['b t n n dt'] | None = None,
@@ -2673,7 +2682,13 @@ class Alphafold3(Module):
         return_loss_breakdown = False
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
+        # get atom sequence length and residue sequence length
+
         w = self.atoms_per_window
+        atom_seq_len = atom_inputs.shape[-2]
+
+        assert divisible_by(atom_seq_len, w)
+        seq_len = atom_inputs.shape[-2] // w
 
         # embed inputs
 
@@ -2697,6 +2712,24 @@ class Alphafold3(Module):
         )
 
         pairwise_init = pairwise_init + relative_position_encoding
+
+        # token bond features
+
+        if exists(token_bond):
+            # well do some precautionary standardization
+            # (1) mask out diagonal - token to itself does not count as a bond
+            # (2) symmetrize, in case it is not already symmetrical (could also throw an error)
+
+            token_bond = token_bond | rearrange(token_bond, 'b i j -> b j i')
+            diagonal = torch.eye(seq_len, device = self.device, dtype = torch.bool)
+            token_bond.masked_fill_(diagonal, False)
+        else:
+            seq_arange = torch.arange(seq_len, device = self.device)
+            token_bond = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
+
+        token_bond_feats = self.token_bond_to_pairwise_feat(token_bond.float())
+
+        pairwise_init = pairwise_init + token_bond_feats
 
         # pairwise mask
 

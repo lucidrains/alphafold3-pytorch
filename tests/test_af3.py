@@ -368,6 +368,8 @@ def test_alphafold3():
     seq_len = 16
     atom_seq_len = seq_len * 27
 
+    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
+
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
     atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
@@ -418,6 +420,7 @@ def test_alphafold3():
         atom_mask = atom_mask,
         atompair_feats = atompair_feats,
         additional_residue_feats = additional_residue_feats,
+        token_bond = token_bond,
         msa = msa,
         msa_mask = msa_mask,
         templates = template_feats,
