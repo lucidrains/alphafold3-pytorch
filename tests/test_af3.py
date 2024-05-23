@@ -2,6 +2,8 @@ import os
 os.environ['TYPECHECK'] = 'True'
 
 import torch
+from torch.nn.utils.rnn import pad_sequence
+
 import pytest
 
 from alphafold3_pytorch import (
@@ -43,8 +45,6 @@ def test_calc_smooth_lddt_loss():
 
     assert torch.all(loss <= 1) and torch.all(loss >= 0)
 
-# ToDo tests
-
 def test_smooth_lddt_loss():
     pred_coords = torch.randn(2, 100, 3)
     true_coords = torch.randn(2, 100, 3)
@@ -65,6 +65,37 @@ def test_weighted_rigid_align():
     aligned_coords = align_fn(pred_coords, true_coords, weights)
 
     assert aligned_coords.shape == pred_coords.shape
+
+def test_weighted_rigid_align_with_mask():
+    pred_coords = torch.randn(2, 100, 3)
+    true_coords = torch.randn(2, 100, 3)
+    weights = torch.rand(2, 100)
+    mask = torch.randint(0, 2, (2, 100)).bool()
+
+    align_fn = WeightedRigidAlign()
+
+    # with mask
+
+    aligned_coords = align_fn(pred_coords, true_coords, weights, mask = mask)
+
+    # do it one sample at a time without make
+
+    all_aligned_coords = []
+
+    for one_mask, one_pred_coords, one_true_coords, one_weight in zip(mask, pred_coords, true_coords, weights):
+        one_aligned_coords = align_fn(
+            one_pred_coords[one_mask][None, ...],
+            one_true_coords[one_mask][None, ...],
+            one_weight[one_mask][None, ...]
+        )
+
+        all_aligned_coords.append(one_aligned_coords.squeeze(0))
+
+    aligned_coords_without_mask = torch.cat(all_aligned_coords, dim = 0)
+
+    # both ways should come out with about the same results
+
+    assert torch.allclose(aligned_coords[mask], aligned_coords_without_mask, atol=1e-5)
 
 def test_express_coordinates_in_frame():
     batch_size = 2
@@ -337,6 +368,8 @@ def test_alphafold3():
     seq_len = 16
     atom_seq_len = seq_len * 27
 
+    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
+
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
     atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
@@ -351,7 +384,6 @@ def test_alphafold3():
     atom_pos = torch.randn(2, atom_seq_len, 3)
     residue_atom_indices = torch.randint(0, 27, (2, seq_len))
 
-    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
     pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
     pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
     plddt_labels = torch.randint(0, 50, (2, seq_len))
@@ -387,13 +419,13 @@ def test_alphafold3():
         atom_mask = atom_mask,
         atompair_feats = atompair_feats,
         additional_residue_feats = additional_residue_feats,
+        token_bond = token_bond,
         msa = msa,
         msa_mask = msa_mask,
         templates = template_feats,
         template_mask = template_mask,
         atom_pos = atom_pos,
         residue_atom_indices = residue_atom_indices,
-        distance_labels = distance_labels,
         pae_labels = pae_labels,
         pde_labels = pde_labels,
         plddt_labels = plddt_labels,

@@ -109,6 +109,19 @@ Then, add your module to `alphafold3_pytorch/alphafold3.py`, add your tests to `
 $ pytest tests/
 ```
 
+## Docker
+
+### Build Docker Container
+```bash
+docker build -t af3 .
+```
+
+### Run Container
+```bash
+## With GPUs
+docker run  --gpus all -it af3
+```
+
 ## Citations
 
 ```bibtex
