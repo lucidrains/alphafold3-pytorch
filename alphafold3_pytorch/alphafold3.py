@@ -2452,9 +2452,9 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        atompair_dist_bins: Float[' dist_bins'] = torch.linspace(3, 20, 37),
+        distance_bins: Float[' dist_bins'] = torch.linspace(3, 20, 38),
         ignore_index = -1,
-        num_dist_bins = 38,
+        num_dist_bins: int | None = None,
         num_plddt_bins = 50,
         num_pde_bins = 64,
         num_pae_bins = 64,
@@ -2626,6 +2626,11 @@ class Alphafold3(Module):
 
         # logit heads
 
+        self.register_buffer('distance_bins', distance_bins)
+        num_dist_bins = default(num_dist_bins, len(distance_bins))
+
+        assert len(distance_bins) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
+
         self.distogram_head = DistogramHead(
             dim_pairwise = dim_pairwise,
             num_dist_bins = num_dist_bins
@@ -2633,7 +2638,7 @@ class Alphafold3(Module):
 
         self.confidence_head = ConfidenceHead(
             dim_single_inputs = dim_single_inputs,
-            atompair_dist_bins = atompair_dist_bins,
+            atompair_dist_bins = distance_bins,
             dim_single = dim_single,
             dim_pairwise = dim_pairwise,
             num_plddt_bins = num_plddt_bins,
@@ -2829,6 +2834,12 @@ class Alphafold3(Module):
         ignore = self.ignore_index
 
         # distogram head
+
+        if not exists(distance_labels) and atom_pos_given and exists(residue_atom_indices):
+            residue_pos = einx.get_at('b (n [w]) c, b n -> b n c', atom_pos, residue_atom_indices)
+            residue_dist = torch.cdist(residue_pos, residue_pos, p = 2)
+            dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', residue_dist, self.distance_bins).abs()
+            distance_labels = dist_from_dist_bins.argmin(dim = -1)
 
         if exists(distance_labels):
             distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
