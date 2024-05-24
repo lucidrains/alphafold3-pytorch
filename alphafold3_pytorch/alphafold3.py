@@ -90,6 +90,20 @@ def maybe(fn):
 # packed atom representation functions
 
 @typecheck
+def lens_to_mask(
+    lens: Int['b n'] | Int[' b']
+) -> Bool['b m']:
+
+    device = lens.device
+
+    if lens.ndim == 2:
+        lens = reduce(lens, 'b m -> b', 'sum')
+
+    max_len = lens.amax()
+    arange = torch.arange(max_len, device = device)
+    return einx.less('m, b -> b m', arange, lens)
+
+@typecheck
 def mean_pool_with_lens(
     feats: Float['b m d'],
     lens: Int['b n']
@@ -114,6 +128,51 @@ def mean_pool_with_lens(
     avg = einx.divide('b n d, b n', summed, lens.clamp(min = 1))
     avg = einx.where('b n, b n d, -> b n d', mask, avg, 0.)
     return avg
+
+@typecheck
+def repeat_consecutive_with_lens(
+    feats: Float['b n d'],
+    lens: Int['b n'],
+    max_length: int | None = None,
+    return_mask = False
+) -> Float['b m d'] | Tuple[Float['b m d'], Bool['b m']]:
+
+    device = feats.device
+
+    # derive arange from the max length
+
+    total_lens = reduce(lens, 'b n -> b', 'sum')
+
+    if not exists(max_length):
+        max_length = total_lens.amax()
+
+    arange = torch.arange(max_length, device = device)
+
+    # get packed atom mask from the total lengths
+
+    mask = lens_to_mask(total_lens)
+
+    lens = F.pad(lens, (1, 0), value = 0)
+    cumsum_lens = lens.cumsum(dim = -1)
+    left_index, right_index = cumsum_lens[:, :-1], cumsum_lens[:, 1:]
+
+    # derive the mask for consecutives per feat
+
+    left_mask = einx.greater_equal('m, b n -> b n m', arange, left_index)
+    right_mask = einx.less('m, b n -> b n m', arange, right_index)
+
+    consecutive_mask = left_mask & right_mask
+
+    # now broadcast and sum for consecutive features
+
+    feats = einx.multiply('b n d, b n m -> b n m d', feats, consecutive_mask.float())
+    feats = reduce(feats, 'b n m d -> b m d', 'sum')
+
+    if not return_mask:
+        return feats
+
+    mask = mask[:, :max_length]
+    return feats, mask
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture

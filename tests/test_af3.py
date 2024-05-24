@@ -2,8 +2,6 @@ import os
 os.environ['TYPECHECK'] = 'True'
 
 import torch
-from torch.nn.utils.rnn import pad_sequence
-
 import pytest
 
 from alphafold3_pytorch import (
@@ -27,7 +25,8 @@ from alphafold3_pytorch import (
 )
 
 from alphafold3_pytorch.alphafold3 import (
-    mean_pool_with_lens
+    mean_pool_with_lens,
+    repeat_consecutive_with_lens
 )
 
 def test_mean_pool_with_lens():
@@ -36,6 +35,13 @@ def test_mean_pool_with_lens():
     pooled = mean_pool_with_lens(seq, lens)
 
     assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
+
+def test_repeat_consecutive_with_lens():
+    seq = torch.tensor([[[1.], [2.], [4.]]])
+    lens = torch.tensor([[3, 4, 2]]).long()
+    repeated = repeat_consecutive_with_lens(seq, lens)
+
+    assert torch.allclose(repeated, torch.tensor([[[1.], [1.], [1.], [2.], [2.], [2.], [2.], [4.], [4.]]]))
 
 def test_smooth_lddt_loss():
     pred_coords = torch.randn(2, 100, 3)
