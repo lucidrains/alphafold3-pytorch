@@ -2128,15 +2128,17 @@ class CentreRandomAugmentation(Module):
         """
         # Center the coordinates
         centered_coords = coords - coords.mean(dim=1, keepdim=True)
+        
+        batch_size = coords.shape[0]
 
         # Generate random rotation matrix
-        rotation_matrix = self._random_rotation_matrix(coords.device)
+        rotation_matrix = torch.stack([self._random_rotation_matrix(coords.device) for _ in range(batch_size)])
 
         # Generate random translation vector
-        translation_vector = self._random_translation_vector(coords.device)
+        translation_vector = torch.stack([self._random_translation_vector(coords.device) for _ in range(batch_size)]).unsqueeze(1)
 
         # Apply rotation and translation
-        augmented_coords = torch.einsum('bni,ij->bnj', centered_coords, rotation_matrix) + translation_vector
+        augmented_coords = torch.einsum('bni,bij->bnj', centered_coords, rotation_matrix) + translation_vector
 
         return augmented_coords
 
