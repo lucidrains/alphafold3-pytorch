@@ -505,3 +505,91 @@ def test_alphafold3_without_msa_and_templates():
     )
 
     loss.backward()
+
+def test_alphafold3_with_packed_atom_repr():
+    seq_len = 16
+    residue_atom_lens = torch.randint(1, 3, (2, seq_len))
+
+    atom_seq_len = residue_atom_lens.sum(dim = -1).amax()
+
+    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+
+    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
+    additional_residue_feats = torch.randn(2, seq_len, 10)
+
+    template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
+    template_mask = torch.ones((2, 2)).bool()
+
+    msa = torch.randn(2, 7, seq_len, 64)
+    msa_mask = torch.ones((2, 7)).bool()
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    residue_atom_indices = torch.randint(0, 2, (2, seq_len))
+
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_additional_residue_feats = 10,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        packed_atom_repr = True,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
+    )
+
+    loss, breakdown = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        residue_atom_lens = residue_atom_lens,
+        atompair_feats = atompair_feats,
+        additional_residue_feats = additional_residue_feats,
+        token_bond = token_bond,
+        msa = msa,
+        msa_mask = msa_mask,
+        templates = template_feats,
+        template_mask = template_mask,
+        atom_pos = atom_pos,
+        residue_atom_indices = residue_atom_indices,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels,
+        return_loss_breakdown = True
+    )
+
+    loss.backward()
+
+    print(residue_atom_lens)
+    sampled_atom_pos = alphafold3(
+        num_sample_steps = 16,
+        atom_inputs = atom_inputs,
+        residue_atom_lens = residue_atom_lens,
+        atompair_feats = atompair_feats,
+        additional_residue_feats = additional_residue_feats,
+        msa = msa,
+        templates = template_feats,
+        template_mask = template_mask,
+    )
+
+    assert sampled_atom_pos.ndim == 3
