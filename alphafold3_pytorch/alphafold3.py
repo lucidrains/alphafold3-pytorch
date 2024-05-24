@@ -1606,7 +1606,22 @@ class DiffusionModule(Module):
 
         if is_unpacked_repr:
             pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
-            atompair_feats = pairwise_repr_cond + atompair_feats
+        else:
+            # todo - fix by doing a specialized fn for this
+
+            repeated_residue_atom_lens = repeat(residue_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr_cond.shape[1])
+            pairwise_repr_cond, ps = pack_one(pairwise_repr_cond, '* n dp')
+            pairwise_repr_cond = repeat_consecutive_with_lens(pairwise_repr_cond, repeated_residue_atom_lens)
+            pairwise_repr_cond = unpack_one(pairwise_repr_cond, ps, '* n dp')
+
+            pairwise_repr_cond = rearrange(pairwise_repr_cond, 'b i j dp -> b j i dp')
+            repeated_residue_atom_lens = repeat(residue_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr_cond.shape[1])
+            pairwise_repr_cond, ps = pack_one(pairwise_repr_cond, '* n dp')
+            pairwise_repr_cond = repeat_consecutive_with_lens(pairwise_repr_cond, repeated_residue_atom_lens)
+            pairwise_repr_cond = unpack_one(pairwise_repr_cond, ps, '* n dp')
+            pairwise_repr_cond = rearrange(pairwise_repr_cond, 'b j i dp -> b i j dp')
+
+        atompair_feats = pairwise_repr_cond + atompair_feats
 
         # condition atompair feats further with single atom repr
 
