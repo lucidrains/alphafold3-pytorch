@@ -2132,10 +2132,10 @@ class CentreRandomAugmentation(Module):
         batch_size = coords.shape[0]
 
         # Generate random rotation matrix
-        rotation_matrix = torch.stack([self._random_rotation_matrix(coords.device) for _ in range(batch_size)])
+        rotation_matrix = self._random_rotation_matrix_batch(coords.device, batch_size=batch_size)
 
         # Generate random translation vector
-        translation_vector = torch.stack([self._random_translation_vector(coords.device) for _ in range(batch_size)]).unsqueeze(1)
+        translation_vector = self._random_translation_vector_batch(coords.device, batch_size=batch_size).unsqueeze(1)
 
         # Apply rotation and translation
         augmented_coords = torch.einsum('bni,bij->bnj', centered_coords, rotation_matrix) + translation_vector
@@ -2169,6 +2169,34 @@ class CentreRandomAugmentation(Module):
     def _random_translation_vector(self, device: torch.device) -> Float['3']:
         # Generate random translation vector
         translation_vector = torch.randn(3, device=device) * self.trans_scale
+        return translation_vector
+    
+    @typecheck
+    def _random_rotation_matrix_batch(self, device: torch.device, batch_size: int) -> Float['b 3 3']:
+        # Generate random rotation angles
+        angles = torch.rand(batch_size, 3, device=device) * 2 * torch.pi
+        
+        # Compute sine and cosine of angles
+        sin_angles = torch.sin(angles)
+        cos_angles = torch.cos(angles)
+        
+        # Construct rotation matrix
+        rotation_matrix = torch.eye(3, device=device).unsqueeze(0).repeat(batch_size, 1, 1)
+        rotation_matrix[:, 0, 0] = cos_angles[:, 0] * cos_angles[:, 1]
+        rotation_matrix[:, 0, 1] = cos_angles[:, 0] * sin_angles[:, 1] * sin_angles[:, 2] - sin_angles[:, 0] * cos_angles[:, 2]
+        rotation_matrix[:, 0, 2] = cos_angles[:, 0] * sin_angles[:, 1] * cos_angles[:, 2] + sin_angles[:, 0] * sin_angles[:, 2]
+        rotation_matrix[:, 1, 0] = sin_angles[:, 0] * cos_angles[:, 1]
+        rotation_matrix[:, 1, 1] = sin_angles[:, 0] * sin_angles[:, 1] * sin_angles[:, 2] + cos_angles[:, 0] * cos_angles[:, 2]
+        rotation_matrix[:, 1, 2] = sin_angles[:, 0] * sin_angles[:, 1] * cos_angles[:, 2] - cos_angles[:, 0] * sin_angles[:, 2]
+        rotation_matrix[:, 2, 0] = -sin_angles[:, 1]
+        rotation_matrix[:, 2, 2] = cos_angles[:, 1] * cos_angles[:, 2]
+        
+        return rotation_matrix
+    
+    @typecheck
+    def _random_translation_vector_batch(self, device: torch.device, batch_size: int) -> Float['b 3']:
+        # Generate random translation vector
+        translation_vector = torch.randn(batch_size, 3, device=device) * self.trans_scale
         return translation_vector
 
 # input embedder
