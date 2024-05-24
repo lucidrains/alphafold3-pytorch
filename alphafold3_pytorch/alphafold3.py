@@ -1773,7 +1773,7 @@ class ElucidatedAtomDiffusion(Module):
     # training
 
     def loss_weight(self, sigma):
-        return (sigma ** 2 + self.sigma_data ** 2) * (sigma * self.sigma_data) ** -2
+        return (sigma ** 2 + self.sigma_data ** 2) * (sigma + self.sigma_data) ** -2
 
     def noise_distribution(self, batch_size):
         return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp()
