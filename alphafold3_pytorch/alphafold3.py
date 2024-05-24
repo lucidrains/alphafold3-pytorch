@@ -2804,7 +2804,7 @@ class Alphafold3(Module):
         additional_residue_feats: Float['b n 10'],
         residue_atom_lens: Int['b n'] | None = None,
         atom_mask: Bool['b m'] | None = None,
-        token_bond: Float['b n n'] | None = None,
+        token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
         msa_mask: Bool['b s'] | None = None,
         templates: Float['b t n n dt'] | None = None,
@@ -2882,14 +2882,14 @@ class Alphafold3(Module):
             # (1) mask out diagonal - token to itself does not count as a bond
             # (2) symmetrize, in case it is not already symmetrical (could also throw an error)
 
-            assert torch.allclose(token_bond, rearrange(token_bond, 'b i j -> b j i')), 'token bond must be symmetrical'
+            token_bond = token_bond | rearrange(token_bond, 'b i j -> b j i')
             diagonal = torch.eye(seq_len, device = self.device, dtype = torch.bool)
-            token_bond.masked_fill_(diagonal, 0.)
+            token_bond.masked_fill_(diagonal, False)
         else:
             seq_arange = torch.arange(seq_len, device = self.device)
-            token_bond = (einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1).float()
+            token_bond = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
 
-        token_bond_feats = self.token_bond_to_pairwise_feat(token_bond)
+        token_bond_feats = self.token_bond_to_pairwise_feat(token_bond.float())
 
         pairwise_init = pairwise_init + token_bond_feats
 

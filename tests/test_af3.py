@@ -366,8 +366,7 @@ def test_alphafold3():
     seq_len = 16
     atom_seq_len = seq_len * 27
 
-    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).float()
-    token_bond = token_bond + token_bond.transpose(-1, -2)
+    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
@@ -513,8 +512,7 @@ def test_alphafold3_with_packed_atom_repr():
 
     atom_seq_len = residue_atom_lens.sum(dim = -1).amax()
 
-    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).float()
-    token_bond = token_bond + token_bond.transpose(-1, -2)
+    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
 
