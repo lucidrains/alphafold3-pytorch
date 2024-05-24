@@ -2841,8 +2841,7 @@ class Alphafold3(Module):
             # handle atom mask
 
             total_atoms = residue_atom_lens.sum(dim = -1)
-            atom_mask = lens_to_mask(total_atoms)
-            atom_mask = atom_mask[:, :atom_seq_len]
+            atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
 
             # handle offsets for residue atom indices
 
@@ -2904,8 +2903,7 @@ class Alphafold3(Module):
 
         if self.packed_atom_repr:
             total_atoms = residue_atom_lens.sum(dim = -1)
-            mask = lens_to_mask(total_atoms)
-            mask = mask[:, :seq_len]
+            mask = lens_to_mask(total_atoms, max_len = seq_len)
         else:
             mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
 
