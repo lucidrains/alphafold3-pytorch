@@ -91,17 +91,15 @@ def maybe(fn):
 
 @typecheck
 def lens_to_mask(
-    lens: Int['b n'] | Int[' b']
-) -> Bool['b m']:
+    lens: Int['b ...'],
+    max_len: int | None = None
+) -> Bool['... m']:
 
     device = lens.device
-
-    if lens.ndim == 2:
-        lens = reduce(lens, 'b m -> b', 'sum')
-
-    max_len = lens.amax()
+    if not exists(max_len):
+        max_len = lens.amax()
     arange = torch.arange(max_len, device = device)
-    return einx.less('m, b -> b m', arange, lens)
+    return einx.less('m, ... -> ... m', arange, lens)
 
 @typecheck
 def mean_pool_with_lens(
@@ -133,50 +131,70 @@ def mean_pool_with_lens(
 def repeat_consecutive_with_lens(
     feats: Float['b n ...'] | Bool['b n'],
     lens: Int['b n'],
-    max_length: int | None = None,
-    return_mask = False
-) -> Float['b m d'] | Bool['b m'] | Tuple[Float['b m d'] | Bool['b m'], Bool['b m']]:
+) -> Float['b m ...'] | Bool['b m']:
 
     is_bool = feats.dtype == torch.bool
+    feats = feats.float()
+
     device = feats.device
 
-    # derive arange from the max length
+    batch, seq, *dims = feats.shape
 
-    total_lens = reduce(lens, 'b n -> b', 'sum')
+    # get mask from lens
 
-    if not exists(max_length):
-        max_length = total_lens.amax()
+    mask = lens_to_mask(lens)
 
-    arange = torch.arange(max_length, device = device)
+    # derive arange
 
-    # get packed atom mask from the total lengths
+    window_size = mask.shape[-1]
+    arange = torch.arange(window_size, device = device)
 
-    mask = lens_to_mask(total_lens)
+    cumsum_len = lens.cumsum(dim = -1)
+    offsets = F.pad(cumsum_len, (1, -1), value = 0)
+    indices = einx.add('w, b n -> b n w', arange, offsets)
 
-    lens = F.pad(lens, (1, 0), value = 0)
-    cumsum_lens = lens.cumsum(dim = -1)
-    left_index, right_index = cumsum_lens[:, :-1], cumsum_lens[:, 1:]
+    # create output tensor + a sink position on the very right (index max_len)
 
-    # derive the mask for consecutives per feat
+    total_lens = lens.sum(dim = -1)
+    max_len = total_lens.amax()
 
-    left_mask = einx.greater_equal('m, b n -> b n m', arange, left_index)
-    right_mask = einx.less('m, b n -> b n m', arange, right_index)
+    output = torch.zeros((batch, max_len + 1, *dims), device = device)
 
-    consecutive_mask = left_mask & right_mask
+    indices.masked_fill_(~mask, max_len) # scatter to sink position for padding
+    indices = rearrange(indices, 'b n w -> b (n w)')
 
-    # now broadcast and sum for consecutive features
+    feats = repeat(feats, 'b n ... -> b (n w) ...', w = window_size)
 
-    feats = einx.multiply('b n ..., b n m -> b n m ...', feats, consecutive_mask.float())
-    feats = reduce(feats, 'b n m ... -> b m ...', 'sum')
+    # scatter
+
+    output = einx.set_at('b [m] ...,  b nw, b nw ... -> b [m] ...', output, indices, feats)
+
+    # remove sink
+
+    output = output[:, :-1]
 
     if is_bool:
-        feats = feats.bool()
+        output = output.bool()
 
-    if not return_mask:
-        return feats
+    return output
 
-    mask = mask[:, :max_length]
-    return feats, mask
+def repeat_pairwise_consecutive_with_lens(
+    feats: Float['b n n dp'],
+    lens: Int['b n']
+) -> Float['b m m dp']:
+
+    repeated_lens = repeat(lens, 'b ... -> (b r) ...', r = feats.shape[1])
+    feats, ps = pack_one(feats, '* n dp')
+    feats = repeat_consecutive_with_lens(feats, repeated_lens)
+    feats = unpack_one(feats, ps, '* n dp')
+
+    feats = rearrange(feats, 'b i j dp -> b j i dp')
+    repeated_lens = repeat(lens, 'b ... -> (b r) ...', r = feats.shape[1])
+    feats, ps = pack_one(feats, '* n dp')
+    feats = repeat_consecutive_with_lens(feats, repeated_lens)
+    feats = unpack_one(feats, ps, '* n dp')
+    feats = rearrange(feats, 'b j i dp -> b i j dp')
+    return feats
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -1607,19 +1625,7 @@ class DiffusionModule(Module):
         if is_unpacked_repr:
             pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
         else:
-            # todo - fix by doing a specialized fn for this
-
-            repeated_residue_atom_lens = repeat(residue_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr_cond.shape[1])
-            pairwise_repr_cond, ps = pack_one(pairwise_repr_cond, '* n dp')
-            pairwise_repr_cond = repeat_consecutive_with_lens(pairwise_repr_cond, repeated_residue_atom_lens)
-            pairwise_repr_cond = unpack_one(pairwise_repr_cond, ps, '* n dp')
-
-            pairwise_repr_cond = rearrange(pairwise_repr_cond, 'b i j dp -> b j i dp')
-            repeated_residue_atom_lens = repeat(residue_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr_cond.shape[1])
-            pairwise_repr_cond, ps = pack_one(pairwise_repr_cond, '* n dp')
-            pairwise_repr_cond = repeat_consecutive_with_lens(pairwise_repr_cond, repeated_residue_atom_lens)
-            pairwise_repr_cond = unpack_one(pairwise_repr_cond, ps, '* n dp')
-            pairwise_repr_cond = rearrange(pairwise_repr_cond, 'b j i dp -> b i j dp')
+            pairwise_repr_cond = repeat_pairwise_consecutive_with_lens(pairwise_repr_cond, residue_atom_lens)
 
         atompair_feats = pairwise_repr_cond + atompair_feats
 
@@ -2834,7 +2840,8 @@ class Alphafold3(Module):
 
             # handle atom mask
 
-            atom_mask = lens_to_mask(residue_atom_lens)
+            total_atoms = residue_atom_lens.sum(dim = -1)
+            atom_mask = lens_to_mask(total_atoms)
             atom_mask = atom_mask[:, :atom_seq_len]
 
             # handle offsets for residue atom indices
@@ -2896,7 +2903,8 @@ class Alphafold3(Module):
         # pairwise mask
 
         if self.packed_atom_repr:
-            mask = lens_to_mask(residue_atom_lens)
+            total_atoms = residue_atom_lens.sum(dim = -1)
+            mask = lens_to_mask(total_atoms)
             mask = mask[:, :seq_len]
         else:
             mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
