@@ -428,6 +428,7 @@ def test_alphafold3():
         pde_labels = pde_labels,
         plddt_labels = plddt_labels,
         resolved_labels = resolved_labels,
+        diffusion_add_smooth_lddt_loss = True,
         return_loss_breakdown = True
     )
 
@@ -580,7 +581,6 @@ def test_alphafold3_with_packed_atom_repr():
 
     loss.backward()
 
-    print(residue_atom_lens)
     sampled_atom_pos = alphafold3(
         num_sample_steps = 16,
         atom_inputs = atom_inputs,

@@ -2047,7 +2047,7 @@ class ElucidatedAtomDiffusion(Module):
 
             smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
-                normalized_atom_pos,
+                atom_pos_ground_truth,
                 atom_is_dna,
                 atom_is_rna,
                 coords_mask = atom_mask
@@ -2488,7 +2488,7 @@ class ConfidenceHead(Module):
         self,
         *,
         dim_single_inputs,
-        atompair_dist_bins: Float['d'],
+        atompair_dist_bins: Float[' d'],
         dim_single = 384,
         dim_pairwise = 128,
         num_plddt_bins = 50,
