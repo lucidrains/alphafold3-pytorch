@@ -1323,6 +1323,7 @@ class DiffusionTransformer(Module):
         dim_pairwise = 128,
         attn_window_size = None,
         attn_pair_bias_kwargs: dict = dict(),
+        num_register_tokens = 0,
         serial = False
     ):
         super().__init__()
@@ -1365,6 +1366,12 @@ class DiffusionTransformer(Module):
 
         self.serial = serial
 
+        self.has_registers = num_register_tokens > 0
+        self.num_registers = num_register_tokens
+
+        if self.has_registers:
+            self.registers = nn.Parameter(torch.zeros(num_register_tokens, dim))
+
     @typecheck
     def forward(
         self,
@@ -1375,6 +1382,21 @@ class DiffusionTransformer(Module):
         mask: Bool['b n'] | None = None
     ):
         serial = self.serial
+
+        # register tokens
+
+        if self.has_registers:
+            num_registers = self.num_registers
+            registers = repeat(self.registers, 'r d -> b r d', b = noised_repr.shape[0])
+            noised_repr, registers_ps = pack((registers, noised_repr), 'b * d')
+
+            single_repr = F.pad(single_repr, (0, 0, num_registers, 0), value = 0.)
+            pairwise_repr = F.pad(pairwise_repr, (0, 0, num_registers, 0, num_registers, 0), value = 0.)
+
+            if exists(mask):
+                mask = F.pad(mask, (num_registers, 0), value = True)
+
+        # main transformer
 
         for attn, transition in self.layers:
 
@@ -1397,6 +1419,11 @@ class DiffusionTransformer(Module):
                 ff_out = ff_out + attn_out
 
             noised_repr = noised_repr + ff_out
+
+        # splice out registers
+
+        if self.has_registers:
+            _, noised_repr = unpack(noised_repr, registers_ps, 'b * d')
 
         return noised_repr
 
@@ -1487,7 +1514,10 @@ class DiffusionModule(Module):
         token_transformer_heads = 16,
         atom_decoder_depth = 3,
         atom_decoder_heads = 4,
-        serial = False
+        serial = False,
+        atom_encoder_kwargs: dict = dict(),
+        atom_decoder_kwargs: dict = dict(),
+        token_transformer_kwargs: dict = dict()
     ):
         super().__init__()
 
@@ -1543,7 +1573,8 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_encoder_depth,
             heads = atom_encoder_heads,
-            serial = serial
+            serial = serial,
+            **atom_encoder_kwargs
         )
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
@@ -1565,7 +1596,8 @@ class DiffusionModule(Module):
             dim_pairwise = dim_pairwise,
             depth = token_transformer_depth,
             heads = token_transformer_heads,
-            serial = serial
+            serial = serial,
+            **token_transformer_kwargs
         )
 
         self.attended_token_norm = nn.LayerNorm(dim_token)
@@ -1581,7 +1613,8 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_decoder_depth,
             heads = atom_decoder_heads,
-            serial = serial
+            serial = serial,
+            **atom_decoder_kwargs
         )
 
         self.atom_feat_to_atom_pos_update = nn.Sequential(

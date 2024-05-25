@@ -233,7 +233,10 @@ def test_diffusion_module():
         dim_pairwise_rel_pos_feats = 12,
         atom_encoder_depth = 1,
         atom_decoder_depth = 1,
-        token_transformer_depth = 1
+        token_transformer_depth = 1,
+        token_transformer_kwargs = dict(
+            num_register_tokens = 2
+        )
     )
 
     atom_pos_update = diffusion_module(
