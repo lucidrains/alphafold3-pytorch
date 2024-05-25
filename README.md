@@ -26,7 +26,6 @@ from alphafold3_pytorch import Alphafold3
 
 alphafold3 = Alphafold3(
     dim_atom_inputs = 77,
-    dim_additional_residue_feats = 33,
     dim_template_feats = 44
 )
 
@@ -38,12 +37,13 @@ atom_seq_len = seq_len * 27
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atom_lens = torch.randint(0, 27, (2, seq_len))
 atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-additional_residue_feats = torch.randn(2, seq_len, 33)
+additional_residue_feats = torch.randn(2, seq_len, 10)
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
 template_mask = torch.ones((2, 2)).bool()
 
 msa = torch.randn(2, 7, seq_len, 64)
+msa_mask = torch.ones((2, 7)).bool()
 
 # required for training, but omitted on inference
 
@@ -65,6 +65,7 @@ loss = alphafold3(
     atompair_feats = atompair_feats,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
+    msa_mask = msa_mask,
     templates = template_feats,
     template_mask = template_mask,
     atom_pos = atom_pos,
@@ -84,10 +85,11 @@ sampled_atom_pos = alphafold3(
     num_recycling_steps = 4,
     num_sample_steps = 16,
     atom_inputs = atom_inputs,
-    atom_mask = atom_mask,
+    residue_atom_lens = atom_lens,
     atompair_feats = atompair_feats,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
+    msa_mask = msa_mask,
     templates = template_feats,
     template_mask = template_mask
 )
