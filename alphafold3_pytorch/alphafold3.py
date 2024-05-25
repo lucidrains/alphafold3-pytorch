@@ -2940,13 +2940,16 @@ class Alphafold3(Module):
 
         pairwise_init = pairwise_init + token_bond_feats
 
-        # pairwise mask
+        # residue mask and pairwise mask
 
         if self.packed_atom_repr:
             total_atoms = residue_atom_lens.sum(dim = -1)
             mask = lens_to_mask(total_atoms, max_len = seq_len)
         else:
-            mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
+            if exists(residue_atom_lens):
+                mask = residue_atom_lens != 0
+            else:
+                mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
 
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
 
