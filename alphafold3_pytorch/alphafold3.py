@@ -2676,7 +2676,8 @@ class Alphafold3(Module):
             token_transformer_depth = 24,
             token_transformer_heads = 16,
             atom_decoder_depth = 3,
-            atom_decoder_heads = 4
+            atom_decoder_heads = 4,
+            serial = True # believe they have an error on Algorithm 23. lacking a residual - default to serial architecture until further news
         ),
         edm_kwargs: dict = dict(
             sigma_min = 0.002,
