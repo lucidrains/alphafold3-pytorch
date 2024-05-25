@@ -433,18 +433,14 @@ class TriangleMultiplication(Module):
         dim_hidden = default(dim_hidden, dim)
         self.norm = nn.LayerNorm(dim)
 
-        self.left_proj = Linear(dim, dim_hidden)
-        self.right_proj = Linear(dim, dim_hidden)
+        self.left_right_proj = nn.Sequential(
+            LinearNoBias(dim, dim_hidden * 4),
+            nn.GLU(dim = -1)
+        )
 
-        self.left_gate = Linear(dim, dim_hidden)
-        self.right_gate = Linear(dim, dim_hidden)
-        self.out_gate = Linear(dim, dim_hidden)
+        self.left_right_gate = LinearNoBias(dim, dim_hidden * 2)
 
-        # initialize all gating to be identity
-
-        for gate in (self.left_gate, self.right_gate, self.out_gate):
-            nn.init.constant_(gate.weight, 0.)
-            nn.init.constant_(gate.bias, 1.)
+        self.out_gate = LinearNoBias(dim, dim_hidden)
 
         if mix == 'outgoing':
             self.mix_einsum_eq = '... i k d, ... j k d -> ... i j d'
@@ -454,7 +450,7 @@ class TriangleMultiplication(Module):
         self.to_out_norm = nn.LayerNorm(dim_hidden)
 
         self.to_out = Sequential(
-            Linear(dim_hidden, dim),
+            LinearNoBias(dim_hidden, dim),
             Dropout(dropout, dropout_type = dropout_type)
         )
 
@@ -470,24 +466,19 @@ class TriangleMultiplication(Module):
 
         x = self.norm(x)
 
-        left = self.left_proj(x)
-        right = self.right_proj(x)
+        left, right = self.left_right_proj(x).chunk(2, dim = -1)
 
         if exists(mask):
             left = left * mask
             right = right * mask
 
-        left_gate = self.left_gate(x).sigmoid()
-        right_gate = self.right_gate(x).sigmoid()
-        out_gate = self.out_gate(x).sigmoid()
-
-        left = left * left_gate
-        right = right * right_gate
-
         out = einsum(left, right, self.mix_einsum_eq)
 
         out = self.to_out_norm(out)
+
+        out_gate = self.out_gate(x).sigmoid()
         out = out * out_gate
+
         return self.to_out(out)
 
 # there are two types of attention in this paper, triangle and attention-pair-bias
