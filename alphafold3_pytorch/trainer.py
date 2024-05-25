@@ -158,14 +158,20 @@ class Trainer:
         steps = 0
 
         while steps < self.num_train_steps:
-            for _ in range(self.grad_accum_every):
+
+            for grad_accum_step in range(self.grad_accum_every):
+                is_accumulating = grad_accum_step < (self.grad_accum_every - 1)
+
                 inputs = next(dl)
 
-                loss = self.model(**inputs)
+                with self.fabric.no_backward_sync(self.model, enabled = is_accumulating):
+                    loss = self.model(**inputs)
 
                 self.fabric.backward(loss / self.grad_accum_every)
 
             print(f'loss: {loss.item():.3f}')
+
+            self.fabric.clip_gradients(self.model, self.optimizer, max_norm = self.clip_grad_norm)
 
             self.optimizer.step()
 
