@@ -2853,7 +2853,8 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | None = None,
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
-        return_loss_breakdown = False
+        return_loss_breakdown = False,
+        return_loss_if_possible: bool = True
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
         atom_seq_len = atom_inputs.shape[-2]
@@ -3016,7 +3017,7 @@ class Alphafold3(Module):
 
         # if neither atom positions or any labels are passed in, sample a structure and return
 
-        if not return_loss:
+        if not return_loss_if_possible or not return_loss:
             return self.edm.sample(
                 num_sample_steps = num_sample_steps,
                 atom_feats = atom_feats,

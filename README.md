@@ -1,4 +1,4 @@
-<img src="./alphafold3.png" width="450px"></img>
+<img src="./alphafold3.png" width="500px"></img>
 
 ## Alphafold 3 - Pytorch (wip)
 

@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
-from alphafold3_pytorch.typing import typecheck
+
+from typing import TypedDict
+from alphafold3_pytorch.typing import (
+    typecheck,
+    Int, Bool, Float
+)
 
 import torch
 from torch.optim import Adam, Optimizer
+from torch.utils.data import Dataset, DataLoader
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from ema_pytorch import EMA
 
 from lightning import Fabric
+
+# constants
+
+@typecheck
+class Alphafold3Input(TypedDict):
+    atom_inputs:                Float['m dai']
+    residue_atom_lens:          Int['n 2']
+    atompair_feats:             Float['m m dap']
+    additional_residue_feats:   Float['n 10']
+    templates:                  Float['t n n dt']
+    template_mask:              Bool['t'] | None
+    msa:                        Float['s n dm']
+    msa_mask:                   Bool['s'] | None
+    atom_pos:                   Float['m 3'] | None
+    residue_atom_indices:       Int['n'] | None
+    distance_labels:            Int['n n'] | None
+    pae_labels:                 Int['n n'] | None
+    pde_labels:                 Int['n'] | None
+    resolved_labels:            Int['n'] | None
 
 # helpers
 
@@ -18,6 +43,11 @@ def exists(val):
 
 def default(v, d):
     return v if exists(v) else d
+
+def cycle(dataloader: DataLoader):
+    while True:
+        for batch in dataloader:
+            yield batch
 
 def default_lambda_lr_fn(steps):
     # 1000 step warmup
@@ -40,6 +70,10 @@ class Trainer:
         self,
         model: Alphafold3,
         *,
+        dataset: Dataset,
+        num_train_steps: int,
+        batch_size: int,
+        grad_accum_every: int = 1,
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         ema_decay = 0.999,
@@ -69,12 +103,13 @@ class Trainer:
 
         # exponential moving average
 
-        self.ema_model = EMA(
-            model,
-            beta = ema_decay,
-            include_online_model = False,
-            **ema_kwargs
-        )
+        if self.is_main:
+            self.ema_model = EMA(
+                model,
+                beta = ema_decay,
+                include_online_model = False,
+                **ema_kwargs
+            )
 
         # optimizer
 
@@ -87,9 +122,18 @@ class Trainer:
 
         self.optimizer = optimizer
 
+        # data
+
+        self.dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+
+        self.num_train_steps = num_train_steps
+        self.grad_accum_every = grad_accum_every
+
         # setup fabric
 
         self.model, self.optimizer = fabric.setup(self.model, self.optimizer)
+
+        fabric.setup_dataloaders(self.dataloader)
 
         # scheduler
 
@@ -102,7 +146,35 @@ class Trainer:
 
         self.clip_grad_norm = clip_grad_norm
 
+    @property
+    def is_main(self):
+        return self.fabric.global_rank == 0
+
     def __call__(
         self
     ):
-        pass
+        dl = iter(self.dataloader)
+
+        steps = 0
+
+        while steps < self.num_train_steps:
+            for _ in range(self.grad_accum_every):
+                inputs = next(dl)
+
+                loss = self.model(**inputs)
+
+                self.fabric.backward(loss / self.grad_accum_every)
+
+            print(f'loss: {loss.item():.3f}')
+
+            self.optimizer.step()
+
+            if self.is_main:
+                self.ema_model.update()
+
+            self.scheduler.step()
+            self.optimizer.zero_grad()
+
+            steps += 1
+
+        print(f'training complete')
