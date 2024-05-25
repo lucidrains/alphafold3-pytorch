@@ -1860,7 +1860,7 @@ class ElucidatedAtomDiffusion(Module):
         self,
         atom_mask: Bool['b m'] | None = None,
         num_sample_steps = None,
-        clamp = True,
+        clamp = False,
         **network_condition_kwargs
     ):
         num_sample_steps = default(num_sample_steps, self.num_sample_steps)
@@ -1911,7 +1911,9 @@ class ElucidatedAtomDiffusion(Module):
 
             atom_pos = atom_pos_next
 
-        atom_pos = atom_pos.clamp(-1., 1.)
+        if clamp:
+            atom_pos = atom_pos.clamp(-1., 1.)
+
         return atom_pos
 
     # training
