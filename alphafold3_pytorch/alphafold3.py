@@ -18,6 +18,21 @@ s - msa
 r - registers
 """
 
+"""
+additional_residue_feats: [*, 10]:
+
+0: residue_index
+1: token_index
+2: asym_id
+3: entity_id
+4: sym_id
+5: restype (must be one hot encoded to 32)
+6: is_protein
+7: is_rna
+8: is_dna
+9: is_ligand
+"""
+
 from __future__ import annotations
 
 from math import pi, sqrt
@@ -55,7 +70,7 @@ from tqdm import tqdm
 
 # constants
 
-DIM_ADDITIONAL_RESIDUE_FEATS = 10
+ADDITIONAL_RESIDUE_FEATS = 10
 
 LinearNoBias = partial(Linear, bias = False)
 
@@ -1005,20 +1020,6 @@ class PairformerStack(Module):
 
 # embedding related
 
-"""
-additional_residue_feats: [*, rf]:
-    0: residue_index
-    1: token_index
-    2: asym_id
-    3: entity_id
-    4: sym_id 
-    5: restype (must be one hot encoded to 32)
-    6: is_protein
-    7: is_rna
-    8: is_dna
-    9: is_ligand
-"""
-
 class RelativePositionEncoding(Module):
     """ Algorithm 3 """
     
@@ -1040,7 +1041,7 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_residue_feats: Float['b n 10']
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}']
     ) -> Float['b n n dp']:
 
         device = additional_residue_feats.device
@@ -1941,7 +1942,7 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_rel_pos_feats: Float['b n n dpr'],
         return_denoised_pos = False,
         residue_atom_lens: Int['b n'] | None = None,
-        additional_residue_feats: Float['b n 10'] | None = None,
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
         nucleotide_loss_weight = 5.,
@@ -2399,7 +2400,7 @@ class InputFeatureEmbedder(Module):
             atoms_per_window = atoms_per_window
         )
 
-        dim_single_input = dim_token + DIM_ADDITIONAL_RESIDUE_FEATS
+        dim_single_input = dim_token + ADDITIONAL_RESIDUE_FEATS
 
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
@@ -2411,12 +2412,12 @@ class InputFeatureEmbedder(Module):
         atom_inputs: Float['b m dai'],
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
-        additional_residue_feats: Float['b n rf'],
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'] | None = None,
 
     ) -> EmbeddedInputs:
 
-        assert additional_residue_feats.shape[-1] == DIM_ADDITIONAL_RESIDUE_FEATS
+        assert additional_residue_feats.shape[-1] == ADDITIONAL_RESIDUE_FEATS
 
         w = self.atoms_per_window
 
@@ -2723,7 +2724,7 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        dim_single_inputs = dim_input_embedder_token + DIM_ADDITIONAL_RESIDUE_FEATS
+        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_RESIDUE_FEATS
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -2842,7 +2843,7 @@ class Alphafold3(Module):
         *,
         atom_inputs: Float['b m dai'],
         atompair_feats: Float['b m m dap'],
-        additional_residue_feats: Float['b n 10'],
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         token_bond: Bool['b n n'] | None = None,
