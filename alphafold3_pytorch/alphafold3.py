@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 global ein notation:
 
@@ -32,8 +34,6 @@ additional_residue_feats: [*, 10]:
 8: is_dna
 9: is_ligand
 """
-
-from __future__ import annotations
 
 from math import pi, sqrt
 from functools import partial, wraps
