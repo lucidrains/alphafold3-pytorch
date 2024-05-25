@@ -48,7 +48,8 @@ class Trainer:
             eps = 1e-8
         ),
         clip_grad_norm = 10.,
-        default_lambda_lr = default_lambda_lr_fn
+        default_lambda_lr = default_lambda_lr_fn,
+        ema_kwargs: dict = dict()
     ):
         super().__init__()
         self.model = model
@@ -58,7 +59,8 @@ class Trainer:
         self.ema_model = EMA(
             model,
             beta = ema_decay,
-            include_online_model = False
+            include_online_model = False,
+            **ema_kwargs
         )
 
         # optimizer
