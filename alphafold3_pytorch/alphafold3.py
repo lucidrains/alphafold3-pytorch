@@ -55,6 +55,8 @@ from tqdm import tqdm
 
 # constants
 
+DIM_ADDITIONAL_RESIDUE_FEATS = 10
+
 LinearNoBias = partial(Linear, bias = False)
 
 # helper functions
@@ -1435,7 +1437,8 @@ class AtomToTokenPooler(Module):
         w = self.atoms_per_window
         is_unpacked_repr = exists(w)
 
-        assert is_unpacked_repr ^ exists(residue_atom_lens), '`residue_atom_lens` must be passed in if using packed_atom_repr (atoms_per_window is None)'
+        if not is_unpacked_repr:
+            assert exists(residue_atom_lens), '`residue_atom_lens` must be passed in if using packed_atom_repr (atoms_per_window is None)'
 
         atom_feats = self.proj(atom_feats)
 
@@ -1613,7 +1616,8 @@ class DiffusionModule(Module):
         w = self.atoms_per_window
         is_unpacked_repr = exists(w)
 
-        assert is_unpacked_repr ^ exists(residue_atom_lens)
+        if not is_unpacked_repr:
+            assert exists(residue_atom_lens)
 
         # in the paper, it seems they pack the atom feats
         # but in this impl, will just use windows for simplicity when communicating between atom and residue resolutions. bit less efficient
@@ -2350,7 +2354,6 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         dim_atom_inputs,
-        dim_additional_residue_feats = 10,
         atoms_per_window = 27,
         dim_atom = 128,
         dim_atompair = 16,
@@ -2396,9 +2399,7 @@ class InputFeatureEmbedder(Module):
             atoms_per_window = atoms_per_window
         )
 
-        dim_single_input = dim_token + dim_additional_residue_feats
-
-        self.dim_additional_residue_feats = dim_additional_residue_feats
+        dim_single_input = dim_token + DIM_ADDITIONAL_RESIDUE_FEATS
 
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
@@ -2415,7 +2416,7 @@ class InputFeatureEmbedder(Module):
 
     ) -> EmbeddedInputs:
 
-        assert additional_residue_feats.shape[-1] == self.dim_additional_residue_feats
+        assert additional_residue_feats.shape[-1] == DIM_ADDITIONAL_RESIDUE_FEATS
 
         w = self.atoms_per_window
 
@@ -2608,7 +2609,6 @@ class Alphafold3(Module):
         self,
         *,
         dim_atom_inputs,
-        dim_additional_residue_feats,
         dim_template_feats,
         dim_template_model = 64,
         atoms_per_window = 27,
@@ -2713,7 +2713,6 @@ class Alphafold3(Module):
 
         self.input_embedder = InputFeatureEmbedder(
             dim_atom_inputs = dim_atom_inputs,
-            dim_additional_residue_feats = dim_additional_residue_feats,
             atoms_per_window = atoms_per_window,
             dim_atom = dim_atom,
             dim_atompair = dim_atompair,
@@ -2723,7 +2722,7 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        dim_single_inputs = dim_input_embedder_token + dim_additional_residue_feats
+        dim_single_inputs = dim_input_embedder_token + DIM_ADDITIONAL_RESIDUE_FEATS
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -2866,22 +2865,28 @@ class Alphafold3(Module):
 
         atom_seq_len = atom_inputs.shape[-2]
 
+        assert exists(residue_atom_lens) or exists(atom_mask)
+
         # determine whether using packed or unpacked atom rep
 
-        assert exists(residue_atom_lens) ^ exists(atom_mask), 'either atom_lens or atom_mask must be given depending on whether packed_atom_repr kwarg is True or False'
+        if self.packed_atom_repr:
+            assert exists(residue_atom_lens), 'residue_atom_lens must be given if using packed atom repr'
 
         if exists(residue_atom_lens):
-            assert self.packed_atom_repr, '`packed_atom_repr` kwarg on Alphafold3 must be True when passing in `atom_lens`'
 
-            # handle atom mask
+            if self.packed_atom_repr:
+                # handle atom mask
 
-            total_atoms = residue_atom_lens.sum(dim = -1)
-            atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
+                total_atoms = residue_atom_lens.sum(dim = -1)
+                atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
 
-            # handle offsets for residue atom indices
+                # handle offsets for residue atom indices
 
-            if exists(residue_atom_indices):
-                residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
+                if exists(residue_atom_indices):
+                    residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
+            else:
+                atom_mask = lens_to_mask(residue_atom_lens, max_len = self.atoms_per_window)
+                atom_mask = rearrange(atom_mask, 'b ... -> b (...)')
 
         # get atom sequence length and residue sequence length depending on whether using packed atomic seq
 

@@ -36,7 +36,7 @@ seq_len = 16
 atom_seq_len = seq_len * 27
 
 atom_inputs = torch.randn(2, atom_seq_len, 77)
-atom_mask = torch.ones((2, atom_seq_len)).bool()
+atom_lens = torch.randint(0, 27, (2, seq_len))
 atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
 additional_residue_feats = torch.randn(2, seq_len, 33)
 
@@ -61,7 +61,7 @@ resolved_labels = torch.randint(0, 2, (2, seq_len))
 loss = alphafold3(
     num_recycling_steps = 2,
     atom_inputs = atom_inputs,
-    atom_mask = atom_mask,
+    residue_atom_lens = atom_lens,
     atompair_feats = atompair_feats,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
