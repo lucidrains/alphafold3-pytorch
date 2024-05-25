@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from ema_pytorch import EMA
 
+from lightning import Fabric
 
 # helpers
 
@@ -49,9 +50,21 @@ class Trainer:
         ),
         clip_grad_norm = 10.,
         default_lambda_lr = default_lambda_lr_fn,
+        fabric: Fabric | None = None,
+        accelerator = 'auto',
+        fabric_kwargs: dict = dict(),
         ema_kwargs: dict = dict()
     ):
         super().__init__()
+
+        if not exists(fabric):
+            fabric = Fabric(accelerator = accelerator, **fabric_kwargs)
+
+        self.fabric = fabric
+        fabric.launch()
+
+        # model
+
         self.model = model
 
         # exponential moving average
@@ -73,6 +86,10 @@ class Trainer:
             )
 
         self.optimizer = optimizer
+
+        # setup fabric
+
+        self.model, self.optimizer = fabric.setup(self.model, self.optimizer)
 
         # scheduler
 
