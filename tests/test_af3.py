@@ -141,7 +141,8 @@ def test_pairformer():
     mask = torch.randint(0, 2, (2, 16)).bool()
 
     pairformer = PairformerStack(
-        depth = 4
+        depth = 4,
+        num_register_tokens = 4,
     )
 
     single_out, pairwise_out = pairformer(

@@ -15,6 +15,7 @@ dap - feature dimension (atompair)
 da - feature dimension (atom)
 t - templates
 s - msa
+r - registers
 """
 
 from __future__ import annotations
@@ -183,13 +184,13 @@ def repeat_pairwise_consecutive_with_lens(
     lens: Int['b n']
 ) -> Float['b m m dp']:
 
-    repeated_lens = repeat(lens, 'b ... -> (b r) ...', r = feats.shape[1])
+    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
     feats, ps = pack_one(feats, '* n dp')
     feats = repeat_consecutive_with_lens(feats, repeated_lens)
     feats = unpack_one(feats, ps, '* n dp')
 
     feats = rearrange(feats, 'b i j dp -> b j i dp')
-    repeated_lens = repeat(lens, 'b ... -> (b r) ...', r = feats.shape[1])
+    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
     feats, ps = pack_one(feats, '* n dp')
     feats = repeat_consecutive_with_lens(feats, repeated_lens)
     feats = unpack_one(feats, ps, '* n dp')
@@ -566,10 +567,10 @@ class TriangleAttention(Module):
         attn_bias = self.to_attn_bias(pairwise_repr)
 
         batch_repeat = pairwise_repr.shape[1]
-        attn_bias = repeat(attn_bias, 'b ... -> (b r) ...', r = batch_repeat)
+        attn_bias = repeat(attn_bias, 'b ... -> (b repeat) ...', repeat = batch_repeat)
 
         if exists(mask):
-            mask = repeat(mask, 'b ... -> (b r) ...', r = batch_repeat)
+            mask = repeat(mask, 'b ... -> (b repeat) ...', repeat = batch_repeat)
 
         pairwise_repr, packed_shape = pack_one(pairwise_repr, '* n d')
 
@@ -912,6 +913,7 @@ class PairformerStack(Module):
         pair_bias_attn_dim_head = 64,
         pair_bias_attn_heads = 16,
         dropout_row_prob = 0.25,
+        num_register_tokens = 0,
         pairwise_block_kwargs: dict = dict()
     ):
         super().__init__()
@@ -945,6 +947,14 @@ class PairformerStack(Module):
 
         self.layers = layers
 
+        self.num_registers = num_register_tokens
+        self.has_registers = num_register_tokens > 0
+
+        if self.has_registers:
+            self.single_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_single))
+            self.pairwise_row_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
+            self.pairwise_col_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
+
     @typecheck
     def forward(
         self,
@@ -954,6 +964,23 @@ class PairformerStack(Module):
         mask: Bool['b n'] | None = None
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
+
+        # prepend register tokens
+
+        if self.has_registers:
+            batch_size, num_registers = single_repr.shape[0], self.num_registers
+            single_registers = repeat(self.single_registers, 'r d -> b r d', b = batch_size)
+            single_repr = torch.cat((single_registers, single_repr), dim = 1)
+
+            row_registers = repeat(self.pairwise_row_registers, 'r d -> b r n d', b = batch_size, n = pairwise_repr.shape[-2])
+            pairwise_repr = torch.cat((row_registers, pairwise_repr), dim = 1)
+            col_registers = repeat(self.pairwise_col_registers, 'r d -> b n r d', b = batch_size, n = pairwise_repr.shape[1])
+            pairwise_repr = torch.cat((col_registers, pairwise_repr), dim = 2)
+
+            if exists(mask):
+                mask = F.pad(mask, (num_registers, 0), value = True)
+
+        # main transformer block layers
 
         for (
             pairwise_block,
@@ -965,6 +992,12 @@ class PairformerStack(Module):
 
             single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
             single_repr = single_transition(single_repr) + single_repr
+
+        # splice out registers
+
+        if self.has_registers:
+            single_repr = single_repr[:, num_registers:]
+            pairwise_repr = pairwise_repr[:, num_registers:, num_registers:]
 
         return single_repr, pairwise_repr
 
