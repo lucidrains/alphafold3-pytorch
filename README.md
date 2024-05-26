@@ -62,22 +62,22 @@ Train model with default configuration
 
 ```bash
 # Train on CPU
-python src/train.py trainer=cpu
+python alphafold3_pytorch/train.py trainer=cpu
 
 # Train on GPU
-python src/train.py trainer=gpu
+python alphafold3_pytorch/train.py trainer=gpu
 ```
 
 Train model with chosen experiment configuration from [configs/experiment/](configs/experiment/)
 
 ```bash
-python src/train.py experiment=experiment_name.yaml
+python alphafold3_pytorch/train.py experiment=experiment_name.yaml
 ```
 
 You can override any parameter from command line like this
 
 ```bash
-python src/train.py trainer.max_epochs=20 data.batch_size=64
+python alphafold3_pytorch/train.py trainer.max_epochs=20 data.batch_size=64
 ```
 
 ## For developers
