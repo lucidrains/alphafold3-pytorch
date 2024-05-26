@@ -1,10 +1,7 @@
 from typing import Tuple
 
-import rootutils
 import torch
 import torch.nn.functional as F
-
-rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from alphafold3_pytorch.utils.typing import typecheck
 

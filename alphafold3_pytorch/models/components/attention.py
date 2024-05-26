@@ -1,7 +1,6 @@
 # from __future__ import annotations
 
 # import torch
-# import rootutils
 # from torch import nn
 # import torch.nn.functional as F
 # from torch.nn import Module
@@ -9,8 +8,6 @@
 # import einx
 # from einops import einsum, repeat, rearrange
 # from einops.layers.torch import Rearrange
-
-# rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 # from alphafold3_pytorch.models.components.constants import AttentionConfig
 # from alphafold3_pytorch.utils.model_utils import max_neg_value, pad_at_dim
