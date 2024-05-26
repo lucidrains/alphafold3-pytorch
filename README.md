@@ -107,6 +107,8 @@ docker build -t af3 . # Rebuild the Docker image
 docker run --gpus all -it af3 # # Lastly, (re)start the Docker container from the updated image
 ```
 
+If you want to update the project's `pip` dependencies only, you can simply push to GitHub your changes to the `pyproject.toml` file.
+
 ### Code formatting
 
 We use `pre-commit` to automatically format the project's code. To set up `pre-commit` (one time only) for automatic code linting and formatting upon each execution of `git commit`:
