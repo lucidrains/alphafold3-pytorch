@@ -9,7 +9,7 @@ from lightning_utilities.core.rank_zero import rank_zero_only
 from omegaconf import DictConfig, OmegaConf, open_dict
 from rich.prompt import Prompt
 
-from src.utils import pylogger
+from alphafold3_pytorch.utils import pylogger
 
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
@@ -44,9 +44,7 @@ def print_config_tree(
 
     # add fields from `print_order` to queue
     for field in print_order:
-        queue.append(field) if field in cfg else log.warning(
-            f"Field '{field}' not found in config. Skipping '{field}' config printing..."
-        )
+        queue.append(field) if field in cfg else log.warning(f"Field '{field}' not found in config. Skipping '{field}' config printing...")
 
     # add all the other fields to queue (not specified in `print_order`)
     for field in cfg:
