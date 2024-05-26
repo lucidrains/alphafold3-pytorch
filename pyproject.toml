@@ -95,7 +95,11 @@ testpaths = "tests/"
 line-length = 1000
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F", "I"] # <-- Note: I suggest including the "I" for additional checks!
-ignore = ["F722"] # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
+ignore = [
+  "F722", # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
+  "F401",
+  "F821",
+]
 
 # Assuming you're developing for Python 3.10
 target-version = "py310"

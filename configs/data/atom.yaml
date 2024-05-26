@@ -1,0 +1,11 @@
+_target_: alphafold3_pytorch.data.atom_datamodule.AtomDataModule
+data_dir: ${paths.data_dir}
+train_val_test_split: [2, 2, 2]
+sequence_crop_size: 384 # NOTE: must be one of (initial_training: 384, fine_tuning_1: 640, fine_tuning_2: 768, fine_tuning_3: 768), proceeding from left to right following Table 6 in the paper
+sampling_weight_for_disorder_pdb_distillation: 0.02  # NOTE: must be one of (initial_training: 0.02, fine_tuning_1: 0.01, fine_tuning_2: 0.02, fine_tuning_3: 0.02), proceeding from left to right following Table 6 in the paper
+train_on_transcription_factor_distillation_sets: false # NOTE: must be one of (initial_training: False, fine_tuning_1: False, fine_tuning_2: True, fine_tuning_3: True), proceeding from left to right following Table 6 in the paper
+pdb_distillation: null # NOTE: does not appear to be used in Table 6 of the paper
+max_number_of_chains: 20 # NOTE: must be one of (initial_training: 20, fine_tuning_1: 20, fine_tuning_2: 20, fine_tuning_3: 50), proceeding from left to right following Table 6 in the paper
+batch_size: 256 # needs to be divisible by the number of devices (e.g., if in a distributed setup)
+num_workers: 0
+pin_memory: False

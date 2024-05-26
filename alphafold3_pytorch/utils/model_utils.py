@@ -20,7 +20,7 @@ Shape = Union[Tuple[int, ...], List[int]]
 def default_lambda_lr_fn(steps: int) -> float:
     """Default lambda learning rate function.
 
-    :param steps: The number of steps.
+    :param steps: The number of steps taken.
     :return: The learning rate.
     """
     # 1000 step warmup

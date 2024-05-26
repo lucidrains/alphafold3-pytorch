@@ -1,5 +1,6 @@
 """This file prepares config fixtures for other tests."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,8 @@ import rootutils
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, open_dict
+
+os.environ["TYPECHECK"] = "True"
 
 
 @pytest.fixture(scope="package")

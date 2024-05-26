@@ -2,20 +2,87 @@ from typing import Any, Dict, Optional, Tuple
 
 import torch
 from lightning import LightningDataModule
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
-from torchvision.datasets import MNIST
-from torchvision.transforms import transforms
+from torch.utils.data import DataLoader, Dataset
+
+from alphafold3_pytorch.models.alphafold3_module import AlphaFold3Input
 
 
-class MNISTDataModule(LightningDataModule):
-    """`LightningDataModule` for the MNIST dataset.
+class AtomDataset(Dataset):
+    """
+    A dummy dataset for atomic data.
 
-    The MNIST database of handwritten digits has a training set of 60,000 examples, and a test set of 10,000 examples.
-    It is a subset of a larger set available from NIST. The digits have been size-normalized and centered in a
-    fixed-size image. The original black and white images from NIST were size normalized to fit in a 20x20 pixel box
-    while preserving their aspect ratio. The resulting images contain grey levels as a result of the anti-aliasing
-    technique used by the normalization algorithm. the images were centered in a 28x28 image by computing the center of
-    mass of the pixels, and translating the image so as to position this point at the center of the 28x28 field.
+    :param seq_len: The length of the protein sequence.
+    :param atoms_per_window: The number of atoms per window.
+    :param num_examples: The number of examples in the dataset.
+    """
+
+    def __init__(
+        self,
+        seq_len=16,
+        atoms_per_window=27,
+        num_examples=2,
+    ):
+        self.seq_len = seq_len
+        self.atom_seq_len = seq_len * atoms_per_window
+        self.num_examples = num_examples
+
+    def __len__(self):
+        """Return the length of the dataset."""
+        return self.num_examples
+
+    def __getitem__(self, idx) -> AlphaFold3Input:
+        """
+        Return a random `AlphaFold3Input` sample from the dataset.
+
+        :param idx: The index of the sample.
+        :return: A random `AlphaFold3Input` sample from the dataset.
+        """
+        seq_len = self.seq_len
+        atom_seq_len = self.atom_seq_len
+
+        atom_inputs = torch.randn(atom_seq_len, 77)
+        residue_atom_lens = torch.randint(0, 27, (seq_len,))
+        atompair_feats = torch.randn(atom_seq_len, atom_seq_len, 16)
+        additional_residue_feats = torch.randn(seq_len, 10)
+
+        templates = torch.randn(2, seq_len, seq_len, 44)
+        template_mask = torch.ones((2,)).bool()
+
+        msa = torch.randn(7, seq_len, 64)
+        msa_mask = torch.ones((7,)).bool()
+
+        # required for training, but omitted on inference
+
+        atom_pos = torch.randn(atom_seq_len, 3)
+        residue_atom_indices = torch.randint(0, 27, (seq_len,))
+
+        distance_labels = torch.randint(0, 37, (seq_len, seq_len))
+        pae_labels = torch.randint(0, 64, (seq_len, seq_len))
+        pde_labels = torch.randint(0, 64, (seq_len, seq_len))
+        plddt_labels = torch.randint(0, 50, (seq_len,))
+        resolved_labels = torch.randint(0, 2, (seq_len,))
+
+        return AlphaFold3Input(
+            atom_inputs=atom_inputs,
+            residue_atom_lens=residue_atom_lens,
+            atompair_feats=atompair_feats,
+            additional_residue_feats=additional_residue_feats,
+            templates=templates,
+            template_mask=template_mask,
+            msa=msa,
+            msa_mask=msa_mask,
+            atom_pos=atom_pos,
+            residue_atom_indices=residue_atom_indices,
+            distance_labels=distance_labels,
+            pae_labels=pae_labels,
+            pde_labels=pde_labels,
+            plddt_labels=plddt_labels,
+            resolved_labels=resolved_labels,
+        )
+
+
+class AtomDataModule(LightningDataModule):
+    """`LightningDataModule` for a dummy atomic dataset.
 
     A `LightningDataModule` implements 7 key methods:
 
@@ -55,8 +122,13 @@ class MNISTDataModule(LightningDataModule):
     def __init__(
         self,
         data_dir: str = "data/",
-        train_val_test_split: Tuple[int, int, int] = (55_000, 5_000, 10_000),
-        batch_size: int = 64,
+        train_val_test_split: Tuple[int, int, int] = (2, 2, 2),
+        sequence_crop_size: int = 384,
+        sampling_weight_for_disorder_pdb_distillation: float = 0.02,
+        train_on_transcription_factor_distillation_sets: bool = False,
+        pdb_distillation: Optional[bool] = None,
+        max_number_of_chains: int = 20,
+        batch_size: int = 256,
         num_workers: int = 0,
         pin_memory: bool = False,
     ) -> None:
@@ -66,24 +138,11 @@ class MNISTDataModule(LightningDataModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
-        # data transformations
-        self.transforms = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-        )
-
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
 
         self.batch_size_per_device = batch_size
-
-    @property
-    def num_classes(self) -> int:
-        """Get the number of classes.
-
-        :return: The number of MNIST classes (10).
-        """
-        return 10
 
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
@@ -93,8 +152,7 @@ class MNISTDataModule(LightningDataModule):
 
         Do not use it to assign state (self.x = y).
         """
-        MNIST(self.hparams.data_dir, train=True, download=True)
-        MNIST(self.hparams.data_dir, train=False, download=True)
+        pass
 
     def setup(self, stage: Optional[str] = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
@@ -114,16 +172,11 @@ class MNISTDataModule(LightningDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
-        # load and split datasets only if not loaded already
+        # load dataset splits only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            trainset = MNIST(self.hparams.data_dir, train=True, transform=self.transforms)
-            testset = MNIST(self.hparams.data_dir, train=False, transform=self.transforms)
-            dataset = ConcatDataset(datasets=[trainset, testset])
-            self.data_train, self.data_val, self.data_test = random_split(
-                dataset=dataset,
-                lengths=self.hparams.train_val_test_split,
-                generator=torch.Generator().manual_seed(42),
-            )
+            self.data_train = AtomDataset(num_examples=self.hparams.train_val_test_split[0])
+            self.data_val = AtomDataset(num_examples=self.hparams.train_val_test_split[1])
+            self.data_test = AtomDataset(num_examples=self.hparams.train_val_test_split[2])
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
@@ -190,4 +243,4 @@ class MNISTDataModule(LightningDataModule):
 
 
 if __name__ == "__main__":
-    _ = MNISTDataModule()
+    _ = AtomDataModule()

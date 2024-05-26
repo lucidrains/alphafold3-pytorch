@@ -1,9 +1,15 @@
+"""This file prepares unit tests for sweeps."""
+
+import os
 from pathlib import Path
 
 import pytest
 
 from tests.helpers.run_if import RunIf
 from tests.helpers.run_sh_command import run_sh_command
+
+os.environ["TYPECHECK"] = "True"
+
 
 startfile = "alphafold3_pytorch/train.py"
 overrides = ["logger=[]"]
@@ -75,7 +81,7 @@ def test_optuna_sweep(tmp_path: Path) -> None:
     command = [
         startfile,
         "-m",
-        "hparams_search=mnist_optuna",
+        "hparams_search=atom_optuna",
         "hydra.sweep.dir=" + str(tmp_path),
         "hydra.sweeper.n_trials=10",
         "hydra.sweeper.sampler.n_startup_trials=5",
@@ -94,7 +100,7 @@ def test_optuna_sweep_ddp_sim_wandb(tmp_path: Path) -> None:
     command = [
         startfile,
         "-m",
-        "hparams_search=mnist_optuna",
+        "hparams_search=atom_optuna",
         "hydra.sweep.dir=" + str(tmp_path),
         "hydra.sweeper.n_trials=5",
         "trainer=ddp_sim",

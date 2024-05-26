@@ -1,14 +1,14 @@
 # @package _global_
 
 # example hyperparameter optimization of some experiment with Optuna:
-# python train.py -m hparams_search=mnist_optuna experiment=example
+# python train.py -m hparams_search=atom_optuna experiment=example
 
 defaults:
   - override /hydra/sweeper: optuna
 
 # choose metric which will be optimized by Optuna
 # make sure this is the correct name of some metric logged in lightning module!
-optimized_metric: "val/acc_best"
+optimized_metric: "val/loss_best"
 
 # here we define Optuna hyperparameter search
 # it optimizes for value returned from function with @hydra.main decorator
@@ -30,7 +30,7 @@ hydra:
     n_jobs: 1
 
     # 'minimize' or 'maximize' the objective
-    direction: maximize
+    direction: minimize
 
     # total number of runs that will be executed
     n_trials: 20

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import einx
 import torch
 import torch.nn.functional as F
@@ -8,10 +10,20 @@ from einops.layers.torch import Rearrange
 from torch import nn
 from torch.nn import Module
 
-from alphafold3_pytorch.models.components.constants import AttentionConfig
 from alphafold3_pytorch.utils.model_utils import max_neg_value, pad_at_dim
 from alphafold3_pytorch.utils.typing import Bool, Float, typecheck
 from alphafold3_pytorch.utils.utils import default, exists
+
+# config
+
+
+class AttentionConfig(NamedTuple):
+    """Configuration for an attention mechanism."""
+
+    enable_flash: bool
+    enable_math: bool
+    enable_mem_efficient: bool
+
 
 # multi-head attention
 

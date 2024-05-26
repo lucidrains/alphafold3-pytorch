@@ -2888,7 +2888,7 @@ class LossBreakdown(NamedTuple):
     diffusion_loss_breakdown: DiffusionLossBreakdown
 
 
-class Alphafold3(Module):
+class AlphaFold3(Module):
     """Algorithm 1."""
 
     @typecheck

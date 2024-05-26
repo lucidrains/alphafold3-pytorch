@@ -1,0 +1,10 @@
+# https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/common/callbacks/ema.py
+
+# Maintains an exponential moving average (EMA) of model weights.
+# Look at the above link for more detailed information regarding the original implementation.
+ema:
+  _target_: src.models.components.callbacks.ema.EMA
+  decay: 0.999
+  validate_original_weights: false
+  every_n_steps: 4
+  cpu_offload: false

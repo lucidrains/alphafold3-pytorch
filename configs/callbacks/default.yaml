@@ -1,22 +1,20 @@
 defaults:
+  - ema
+  - last_model_checkpoint
+  - learning_rate_monitor
   - model_checkpoint
-  - early_stopping
   - model_summary
   - rich_progress_bar
   - _self_
 
-model_checkpoint:
+last_model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
-  filename: "epoch_{epoch:03d}"
-  monitor: "val/acc"
-  mode: "max"
-  save_last: True
+  filename: "last"
+  monitor: null
+  verbose: True
   auto_insert_metric_name: False
-
-early_stopping:
-  monitor: "val/acc"
-  patience: 100
-  mode: "max"
+  every_n_train_steps: 500 # NOTE: this is an improvised fault-tolerance value to enable one to resume training from the most-recent checkpoint, which may need to be adjusted
+  enable_version_counter: False
 
 model_summary:
   max_depth: -1

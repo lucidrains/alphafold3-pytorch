@@ -2,13 +2,15 @@
 
 defaults:
   - _self_
-  - data: mnist # choose datamodule with `test_dataloader()` for evaluation
-  - model: mnist
+  - data: atom # choose datamodule with `test_dataloader()` for evaluation
+  - model: alphafold3
   - logger: null
+  - strategy: default
   - trainer: default
   - paths: default
   - extras: default
   - hydra: default
+  - environment: default
 
 task_name: "eval"
 

@@ -2,8 +2,8 @@ _target_: lightning.pytorch.trainer.Trainer
 
 default_root_dir: ${paths.output_dir}
 
-min_epochs: 1 # prevents early stopping
-max_epochs: 10
+min_steps: 1 # prevents early stopping
+max_steps: ${divide:${multiply:1e6, 20}, 256} # NOTE: references values for "Initial training" in Table 6 of the paper
 
 accelerator: cpu
 devices: 1
@@ -17,3 +17,14 @@ check_val_every_n_epoch: 1
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
 deterministic: False
+
+# if `gradient_clip_val` is not `null`, gradients will be norm-clipped by an upper bound of `gradient_clip_val` during training
+gradient_clip_algorithm: norm
+gradient_clip_val: 10.0
+
+# accumulate gradients of `accumulate_grad_batches` batches (e.g., by this amount for each rank) before doing a backward pass
+# NOTE: here, we have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients
+accumulate_grad_batches: ${validate_gradient_accumulation_factor:${data.batch_size, trainer.world_size}}
+
+# if `num_sanity_val_steps` is > 0, then specifically that many validation steps will be run during the first call to `trainer.fit`
+num_sanity_val_steps: 0

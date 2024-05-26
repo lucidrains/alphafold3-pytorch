@@ -1,6 +1,12 @@
+"""This file prepares unit tests for configuration file contents."""
+
+import os
+
 import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
+
+os.environ["TYPECHECK"] = "True"
 
 
 def test_train_config(cfg_train: DictConfig) -> None:

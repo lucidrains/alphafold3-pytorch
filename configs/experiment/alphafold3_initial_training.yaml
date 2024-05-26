@@ -1,0 +1,58 @@
+# @package _global_
+
+# lists the experiment parameters corresponding to "Initial training" in Table 6 of the paper
+
+# to execute this experiment run:
+# python train.py experiment=alphafold3_initial_training
+
+defaults:
+  - override /data: atom
+  - override /model: alphafold3
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["atom", "alphafold3", "initial_training"]
+
+seed: 12345
+
+trainer:
+  min_steps: 1 # prevents early stopping
+  max_steps: ${divide:${multiply:1e6, 20}, 256} # NOTE: references values for "Initial training" in Table 6 of the paper
+  gradient_clip_algorithm: norm
+  gradient_clip_val: 10.0
+  # NOTE: here, we have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients
+  accumulate_grad_batches: ${validate_gradient_accumulation_factor:${data.batch_size, trainer.world_size}}
+
+model:
+  optimizer:
+    lr: 1.8e-3
+  net:
+    dim_atom_inputs: 77
+    dim_template_feats: 44
+  # training parameters
+  compile: false
+  skip_invalid_gradient_updates: false
+  # model parameters
+  parameters_initialized_from: random
+  masked_diffusion_loss_for_non_protein_in_disorder: false
+  train_structure_and_distogram: true
+  train_pae_head: false
+  polymer_ligand_bond_loss_weight: 0.0
+
+data:
+  sequence_crop_size: 384
+  sampling_weight_for_disorder_pdb_distillation: 0.02
+  train_on_transcription_factor_distillation_sets: false
+  pdb_distillation: null
+  max_number_of_chains: 20
+  batch_size: 256
+
+logger:
+  wandb:
+    tags: ${tags}
+    group: "alphafold3"
+  aim:
+    experiment: "alphafold3"
