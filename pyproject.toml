@@ -97,6 +97,41 @@ line-length = 1000
 select = ["E", "F", "I"] # <-- Note: I suggest including the "I" for additional checks!
 ignore = ["F722"] # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
 
+# Assuming you're developing for Python 3.10
+target-version = "py310"
+
+[tool.black]
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | env
+  | .env
+  | venv
+  | .venv
+)/
+'''
+line-length = 1000
+target-version = ["py310"]
+
+[tool.isort]
+skip = [".env", "env", ".venv", "venv", "data"]
+ensure_newline_before_comments = true
+force_grid_wrap = 0
+include_trailing_comma = true
+line_length = 1000 # match our custom config above
+multi_line_output = 3
+float_to_top = true
+use_parentheses = true
+skip_glob = "**/*.pyx"
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
