@@ -24,37 +24,39 @@ $ pip install alphafold3-pytorch
 import torch
 from alphafold3_pytorch import Alphafold3
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 alphafold3 = Alphafold3(
     dim_atom_inputs = 77,
     dim_template_feats = 44
 )
+alphafold3.to(device)
 
 # mock inputs
 
 seq_len = 16
 atom_seq_len = seq_len * 27
 
-atom_inputs = torch.randn(2, atom_seq_len, 77)
-atom_lens = torch.randint(0, 27, (2, seq_len))
-atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-additional_residue_feats = torch.randn(2, seq_len, 10)
+atom_inputs = torch.randn(2, atom_seq_len, 77, device=device)
+atom_lens = torch.randint(0, 27, (2, seq_len), device=device)
+atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16, device=device)
+additional_residue_feats = torch.randn(2, seq_len, 10, device=device)
 
-template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
-template_mask = torch.ones((2, 2)).bool()
+template_feats = torch.randn(2, 2, seq_len, seq_len, 44, device=device)
+template_mask = torch.ones((2, 2), device=device).bool()
 
-msa = torch.randn(2, 7, seq_len, 64)
-msa_mask = torch.ones((2, 7)).bool()
+msa = torch.randn(2, 7, seq_len, 64, device=device)
+msa_mask = torch.ones((2, 7), device=device).bool()
 
 # required for training, but omitted on inference
 
-atom_pos = torch.randn(2, atom_seq_len, 3)
-residue_atom_indices = torch.randint(0, 27, (2, seq_len))
+atom_pos = torch.randn(2, atom_seq_len, 3, device=device)
+residue_atom_indices = torch.randint(0, 27, (2, seq_len), device=device)
 
-distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
-pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-plddt_labels = torch.randint(0, 50, (2, seq_len))
-resolved_labels = torch.randint(0, 2, (2, seq_len))
+distance_labels = torch.randint(0, 37, (2, seq_len, seq_len), device=device)
+pae_labels = torch.randint(0, 64, (2, seq_len, seq_len), device=device)
+pde_labels = torch.randint(0, 64, (2, seq_len, seq_len), device=device)
+plddt_labels = torch.randint(0, 50, (2, seq_len), device=device)
+resolved_labels = torch.randint(0, 2, (2, seq_len), device=device)
 
 # train
 
