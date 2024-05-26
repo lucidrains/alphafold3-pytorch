@@ -93,11 +93,9 @@ testpaths = "tests/"
 
 [tool.ruff]
 line-length = 1000
-
-ignore = [
-    "F722", # for jaxtyping shape annotation
-    "F401"
-]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+select = ["E", "F", "I"] # <-- Note: I suggest including the "I" for additional checks!
+ignore = ["F722"] # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
 
 [tool.hatch.metadata]
 allow-direct-references = true
