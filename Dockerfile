@@ -1,4 +1,3 @@
-
 FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
 
 ## Add System Dependencies
@@ -14,7 +13,7 @@ RUN apt-get update \
 ## Change working directory
 WORKDIR /app/alphafold
 
-## Clone and install the LucidRains package + requirements
+## Clone and install the lucidrains package + requirements
 RUN git clone https://github.com/lucidrains/alphafold3-pytorch . \
     && git checkout main \
     && python -m pip install .

@@ -1,8 +1,23 @@
-<img src="./alphafold3.png" width="500px"></img>
+<div align="center">
 
-## Alphafold 3 - Pytorch (wip)
+# AlphaFold 3 - PyTorch (wip)
 
-Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">Alphafold 3</a> in Pytorch
+<a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
+<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
+<a href="https://hydra.cc/"><img alt="Config: Hydra" src="https://img.shields.io/badge/Config-Hydra-89b8cd"></a>
+<a href="https://github.com/ashleve/lightning-hydra-template"><img alt="Template" src="https://img.shields.io/badge/-Lightning--Hydra--Template-017F2F?style=flat&logo=github&labelColor=gray"></a><br>
+
+<!-- [![Paper](http://img.shields.io/badge/paper-arxiv.1001.2234-B31B1B.svg)](https://www.nature.com/articles/s41586-024-07487-w) -->
+
+<!-- [![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020) -->
+
+<img src="./img/alphafold3.png" width="600">
+
+</div>
+
+## Description
+
+Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">AlphaFold 3</a> in Pytorch
 
 Getting a fair number of emails. You can chat with me about this work <a href="https://discord.gg/x6FuzQPQXY">here</a>
 
@@ -12,117 +27,101 @@ Getting a fair number of emails. You can chat with me about this work <a href="h
 
 - <a href="https://github.com/engelberger">Felipe</a> for contributing Weighted Rigid Align, Express Coordinates In Frame, Compute Alignment Error, and Centre Random Augmentation modules!
 
-## Install
+## Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [For developers](#for-developers)
+- [Citations](#citations)
+
+## Installation
+
+### Pip
 
 ```bash
-$ pip install alphafold3-pytorch
+pip install alphafold3-pytorch
+```
+
+### Docker
+
+```bash
+# Clone project
+git clone https://github.com/lucidrains/alphafold3-pytorch
+cd alphafold3-pytorch
+
+# Build Docker container
+docker build -t af3 .
+
+# Run container (with GPUs)
+docker run --gpus all -it af3
 ```
 
 ## Usage
 
-```python
-import torch
-from alphafold3_pytorch import Alphafold3
+Train model with default configuration
 
-alphafold3 = Alphafold3(
-    dim_atom_inputs = 77,
-    dim_template_feats = 44
-)
+```bash
+# Train on CPU
+python src/train.py trainer=cpu
 
-# mock inputs
-
-seq_len = 16
-atom_seq_len = seq_len * 27
-
-atom_inputs = torch.randn(2, atom_seq_len, 77)
-atom_lens = torch.randint(0, 27, (2, seq_len))
-atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-additional_residue_feats = torch.randn(2, seq_len, 10)
-
-template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
-template_mask = torch.ones((2, 2)).bool()
-
-msa = torch.randn(2, 7, seq_len, 64)
-msa_mask = torch.ones((2, 7)).bool()
-
-# required for training, but omitted on inference
-
-atom_pos = torch.randn(2, atom_seq_len, 3)
-residue_atom_indices = torch.randint(0, 27, (2, seq_len))
-
-distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
-pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-plddt_labels = torch.randint(0, 50, (2, seq_len))
-resolved_labels = torch.randint(0, 2, (2, seq_len))
-
-# train
-
-loss = alphafold3(
-    num_recycling_steps = 2,
-    atom_inputs = atom_inputs,
-    residue_atom_lens = atom_lens,
-    atompair_feats = atompair_feats,
-    additional_residue_feats = additional_residue_feats,
-    msa = msa,
-    msa_mask = msa_mask,
-    templates = template_feats,
-    template_mask = template_mask,
-    atom_pos = atom_pos,
-    residue_atom_indices = residue_atom_indices,
-    distance_labels = distance_labels,
-    pae_labels = pae_labels,
-    pde_labels = pde_labels,
-    plddt_labels = plddt_labels,
-    resolved_labels = resolved_labels
-)
-
-loss.backward()
-
-# after much training ...
-
-sampled_atom_pos = alphafold3(
-    num_recycling_steps = 4,
-    num_sample_steps = 16,
-    atom_inputs = atom_inputs,
-    residue_atom_lens = atom_lens,
-    atompair_feats = atompair_feats,
-    additional_residue_feats = additional_residue_feats,
-    msa = msa,
-    msa_mask = msa_mask,
-    templates = template_feats,
-    template_mask = template_mask
-)
-
-sampled_atom_pos.shape # (2, 16 * 27, 3)
+# Train on GPU
+python src/train.py trainer=gpu
 ```
 
-## Contributing
+Train model with chosen experiment configuration from [configs/experiment/](configs/experiment/)
+
+```bash
+python src/train.py experiment=experiment_name.yaml
+```
+
+You can override any parameter from command line like this
+
+```bash
+python src/train.py trainer.max_epochs=20 data.batch_size=64
+```
+
+## For developers
+
+### Contributing
 
 At the project root, run
 
 ```bash
-$ sh ./contribute.sh
+bash contribute.sh
 ```
 
 Then, add your module to `alphafold3_pytorch/alphafold3.py`, add your tests to `tests/test_af3.py`, and submit a pull request. You can run the tests locally with
 
 ```bash
-$ pytest tests/
+pytest tests/
 ```
 
-## Docker
+### Dependency management
 
-### Build Docker Container
+We use `pip` and `docker` to manage the project's underlying dependencies. Notably, to update the dependencies built by the project's `Dockerfile`, first edit the contents of the `dependencies` list in `pyproject.toml`, and then rebuild the project's `docker` image:
+
 ```bash
-docker build -t af3 .
+docker stop <container_id> # First stop any running `af3` container(s)
+docker rm <container_id> # Then remove the container(s) - Caution: Make sure to push your local changes to GitHub before running this!
+docker build -t af3 . # Rebuild the Docker image
+docker run --gpus all -it af3 # # Lastly, (re)start the Docker container from the updated image
 ```
 
-### Run Container
+### Code formatting
+
+We use `pre-commit` to automatically format the project's code. To set up `pre-commit` (one time only) for automatic code linting and formatting upon each execution of `git commit`:
+
 ```bash
-## With GPUs
-docker run  --gpus all -it af3
+pre-commit install
 ```
+
+To manually reformat all files in the project as desired:
+
+```bash
+pre-commit run -a
+```
+
+Refer to [pre-commit's documentation](https://pre-commit.com/) for more details.
 
 ## Citations
 
