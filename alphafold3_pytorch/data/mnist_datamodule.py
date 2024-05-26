@@ -60,14 +60,6 @@ class MNISTDataModule(LightningDataModule):
         num_workers: int = 0,
         pin_memory: bool = False,
     ) -> None:
-        """Initialize a `MNISTDataModule`.
-
-        :param data_dir: The data directory. Defaults to `"data/"`.
-        :param train_val_test_split: The train, validation and test split. Defaults to `(55_000, 5_000, 10_000)`.
-        :param batch_size: The batch size. Defaults to `64`.
-        :param num_workers: The number of workers. Defaults to `0`.
-        :param pin_memory: Whether to pin memory. Defaults to `False`.
-        """
         super().__init__()
 
         # this line allows to access init params with 'self.hparams' attribute
@@ -75,7 +67,9 @@ class MNISTDataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
 
         # data transformations
-        self.transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+        self.transforms = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        )
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
@@ -115,7 +109,9 @@ class MNISTDataModule(LightningDataModule):
         # Divide batch size by the number of devices.
         if self.trainer is not None:
             if self.hparams.batch_size % self.trainer.world_size != 0:
-                raise RuntimeError(f"Batch size ({self.hparams.batch_size}) is not divisible by the number of devices ({self.trainer.world_size}).")
+                raise RuntimeError(
+                    f"Batch size ({self.hparams.batch_size}) is not divisible by the number of devices ({self.trainer.world_size})."
+                )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
         # load and split datasets only if not loaded already

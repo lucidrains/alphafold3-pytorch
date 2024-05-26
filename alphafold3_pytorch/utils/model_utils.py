@@ -147,7 +147,11 @@ def mean_pool_with_lens(
     seq_len = feats.shape[1]
 
     mask = lens > 0
-    assert (lens.sum(dim=-1) <= seq_len).all(), "One of the lengths given exceeds the total sequence length of the features passed in."
+    assert (
+        lens.sum(dim=-1) <= seq_len
+    ).all(), (
+        "One of the lengths given exceeds the total sequence length of the features passed in."
+    )
 
     cumsum_feats = feats.cumsum(dim=1)
     cumsum_feats = F.pad(cumsum_feats, (0, 0, 1, 0), value=0.0)

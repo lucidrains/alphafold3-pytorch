@@ -237,9 +237,7 @@ class Attend(Module):
 
         # break into windows
 
-        q, k, v = tuple(
-            rearrange(t, "b h (n w) d -> b h n w d", w=window_size) for t in (q, k, v)
-        )
+        q, k, v = tuple(rearrange(t, "b h (n w) d -> b h n w d", w=window_size) for t in (q, k, v))
         mask = rearrange(mask, "b (n w) -> b n w", w=window_size)
 
         # just do radius of 1 for now
@@ -249,17 +247,14 @@ class Attend(Module):
         mask = F.pad(mask, (1, 1), value=False)
 
         k, v = tuple(
-            torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim=-2)
-            for t in (k, v)
+            torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim=-2) for t in (k, v)
         )
         mask = torch.cat((mask[..., :-2], mask[..., 1:-1], mask[..., 2:]), dim=-1)
 
         # handle attention bias (inefficiently)
 
         if exists(attn_bias):
-            attn_bias = F.pad(
-                attn_bias, (0, padding_needed, 0, padding_needed), value=0.0
-            )
+            attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value=0.0)
             attn_bias = rearrange(
                 attn_bias,
                 "... (i w1) (j w2) -> ... i j w1 w2",
@@ -281,9 +276,7 @@ class Attend(Module):
 
             n = torch.arange(attn_bias.shape[-3], device=device)
 
-            attn_bias = einx.get_at(
-                "... [i j] w1 w2, n, n -> ... n w1 w2", attn_bias, n, n
-            )
+            attn_bias = einx.get_at("... [i j] w1 w2, n, n -> ... n w1 w2", attn_bias, n, n)
 
         # carry out attention as usual
 
@@ -300,9 +293,7 @@ class Attend(Module):
             assert attn_bias.ndim == sim.ndim
             sim = sim + attn_bias
 
-        sim = einx.where(
-            "b n j, b h n i j, -> b h n i j", mask, sim, max_neg_value(sim)
-        )
+        sim = einx.where("b n j, b h n i j, -> b h n i j", mask, sim, max_neg_value(sim))
 
         attn = sim.softmax(dim=-1)
 
