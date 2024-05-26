@@ -113,3 +113,22 @@ def get_metric_value(metric_dict: Dict[str, Any], metric_name: Optional[str]) ->
     log.info(f"Retrieved metric value! <{metric_name}={metric_value}>")
 
     return metric_value
+
+
+def exists(val: Any) -> bool:
+    """Check if a value exists.
+
+    :param val: The value to check.
+    :return: `True` if the value exists, otherwise `False`.
+    """
+    return val is not None
+
+
+def default(v: Any, d: Any) -> Any:
+    """Return default value `d` if `v` does not exist (i.e., is `None`).
+
+    :param v: The value to check.
+    :param d: The default value to return if `v` does not exist.
+    :return: The value `v` if it exists, otherwise the default value `d`.
+    """
+    return v if exists(v) else d
