@@ -1,5 +1,6 @@
 from typing import Tuple, TypedDict
 
+import rootutils
 import torch
 from lightning import LightningModule
 from torch import Tensor
@@ -8,6 +9,9 @@ from torchmetrics import MeanMetric, MinMetric
 from alphafold3_pytorch.utils import RankedLogger
 from alphafold3_pytorch.utils.model_utils import default_lambda_lr_fn
 from alphafold3_pytorch.utils.typing import Bool, Float, Int, typecheck
+
+rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+
 
 # constants
 

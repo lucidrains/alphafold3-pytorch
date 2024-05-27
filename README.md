@@ -60,6 +60,14 @@ docker run --gpus all -it af3
 
 ## Usage
 
+Run a sample script
+
+```bash
+bash scripts/usage.py
+```
+
+which is based on the following sample code:
+
 ```python
 import torch
 from alphafold3_pytorch import AlphaFold3
