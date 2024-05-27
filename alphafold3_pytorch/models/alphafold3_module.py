@@ -1,4 +1,4 @@
-from typing import Tuple, TypedDict
+from typing import Any, Dict, Tuple, TypedDict
 
 import rootutils
 import torch
@@ -83,17 +83,15 @@ class AlphaFold3LitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
+        **kwargs: Dict[str, Any],
     ) -> None:
         super().__init__()
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(ignore=["net"], logger=False)
 
         self.net = net
-
-        # loss function
-        self.criterion = torch.nn.CrossEntropyLoss()
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -113,7 +111,7 @@ class AlphaFold3LitModule(LightningModule):
         :param x: A batch of `AlphaFold3Input` data.
         :return: A tensor of losses.
         """
-        return self.net(batch)
+        return self.net(**batch)
 
     def on_train_start(self) -> None:
         """Lightning hook that is called when training begins."""
@@ -145,10 +143,10 @@ class AlphaFold3LitModule(LightningModule):
         self.log(
             "train/loss",
             self.train_loss,
-            on_step=False,
-            on_epoch=True,
+            on_step=True,
+            on_epoch=False,
             prog_bar=True,
-            batch_size=len(batch),
+            batch_size=len(batch["atom_inputs"]),
         )
 
         # return loss or backpropagation will fail
@@ -171,10 +169,10 @@ class AlphaFold3LitModule(LightningModule):
         self.log(
             "val/loss",
             self.val_loss,
-            on_step=False,
-            on_epoch=True,
+            on_step=True,
+            on_epoch=False,
             prog_bar=True,
-            batch_size=len(batch),
+            batch_size=len(batch["atom_inputs"]),
         )
 
     def on_validation_epoch_end(self) -> None:
@@ -203,10 +201,10 @@ class AlphaFold3LitModule(LightningModule):
         self.log(
             "test/loss",
             self.test_loss,
-            on_step=False,
-            on_epoch=True,
+            on_step=True,
+            on_epoch=False,
             prog_bar=True,
-            batch_size=len(batch),
+            batch_size=len(batch["atom_inputs"]),
         )
 
     def on_test_epoch_end(self) -> None:

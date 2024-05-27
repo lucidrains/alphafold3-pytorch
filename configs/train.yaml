@@ -7,7 +7,7 @@ defaults:
   - data: atom
   - model: alphafold3
   - callbacks: default
-  - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - logger: csv # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - strategy: default
   - trainer: default
   - paths: default

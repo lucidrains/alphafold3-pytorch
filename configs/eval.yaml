@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: atom # choose datamodule with `test_dataloader()` for evaluation
   - model: alphafold3
-  - logger: null
+  - logger: csv
   - strategy: default
   - trainer: default
   - paths: default

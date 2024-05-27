@@ -189,6 +189,7 @@ class AtomDataModule(LightningDataModule):
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
             shuffle=True,
+            drop_last=True,
         )
 
     def val_dataloader(self) -> DataLoader[Any]:
@@ -202,6 +203,7 @@ class AtomDataModule(LightningDataModule):
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
             shuffle=False,
+            drop_last=True,
         )
 
     def test_dataloader(self) -> DataLoader[Any]:
@@ -215,6 +217,7 @@ class AtomDataModule(LightningDataModule):
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
             shuffle=False,
+            drop_last=False,
         )
 
     def teardown(self, stage: Optional[str] = None) -> None:

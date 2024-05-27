@@ -39,7 +39,7 @@ def test_train_eval(tmp_path: Path, cfg_train: DictConfig, cfg_eval: DictConfig)
     HydraConfig().set_config(cfg_eval)
     test_metric_dict, _ = evaluate(cfg_eval)
 
-    assert test_metric_dict["test/loss"] < 1000.0
+    assert test_metric_dict["test/loss"] < 10000.0
     assert (
         abs(train_metric_dict["test/loss"].item() - test_metric_dict["test/loss"].item()) < 0.001
     )

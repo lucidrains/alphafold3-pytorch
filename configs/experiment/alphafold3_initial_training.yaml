@@ -24,7 +24,7 @@ trainer:
   gradient_clip_algorithm: norm
   gradient_clip_val: 10.0
   # NOTE: here, we have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients
-  accumulate_grad_batches: ${validate_gradient_accumulation_factor:${data.batch_size, trainer.world_size}}
+  accumulate_grad_batches: ${validate_gradient_accumulation_factor:data.batch_size, trainer.world_size}
 
 model:
   optimizer:

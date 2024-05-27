@@ -3,7 +3,7 @@
 # Maintains an exponential moving average (EMA) of model weights.
 # Look at the above link for more detailed information regarding the original implementation.
 ema:
-  _target_: src.models.components.callbacks.ema.EMA
+  _target_: alphafold3_pytorch.models.components.callbacks.ema.EMA
   decay: 0.999
   validate_original_weights: false
   every_n_steps: 4

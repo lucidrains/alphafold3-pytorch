@@ -24,7 +24,7 @@ gradient_clip_val: 10.0
 
 # accumulate gradients of `accumulate_grad_batches` batches (e.g., by this amount for each rank) before doing a backward pass
 # NOTE: here, we have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients
-accumulate_grad_batches: ${validate_gradient_accumulation_factor:${data.batch_size, trainer.world_size}}
+accumulate_grad_batches: ${validate_gradient_accumulation_factor:data.batch_size, trainer.world_size}
 
 # if `num_sanity_val_steps` is > 0, then specifically that many validation steps will be run during the first call to `trainer.fit`
 num_sanity_val_steps: 0
