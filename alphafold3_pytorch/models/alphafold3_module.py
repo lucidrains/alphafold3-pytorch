@@ -144,7 +144,7 @@ class AlphaFold3LitModule(LightningModule):
             "train/loss",
             self.train_loss,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             batch_size=len(batch["atom_inputs"]),
         )
@@ -170,7 +170,7 @@ class AlphaFold3LitModule(LightningModule):
             "val/loss",
             self.val_loss,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             batch_size=len(batch["atom_inputs"]),
         )
@@ -202,7 +202,7 @@ class AlphaFold3LitModule(LightningModule):
             "test/loss",
             self.test_loss,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             batch_size=len(batch["atom_inputs"]),
         )
