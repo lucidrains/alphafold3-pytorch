@@ -10,17 +10,6 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
 from omegaconf import DictConfig
 
-from alphafold3_pytorch import register_custom_omegaconf_resolvers, resolve_omegaconf_variable
-from alphafold3_pytorch.utils import (
-    RankedLogger,
-    extras,
-    get_metric_value,
-    instantiate_callbacks,
-    instantiate_loggers,
-    log_hyperparameters,
-    task_wrapper,
-)
-
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 
@@ -41,6 +30,16 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
+from alphafold3_pytorch import register_custom_omegaconf_resolvers, resolve_omegaconf_variable
+from alphafold3_pytorch.utils import (
+    RankedLogger,
+    extras,
+    get_metric_value,
+    instantiate_callbacks,
+    instantiate_loggers,
+    log_hyperparameters,
+    task_wrapper,
+)
 
 log = RankedLogger(__name__, rank_zero_only=True)
 

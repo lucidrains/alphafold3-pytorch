@@ -96,8 +96,9 @@ line-length = 1000
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F", "I"] # <-- Note: I suggest including the "I" for additional checks!
 ignore = [
-  "F722", # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
+  "E402",
   "F401",
+  "F722", # Ignore Jaxtyping forward references: https://github.com/google/jaxtyping/blob/v0.2.12/FAQ.md
   "F821",
 ]
 
@@ -134,7 +135,7 @@ line_length = 99 # match our custom config above
 multi_line_output = 3
 float_to_top = true
 use_parentheses = true
-skip_glob = "**/*.pyx"
+skip_glob = "**/*.pyx,alphafold3_pytorch/train.py,alphafold3_pytorch/eval.py"
 
 [tool.hatch.metadata]
 allow-direct-references = true

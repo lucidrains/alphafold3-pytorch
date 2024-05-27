@@ -22,7 +22,6 @@ repos:
       args: [
         "--profile", "black",
         "--filter-files",
-        "--skip", "alphafold3_pytorch/",
       ]
 
 # python code linting
