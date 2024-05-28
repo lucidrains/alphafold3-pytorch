@@ -2212,7 +2212,7 @@ class WeightedRigidAlign(Module):
             )
 
         # Compute the weighted covariance matrix
-        cov_matrix = einsum(true_coords_centered * weights, pred_coords_centered, 'b n i, b n j -> b i j')
+        cov_matrix = einsum(weights * true_coords_centered, pred_coords_centered, 'b n i, b n j -> b i j')
 
         # Compute the SVD of the covariance matrix
         U, S, V = torch.svd(cov_matrix)
@@ -2234,7 +2234,7 @@ class WeightedRigidAlign(Module):
         rot_matrix = einsum(U, F, V, "b i j, b j k, b l k -> b i l")
 
         # Apply the rotation and translation
-        aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b i j -> b n j') + true_centroid
+        aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b j i -> b n j') + true_centroid
         aligned_coords.detach_()
 
         return aligned_coords
