@@ -52,6 +52,20 @@ def cycle(dataloader: DataLoader):
         for batch in dataloader:
             yield batch
 
+@typecheck
+def accum_dict(
+    past_losses: dict | None,
+    losses: dict,
+    scale: float = 1.
+):
+    if not exists(past_losses):
+        return losses
+
+    for loss_name in past_losses.keys():
+        past_losses[loss_name] += losses.get(loss_name, 0.) * scale
+
+    return past_losses
+
 def default_lambda_lr_fn(steps):
     # 1000 step warmup
 
@@ -193,6 +207,9 @@ class Trainer:
 
             # gradient accumulation
 
+            total_loss = 0.
+            train_loss_breakdown = None
+
             for grad_accum_step in range(self.grad_accum_every):
                 is_accumulating = grad_accum_step < (self.grad_accum_every - 1)
 
@@ -207,15 +224,22 @@ class Trainer:
                         return_loss_breakdown = True
                     )
 
+                    # accumulate
+
+                    scale = self.grad_accum_every ** -1
+
+                    total_loss += loss.item() * scale
+                    train_loss_breakdown = accum_dict(train_loss_breakdown, loss_breakdown._asdict(), scale = scale)
+
                     # backwards
 
                     self.fabric.backward(loss / self.grad_accum_every)
 
             # log entire loss breakdown
 
-            self.log(**loss_breakdown._asdict())
+            self.log(**train_loss_breakdown)
 
-            self.print(f'loss: {loss.item():.3f}')
+            self.print(f'loss: {total_loss:.3f}')
 
             # clip gradients
 
@@ -252,9 +276,10 @@ class Trainer:
                     self.ema_model.eval()
 
                     total_valid_loss = 0.
+                    valid_loss_breakdown = None
 
                     for valid_batch in self.valid_dataloader:
-                        valid_loss, valid_loss_breakdown = self.ema_model(
+                        valid_loss, loss_breakdown = self.ema_model(
                             **valid_batch,
                             return_loss_breakdown = True
                         )
@@ -262,10 +287,18 @@ class Trainer:
                         valid_batch_size = valid_batch.get('atom_inputs').shape[0]
                         scale = valid_batch_size / self.valid_dataset_size
 
-                        scaled_valid_loss = valid_loss.item() * scale
-                        total_valid_loss += scaled_valid_loss
+                        total_valid_loss += valid_loss.item() * scale
+                        valid_loss_breakdown = accum_dict(valid_loss_breakdown, loss_breakdown._asdict(), scale = scale)
 
                     self.print(f'valid loss: {total_valid_loss:.3f}')
+
+                # prepend valid_ to all losses for logging
+
+                valid_loss_breakdown = {f'valid_{k}':v for k, v in valid_loss_breakdown.items()}
+
+                # log
+
+                self.log(**valid_loss_breakdown)
 
             self.wait()
 
