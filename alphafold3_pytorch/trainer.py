@@ -146,18 +146,26 @@ class Trainer:
 
         self.clip_grad_norm = clip_grad_norm
 
+        # steps
+
+        self.steps = 0
+
     @property
     def is_main(self):
         return self.fabric.global_rank == 0
 
+    def print(self, *args, **kwargs):
+        self.fabric.print(*args, **kwargs)
+
+    def log(self, **log_data):
+        self.fabric.log_dict(log_data, step = self.steps)
+
     def __call__(
         self
     ):
-        dl = iter(self.dataloader)
+        dl = cycle(self.dataloader)
 
-        steps = 0
-
-        while steps < self.num_train_steps:
+        while self.steps < self.num_train_steps:
 
             for grad_accum_step in range(self.grad_accum_every):
                 is_accumulating = grad_accum_step < (self.grad_accum_every - 1)
@@ -169,7 +177,9 @@ class Trainer:
 
                     self.fabric.backward(loss / self.grad_accum_every)
 
-            print(f'loss: {loss.item():.3f}')
+            self.log(loss = loss)
+
+            self.print(f'loss: {loss.item():.3f}')
 
             self.fabric.clip_gradients(self.model, self.optimizer, max_norm = self.clip_grad_norm)
 
@@ -181,6 +191,6 @@ class Trainer:
             self.scheduler.step()
             self.optimizer.zero_grad()
 
-            steps += 1
+            self.steps += 1
 
         print(f'training complete')
