@@ -1355,6 +1355,7 @@ class DiffusionTransformer(Module):
                 linear_attn = TaylorSeriesLinearAttn(
                     dim = dim,
                     prenorm = True,
+                    gate_value_heads = True,
                     **linear_attn_kwargs
                 )
 
