@@ -1,4 +1,4 @@
-<img src="./alphafold3.png" width="450px"></img>
+<img src="./alphafold3.png" width="500px"></img>
 
 ## Alphafold 3 - Pytorch (wip)
 
@@ -11,6 +11,8 @@ Getting a fair number of emails. You can chat with me about this work <a href="h
 - <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
 
 - <a href="https://github.com/engelberger">Felipe</a> for contributing Weighted Rigid Align, Express Coordinates In Frame, Compute Alignment Error, and Centre Random Augmentation modules!
+
+- <a href="https://github.com/amorehead">Alex</a> for fixing various issues in the transcribed algorithms
 
 ## Install
 
@@ -26,7 +28,6 @@ from alphafold3_pytorch import Alphafold3
 
 alphafold3 = Alphafold3(
     dim_atom_inputs = 77,
-    dim_additional_residue_feats = 33,
     dim_template_feats = 44
 )
 
@@ -36,14 +37,15 @@ seq_len = 16
 atom_seq_len = seq_len * 27
 
 atom_inputs = torch.randn(2, atom_seq_len, 77)
-atom_mask = torch.ones((2, atom_seq_len)).bool()
+atom_lens = torch.randint(0, 27, (2, seq_len))
 atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
-additional_residue_feats = torch.randn(2, seq_len, 33)
+additional_residue_feats = torch.randn(2, seq_len, 10)
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
 template_mask = torch.ones((2, 2)).bool()
 
 msa = torch.randn(2, 7, seq_len, 64)
+msa_mask = torch.ones((2, 7)).bool()
 
 # required for training, but omitted on inference
 
@@ -61,10 +63,11 @@ resolved_labels = torch.randint(0, 2, (2, seq_len))
 loss = alphafold3(
     num_recycling_steps = 2,
     atom_inputs = atom_inputs,
-    atom_mask = atom_mask,
+    residue_atom_lens = atom_lens,
     atompair_feats = atompair_feats,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
+    msa_mask = msa_mask,
     templates = template_feats,
     template_mask = template_mask,
     atom_pos = atom_pos,
@@ -84,10 +87,11 @@ sampled_atom_pos = alphafold3(
     num_recycling_steps = 4,
     num_sample_steps = 16,
     atom_inputs = atom_inputs,
-    atom_mask = atom_mask,
+    residue_atom_lens = atom_lens,
     atompair_feats = atompair_feats,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
+    msa_mask = msa_mask,
     templates = template_feats,
     template_mask = template_mask
 )
@@ -147,5 +151,14 @@ docker run  --gpus all -it af3
   journal  = "Nature",
   month    = "May",
   year     =  2024
+}
+```
+
+```bibtex
+@inproceedings{Darcet2023VisionTN,
+    title   = {Vision Transformers Need Registers},
+    author  = {Timoth'ee Darcet and Maxime Oquab and Julien Mairal and Piotr Bojanowski},
+    year    = {2023},
+    url     = {https://api.semanticscholar.org/CorpusID:263134283}
 }
 ```

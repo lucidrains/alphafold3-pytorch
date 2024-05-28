@@ -31,6 +31,11 @@ from alphafold3_pytorch.alphafold3 import (
     Alphafold3
 )
 
+from alphafold3_pytorch.trainer import (
+    Trainer,
+    Alphafold3Input
+)
+
 __all__ = [
     Attention,
     Attend,
@@ -58,5 +63,7 @@ __all__ = [
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3
+    Alphafold3,
+    Alphafold3Input,
+    Trainer
 ]

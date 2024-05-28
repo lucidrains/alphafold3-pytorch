@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 global ein notation:
 
@@ -15,9 +17,23 @@ dap - feature dimension (atompair)
 da - feature dimension (atom)
 t - templates
 s - msa
+r - registers
 """
 
-from __future__ import annotations
+"""
+additional_residue_feats: [*, 10]:
+
+0: residue_index
+1: token_index
+2: asym_id
+3: entity_id
+4: sym_id
+5: restype (must be one hot encoded to 32)
+6: is_protein
+7: is_rna
+8: is_dna
+9: is_ligand
+"""
 
 from math import pi, sqrt
 from functools import partial, wraps
@@ -54,6 +70,8 @@ from tqdm import tqdm
 
 # constants
 
+ADDITIONAL_RESIDUE_FEATS = 10
+
 LinearNoBias = partial(Linear, bias = False)
 
 # helper functions
@@ -87,35 +105,114 @@ def maybe(fn):
         return fn(t, *args, **kwargs)
     return inner
 
-# Loss functions
+# packed atom representation functions
 
 @typecheck
-def calc_smooth_lddt_loss(
-    denoised: Float['b m 3'], 
-    ground_truth: Float['b m 3'], 
-    is_rna_per_atom: Float['b m'],
-    is_dna_per_atom: Float['b m']
-) -> Float[' b']:
-    
-    m, device = is_rna_per_atom.shape[-1], denoised.device
-    
-    dx_denoised = torch.cdist(denoised, denoised)
-    dx_gt = torch.cdist(ground_truth, ground_truth)
-    
-    ddx = torch.abs(dx_gt - dx_denoised)
-    eps = 0.25 * (
-        sigmoid(0.5 - ddx) + sigmoid(1 - ddx) + sigmoid(2 - ddx) + sigmoid(4 - ddx)
-    )
-    
-    is_nuc = is_rna_per_atom + is_dna_per_atom
-    mask = einx.multiply('b i, b j -> b i j', is_nuc, is_nuc)
-    c = (dx_gt < 30) * mask + (dx_gt < 15) * (1 - mask)
-    
-    eye = torch.eye(m, device = device)
-    num = einx.sum('b [...]', c * eps * (1 - eye)) / (m**2 - m)
-    den = einx.sum('b [...]', c * (1 - eye)) / (m**2 - m)
+def lens_to_mask(
+    lens: Int['b ...'],
+    max_len: int | None = None
+) -> Bool['... m']:
 
-    return 1. - num/den
+    device = lens.device
+    if not exists(max_len):
+        max_len = lens.amax()
+    arange = torch.arange(max_len, device = device)
+    return einx.less('m, ... -> ... m', arange, lens)
+
+@typecheck
+def mean_pool_with_lens(
+    feats: Float['b m d'],
+    lens: Int['b n']
+) -> Float['b n d']:
+
+    seq_len = feats.shape[1]
+
+    mask = lens > 0
+    assert (lens.sum(dim = -1) <= seq_len).all(), 'one of the lengths given exceeds the total sequence length of the features passed in'
+
+    cumsum_feats = feats.cumsum(dim = 1)
+    cumsum_feats = F.pad(cumsum_feats, (0, 0, 1, 0), value = 0.)
+
+    cumsum_indices = lens.cumsum(dim = 1)
+    cumsum_indices = F.pad(cumsum_indices, (1, 0), value = 0)
+
+    sel_cumsum = einx.get_at('b [m] d, b n -> b n d', cumsum_feats, cumsum_indices)
+
+    # subtract cumsum at one index from the previous one
+    summed = sel_cumsum[:, 1:] - sel_cumsum[:, :-1]
+
+    avg = einx.divide('b n d, b n', summed, lens.clamp(min = 1))
+    avg = einx.where('b n, b n d, -> b n d', mask, avg, 0.)
+    return avg
+
+@typecheck
+def repeat_consecutive_with_lens(
+    feats: Float['b n ...'] | Bool['b n'],
+    lens: Int['b n'],
+) -> Float['b m ...'] | Bool['b m']:
+
+    is_bool = feats.dtype == torch.bool
+    feats = feats.float()
+
+    device = feats.device
+
+    batch, seq, *dims = feats.shape
+
+    # get mask from lens
+
+    mask = lens_to_mask(lens)
+
+    # derive arange
+
+    window_size = mask.shape[-1]
+    arange = torch.arange(window_size, device = device)
+
+    cumsum_len = lens.cumsum(dim = -1)
+    offsets = F.pad(cumsum_len, (1, -1), value = 0)
+    indices = einx.add('w, b n -> b n w', arange, offsets)
+
+    # create output tensor + a sink position on the very right (index max_len)
+
+    total_lens = lens.sum(dim = -1)
+    max_len = total_lens.amax()
+
+    output = torch.zeros((batch, max_len + 1, *dims), device = device)
+
+    indices.masked_fill_(~mask, max_len) # scatter to sink position for padding
+    indices = rearrange(indices, 'b n w -> b (n w)')
+
+    feats = repeat(feats, 'b n ... -> b (n w) ...', w = window_size)
+
+    # scatter
+
+    output = einx.set_at('b [m] ...,  b nw, b nw ... -> b [m] ...', output, indices, feats)
+
+    # remove sink
+
+    output = output[:, :-1]
+
+    if is_bool:
+        output = output.bool()
+
+    return output
+
+def repeat_pairwise_consecutive_with_lens(
+    feats: Float['b n n dp'],
+    lens: Int['b n']
+) -> Float['b m m dp']:
+
+    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
+    feats, ps = pack_one(feats, '* n dp')
+    feats = repeat_consecutive_with_lens(feats, repeated_lens)
+    feats = unpack_one(feats, ps, '* n dp')
+
+    feats = rearrange(feats, 'b i j dp -> b j i dp')
+    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
+    feats, ps = pack_one(feats, '* n dp')
+    feats = repeat_consecutive_with_lens(feats, repeated_lens)
+    feats = unpack_one(feats, ps, '* n dp')
+    feats = rearrange(feats, 'b j i dp -> b i j dp')
+    return feats
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -336,18 +433,14 @@ class TriangleMultiplication(Module):
         dim_hidden = default(dim_hidden, dim)
         self.norm = nn.LayerNorm(dim)
 
-        self.left_proj = Linear(dim, dim_hidden)
-        self.right_proj = Linear(dim, dim_hidden)
+        self.left_right_proj = nn.Sequential(
+            LinearNoBias(dim, dim_hidden * 4),
+            nn.GLU(dim = -1)
+        )
 
-        self.left_gate = Linear(dim, dim_hidden)
-        self.right_gate = Linear(dim, dim_hidden)
-        self.out_gate = Linear(dim, dim_hidden)
+        self.left_right_gate = LinearNoBias(dim, dim_hidden * 2)
 
-        # initialize all gating to be identity
-
-        for gate in (self.left_gate, self.right_gate, self.out_gate):
-            nn.init.constant_(gate.weight, 0.)
-            nn.init.constant_(gate.bias, 1.)
+        self.out_gate = LinearNoBias(dim, dim_hidden)
 
         if mix == 'outgoing':
             self.mix_einsum_eq = '... i k d, ... j k d -> ... i j d'
@@ -357,7 +450,7 @@ class TriangleMultiplication(Module):
         self.to_out_norm = nn.LayerNorm(dim_hidden)
 
         self.to_out = Sequential(
-            Linear(dim_hidden, dim),
+            LinearNoBias(dim_hidden, dim),
             Dropout(dropout, dropout_type = dropout_type)
         )
 
@@ -373,24 +466,19 @@ class TriangleMultiplication(Module):
 
         x = self.norm(x)
 
-        left = self.left_proj(x)
-        right = self.right_proj(x)
+        left, right = self.left_right_proj(x).chunk(2, dim = -1)
 
         if exists(mask):
             left = left * mask
             right = right * mask
 
-        left_gate = self.left_gate(x).sigmoid()
-        right_gate = self.right_gate(x).sigmoid()
-        out_gate = self.out_gate(x).sigmoid()
-
-        left = left * left_gate
-        right = right * right_gate
-
         out = einsum(left, right, self.mix_einsum_eq)
 
         out = self.to_out_norm(out)
+
+        out_gate = self.out_gate(x).sigmoid()
         out = out * out_gate
+
         return self.to_out(out)
 
 # there are two types of attention in this paper, triangle and attention-pair-bias
@@ -487,10 +575,10 @@ class TriangleAttention(Module):
         attn_bias = self.to_attn_bias(pairwise_repr)
 
         batch_repeat = pairwise_repr.shape[1]
-        attn_bias = repeat(attn_bias, 'b ... -> (b r) ...', r = batch_repeat)
+        attn_bias = repeat(attn_bias, 'b ... -> (b repeat) ...', repeat = batch_repeat)
 
         if exists(mask):
-            mask = repeat(mask, 'b ... -> (b r) ...', r = batch_repeat)
+            mask = repeat(mask, 'b ... -> (b repeat) ...', repeat = batch_repeat)
 
         pairwise_repr, packed_shape = pack_one(pairwise_repr, '* n d')
 
@@ -833,6 +921,7 @@ class PairformerStack(Module):
         pair_bias_attn_dim_head = 64,
         pair_bias_attn_heads = 16,
         dropout_row_prob = 0.25,
+        num_register_tokens = 0,
         pairwise_block_kwargs: dict = dict()
     ):
         super().__init__()
@@ -866,6 +955,14 @@ class PairformerStack(Module):
 
         self.layers = layers
 
+        self.num_registers = num_register_tokens
+        self.has_registers = num_register_tokens > 0
+
+        if self.has_registers:
+            self.single_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_single))
+            self.pairwise_row_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
+            self.pairwise_col_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
+
     @typecheck
     def forward(
         self,
@@ -875,6 +972,23 @@ class PairformerStack(Module):
         mask: Bool['b n'] | None = None
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
+
+        # prepend register tokens
+
+        if self.has_registers:
+            batch_size, num_registers = single_repr.shape[0], self.num_registers
+            single_registers = repeat(self.single_registers, 'r d -> b r d', b = batch_size)
+            single_repr = torch.cat((single_registers, single_repr), dim = 1)
+
+            row_registers = repeat(self.pairwise_row_registers, 'r d -> b r n d', b = batch_size, n = pairwise_repr.shape[-2])
+            pairwise_repr = torch.cat((row_registers, pairwise_repr), dim = 1)
+            col_registers = repeat(self.pairwise_col_registers, 'r d -> b n r d', b = batch_size, n = pairwise_repr.shape[1])
+            pairwise_repr = torch.cat((col_registers, pairwise_repr), dim = 2)
+
+            if exists(mask):
+                mask = F.pad(mask, (num_registers, 0), value = True)
+
+        # main transformer block layers
 
         for (
             pairwise_block,
@@ -887,23 +1001,15 @@ class PairformerStack(Module):
             single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
             single_repr = single_transition(single_repr) + single_repr
 
+        # splice out registers
+
+        if self.has_registers:
+            single_repr = single_repr[:, num_registers:]
+            pairwise_repr = pairwise_repr[:, num_registers:, num_registers:]
+
         return single_repr, pairwise_repr
 
 # embedding related
-
-"""
-additional_residue_feats: [*, rf]:
-    0: residue_index
-    1: token_index
-    2: asym_id
-    3: entity_id
-    4: sym_id 
-    5: restype (must be one hot encoded to 32)
-    6: is_protein
-    7: is_rna
-    8: is_dna
-    9: is_ligand
-"""
 
 class RelativePositionEncoding(Module):
     """ Algorithm 3 """
@@ -926,7 +1032,7 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_residue_feats: Float['b n 10']
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}']
     ) -> Float['b n n dp']:
 
         device = additional_residue_feats.device
@@ -1217,6 +1323,7 @@ class DiffusionTransformer(Module):
         dim_pairwise = 128,
         attn_window_size = None,
         attn_pair_bias_kwargs: dict = dict(),
+        num_register_tokens = 0,
         serial = False
     ):
         super().__init__()
@@ -1259,6 +1366,12 @@ class DiffusionTransformer(Module):
 
         self.serial = serial
 
+        self.has_registers = num_register_tokens > 0
+        self.num_registers = num_register_tokens
+
+        if self.has_registers:
+            self.registers = nn.Parameter(torch.zeros(num_register_tokens, dim))
+
     @typecheck
     def forward(
         self,
@@ -1269,6 +1382,21 @@ class DiffusionTransformer(Module):
         mask: Bool['b n'] | None = None
     ):
         serial = self.serial
+
+        # register tokens
+
+        if self.has_registers:
+            num_registers = self.num_registers
+            registers = repeat(self.registers, 'r d -> b r d', b = noised_repr.shape[0])
+            noised_repr, registers_ps = pack((registers, noised_repr), 'b * d')
+
+            single_repr = F.pad(single_repr, (0, 0, num_registers, 0), value = 0.)
+            pairwise_repr = F.pad(pairwise_repr, (0, 0, num_registers, 0, num_registers, 0), value = 0.)
+
+            if exists(mask):
+                mask = F.pad(mask, (num_registers, 0), value = True)
+
+        # main transformer
 
         for attn, transition in self.layers:
 
@@ -1291,6 +1419,11 @@ class DiffusionTransformer(Module):
                 ff_out = ff_out + attn_out
 
             noised_repr = noised_repr + ff_out
+
+        # splice out registers
+
+        if self.has_registers:
+            _, noised_repr = unpack(noised_repr, registers_ps, 'b * d')
 
         return noised_repr
 
@@ -1316,12 +1449,25 @@ class AtomToTokenPooler(Module):
         self,
         *,
         atom_feats: Float['b m da'],
-        atom_mask: Bool['b m']
+        atom_mask: Bool['b m'],
+        residue_atom_lens: Int['b n'] | None = None
     ) -> Float['b n ds']:
+
         w = self.atoms_per_window
+        is_unpacked_repr = exists(w)
+
+        if not is_unpacked_repr:
+            assert exists(residue_atom_lens), '`residue_atom_lens` must be passed in if using packed_atom_repr (atoms_per_window is None)'
 
         atom_feats = self.proj(atom_feats)
 
+        # packed atom representation
+
+        if exists(residue_atom_lens):
+            tokens = mean_pool_with_lens(atom_feats, residue_atom_lens)
+            return tokens
+
+        # unpacked atom representation
         # masked mean pool the atom feats for each residue, for the token transformer
         # this is basically a simple 2-level hierarchical transformer
 
@@ -1368,7 +1514,10 @@ class DiffusionModule(Module):
         token_transformer_heads = 16,
         atom_decoder_depth = 3,
         atom_decoder_heads = 4,
-        serial = False
+        serial = False,
+        atom_encoder_kwargs: dict = dict(),
+        atom_decoder_kwargs: dict = dict(),
+        token_transformer_kwargs: dict = dict()
     ):
         super().__init__()
 
@@ -1424,7 +1573,8 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_encoder_depth,
             heads = atom_encoder_heads,
-            serial = serial
+            serial = serial,
+            **atom_encoder_kwargs
         )
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
@@ -1446,7 +1596,8 @@ class DiffusionModule(Module):
             dim_pairwise = dim_pairwise,
             depth = token_transformer_depth,
             heads = token_transformer_heads,
-            serial = serial
+            serial = serial,
+            **token_transformer_kwargs
         )
 
         self.attended_token_norm = nn.LayerNorm(dim_token)
@@ -1462,7 +1613,8 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_decoder_depth,
             heads = atom_decoder_heads,
-            serial = serial
+            serial = serial,
+            **atom_decoder_kwargs
         )
 
         self.atom_feat_to_atom_pos_update = nn.Sequential(
@@ -1484,13 +1636,19 @@ class DiffusionModule(Module):
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
+        residue_atom_lens: Int['b n'] | None = None
     ):
         w = self.atoms_per_window
+        is_unpacked_repr = exists(w)
+
+        if not is_unpacked_repr:
+            assert exists(residue_atom_lens)
 
         # in the paper, it seems they pack the atom feats
         # but in this impl, will just use windows for simplicity when communicating between atom and residue resolutions. bit less efficient
 
-        assert divisible_by(noised_atom_pos.shape[-2], w)
+        if is_unpacked_repr:
+            assert divisible_by(noised_atom_pos.shape[-2], w)
 
         conditioned_single_repr = self.single_conditioner(
             times = times,
@@ -1515,13 +1673,22 @@ class DiffusionModule(Module):
 
         single_repr_cond = self.single_repr_to_atom_feat_cond(conditioned_single_repr)
 
-        single_repr_cond = repeat(single_repr_cond, 'b n ds -> b (n w) ds', w = w)
+        if is_unpacked_repr:
+            single_repr_cond = repeat(single_repr_cond, 'b n ds -> b (n w) ds', w = w)
+        else:
+            single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, residue_atom_lens)
+
         atom_feats_cond = single_repr_cond + atom_feats_cond
 
         # condition atompair feats with pairwise repr
 
         pairwise_repr_cond = self.pairwise_repr_to_atompair_feat_cond(conditioned_pairwise_repr)
-        pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
+
+        if is_unpacked_repr:
+            pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
+        else:
+            pairwise_repr_cond = repeat_pairwise_consecutive_with_lens(pairwise_repr_cond, residue_atom_lens)
+
         atompair_feats = pairwise_repr_cond + atompair_feats
 
         # condition atompair feats further with single atom repr
@@ -1546,8 +1713,10 @@ class DiffusionModule(Module):
 
         tokens = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
-            atom_mask = atom_mask
+            atom_mask = atom_mask,
+            residue_atom_lens = residue_atom_lens
         )
+
         # token transformer
 
         tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
@@ -1564,7 +1733,11 @@ class DiffusionModule(Module):
         # atom decoder
 
         atom_decoder_input = self.tokens_to_atom_decoder_input_cond(tokens)
-        atom_decoder_input = repeat(atom_decoder_input, 'b n da -> b (n w) da', w = w)
+
+        if is_unpacked_repr:
+            atom_decoder_input = repeat(atom_decoder_input, 'b n da -> b (n w) da', w = w)
+        else:
+            atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, residue_atom_lens)
 
         atom_decoder_input = atom_decoder_input + atom_feats_skip
 
@@ -1714,9 +1887,9 @@ class ElucidatedAtomDiffusion(Module):
     @torch.no_grad()
     def sample(
         self,
-        atom_mask: Bool['b m'],
+        atom_mask: Bool['b m'] | None = None,
         num_sample_steps = None,
-        clamp = True,
+        clamp = False,
         **network_condition_kwargs
     ):
         num_sample_steps = default(num_sample_steps, self.num_sample_steps)
@@ -1767,7 +1940,9 @@ class ElucidatedAtomDiffusion(Module):
 
             atom_pos = atom_pos_next
 
-        atom_pos = atom_pos.clamp(-1., 1.)
+        if clamp:
+            atom_pos = atom_pos.clamp(-1., 1.)
+
         return atom_pos
 
     # training
@@ -1790,7 +1965,8 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         return_denoised_pos = False,
-        additional_residue_feats: Float['b n 10'] | None = None,
+        residue_atom_lens: Int['b n'] | None = None,
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
         nucleotide_loss_weight = 5.,
@@ -1821,6 +1997,7 @@ class ElucidatedAtomDiffusion(Module):
                 single_inputs_repr = single_inputs_repr,
                 pairwise_trunk = pairwise_trunk,
                 pairwise_rel_pos_feats = pairwise_rel_pos_feats,
+                residue_atom_lens = residue_atom_lens
             )
         )
 
@@ -1833,14 +2010,20 @@ class ElucidatedAtomDiffusion(Module):
 
         if exists(additional_residue_feats):
             w = self.net.atoms_per_window
+            is_unpacked_repr = exists(w)
 
-            is_nucleotide_or_ligand_fields = additional_residue_feats[..., 7:] != 0.
-            atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in is_nucleotide_or_ligand_fields.unbind(dim = -1))
+            is_nucleotide_or_ligand_fields = (additional_residue_feats[..., 7:] != 0.).unbind(dim = -1)
+
+            if is_unpacked_repr:
+                atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in is_nucleotide_or_ligand_fields)
+            else:
+                atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat_consecutive_with_lens(t, residue_atom_lens) for t in is_nucleotide_or_ligand_fields)
 
             # section 3.7.1 equation 4
 
-            align_weights = torch.where(atom_is_dna | atom_is_rna, nucleotide_loss_weight, align_weights)
-            align_weights = torch.where(atom_is_ligand, ligand_loss_weight, align_weights)
+            # upweighting of nucleotide and ligand atoms is additive per equation 4
+            align_weights = torch.where(atom_is_dna | atom_is_rna, 1 + nucleotide_loss_weight, align_weights)
+            align_weights = torch.where(atom_is_ligand, 1 + ligand_loss_weight, align_weights)
 
         # section 3.7.1 equation 2 - weighted rigid aligned ground truth
 
@@ -1894,7 +2077,7 @@ class ElucidatedAtomDiffusion(Module):
 
             smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
-                normalized_atom_pos,
+                atom_pos_ground_truth,
                 atom_is_dna,
                 atom_is_rna,
                 coords_mask = atom_mask
@@ -2021,7 +2204,7 @@ class WeightedRigidAlign(Module):
         U, _, V = torch.svd(cov_matrix)
 
         # Compute the rotation matrix
-        rot_matrix = einsum(U, V, 'b i j, b j k -> b i k')
+        rot_matrix = einsum(U, V, 'b i j, b k j -> b i k')
 
         # Ensure proper rotation matrix with determinant 1
         det = torch.det(rot_matrix)
@@ -2029,7 +2212,7 @@ class WeightedRigidAlign(Module):
         V_fixed = V.clone()
         V_fixed[det_mask, :, -1] *= -1
 
-        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b j k -> b i k')
+        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b k j -> b i k')
 
         # (A seeming typo in line 11 of Algorithm 28?
         #  The bias should be \vec{\mu}^{GT} in the notation there,
@@ -2134,53 +2317,63 @@ class CentreRandomAugmentation(Module):
     def __init__(self, trans_scale: float = 1.0):
         super().__init__()
         self.trans_scale = trans_scale
+        self.register_buffer('dummy', torch.tensor(0), persistent = False)
+
+    @property
+    def device(self):
+        return self.dummy.device
 
     @typecheck
     def forward(self, coords: Float['b n 3']) -> Float['b n 3']:
         """
         coords: coordinates to be augmented
         """
+        batch_size = coords.shape[0]
+
         # Center the coordinates
         centered_coords = coords - coords.mean(dim=1, keepdim=True)
 
         # Generate random rotation matrix
-        rotation_matrix = self._random_rotation_matrix(coords.device)
+        rotation_matrix = self._random_rotation_matrix(batch_size)
 
         # Generate random translation vector
-        translation_vector = self._random_translation_vector(coords.device)
+        translation_vector = self._random_translation_vector(batch_size)
+        translation_vector = rearrange(translation_vector, 'b c -> b 1 c')
 
         # Apply rotation and translation
-        augmented_coords = torch.einsum('bni,ij->bnj', centered_coords, rotation_matrix) + translation_vector
+        augmented_coords = einsum(centered_coords, rotation_matrix, 'b n i, b i j -> b n j') + translation_vector
 
         return augmented_coords
 
     @typecheck
-    def _random_rotation_matrix(self, device: torch.device) -> Float['3 3']:
+    def _random_rotation_matrix(self, batch_size: int) -> Float['b 3 3']:
         # Generate random rotation angles
-        angles = torch.rand(3, device=device) * 2 * torch.pi
+        angles = torch.rand((batch_size, 3), device = self.device) * 2 * torch.pi
 
         # Compute sine and cosine of angles
         sin_angles = torch.sin(angles)
         cos_angles = torch.cos(angles)
 
         # Construct rotation matrix
-        rotation_matrix = torch.eye(3, device=device)
-        rotation_matrix[0, 0] = cos_angles[0] * cos_angles[1]
-        rotation_matrix[0, 1] = cos_angles[0] * sin_angles[1] * sin_angles[2] - sin_angles[0] * cos_angles[2]
-        rotation_matrix[0, 2] = cos_angles[0] * sin_angles[1] * cos_angles[2] + sin_angles[0] * sin_angles[2]
-        rotation_matrix[1, 0] = sin_angles[0] * cos_angles[1]
-        rotation_matrix[1, 1] = sin_angles[0] * sin_angles[1] * sin_angles[2] + cos_angles[0] * cos_angles[2]
-        rotation_matrix[1, 2] = sin_angles[0] * sin_angles[1] * cos_angles[2] - cos_angles[0] * sin_angles[2]
-        rotation_matrix[2, 0] = -sin_angles[1]
-        rotation_matrix[2, 1] = cos_angles[1] * sin_angles[2]
-        rotation_matrix[2, 2] = cos_angles[1] * cos_angles[2]
+        eye = torch.eye(3, device = self.device)
+        rotation_matrix = repeat(eye, 'i j -> b i j', b = batch_size).clone()
+
+        rotation_matrix[:, 0, 0] = cos_angles[:, 0] * cos_angles[:, 1]
+        rotation_matrix[:, 0, 1] = cos_angles[:, 0] * sin_angles[:, 1] * sin_angles[:, 2] - sin_angles[:, 0] * cos_angles[:, 2]
+        rotation_matrix[:, 0, 2] = cos_angles[:, 0] * sin_angles[:, 1] * cos_angles[:, 2] + sin_angles[:, 0] * sin_angles[:, 2]
+        rotation_matrix[:, 1, 0] = sin_angles[:, 0] * cos_angles[:, 1]
+        rotation_matrix[:, 1, 1] = sin_angles[:, 0] * sin_angles[:, 1] * sin_angles[:, 2] + cos_angles[:, 0] * cos_angles[:, 2]
+        rotation_matrix[:, 1, 2] = sin_angles[:, 0] * sin_angles[:, 1] * cos_angles[:, 2] - cos_angles[:, 0] * sin_angles[:, 2]
+        rotation_matrix[:, 2, 0] = -sin_angles[:, 1]
+        rotation_matrix[:, 2, 1] = cos_angles[:, 1] * sin_angles[:, 2]
+        rotation_matrix[:, 2, 2] = cos_angles[:, 1] * cos_angles[:, 2]
 
         return rotation_matrix
 
     @typecheck
-    def _random_translation_vector(self, device: torch.device) -> Float['3']:
+    def _random_translation_vector(self, batch_size: int) -> Float['b 3']:
         # Generate random translation vector
-        translation_vector = torch.randn(3, device=device) * self.trans_scale
+        translation_vector = torch.randn((batch_size, 3), device = self.device) * self.trans_scale
         return translation_vector
 
 # input embedder
@@ -2199,7 +2392,6 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         dim_atom_inputs,
-        dim_additional_residue_feats = 10,
         atoms_per_window = 27,
         dim_atom = 128,
         dim_atompair = 16,
@@ -2245,9 +2437,7 @@ class InputFeatureEmbedder(Module):
             atoms_per_window = atoms_per_window
         )
 
-        dim_single_input = dim_token + dim_additional_residue_feats
-
-        self.dim_additional_residue_feats = dim_additional_residue_feats
+        dim_single_input = dim_token + ADDITIONAL_RESIDUE_FEATS
 
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
@@ -2259,10 +2449,12 @@ class InputFeatureEmbedder(Module):
         atom_inputs: Float['b m dai'],
         atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
-        additional_residue_feats: Float['b n rf'],
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
+        residue_atom_lens: Int['b n'] | None = None,
+
     ) -> EmbeddedInputs:
 
-        assert additional_residue_feats.shape[-1] == self.dim_additional_residue_feats
+        assert additional_residue_feats.shape[-1] == ADDITIONAL_RESIDUE_FEATS
 
         w = self.atoms_per_window
 
@@ -2281,7 +2473,8 @@ class InputFeatureEmbedder(Module):
 
         single_inputs = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
-            atom_mask = atom_mask
+            atom_mask = atom_mask,
+            residue_atom_lens = residue_atom_lens
         )
 
         single_inputs = torch.cat((single_inputs, additional_residue_feats), dim = -1)
@@ -2334,7 +2527,7 @@ class ConfidenceHead(Module):
         self,
         *,
         dim_single_inputs,
-        atompair_dist_bins: Float['d'],
+        atompair_dist_bins: Float[' d'],
         dim_single = 384,
         dim_pairwise = 128,
         num_plddt_bins = 50,
@@ -2454,7 +2647,6 @@ class Alphafold3(Module):
         self,
         *,
         dim_atom_inputs,
-        dim_additional_residue_feats,
         dim_template_feats,
         dim_template_model = 64,
         atoms_per_window = 27,
@@ -2472,6 +2664,7 @@ class Alphafold3(Module):
         num_pae_bins = 64,
         sigma_data = 16,
         diffusion_num_augmentations = 4,
+        packed_atom_repr = False,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
         loss_diffusion_weight = 4.,
@@ -2521,7 +2714,8 @@ class Alphafold3(Module):
             token_transformer_depth = 24,
             token_transformer_heads = 16,
             atom_decoder_depth = 3,
-            atom_decoder_heads = 4
+            atom_decoder_heads = 4,
+            serial = True # believe they have an error on Algorithm 23. lacking a residual - default to serial architecture until further news
         ),
         edm_kwargs: dict = dict(
             sigma_min = 0.002,
@@ -2538,6 +2732,15 @@ class Alphafold3(Module):
     ):
         super().__init__()
 
+        # whether a packed atom representation is being used
+
+        self.packed_atom_repr = packed_atom_repr
+
+        # atoms per window if using unpacked representation
+
+        if packed_atom_repr:
+            atoms_per_window = None
+
         self.atoms_per_window = atoms_per_window
 
         # augmentation
@@ -2549,7 +2752,6 @@ class Alphafold3(Module):
 
         self.input_embedder = InputFeatureEmbedder(
             dim_atom_inputs = dim_atom_inputs,
-            dim_additional_residue_feats = dim_additional_residue_feats,
             atoms_per_window = atoms_per_window,
             dim_atom = dim_atom,
             dim_atompair = dim_atompair,
@@ -2559,7 +2761,7 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        dim_single_inputs = dim_input_embedder_token + dim_additional_residue_feats
+        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_RESIDUE_FEATS
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -2677,9 +2879,10 @@ class Alphafold3(Module):
         self,
         *,
         atom_inputs: Float['b m dai'],
-        atom_mask: Bool['b m'],
         atompair_feats: Float['b m m dap'],
-        additional_residue_feats: Float['b n 10'],
+        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
+        residue_atom_lens: Int['b n'] | None = None,
+        atom_mask: Bool['b m'] | None = None,
         token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
         msa_mask: Bool['b s'] | None = None,
@@ -2696,16 +2899,43 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | None = None,
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
-        return_loss_breakdown = False
+        return_loss_breakdown = False,
+        return_loss_if_possible: bool = True
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
-        # get atom sequence length and residue sequence length
-
-        w = self.atoms_per_window
         atom_seq_len = atom_inputs.shape[-2]
 
-        assert divisible_by(atom_seq_len, w)
-        seq_len = atom_inputs.shape[-2] // w
+        assert exists(residue_atom_lens) or exists(atom_mask)
+
+        # determine whether using packed or unpacked atom rep
+
+        if self.packed_atom_repr:
+            assert exists(residue_atom_lens), 'residue_atom_lens must be given if using packed atom repr'
+
+        if exists(residue_atom_lens):
+
+            if self.packed_atom_repr:
+                # handle atom mask
+
+                total_atoms = residue_atom_lens.sum(dim = -1)
+                atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
+
+                # handle offsets for residue atom indices
+
+                if exists(residue_atom_indices):
+                    residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
+            else:
+                atom_mask = lens_to_mask(residue_atom_lens, max_len = self.atoms_per_window)
+                atom_mask = rearrange(atom_mask, 'b ... -> b (...)')
+
+        # get atom sequence length and residue sequence length depending on whether using packed atomic seq
+
+        if self.packed_atom_repr:
+            seq_len = residue_atom_lens.shape[-1]
+        else:
+            w = self.atoms_per_window
+            assert divisible_by(atom_seq_len, w)
+            seq_len = atom_inputs.shape[-2] // w
 
         # embed inputs
 
@@ -2719,7 +2949,8 @@ class Alphafold3(Module):
             atom_inputs = atom_inputs,
             atom_mask = atom_mask,
             atompair_feats = atompair_feats,
-            additional_residue_feats = additional_residue_feats
+            additional_residue_feats = additional_residue_feats,
+            residue_atom_lens = residue_atom_lens
         )
 
         # relative positional encoding
@@ -2748,9 +2979,17 @@ class Alphafold3(Module):
 
         pairwise_init = pairwise_init + token_bond_feats
 
-        # pairwise mask
+        # residue mask and pairwise mask
 
-        mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
+        if self.packed_atom_repr:
+            total_atoms = residue_atom_lens.sum(dim = -1)
+            mask = lens_to_mask(total_atoms, max_len = seq_len)
+        else:
+            if exists(residue_atom_lens):
+                mask = residue_atom_lens != 0
+            else:
+                mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
+
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
 
         # init recycled single and pairwise
@@ -2824,7 +3063,7 @@ class Alphafold3(Module):
 
         # if neither atom positions or any labels are passed in, sample a structure and return
 
-        if not return_loss:
+        if not return_loss_if_possible or not return_loss:
             return self.edm.sample(
                 num_sample_steps = num_sample_steps,
                 atom_feats = atom_feats,
@@ -2834,7 +3073,8 @@ class Alphafold3(Module):
                 single_trunk_repr = single,
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
-                pairwise_rel_pos_feats = relative_position_encoding
+                pairwise_rel_pos_feats = relative_position_encoding,
+                residue_atom_lens = residue_atom_lens
             )
 
         # losses default to 0
@@ -2848,7 +3088,12 @@ class Alphafold3(Module):
         # distogram head
 
         if not exists(distance_labels) and atom_pos_given and exists(residue_atom_indices):
-            residue_pos = einx.get_at('b (n [w]) c, b n -> b n c', atom_pos, residue_atom_indices)
+
+            if self.packed_atom_repr:
+                residue_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, residue_atom_indices)
+            else:
+                residue_pos = einx.get_at('b (n [w]) c, b n -> b n c', atom_pos, residue_atom_indices)
+
             residue_dist = torch.cdist(residue_pos, residue_pos, p = 2)
             dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', residue_dist, self.distance_bins).abs()
             distance_labels = dist_from_dist_bins.argmin(dim = -1)
@@ -2883,6 +3128,7 @@ class Alphafold3(Module):
                     relative_position_encoding,
                     additional_residue_feats,
                     residue_atom_indices,
+                    residue_atom_lens,
                     pae_labels,
                     pde_labels,
                     plddt_labels,
@@ -2903,6 +3149,7 @@ class Alphafold3(Module):
                         relative_position_encoding,
                         additional_residue_feats,
                         residue_atom_indices,
+                        residue_atom_lens,
                         pae_labels,
                         pde_labels,
                         plddt_labels,
@@ -2925,6 +3172,7 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
+                residue_atom_lens = residue_atom_lens,
                 return_denoised_pos = True,
             )
 
@@ -2935,7 +3183,10 @@ class Alphafold3(Module):
 
         if calc_diffusion_loss and should_call_confidence_head:
 
-            pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
+            if self.packed_atom_repr:
+                pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
+            else:
+                pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
                 single_repr = single,
