@@ -72,6 +72,10 @@ from tqdm import tqdm
 
 ADDITIONAL_RESIDUE_FEATS = 10
 
+# threshold for checking that point cross-correlation
+# is full-rank in `WeightedRigidAlign`
+AMBIGUOUS_ROT_SINGULAR_THR = 1e-15
+
 LinearNoBias = partial(Linear, bias = False)
 
 # helper functions
@@ -2182,6 +2186,7 @@ class WeightedRigidAlign(Module):
         weights: Float['b n'],             # weights for each atom
         mask: Bool['b n'] | None = None    # mask for variable lengths
     ) -> Float['b n 3']:
+        batch_size, num_points, dim = pred_coords.shape
 
         if exists(mask):
             # zero out all predicted and true coordinates where not an atom
@@ -2200,23 +2205,33 @@ class WeightedRigidAlign(Module):
         pred_coords_centered = pred_coords - pred_centroid
         true_coords_centered = true_coords - true_centroid
 
+        if num_points < (dim + 1):
+            print(
+                "Warning: The size of one of the point clouds is <= dim+1. "
+                + "`WeightedRigidAlign` cannot return a unique rotation."
+            )
+
         # Compute the weighted covariance matrix
-        weighted_true_coords_center = true_coords_centered * weights
-        cov_matrix = einsum(weighted_true_coords_center, pred_coords_centered, 'b n i, b n j -> b i j')
+        cov_matrix = einsum(true_coords_centered * weights, pred_coords_centered, 'b n i, b n j -> b i j')
 
         # Compute the SVD of the covariance matrix
-        U, _, V = torch.svd(cov_matrix)
+        U, S, V = torch.svd(cov_matrix)
+
+        # Catch ambiguous rotation by checking the magnitude of singular values
+        if (S.abs() <= AMBIGUOUS_ROT_SINGULAR_THR).any() and not (num_points < (dim + 1)):
+            print(
+                "Warning: Excessively low rank of "
+                + "cross-correlation between aligned point clouds. "
+                + "`WeightedRigidAlign` cannot return a unique rotation."
+            )
 
         # Compute the rotation matrix
         rot_matrix = einsum(U, V, 'b i j, b k j -> b i k')
 
         # Ensure proper rotation matrix with determinant 1
-        det = torch.det(rot_matrix)
-        det_mask = det < 0
-        V_fixed = V.clone()
-        V_fixed[det_mask, :, -1] *= -1
-
-        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b k j -> b i k')
+        F = torch.eye(dim, dtype=cov_matrix.dtype, device=cov_matrix.device)[None].repeat(batch_size, 1, 1)
+        F[:, -1, -1] = torch.det(rot_matrix)
+        rot_matrix = einsum(U, F, V, "b i j, b j k, b l k -> b i l")
 
         # Apply the rotation and translation
         aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b i j -> b n j') + true_centroid
@@ -2339,7 +2354,7 @@ class CentreRandomAugmentation(Module):
         translation_vector = rearrange(translation_vector, 'b c -> b 1 c')
 
         # Apply rotation and translation
-        augmented_coords = einsum(centered_coords, rotation_matrix, 'b n i, b i j -> b n j') + translation_vector
+        augmented_coords = einsum(centered_coords, rotation_matrix, 'b n i, b j i -> b n j') + translation_vector
 
         return augmented_coords
 
