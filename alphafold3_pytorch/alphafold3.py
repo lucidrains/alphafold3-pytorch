@@ -1757,9 +1757,9 @@ class DiffusionModule(Module):
 # https://arxiv.org/abs/2206.00364
 
 class DiffusionLossBreakdown(NamedTuple):
-    mse: Float['']
-    bond: Float['']
-    smooth_lddt: Float['']
+    diffusion_mse: Float['']
+    diffusion_bond: Float['']
+    diffusion_smooth_lddt: Float['']
 
 class ElucidatedAtomDiffusionReturn(NamedTuple):
     loss: Float['']
@@ -2618,14 +2618,17 @@ class ConfidenceHead(Module):
 # main class
 
 class LossBreakdown(NamedTuple):
-    diffusion: Float['']
+    total_loss: Float['']
+    total_diffusion: Float['']
     distogram: Float['']
     pae: Float['']
     pde: Float['']
     plddt: Float['']
     resolved: Float['']
     confidence: Float['']
-    diffusion_loss_breakdown: DiffusionLossBreakdown
+    diffusion_mse: Float['']
+    diffusion_bond: Float['']
+    diffusion_smooth_lddt: Float['']
 
 class Alphafold3(Module):
     """ Algorithm 1 """
@@ -3215,14 +3218,15 @@ class Alphafold3(Module):
             return loss
 
         loss_breakdown = LossBreakdown(
+            total_loss = loss,
+            total_diffusion = diffusion_loss,
             pae = pae_loss,
             pde = pde_loss,
             plddt = plddt_loss,
             resolved = resolved_loss,
             distogram = distogram_loss,
-            diffusion = diffusion_loss,
             confidence = confidence_loss,
-            diffusion_loss_breakdown = diffusion_loss_breakdown
+            **diffusion_loss_breakdown._asdict()
         )
 
         return loss, loss_breakdown

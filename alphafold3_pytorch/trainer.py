@@ -173,11 +173,14 @@ class Trainer:
                 inputs = next(dl)
 
                 with self.fabric.no_backward_sync(self.model, enabled = is_accumulating):
-                    loss = self.model(**inputs)
+                    loss, loss_breakdown = self.model(
+                        **inputs,
+                        return_loss_breakdown = True
+                    )
 
                     self.fabric.backward(loss / self.grad_accum_every)
 
-            self.log(loss = loss)
+            self.log(**loss_breakdown._asdict())
 
             self.print(f'loss: {loss.item():.3f}')
 
