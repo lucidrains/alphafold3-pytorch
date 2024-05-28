@@ -265,7 +265,7 @@ class Trainer:
                         scaled_valid_loss = valid_loss.item() * scale
                         total_valid_loss += scaled_valid_loss
 
-                    self.print(f'valid loss: {valid_loss.item():.3f}')
+                    self.print(f'valid loss: {total_valid_loss:.3f}')
 
             self.wait()
 
