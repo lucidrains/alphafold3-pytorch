@@ -55,13 +55,15 @@ def test_smooth_lddt_loss():
 
 def test_weighted_rigid_align():
     pred_coords = torch.randn(2, 100, 3)
-    true_coords = torch.randn(2, 100, 3)
     weights = torch.rand(2, 100)
 
     align_fn = WeightedRigidAlign()
-    aligned_coords = align_fn(pred_coords, true_coords, weights)
+    aligned_coords = align_fn(pred_coords, pred_coords, weights)
 
-    assert aligned_coords.shape == pred_coords.shape
+    # `pred_coords` should match itself without any change after alignment
+
+    rmsd = torch.sqrt(((pred_coords - aligned_coords) ** 2).sum(dim=-1).mean(dim=-1))
+    assert (rmsd < 1e-5).all()
 
 def test_weighted_rigid_align_with_mask():
     pred_coords = torch.randn(2, 100, 3)
