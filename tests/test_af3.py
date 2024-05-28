@@ -176,8 +176,8 @@ def test_msa_module():
 
     assert pairwise.shape == pairwise_out.shape
 
-
-def test_diffusion_transformer():
+@pytest.mark.parametrize('use_linear_attn', (False, True))
+def test_diffusion_transformer(use_linear_attn):
 
     single = torch.randn(2, 16, 384)
     pairwise = torch.randn(2, 16, 16, 128)
@@ -185,7 +185,8 @@ def test_diffusion_transformer():
 
     diffusion_transformer = DiffusionTransformer(
         depth = 2,
-        heads = 16
+        heads = 16,
+        use_linear_attn = use_linear_attn
     )
 
     single_out = diffusion_transformer(
