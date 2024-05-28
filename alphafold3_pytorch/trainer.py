@@ -58,11 +58,13 @@ def accum_dict(
     losses: dict,
     scale: float = 1.
 ):
+    losses = {k: v * scale for k, v in losses.items()}
+
     if not exists(past_losses):
         return losses
 
     for loss_name in past_losses.keys():
-        past_losses[loss_name] += losses.get(loss_name, 0.) * scale
+        past_losses[loss_name] += losses.get(loss_name, 0.)
 
     return past_losses
 
