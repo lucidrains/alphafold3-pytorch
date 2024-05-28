@@ -44,6 +44,9 @@ def exists(val):
 def default(v, d):
     return v if exists(v) else d
 
+def divisible_by(num, den):
+    return (num % den) == 0
+
 def cycle(dataloader: DataLoader):
     while True:
         for batch in dataloader:
@@ -74,6 +77,8 @@ class Trainer:
         num_train_steps: int,
         batch_size: int,
         grad_accum_every: int = 1,
+        valid_dataset: Dataset | None = None,
+        valid_every: int = 1000,
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         ema_decay = 0.999,
@@ -122,9 +127,21 @@ class Trainer:
 
         self.optimizer = optimizer
 
-        # data
+        # train dataloader
 
         self.dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+
+        # validation dataloader on the EMA model
+
+        self.valid_every = valid_every
+
+        self.needs_valid = exists(valid_dataset)
+
+        if self.needs_valid and self.is_main:
+            self.valid_dataset_size = len(valid_dataset)
+            self.valid_dataloader = DataLoader(valid_dataset, batch_size = batch_size)
+
+        # training steps and num gradient accum steps
 
         self.num_train_steps = num_train_steps
         self.grad_accum_every = grad_accum_every
@@ -154,6 +171,9 @@ class Trainer:
     def is_main(self):
         return self.fabric.global_rank == 0
 
+    def wait(self):
+        self.fabric.barrier()
+
     def print(self, *args, **kwargs):
         self.fabric.print(*args, **kwargs)
 
@@ -165,7 +185,13 @@ class Trainer:
     ):
         dl = cycle(self.dataloader)
 
+        # while less than required number of training steps
+
         while self.steps < self.num_train_steps:
+
+            self.model.train()
+
+            # gradient accumulation
 
             for grad_accum_step in range(self.grad_accum_every):
                 is_accumulating = grad_accum_step < (self.grad_accum_every - 1)
@@ -173,27 +199,74 @@ class Trainer:
                 inputs = next(dl)
 
                 with self.fabric.no_backward_sync(self.model, enabled = is_accumulating):
+
+                    # model forwards
+
                     loss, loss_breakdown = self.model(
                         **inputs,
                         return_loss_breakdown = True
                     )
 
+                    # backwards
+
                     self.fabric.backward(loss / self.grad_accum_every)
+
+            # log entire loss breakdown
 
             self.log(**loss_breakdown._asdict())
 
             self.print(f'loss: {loss.item():.3f}')
 
+            # clip gradients
+
             self.fabric.clip_gradients(self.model, self.optimizer, max_norm = self.clip_grad_norm)
+
+            # optimizer step
 
             self.optimizer.step()
 
+            # update exponential moving average
+
+            self.wait()
+
             if self.is_main:
                 self.ema_model.update()
+
+            self.wait()
+
+            # scheduler
 
             self.scheduler.step()
             self.optimizer.zero_grad()
 
             self.steps += 1
+
+            # maybe validate, for now, only on main with EMA model
+
+            if (
+                self.is_main and
+                self.needs_valid and
+                divisible_by(self.steps, self.valid_every)
+            ):
+                with torch.no_grad():
+                    self.ema_model.eval()
+
+                    total_valid_loss = 0.
+
+                    for valid_batch in self.valid_dataloader:
+                        valid_loss, valid_loss_breakdown = self.ema_model(
+                            **valid_batch,
+                            return_loss_breakdown = True
+                        )
+
+                        valid_batch_size = valid_batch.get('atom_inputs').shape[0]
+                        scale = valid_batch_size / self.valid_dataset_size
+
+                        scaled_valid_loss = valid_loss.item() * scale
+                        total_valid_loss += scaled_valid_loss
+
+                    self.print(f'valid loss: {valid_loss.item():.3f}')
+
+            self.wait()
 
         print(f'training complete')

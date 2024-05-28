@@ -13,17 +13,19 @@ from alphafold3_pytorch import (
 
 # mock dataset
 
-class AtomDataset(Dataset):
+class MockAtomDataset(Dataset):
     def __init__(
         self,
+        data_length,
         seq_len = 16,
         atoms_per_window = 27
     ):
+        self.data_length = data_length
         self.seq_len = seq_len
         self.atom_seq_len = seq_len * atoms_per_window
 
     def __len__(self):
-        return 100
+        return self.data_length
 
     def __getitem__(self, idx):
         seq_len = self.seq_len
@@ -93,14 +95,17 @@ def test_trainer():
         ),
     )
 
-    dataset = AtomDataset()
+    dataset = MockAtomDataset(100)
+    valid_dataset = MockAtomDataset(2)
 
     trainer = Trainer(
         alphafold3,
         dataset = dataset,
+        valid_dataset = valid_dataset,
         accelerator = 'cpu',
         num_train_steps = 2,
         batch_size = 1,
+        valid_every = 1,
         grad_accum_every = 2
     )
 
