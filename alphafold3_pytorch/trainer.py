@@ -167,7 +167,7 @@ class Trainer:
                 with self.fabric.no_backward_sync(self.model, enabled = is_accumulating):
                     loss = self.model(**inputs)
 
-                self.fabric.backward(loss / self.grad_accum_every)
+                    self.fabric.backward(loss / self.grad_accum_every)
 
             print(f'loss: {loss.item():.3f}')
 
