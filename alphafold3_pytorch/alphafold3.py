@@ -2198,7 +2198,7 @@ class WeightedRigidAlign(Module):
         U, _, V = torch.svd(cov_matrix)
 
         # Compute the rotation matrix
-        rot_matrix = einsum(U, V, 'b i j, b j k -> b i k')
+        rot_matrix = einsum(U, V, 'b i j, b k j -> b i k')
 
         # Ensure proper rotation matrix with determinant 1
         det = torch.det(rot_matrix)
@@ -2206,7 +2206,7 @@ class WeightedRigidAlign(Module):
         V_fixed = V.clone()
         V_fixed[det_mask, :, -1] *= -1
 
-        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b j k -> b i k')
+        rot_matrix[det_mask] = einsum(U[det_mask], V_fixed[det_mask], 'b i j, b k j -> b i k')
 
         # Apply the rotation and translation
         aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b i j -> b n j') + true_centroid
