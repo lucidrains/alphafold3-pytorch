@@ -2021,8 +2021,9 @@ class ElucidatedAtomDiffusion(Module):
 
             # section 3.7.1 equation 4
 
-            align_weights = torch.where(atom_is_dna | atom_is_rna, nucleotide_loss_weight, align_weights)
-            align_weights = torch.where(atom_is_ligand, ligand_loss_weight, align_weights)
+            # upweighting of nucleotide and ligand atoms is additive per equation 4
+            align_weights = torch.where(atom_is_dna | atom_is_rna, 1 + nucleotide_loss_weight, align_weights)
+            align_weights = torch.where(atom_is_ligand, 1 + ligand_loss_weight, align_weights)
 
         # section 3.7.1 equation 2 - weighted rigid aligned ground truth
 
