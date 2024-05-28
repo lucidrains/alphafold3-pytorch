@@ -151,10 +151,7 @@ def repeat_consecutive_with_lens(
     lens: Int['b n'],
 ) -> Float['b m ...'] | Bool['b m']:
 
-    is_bool = feats.dtype == torch.bool
-    feats = feats.float()
-
-    device = feats.device
+    device, dtype = feats.device, feats.dtype
 
     batch, seq, *dims = feats.shape
 
@@ -174,25 +171,38 @@ def repeat_consecutive_with_lens(
     # create output tensor + a sink position on the very right (index max_len)
 
     total_lens = lens.sum(dim = -1)
+    output_mask = lens_to_mask(total_lens)
+
     max_len = total_lens.amax()
 
-    output = torch.zeros((batch, max_len + 1, *dims), device = device)
+    output_indices = torch.zeros((batch, max_len + 1), device = device, dtype = torch.long)
 
     indices.masked_fill_(~mask, max_len) # scatter to sink position for padding
     indices = rearrange(indices, 'b n w -> b (n w)')
 
-    feats = repeat(feats, 'b n ... -> b (n w) ...', w = window_size)
-
     # scatter
 
-    output = einx.set_at('b [m] ...,  b nw, b nw ... -> b [m] ...', output, indices, feats)
+    seq_arange = torch.arange(seq, device = device)
+    seq_arange = repeat(seq_arange, 'n -> (n w)', w = window_size)
+
+    output_indices = einx.set_at('b [m],  b nw, nw -> b [m]', output_indices, indices, seq_arange)
 
     # remove sink
 
-    output = output[:, :-1]
+    output_indices = output_indices[:, :-1]
 
-    if is_bool:
-        output = output.bool()
+    # gather
+
+    output = einx.get_at('b [n] ..., b m -> b m ...', feats, output_indices)
+
+    # final mask
+
+    mask_value = False if dtype == torch.bool else 0
+
+    output = einx.where(
+        'b n, b n ..., -> b n ...',
+        output_mask, output, mask_value
+    )
 
     return output
 
