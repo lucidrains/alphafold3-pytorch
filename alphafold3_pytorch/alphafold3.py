@@ -1388,6 +1388,8 @@ class DiffusionTransformer(Module):
         )
     ):
         super().__init__()
+        self.attn_window_size = attn_window_size
+
         dim_single_cond = default(dim_single_cond, dim)
 
         layers = ModuleList([])
@@ -1442,6 +1444,8 @@ class DiffusionTransformer(Module):
         self.num_registers = num_register_tokens
 
         if self.has_registers:
+            assert not exists(attn_window_size), 'register tokens disabled for windowed attention'
+
             self.registers = nn.Parameter(torch.zeros(num_register_tokens, dim))
 
     @typecheck
@@ -1450,10 +1454,20 @@ class DiffusionTransformer(Module):
         noised_repr: Float['b n d'],
         *,
         single_repr: Float['b n ds'],
-        pairwise_repr: Float['b n n dp'],
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*3) dp'],
         mask: Bool['b n'] | None = None
     ):
+        w = self.attn_window_size
+        has_windows = exists(w)
+
         serial = self.serial
+
+        # handle windowing
+
+        pairwise_is_windowed = pairwise_repr.shape[-2] != pairwise_repr.shape[-3]
+
+        if has_windows and not pairwise_is_windowed:
+            pairwise_repr = full_pairwise_repr_to_windowed(pairwise_repr, window_size = w)
 
         # register tokens
 
