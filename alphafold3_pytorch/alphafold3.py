@@ -36,6 +36,7 @@ additional_residue_feats: [*, 10]:
 """
 
 from math import pi, sqrt
+from pathlib import Path
 from functools import partial, wraps
 from collections import namedtuple
 
@@ -68,6 +69,8 @@ from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
 
 from tqdm import tqdm
+
+from importlib.metadata import version
 
 # constants
 
@@ -104,6 +107,15 @@ def maybe(fn):
         if not exists(t):
             return None
         return fn(t, *args, **kwargs)
+    return inner
+
+def save_args_and_kwargs(fn):
+    @wraps(fn)
+    def inner(self, *args, **kwargs):
+        self._args_and_kwargs = (args, kwargs)
+        self._version = version('alphafold3_pytorch')
+
+        return fn(self, *args, **kwargs)
     return inner
 
 # packed atom representation functions
@@ -2687,6 +2699,7 @@ class LossBreakdown(NamedTuple):
 class Alphafold3(Module):
     """ Algorithm 1 """
 
+    @save_args_and_kwargs
     @typecheck
     def __init__(
         self,
@@ -2918,6 +2931,59 @@ class Alphafold3(Module):
     @property
     def device(self):
         return self.zero.device
+
+    @property
+    def state_dict_with_init_args(self):
+        return dict(
+            version = self._version,
+            init_args_and_kwargs = self._args_and_kwargs,
+            state_dict = self.state_dict()
+        )
+
+    @typecheck
+    def save(self, path: str | Path, overwrite = False):
+        if isinstance(path, str):
+            path = Path(path)
+
+        assert not path.is_dir() and (not path.exists() or overwrite)
+
+        path.parent.mkdir(exist_ok = True, parents = True)
+
+        package = dict(
+            model = self.state_dict_with_init_args
+        )
+
+        torch.save(package, str(path))
+
+    @typecheck
+    def load(self, path: str | Path, strict = False):
+        if isinstance(path, str):
+            path = Path(path)
+
+        assert path.exists() and not path.is_dir()
+
+        package = torch.load(str(path), map_location = 'cpu')
+
+        model_package = package['model']
+        self.load_state_dict(model_package['state_dict'], strict = strict)
+
+    @staticmethod
+    @typecheck
+    def init_and_load(path: str | Path):
+        if isinstance(path, str):
+            path = Path(path)
+
+        assert path.exists() and not path.is_dir()
+
+        package = torch.load(str(path), map_location = 'cpu')
+
+        model_package = package['model']
+
+        args, kwargs = model_package['init_args_and_kwargs']
+        alphafold3 = Alphafold3(*args, **kwargs)
+
+        alphafold3.load(path)
+        return alphafold3
 
     @typecheck
     def forward(

@@ -3,7 +3,7 @@ os.environ['TYPECHECK'] = 'True'
 
 import pytest
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from alphafold3_pytorch import (
     Alphafold3,
@@ -97,6 +97,30 @@ def test_trainer():
 
     dataset = MockAtomDataset(100)
     valid_dataset = MockAtomDataset(2)
+
+    # test saving and loading from Alphafold3, independent of lightning
+
+    dataloader = DataLoader(dataset, batch_size = 2)
+    inputs = next(iter(dataloader))
+
+    alphafold3.eval()
+    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    before_distogram = breakdown.distogram
+
+    path = './some/nested/folder/af3'
+    alphafold3.save(path, overwrite = True)
+
+    # load from scratch, along with saved hyperparameters
+
+    alphafold3 = Alphafold3.init_and_load(path)
+
+    alphafold3.eval()
+    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    after_distogram = breakdown.distogram
+
+    assert torch.allclose(before_distogram, after_distogram)
+
+    # test training + validation
 
     trainer = Trainer(
         alphafold3,
