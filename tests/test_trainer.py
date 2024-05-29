@@ -132,10 +132,13 @@ def test_trainer():
         num_train_steps = 2,
         batch_size = 1,
         valid_every = 1,
-        grad_accum_every = 2
+        grad_accum_every = 2,
+        checkpoint_every = 1
     )
 
     trainer()
+
+    assert Path('./checkpoints/af3.ckpt.1.pt').exists()
 
     # saving and loading from trainer
 

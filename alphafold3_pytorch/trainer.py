@@ -110,6 +110,8 @@ class Trainer:
         default_lambda_lr = default_lambda_lr_fn,
         fabric: Fabric | None = None,
         accelerator = 'auto',
+        checkpoint_every: int = 1000,
+        checkpoint_folder: str = './checkpoints',
         fabric_kwargs: dict = dict(),
         ema_kwargs: dict = dict()
     ):
@@ -193,6 +195,14 @@ class Trainer:
         # steps
 
         self.steps = 0
+
+        # checkpointing logic
+
+        self.checkpoint_every = checkpoint_every
+        self.checkpoint_folder = Path(checkpoint_folder)
+
+        self.checkpoint_folder.mkdir(exist_ok = True, parents = True)
+        assert self.checkpoint_folder.is_dir()
 
     @property
     def is_main(self):
@@ -353,6 +363,11 @@ class Trainer:
                 # log
 
                 self.log(**valid_loss_breakdown)
+
+            self.wait()
+
+            if self.is_main and divisible_by(self.steps, self.checkpoint_every):
+                self.save(self.checkpoint_folder / f'af3.ckpt.{self.steps}.pt')
 
             self.wait()
 
