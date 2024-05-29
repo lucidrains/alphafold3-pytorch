@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from alphafold3_pytorch.alphafold3 import Alphafold3
 
 from typing import TypedDict
@@ -187,6 +189,45 @@ class Trainer:
     def is_main(self):
         return self.fabric.global_rank == 0
 
+    # saving and loading
+
+    def save(self, path: str | Path, overwrite = False):
+        if isinstance(path, str):
+            path = Path(path)
+
+        assert not path.is_dir() and (not path.exists() or overwrite)
+
+        path.parent.mkdir(exist_ok = True, parents = True)
+
+        package = dict(
+            model = self.model.state_dict_with_init_args,
+            optimizer = self.optimizer.state_dict(),
+            scheduler = self.scheduler.state_dict(),
+            steps = self.steps
+        )
+
+        torch.save(str(path), package)
+
+    def load(self, path: str | Path, strict = True):
+        if isinstance(path, str):
+            path = Path(path)
+
+        assert path.exists()
+
+        package = torch.load(str(path))
+
+        if 'optimizer' in package:
+            self.optimizer.load_state_dict(package['optimizer'])
+
+        if 'scheduler' in package:
+            self.scheduler.load_state_dict(package['scheduler'])
+
+        self.steps = package.get('steps', 0)
+
+        self.model.load_state_dict(package['model'])
+
+    # shortcut methods
+
     def wait(self):
         self.fabric.barrier()
 
@@ -195,6 +236,8 @@ class Trainer:
 
     def log(self, **log_data):
         self.fabric.log_dict(log_data, step = self.steps)
+
+    # main train forwards
 
     def __call__(
         self

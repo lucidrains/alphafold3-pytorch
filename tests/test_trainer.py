@@ -134,3 +134,12 @@ def test_trainer():
     )
 
     trainer()
+
+    # saving and loading from trainer
+
+    trainer.save('./some/nested/folder2/training')
+    trainer.load('./some/nested/folder2/training')
+
+    # also allow for loading Alphafold3 directly from training ckpt
+
+    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training')
