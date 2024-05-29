@@ -10,6 +10,7 @@ n - residue sequence length
 i - residue sequence length (source)
 j - residue sequence length (target)
 m - atom sequence length
+nw - windowed sequence length
 d - feature dimension
 ds - feature dimension (single)
 dp - feature dimension (pairwise)
@@ -65,7 +66,8 @@ from alphafold3_pytorch.typing import (
 
 from alphafold3_pytorch.attention import (
     Attention,
-    full_attn_bias_matrix_to_local
+    full_attn_bias_to_windowed,
+    full_pairwise_repr_to_windowed
 )
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
@@ -525,6 +527,8 @@ class AttentionPairBias(Module):
     ):
         super().__init__()
 
+        self.window_size = window_size
+
         self.attn = Attention(
             heads = heads,
             window_size = window_size,
@@ -539,7 +543,7 @@ class AttentionPairBias(Module):
         self.to_attn_bias = nn.Sequential(
             nn.LayerNorm(dim_pairwise),
             to_attn_bias_linear,
-            Rearrange('... i j h -> ... h i j')
+            Rearrange('b ... h -> b h ...')
         )
 
     @typecheck
@@ -547,10 +551,33 @@ class AttentionPairBias(Module):
         self,
         single_repr: Float['b n ds'],
         *,
-        pairwise_repr: Float['b n n dp'],
-        attn_bias: Float['b n n'] | None = None,
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*3) dp'],
+        attn_bias: Float['b n n'] | Float['b nw w (w*3)'] | None = None,
         **kwargs
     ) -> Float['b n ds']:
+
+        w, has_window_size = self.window_size, exists(self.window_size)
+
+        # take care of windowing logic
+        # for sequence-local atom transformer
+
+        windowed_pairwise = pairwise_repr.shape[-2] != pairwise_repr.shape[-3]
+
+        windowed_attn_bias = None
+
+        if exists(attn_bias):
+            windowed_attn_bias = attn_bias.shape[-1] != attn_bias.shape[-2]
+
+        if has_window_size:
+            if not windowed_pairwise:
+                pairwise_repr = full_pairwise_repr_to_windowed(pairwise_repr, window_size = w)
+            if exists(attn_bias):
+                attn_bias = full_attn_bias_to_windowed(attn_bias, window_size = w)
+        else:
+            assert not windowed_pairwise, 'cannot pass in windowed pairwise repr if no window_size given to AttentionPairBias'
+            assert not exists(windowed_attn_bias) or not windowed_attn_bias, 'cannot pass in windowed attention bias if no window_size set for AttentionPairBias'
+
+        # attention bias preparation with further addition from pairwise repr
 
         if exists(attn_bias):
             attn_bias = rearrange(attn_bias, 'b i j -> b 1 i j')

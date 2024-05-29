@@ -56,7 +56,7 @@ def pad_at_dim(
 # for changing full attention bias matrix to a local windowed one for atom attention
 
 @typecheck
-def full_attn_bias_matrix_to_local(
+def full_attn_bias_to_windowed(
     attn_bias: Float['... m m'],
     window_size: int
 ) -> Float['... n w (w*3)']:
@@ -84,6 +84,36 @@ def full_attn_bias_matrix_to_local(
     )
 
     return attn_bias
+
+@typecheck
+def full_pairwise_repr_to_windowed(
+    pairwise_repr: Float['... m m dp'],
+    window_size: int
+) -> Float['... n w (w*3) dp']:
+
+    seq_len, device = pairwise_repr.shape[-2], pairwise_repr.device
+
+    padding_needed = (window_size - (seq_len % window_size)) % window_size
+    pairwise_repr = F.pad(pairwise_repr, (0, 0, 0, padding_needed, 0, padding_needed), value = 0.)
+    pairwise_repr = rearrange(pairwise_repr, '... (i w1) (j w2) d -> ... i j w1 w2 d', w1 = window_size, w2 = window_size)
+    pairwise_repr = pad_at_dim(pairwise_repr, (1, 1), dim = -4, value = 0.)
+
+    pairwise_repr = torch.cat((
+        pairwise_repr[..., :-2, :, :, :],
+        pairwise_repr[..., 1:-1, :, :, :],
+        pairwise_repr[..., 2:, :, :, :]
+    ), dim = -2)
+
+    # get the diagonal
+
+    n = torch.arange(pairwise_repr.shape[-4], device = device)
+
+    pairwise_repr = einx.get_at(
+        '... [i j] w1 w2 d, n, n -> ... n w1 w2 d',
+        pairwise_repr, n, n
+    )
+
+    return pairwise_repr
 
 # multi-head attention
 
@@ -149,7 +179,7 @@ class Attention(Module):
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
-        attn_bias: Float['... i j'] | None = None
+        attn_bias: Float['... i j'] | Float['... nw w (w*3)'] | None = None
 
     ) -> Float['b i d']:
 
@@ -250,7 +280,7 @@ class Attend(Module):
         k: Float['b h n d'],
         v: Float['b h n d'],
         mask: Bool['b n'] | None = None,
-        attn_bias: Float['... n n'] | Float['... n w (w*3)'] | None = None
+        attn_bias: Float['... n n'] | Float['... nw w (w*3)'] | None = None
     ) -> Float['b h n d']:
         """
         simple local attention with a radius of 1 window size
@@ -290,7 +320,7 @@ class Attend(Module):
         is_full_attn_bias = attn_bias.shape[-1] == attn_bias.shape[-2]
 
         if exists(attn_bias) and is_full_attn_bias:
-            attn_bias = full_attn_bias_matrix_to_local(attn_bias, window_size = window_size)
+            attn_bias = full_attn_bias_to_windowed(attn_bias, window_size = window_size)
 
         # carry out attention as usual
 
@@ -333,14 +363,21 @@ class Attend(Module):
         k: Float['b h j d'],
         v: Float['b h j d'],
         mask: Bool['b j'] | None = None,
-        attn_bias: Float['... i j'] | None = None,
+        attn_bias: Float['... i j'] | Float['... nw w (w*3)'] | None = None,
     ) -> Float['b h i d']:
+
+        is_windowed_attn_bias = None
+
+        if exists(attn_bias):
+            is_windowed_attn_bias = attn_bias.shape[-1] != attn_bias.shape[-2]
 
         # local windowed attention
         # todo (handle attn bias efficiently)
 
         if self.is_local_attn:
             return self.local_attn(q, k, v, mask = mask, attn_bias = attn_bias)
+
+        assert not exists(is_windowed_attn_bias) or not is_windowed_attn_bias
 
         # forward to using flash attention if applicable
 
