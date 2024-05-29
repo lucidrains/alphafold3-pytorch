@@ -56,36 +56,6 @@ def pad_at_dim(
 # for changing full attention bias matrix to a local windowed one for atom attention
 
 @typecheck
-def full_attn_bias_to_windowed(
-    attn_bias: Float['... m m'],
-    window_size: int
-) -> Float['... n w (w*3)']:
-
-    seq_len, device = attn_bias.shape[-1], attn_bias.device
-
-    padding_needed = (window_size - (seq_len % window_size)) % window_size
-    attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
-    attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
-    attn_bias = pad_at_dim(attn_bias, (1, 1), dim = -3, value = 0.)
-
-    attn_bias = torch.cat((
-        attn_bias[..., :-2, :, :],
-        attn_bias[..., 1:-1, :, :],
-        attn_bias[..., 2:, :, :]
-    ), dim = -1)
-
-    # get the diagonal
-
-    n = torch.arange(attn_bias.shape[-3], device = device)
-
-    attn_bias = einx.get_at(
-        '... [i j] w1 w2, n, n -> ... n w1 w2',
-        attn_bias, n, n
-    )
-
-    return attn_bias
-
-@typecheck
 def full_pairwise_repr_to_windowed(
     pairwise_repr: Float['... m m dp'],
     window_size: int
@@ -114,6 +84,16 @@ def full_pairwise_repr_to_windowed(
     )
 
     return pairwise_repr
+
+@typecheck
+def full_attn_bias_to_windowed(
+    attn_bias: Float['... m m'],
+    window_size: int
+) -> Float['... n w (w*3)']:
+
+    attn_bias = rearrange(attn_bias, '... -> ... 1')
+    attn_bias = full_pairwise_repr_to_windowed(attn_bias, window_size = window_size)
+    return rearrange(attn_bias, '... 1 -> ...')
 
 # multi-head attention
 
