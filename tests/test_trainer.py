@@ -34,8 +34,9 @@ class MockAtomDataset(Dataset):
         atom_seq_len = self.atom_seq_len
 
         atom_inputs = torch.randn(atom_seq_len, 77)
+        atompair_inputs = torch.randn(atom_seq_len, atom_seq_len, 5)
+
         residue_atom_lens = torch.randint(0, 27, (seq_len,))
-        atompair_feats = torch.randn(atom_seq_len, atom_seq_len, 16)
         additional_residue_feats = torch.randn(seq_len, 10)
 
         templates = torch.randn(2, seq_len, seq_len, 44)
@@ -57,8 +58,8 @@ class MockAtomDataset(Dataset):
 
         return Alphafold3Input(
             atom_inputs = atom_inputs,
+            atompair_inputs = atompair_inputs,
             residue_atom_lens = residue_atom_lens,
-            atompair_feats = atompair_feats,
             additional_residue_feats = additional_residue_feats,
             templates = templates,
             template_mask = template_mask,

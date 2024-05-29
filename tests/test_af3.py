@@ -353,8 +353,9 @@ def test_input_embedder():
 
     atom_seq_len = 16 * 27
     atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
     atom_mask = torch.ones((2, atom_seq_len)).bool()
-    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     additional_residue_feats = torch.randn(2, 16, 10)
 
     embedder = InputFeatureEmbedder(
@@ -364,7 +365,7 @@ def test_input_embedder():
     embedder(
         atom_inputs = atom_inputs,
         atom_mask = atom_mask,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats
     )
 
@@ -383,8 +384,9 @@ def test_alphafold3():
     token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
     atom_lens = torch.randint(0, 27, (2, seq_len))
-    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     additional_residue_feats = torch.randn(2, seq_len, 10)
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
@@ -428,7 +430,7 @@ def test_alphafold3():
         num_recycling_steps = 2,
         atom_inputs = atom_inputs,
         residue_atom_lens = atom_lens,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats,
         token_bond = token_bond,
         msa = msa,
@@ -451,7 +453,7 @@ def test_alphafold3():
         num_sample_steps = 16,
         atom_inputs = atom_inputs,
         residue_atom_lens = atom_lens,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats,
         msa = msa,
         templates = template_feats,
@@ -465,8 +467,8 @@ def test_alphafold3_without_msa_and_templates():
     atom_seq_len = seq_len * 27
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
     atom_lens = torch.randint(0, 27, (2, seq_len))
-    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     additional_residue_feats = torch.randn(2, seq_len, 10)
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
@@ -505,7 +507,7 @@ def test_alphafold3_without_msa_and_templates():
         num_recycling_steps = 2,
         atom_inputs = atom_inputs,
         residue_atom_lens = atom_lens,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats,
         atom_pos = atom_pos,
         residue_atom_indices = residue_atom_indices,
@@ -528,8 +530,8 @@ def test_alphafold3_with_packed_atom_repr():
     token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-    atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     additional_residue_feats = torch.randn(2, seq_len, 10)
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
@@ -574,7 +576,7 @@ def test_alphafold3_with_packed_atom_repr():
         num_recycling_steps = 2,
         atom_inputs = atom_inputs,
         residue_atom_lens = residue_atom_lens,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats,
         token_bond = token_bond,
         msa = msa,
@@ -596,7 +598,7 @@ def test_alphafold3_with_packed_atom_repr():
         num_sample_steps = 16,
         atom_inputs = atom_inputs,
         residue_atom_lens = residue_atom_lens,
-        atompair_feats = atompair_feats,
+        atompair_inputs = atompair_inputs,
         additional_residue_feats = additional_residue_feats,
         msa = msa,
         templates = template_feats,

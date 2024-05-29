@@ -14,7 +14,9 @@ d - feature dimension
 ds - feature dimension (single)
 dp - feature dimension (pairwise)
 dap - feature dimension (atompair)
+dapi - feature dimension (atompair input)
 da - feature dimension (atom)
+dai - feature dimension (atom input)
 t - templates
 s - msa
 r - registers
@@ -2446,6 +2448,7 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         dim_atom_inputs,
+        dim_atompair_inputs = 5,
         atoms_per_window = 27,
         dim_atom = 128,
         dim_atompair = 16,
@@ -2460,6 +2463,8 @@ class InputFeatureEmbedder(Module):
         self.atoms_per_window = atoms_per_window
 
         self.to_atom_feats = LinearNoBias(dim_atom_inputs, dim_atom)
+
+        self.to_atompair_feats = LinearNoBias(dim_atompair_inputs, dim_atompair)
 
         self.atom_repr_to_atompair_feat_cond = nn.Sequential(
             nn.LayerNorm(dim_atom),
@@ -2501,8 +2506,8 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         atom_inputs: Float['b m dai'],
+        atompair_inputs: Float['b m m dapi'],
         atom_mask: Bool['b m'],
-        atompair_feats: Float['b m m dap'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'] | None = None,
 
@@ -2513,6 +2518,7 @@ class InputFeatureEmbedder(Module):
         w = self.atoms_per_window
 
         atom_feats = self.to_atom_feats(atom_inputs)
+        atompair_feats = self.to_atompair_feats(atompair_inputs)
 
         atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
         atompair_feats = atom_feats_cond + atompair_feats
@@ -2709,6 +2715,7 @@ class Alphafold3(Module):
         dim_template_model = 64,
         atoms_per_window = 27,
         dim_atom = 128,
+        dim_atompair_inputs = 5,
         dim_atompair = 16,
         dim_input_embedder_token = 384,
         dim_single = 384,
@@ -2810,6 +2817,7 @@ class Alphafold3(Module):
 
         self.input_embedder = InputFeatureEmbedder(
             dim_atom_inputs = dim_atom_inputs,
+            dim_atompair_inputs = dim_atompair_inputs,
             atoms_per_window = atoms_per_window,
             dim_atom = dim_atom,
             dim_atompair = dim_atompair,
@@ -2995,7 +3003,7 @@ class Alphafold3(Module):
         self,
         *,
         atom_inputs: Float['b m dai'],
-        atompair_feats: Float['b m m dap'],
+        atompair_inputs: Float['b m m dapi'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'] | None = None,
         atom_mask: Bool['b m'] | None = None,
@@ -3063,8 +3071,8 @@ class Alphafold3(Module):
             atompair_feats
         ) = self.input_embedder(
             atom_inputs = atom_inputs,
+            atompair_inputs = atompair_inputs,
             atom_mask = atom_mask,
-            atompair_feats = atompair_feats,
             additional_residue_feats = additional_residue_feats,
             residue_atom_lens = residue_atom_lens
         )
