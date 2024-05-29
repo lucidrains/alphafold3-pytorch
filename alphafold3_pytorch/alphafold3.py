@@ -580,7 +580,7 @@ class AttentionPairBias(Module):
         # attention bias preparation with further addition from pairwise repr
 
         if exists(attn_bias):
-            attn_bias = rearrange(attn_bias, 'b i j -> b 1 i j')
+            attn_bias = rearrange(attn_bias, 'b ... -> b 1 ...')
         else:
             attn_bias = 0.
 
