@@ -96,7 +96,8 @@ def test_trainer():
     )
 
     dataset = MockAtomDataset(100)
-    valid_dataset = MockAtomDataset(2)
+    valid_dataset = MockAtomDataset(4)
+    test_dataset = MockAtomDataset(2)
 
     # test saving and loading from Alphafold3, independent of lightning
 
@@ -126,6 +127,7 @@ def test_trainer():
         alphafold3,
         dataset = dataset,
         valid_dataset = valid_dataset,
+        test_dataset = test_dataset,
         accelerator = 'cpu',
         num_train_steps = 2,
         batch_size = 1,

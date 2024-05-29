@@ -97,6 +97,7 @@ class Trainer:
         grad_accum_every: int = 1,
         valid_dataset: Dataset | None = None,
         valid_every: int = 1000,
+        test_dataset: Dataset | None = None,
         optimizer: Optimizer | None = None,
         scheduler: LRScheduler | None = None,
         ema_decay = 0.999,
@@ -158,6 +159,14 @@ class Trainer:
         if self.needs_valid and self.is_main:
             self.valid_dataset_size = len(valid_dataset)
             self.valid_dataloader = DataLoader(valid_dataset, batch_size = batch_size)
+
+        # testing dataloader on EMA model
+
+        self.needs_test = exists(test_dataset)
+
+        if self.needs_test and self.is_main:
+            self.test_dataset_size = len(test_dataset)
+            self.test_dataloader = DataLoader(test_dataset, batch_size = batch_size)
 
         # training steps and num gradient accum steps
 
@@ -346,5 +355,36 @@ class Trainer:
                 self.log(**valid_loss_breakdown)
 
             self.wait()
+
+        # maybe test
+
+        if self.is_main and self.needs_test:
+            with torch.no_grad():
+                self.ema_model.eval()
+
+                total_test_loss = 0.
+                test_loss_breakdown = None
+
+                for test_batch in self.test_dataloader:
+                    test_loss, loss_breakdown = self.ema_model(
+                        **test_batch,
+                        return_loss_breakdown = True
+                    )
+
+                    test_batch_size = test_batch.get('atom_inputs').shape[0]
+                    scale = test_batch_size / self.test_dataset_size
+
+                    total_test_loss += test_loss.item() * scale
+                    test_loss_breakdown = accum_dict(test_loss_breakdown, loss_breakdown._asdict(), scale = scale)
+
+                self.print(f'test loss: {total_test_loss:.3f}')
+
+            # prepend test_ to all losses for logging
+
+            test_loss_breakdown = {f'test_{k}':v for k, v in test_loss_breakdown.items()}
+
+            # log
+
+            self.log(**test_loss_breakdown)
 
         print(f'training complete')
