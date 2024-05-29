@@ -112,6 +112,7 @@ class Trainer:
         accelerator = 'auto',
         checkpoint_every: int = 1000,
         checkpoint_folder: str = './checkpoints',
+        overwrite_checkpoints: bool = False,
         fabric_kwargs: dict = dict(),
         ema_kwargs: dict = dict()
     ):
@@ -199,6 +200,7 @@ class Trainer:
         # checkpointing logic
 
         self.checkpoint_every = checkpoint_every
+        self.overwrite_checkpoints = overwrite_checkpoints
         self.checkpoint_folder = Path(checkpoint_folder)
 
         self.checkpoint_folder.mkdir(exist_ok = True, parents = True)
@@ -367,7 +369,9 @@ class Trainer:
             self.wait()
 
             if self.is_main and divisible_by(self.steps, self.checkpoint_every):
-                self.save(self.checkpoint_folder / f'af3.ckpt.{self.steps}.pt')
+                checkpoint_path = self.checkpoint_folder / f'af3.ckpt.{self.steps}.pt'
+
+                self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
 
             self.wait()
 

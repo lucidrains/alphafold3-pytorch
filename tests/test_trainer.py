@@ -1,6 +1,8 @@
 import os
 os.environ['TYPECHECK'] = 'True'
 
+from pathlib import Path
+
 import pytest
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -133,7 +135,8 @@ def test_trainer():
         batch_size = 1,
         valid_every = 1,
         grad_accum_every = 2,
-        checkpoint_every = 1
+        checkpoint_every = 1,
+        overwrite_checkpoints = True
     )
 
     trainer()
