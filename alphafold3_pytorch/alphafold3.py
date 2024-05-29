@@ -63,7 +63,11 @@ from alphafold3_pytorch.typing import (
     typecheck
 )
 
-from alphafold3_pytorch.attention import Attention
+from alphafold3_pytorch.attention import (
+    Attention,
+    full_attn_bias_matrix_to_local
+)
+
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
 
 import einx

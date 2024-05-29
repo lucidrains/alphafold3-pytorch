@@ -53,6 +53,38 @@ def pad_at_dim(
     zeros = ((0, 0) * dims_from_right)
     return F.pad(t, (*zeros, *pad), value = value)
 
+# for changing full attention bias matrix to a local windowed one for atom attention
+
+@typecheck
+def full_attn_bias_matrix_to_local(
+    attn_bias: Float['... m m'],
+    window_size: int
+) -> Float['... n w (w*3)']:
+
+    seq_len, device = attn_bias.shape[-1], attn_bias.device
+
+    padding_needed = (window_size - (seq_len % window_size)) % window_size
+    attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
+    attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
+    attn_bias = pad_at_dim(attn_bias, (1, 1), dim = -3, value = 0.)
+
+    attn_bias = torch.cat((
+        attn_bias[..., :-2, :, :],
+        attn_bias[..., 1:-1, :, :],
+        attn_bias[..., 2:, :, :]
+    ), dim = -1)
+
+    # get the diagonal
+
+    n = torch.arange(attn_bias.shape[-3], device = device)
+
+    attn_bias = einx.get_at(
+        '... [i j] w1 w2, n, n -> ... n w1 w2',
+        attn_bias, n, n
+    )
+
+    return attn_bias
+
 # multi-head attention
 
 class Attention(Module):
@@ -218,7 +250,7 @@ class Attend(Module):
         k: Float['b h n d'],
         v: Float['b h n d'],
         mask: Bool['b n'] | None = None,
-        attn_bias: Float['... n n'] | None = None
+        attn_bias: Float['... n n'] | Float['... n w (w*3)'] | None = None
     ) -> Float['b h n d']:
         """
         simple local attention with a radius of 1 window size
@@ -233,7 +265,7 @@ class Attend(Module):
 
         # pad to multiple of window size if needed
 
-        padding_needed = (window_size - (seq_len % window_size)) % window_size        
+        padding_needed = (window_size - (seq_len % window_size)) % window_size
 
         if padding_needed > 0:
             q, k, v = tuple(pad_at_dim(t, (0, padding_needed), value = 0., dim = -2) for t in (q, k, v))
@@ -255,25 +287,10 @@ class Attend(Module):
 
         # handle attention bias (inefficiently)
 
-        if exists(attn_bias):
-            attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
-            attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
-            attn_bias = pad_at_dim(attn_bias, (1, 1), dim = -3, value = 0.)
+        is_full_attn_bias = attn_bias.shape[-1] == attn_bias.shape[-2]
 
-            attn_bias = torch.cat((
-                attn_bias[..., :-2, :, :],
-                attn_bias[..., 1:-1, :, :],
-                attn_bias[..., 2:, :, :]
-            ), dim = -1)
-
-            # get the diagonal
-
-            n = torch.arange(attn_bias.shape[-3], device = device)
-
-            attn_bias = einx.get_at(
-                '... [i j] w1 w2, n, n -> ... n w1 w2',
-                attn_bias, n, n
-            )
+        if exists(attn_bias) and is_full_attn_bias:
+            attn_bias = full_attn_bias_matrix_to_local(attn_bias, window_size = window_size)
 
         # carry out attention as usual
 
