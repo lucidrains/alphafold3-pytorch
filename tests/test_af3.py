@@ -241,6 +241,7 @@ def test_diffusion_module():
 
     diffusion_module = DiffusionModule(
         atoms_per_window = 27,
+        packed_atom_repr = False,
         dim_pairwise_trunk = 128,
         dim_pairwise_rel_pos_feats = 12,
         atom_encoder_depth = 1,

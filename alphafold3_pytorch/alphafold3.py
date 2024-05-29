@@ -1566,6 +1566,7 @@ class DiffusionModule(Module):
         atom_encoder_kwargs: dict = dict(),
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
+        packed_atom_repr = True,
         use_linear_attn = False,
         linear_attn_kwargs: dict = dict(
             heads = 8,
@@ -1574,6 +1575,7 @@ class DiffusionModule(Module):
     ):
         super().__init__()
 
+        self.packed_atom_repr = packed_atom_repr
         self.atoms_per_window = atoms_per_window
 
         # conditioning
@@ -1696,9 +1698,9 @@ class DiffusionModule(Module):
         residue_atom_lens: Int['b n'] | None = None
     ):
         w = self.atoms_per_window
-        is_unpacked_repr = exists(w)
+        is_unpacked_repr = not self.packed_atom_repr
 
-        if not is_unpacked_repr:
+        if self.packed_atom_repr:
             assert exists(residue_atom_lens)
 
         # in the paper, it seems they pack the atom feats
@@ -2067,7 +2069,7 @@ class ElucidatedAtomDiffusion(Module):
 
         if exists(additional_residue_feats):
             w = self.net.atoms_per_window
-            is_unpacked_repr = exists(w)
+            is_unpacked_repr = not self.net.packed_atom_repr
 
             is_nucleotide_or_ligand_fields = (additional_residue_feats[..., 7:] != 0.).unbind(dim = -1)
 
@@ -2807,9 +2809,6 @@ class Alphafold3(Module):
 
         # atoms per window if using unpacked representation
 
-        if packed_atom_repr:
-            atoms_per_window = None
-
         self.atoms_per_window = atoms_per_window
 
         # augmentation
@@ -2892,6 +2891,7 @@ class Alphafold3(Module):
         self.diffusion_module = DiffusionModule(
             dim_pairwise_trunk = dim_pairwise,
             dim_pairwise_rel_pos_feats = dim_pairwise,
+            packed_atom_repr = packed_atom_repr,
             atoms_per_window = atoms_per_window,
             dim_pairwise = dim_pairwise,
             sigma_data = sigma_data,
