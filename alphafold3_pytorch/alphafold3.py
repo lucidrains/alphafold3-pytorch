@@ -2965,6 +2965,11 @@ class Alphafold3(Module):
         package = torch.load(str(path), map_location = 'cpu')
 
         model_package = package['model']
+        current_version = version('alphafold3_pytorch')
+
+        if model_package['version'] != current_version:
+            print(f'loading a saved model from version {model_package["version"]} but you are on version {current_version}')
+
         self.load_state_dict(model_package['state_dict'], strict = strict)
 
     @staticmethod
