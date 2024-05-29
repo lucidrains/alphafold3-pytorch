@@ -139,7 +139,7 @@ def test_trainer():
 
     # saving and loading from trainer
 
-    trainer.save('./some/nested/folder2/training')
+    trainer.save('./some/nested/folder2/training', overwrite = True)
     trainer.load('./some/nested/folder2/training')
 
     # also allow for loading Alphafold3 directly from training ckpt

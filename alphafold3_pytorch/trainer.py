@@ -215,13 +215,15 @@ class Trainer:
             steps = self.steps
         )
 
-        torch.save(str(path), package)
+        torch.save(package, str(path))
 
     def load(self, path: str | Path, strict = True):
         if isinstance(path, str):
             path = Path(path)
 
         assert path.exists()
+
+        self.model.load(path)
 
         package = torch.load(str(path))
 
@@ -232,8 +234,6 @@ class Trainer:
             self.scheduler.load_state_dict(package['scheduler'])
 
         self.steps = package.get('steps', 0)
-
-        self.model.load_state_dict(package['model'])
 
     # shortcut methods
 
