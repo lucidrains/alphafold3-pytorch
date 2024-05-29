@@ -1800,6 +1800,10 @@ class DiffusionModule(Module):
 
         atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
 
+        # window the atom pair features before passing to atom encoder and decoder
+
+        atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
+
         # atom encoder
 
         atom_feats = self.atom_encoder(
@@ -2570,10 +2574,16 @@ class InputFeatureEmbedder(Module):
         atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
         atompair_feats = atom_feats_cond + atompair_feats
 
+        # window the atom pair features before passing to atom encoder and decoder
+
+        windowed_atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = w)
+
+        # initial atom transformer
+
         atom_feats = self.atom_transformer(
             atom_feats,
             single_repr = atom_feats,
-            pairwise_repr = atompair_feats
+            pairwise_repr = windowed_atompair_feats
         )
 
         atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
