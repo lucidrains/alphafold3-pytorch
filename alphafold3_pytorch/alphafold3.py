@@ -173,9 +173,9 @@ def mean_pool_with_lens(
 
 @typecheck
 def repeat_consecutive_with_lens(
-    feats: Float['b n ...'] | Bool['b n'],
+    feats: Float['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
-) -> Float['b m ...'] | Bool['b m']:
+) -> Float['b m ...'] | Bool['b m'] | Int['b m']:
 
     device, dtype = feats.device, feats.dtype
 
@@ -1700,7 +1700,7 @@ class DiffusionModule(Module):
         noised_atom_pos: Float['b m 3'],
         *,
         atom_feats: Float['b m da'],
-        atompair_feats: Float['b m m dap'],
+        atompair_feats: Float['b m m dap'] | Float['b nw w (w*3) dap'],
         atom_mask: Bool['b m'],
         times: Float[' b'],
         mask: Bool['b n'],
@@ -1711,6 +1711,10 @@ class DiffusionModule(Module):
         residue_atom_lens: Int['b n']
     ):
         w = self.atoms_per_window
+        device = noised_atom_pos.device
+
+        batch_size, seq_len = single_trunk_repr.shape[:2]
+        atom_seq_len = atom_feats.shape[1]
 
         conditioned_single_repr = self.single_conditioner(
             times = times,
@@ -1740,19 +1744,34 @@ class DiffusionModule(Module):
 
         atom_feats_cond = single_repr_cond + atom_feats_cond
 
+        # window the atom pair features before passing to atom encoder and decoder if necessary
+
+        atompair_is_windowed = atompair_feats.shape[-2] != atompair_feats.shape[-3]
+
+        if not atompair_is_windowed:
+            atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
+
         # condition atompair feats with pairwise repr
 
         pairwise_repr_cond = self.pairwise_repr_to_atompair_feat_cond(conditioned_pairwise_repr)
 
-        pairwise_repr_cond = repeat_pairwise_consecutive_with_lens(pairwise_repr_cond, residue_atom_lens)
-        pairwise_repr_cond = pad_or_slice_to(pairwise_repr_cond, length = atompair_feats.shape[1], dim = 1)
-        pairwise_repr_cond = pad_or_slice_to(pairwise_repr_cond, length = atompair_feats.shape[2], dim = 2)
+        indices = torch.arange(seq_len, device = device)
+        indices = repeat(indices, 'n -> b n', b = batch_size)
+
+        indices = repeat_consecutive_with_lens(indices, residue_atom_lens)
+        indices = pad_or_slice_to(indices, atom_seq_len, dim = -1)
+        indices = pad_to_multiple(indices, w, dim = -1)
+
+        row_indices = col_indices = indices
+        row_indices = rearrange(row_indices, 'b (n w) -> b n w 1', w = w)
+        col_indices = rearrange(col_indices, 'b (n w) -> b n 1 w', w = w)
+
+        col_indices = concat_neighboring_windows(col_indices, dim_seq = 1, dim_window = -1)
+        row_indices, col_indices = torch.broadcast_tensors(row_indices, col_indices)
+
+        pairwise_repr_cond = einx.get_at('b [i j] dap, b nw w1 w2, b nw w1 w2 -> b nw w1 w2 dap', pairwise_repr_cond, row_indices, col_indices)
 
         atompair_feats = pairwise_repr_cond + atompair_feats
-
-        # window the atom pair features before passing to atom encoder and decoder
-
-        atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
 
         # condition atompair feats further with single atom repr
 
