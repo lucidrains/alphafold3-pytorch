@@ -67,6 +67,10 @@ from alphafold3_pytorch.typing import (
 from alphafold3_pytorch.attention import (
     Attention,
     pad_at_dim,
+    slice_at_dim,
+    pad_or_slice_to,
+    pad_to_multiple,
+    concat_neighboring_windows,
     full_attn_bias_to_windowed,
     full_pairwise_repr_to_windowed
 )
@@ -126,37 +130,6 @@ def save_args_and_kwargs(fn):
 
         return fn(self, *args, **kwargs)
     return inner
-
-# padding and slicing
-
-@typecheck
-def slice_at_dim(
-    t: Tensor,
-    dim_slice: slice,
-    *,
-    dim: int
-):
-    dim += (t.ndim if dim < 0 else 0)
-    colons = [slice(None)] * t.ndim
-    colons[dim] = dim_slice
-    return t[tuple(colons)]
-
-@typecheck
-def pad_or_slice_to(
-    t: Tensor,
-    length: int,
-    *,
-    dim: int,
-    pad_value = 0
-):
-    curr_length = t.shape[dim]
-
-    if curr_length < length:
-        t = pad_at_dim(t, (0, length - curr_length), dim = dim, value = pad_value)
-    elif curr_length > length:
-        t = slice_at_dim(t, slice(0, length), dim = dim)
-
-    return t
 
 # packed atom representation functions
 
@@ -1650,7 +1623,7 @@ class DiffusionModule(Module):
 
         self.atom_repr_to_atompair_feat_cond = nn.Sequential(
             nn.LayerNorm(dim_atom),
-            LinearNoBiasThenOuterSum(dim_atom, dim_atompair),
+            LinearNoBias(dim_atom, dim_atompair * 2),
             nn.ReLU()
         )
 
@@ -1777,18 +1750,26 @@ class DiffusionModule(Module):
 
         atompair_feats = pairwise_repr_cond + atompair_feats
 
+        # window the atom pair features before passing to atom encoder and decoder
+
+        atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
+
         # condition atompair feats further with single atom repr
 
         atom_repr_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
-        atompair_feats = atom_repr_cond + atompair_feats
+        atom_repr_cond = pad_to_multiple(atom_repr_cond, w, dim = 1)
+        atom_repr_cond = rearrange(atom_repr_cond, 'b (n w) dap -> b n w dap', w = w)
+
+        atom_repr_cond_row, atom_repr_cond_col = atom_repr_cond.chunk(2, dim = -1)
+
+        atom_repr_cond_col = concat_neighboring_windows(atom_repr_cond_col, dim_seq = 1, dim_window = 2)
+
+        atompair_feats = einx.add('b nw w1 w2 dap, b nw w1 dap -> b nw w1 w2 dap', atompair_feats, atom_repr_cond_row)
+        atompair_feats = einx.add('b nw w1 w2 dap, b nw w2 dap -> b nw w1 w2 dap', atompair_feats, atom_repr_cond_col)
 
         # furthermore, they did one more MLP on the atompair feats for attention biasing in atom transformer
 
         atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
-
-        # window the atom pair features before passing to atom encoder and decoder
-
-        atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
 
         # atom encoder
 
@@ -3313,7 +3294,7 @@ class Alphafold3(Module):
         return_pae_logits = exists(pae_labels)
 
         if calc_diffusion_loss and should_call_confidence_head:
-            
+
             # rollout
 
             pred_atom_pos = self.edm.sample(

@@ -53,6 +53,68 @@ def pad_at_dim(
     zeros = ((0, 0) * dims_from_right)
     return F.pad(t, (*zeros, *pad), value = value)
 
+@typecheck
+def slice_at_dim(
+    t: Tensor,
+    dim_slice: slice,
+    *,
+    dim: int
+):
+    dim += (t.ndim if dim < 0 else 0)
+    colons = [slice(None)] * t.ndim
+    colons[dim] = dim_slice
+    return t[tuple(colons)]
+
+@typecheck
+def pad_or_slice_to(
+    t: Tensor,
+    length: int,
+    *,
+    dim: int,
+    pad_value = 0
+):
+    curr_length = t.shape[dim]
+
+    if curr_length < length:
+        t = pad_at_dim(t, (0, length - curr_length), dim = dim, value = pad_value)
+    elif curr_length > length:
+        t = slice_at_dim(t, slice(0, length), dim = dim)
+
+    return t
+
+@typecheck
+def pad_to_multiple(
+    t: Tensor,
+    multiple: int,
+    *,
+    dim = -1,
+    value = 0.
+):
+    seq_len = t.shape[dim]
+    padding_needed = (multiple - (seq_len % multiple)) % multiple
+
+    if padding_needed == 0:
+        return t
+
+    return pad_at_dim(t, (0, padding_needed), dim = dim, value = value)
+
+@typecheck
+def concat_neighboring_windows(
+    t: Tensor,
+    *,
+    dim_seq: int,
+    dim_window: int
+):
+    t = pad_at_dim(t, (1, 1), dim = dim_seq, value = 0.)
+
+    t = torch.cat((
+        slice_at_dim(t, slice(None, -2), dim = dim_seq),
+        slice_at_dim(t, slice(1, -1), dim = dim_seq),
+        slice_at_dim(t, slice(2, None), dim = dim_seq)
+    ), dim = dim_window)
+
+    return t
+
 # for changing full attention bias matrix to a local windowed one for atom attention
 
 @typecheck
@@ -66,13 +128,7 @@ def full_pairwise_repr_to_windowed(
     padding_needed = (window_size - (seq_len % window_size)) % window_size
     pairwise_repr = F.pad(pairwise_repr, (0, 0, 0, padding_needed, 0, padding_needed), value = 0.)
     pairwise_repr = rearrange(pairwise_repr, '... (i w1) (j w2) d -> ... i j w1 w2 d', w1 = window_size, w2 = window_size)
-    pairwise_repr = pad_at_dim(pairwise_repr, (1, 1), dim = -4, value = 0.)
-
-    pairwise_repr = torch.cat((
-        pairwise_repr[..., :-2, :, :, :],
-        pairwise_repr[..., 1:-1, :, :, :],
-        pairwise_repr[..., 2:, :, :, :]
-    ), dim = -2)
+    pairwise_repr = concat_neighboring_windows(pairwise_repr, dim_seq = -4, dim_window = -2)
 
     # get the diagonal
 
