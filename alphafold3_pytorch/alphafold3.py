@@ -3079,7 +3079,8 @@ class Alphafold3(Module):
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
         return_loss_breakdown = False,
-        return_loss_if_possible: bool = True
+        return_loss_if_possible: bool = True,
+        num_rollout_steps: int = 20,
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
         atom_seq_len = atom_inputs.shape[-2]
@@ -3364,7 +3365,7 @@ class Alphafold3(Module):
             
             # rollout
             pred_atom_pos = self.edm.sample(
-                num_sample_steps = num_sample_steps,
+                num_sample_steps = num_rollout_steps,
                 atom_feats = atom_feats,
                 atompair_feats = atompair_feats,
                 atom_mask = atom_mask,
