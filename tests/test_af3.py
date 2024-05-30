@@ -26,7 +26,8 @@ from alphafold3_pytorch import (
 
 from alphafold3_pytorch.alphafold3 import (
     mean_pool_with_lens,
-    repeat_consecutive_with_lens
+    repeat_consecutive_with_lens,
+    full_pairwise_repr_to_windowed
 )
 
 def test_mean_pool_with_lens():
@@ -383,16 +384,24 @@ def test_distogram_head():
 
     logits = distogram_head(pairwise_repr)
 
-
-def test_alphafold3():
+@pytest.mark.parametrize('window_atompair_inputs', (True, False))
+def test_alphafold3(
+    window_atompair_inputs: bool
+):
     seq_len = 16
+    atoms_per_window = 27
+
     residue_atom_lens = torch.randint(1, 3, (2, seq_len))
     atom_seq_len = residue_atom_lens.sum(dim = -1).amax()
 
     token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
+
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
+    if window_atompair_inputs:
+        atompair_inputs = full_pairwise_repr_to_windowed(atompair_inputs, window_size = atoms_per_window)
 
     additional_residue_feats = torch.randn(2, seq_len, 10)
 
@@ -412,6 +421,7 @@ def test_alphafold3():
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
+        atoms_per_window = atoms_per_window,
         dim_template_feats = 44,
         num_dist_bins = 38,
         confidence_head_kwargs = dict(

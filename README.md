@@ -1,6 +1,6 @@
 <img src="./alphafold3.png" width="500px"></img>
 
-## Alphafold 3 - Pytorch (wip)
+## Alphafold 3 - Pytorch
 
 Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">Alphafold 3</a> in Pytorch
 
