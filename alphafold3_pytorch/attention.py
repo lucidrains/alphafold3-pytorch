@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import NamedTuple, Tuple
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import Module
 

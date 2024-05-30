@@ -29,14 +29,14 @@ class Alphafold3Input(TypedDict):
     additional_residue_feats:   Float['n 10']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
-    template_mask:              Bool['t'] | None
-    msa_mask:                   Bool['s'] | None
+    template_mask:              Bool[' t'] | None
+    msa_mask:                   Bool[' s'] | None
     atom_pos:                   Float['m 3'] | None
-    residue_atom_indices:       Int['n'] | None
+    residue_atom_indices:       Int[' n'] | None
     distance_labels:            Int['n n'] | None
     pae_labels:                 Int['n n'] | None
-    pde_labels:                 Int['n'] | None
-    resolved_labels:            Int['n'] | None
+    pde_labels:                 Int[' n'] | None
+    resolved_labels:            Int[' n'] | None
 
 # helpers
 
@@ -406,4 +406,4 @@ class Trainer:
 
             self.log(**test_loss_breakdown)
 
-        print(f'training complete')
+        print('training complete')

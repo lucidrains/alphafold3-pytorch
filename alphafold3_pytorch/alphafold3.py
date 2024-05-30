@@ -1,43 +1,5 @@
 from __future__ import annotations
 
-"""
-global ein notation:
-
-b - batch
-ba - batch with augmentation
-h - heads
-n - residue sequence length
-i - residue sequence length (source)
-j - residue sequence length (target)
-m - atom sequence length
-nw - windowed sequence length
-d - feature dimension
-ds - feature dimension (single)
-dp - feature dimension (pairwise)
-dap - feature dimension (atompair)
-dapi - feature dimension (atompair input)
-da - feature dimension (atom)
-dai - feature dimension (atom input)
-t - templates
-s - msa
-r - registers
-"""
-
-"""
-additional_residue_feats: [*, 10]:
-
-0: residue_index
-1: token_index
-2: asym_id
-3: entity_id
-4: sym_id
-5: restype (must be one hot encoded to 32)
-6: is_protein
-7: is_rna
-8: is_dna
-9: is_ligand
-"""
-
 from math import pi, sqrt
 from pathlib import Path
 from functools import partial, wraps
@@ -84,6 +46,44 @@ from einops.layers.torch import Rearrange
 from tqdm import tqdm
 
 from importlib.metadata import version
+
+"""
+global ein notation:
+
+b - batch
+ba - batch with augmentation
+h - heads
+n - residue sequence length
+i - residue sequence length (source)
+j - residue sequence length (target)
+m - atom sequence length
+nw - windowed sequence length
+d - feature dimension
+ds - feature dimension (single)
+dp - feature dimension (pairwise)
+dap - feature dimension (atompair)
+dapi - feature dimension (atompair input)
+da - feature dimension (atom)
+dai - feature dimension (atom input)
+t - templates
+s - msa
+r - registers
+"""
+
+"""
+additional_residue_feats: [*, 10]:
+
+0: residue_index
+1: token_index
+2: asym_id
+3: entity_id
+4: sym_id
+5: restype (must be one hot encoded to 32)
+6: is_protein
+7: is_rna
+8: is_dna
+9: is_ligand
+"""
 
 # constants
 
@@ -240,24 +240,6 @@ def repeat_consecutive_with_lens(
     )
 
     return output
-
-def repeat_pairwise_consecutive_with_lens(
-    feats: Float['b n n dp'],
-    lens: Int['b n']
-) -> Float['b m m dp']:
-
-    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
-    feats, ps = pack_one(feats, '* n dp')
-    feats = repeat_consecutive_with_lens(feats, repeated_lens)
-    feats = unpack_one(feats, ps, '* n dp')
-
-    feats = rearrange(feats, 'b i j dp -> b j i dp')
-    repeated_lens = repeat(lens, 'b ... -> (b repeat) ...', repeat = feats.shape[1])
-    feats, ps = pack_one(feats, '* n dp')
-    feats = repeat_consecutive_with_lens(feats, repeated_lens)
-    feats = unpack_one(feats, ps, '* n dp')
-    feats = rearrange(feats, 'b j i dp -> b i j dp')
-    return feats
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -2105,8 +2087,6 @@ class ElucidatedAtomDiffusion(Module):
         align_weights = atom_pos_ground_truth.new_ones(atom_pos_ground_truth.shape[:2])
 
         if exists(additional_residue_feats):
-            w = self.net.atoms_per_window
-
             is_nucleotide_or_ligand_fields = (additional_residue_feats[..., 7:] != 0.).unbind(dim = -1)
 
             is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, residue_atom_lens) for t in is_nucleotide_or_ligand_fields)
