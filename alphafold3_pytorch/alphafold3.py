@@ -1568,7 +1568,7 @@ class AtomToTokenPooler(Module):
         *,
         atom_feats: Float['b m da'],
         atom_mask: Bool['b m'],
-        residue_atom_lens: Int['b n'] | None = None
+        residue_atom_lens: Int['b n']
     ) -> Float['b n ds']:
 
         atom_feats = self.proj(atom_feats)
@@ -2052,8 +2052,8 @@ class ElucidatedAtomDiffusion(Module):
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
+        residue_atom_lens: Int['b n'],
         return_denoised_pos = False,
-        residue_atom_lens: Int['b n'] | None = None,
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
@@ -2543,7 +2543,7 @@ class InputFeatureEmbedder(Module):
         atompair_inputs: Float['b m m dapi'],
         atom_mask: Bool['b m'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
-        residue_atom_lens: Int['b n'] | None = None,
+        residue_atom_lens: Int['b n'],
 
     ) -> EmbeddedInputs:
 
