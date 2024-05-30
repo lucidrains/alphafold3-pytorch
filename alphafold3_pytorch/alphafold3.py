@@ -2503,7 +2503,7 @@ class InputFeatureEmbedder(Module):
 
         self.atom_repr_to_atompair_feat_cond = nn.Sequential(
             nn.LayerNorm(dim_atom),
-            LinearNoBiasThenOuterSum(dim_atom, dim_atompair),
+            LinearNoBias(dim_atom, dim_atompair * 2),
             nn.ReLU()
         )
 
@@ -2540,7 +2540,7 @@ class InputFeatureEmbedder(Module):
         self,
         *,
         atom_inputs: Float['b m dai'],
-        atompair_inputs: Float['b m m dapi'],
+        atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         atom_mask: Bool['b m'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'],
@@ -2554,19 +2554,32 @@ class InputFeatureEmbedder(Module):
         atom_feats = self.to_atom_feats(atom_inputs)
         atompair_feats = self.to_atompair_feats(atompair_inputs)
 
-        atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
-        atompair_feats = atom_feats_cond + atompair_feats
-
         # window the atom pair features before passing to atom encoder and decoder
 
-        windowed_atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = w)
+        is_windowed = atompair_inputs.ndim == 5
+
+        if not is_windowed:
+            atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = w)
+
+        # condition atompair with atom repr
+
+        atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
+
+        atom_feats_cond = pad_to_multiple(atom_feats_cond, w, dim = 1)
+        atom_feats_cond = rearrange(atom_feats_cond, 'b (nw w) dap -> b nw w dap', w = w)
+
+        atom_feats_cond_row, atom_feats_cond_col = atom_feats_cond.chunk(2, dim = -1)
+        atom_feats_cond_col = concat_neighboring_windows(atom_feats_cond_col, dim_seq = 1, dim_window = -2)
+
+        atompair_feats = einx.add('b nw w1 w2 dap, b nw w1 dap',atompair_feats, atom_feats_cond_row)
+        atompair_feats = einx.add('b nw w1 w2 dap, b nw w2 dap',atompair_feats, atom_feats_cond_col)
 
         # initial atom transformer
 
         atom_feats = self.atom_transformer(
             atom_feats,
             single_repr = atom_feats,
-            pairwise_repr = windowed_atompair_feats
+            pairwise_repr = atompair_feats
         )
 
         atompair_feats = self.atompair_feats_mlp(atompair_feats) + atompair_feats
@@ -3035,7 +3048,7 @@ class Alphafold3(Module):
         self,
         *,
         atom_inputs: Float['b m dai'],
-        atompair_inputs: Float['b m m dapi'],
+        atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
         residue_atom_lens: Int['b n'],
         atom_mask: Bool['b m'] | None = None,
