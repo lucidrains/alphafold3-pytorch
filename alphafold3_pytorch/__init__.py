@@ -1,6 +1,7 @@
 from alphafold3_pytorch.attention import (
     Attention,
-    Attend
+    Attend,
+    full_pairwise_repr_to_windowed
 )
 
 from alphafold3_pytorch.alphafold3 import (
