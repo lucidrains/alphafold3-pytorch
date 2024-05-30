@@ -3079,7 +3079,8 @@ class Alphafold3(Module):
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
         return_loss_breakdown = False,
-        return_loss_if_possible: bool = True
+        return_loss_if_possible: bool = True,
+        num_rollout_steps: int = 20,
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
         atom_seq_len = atom_inputs.shape[-2]
@@ -3361,6 +3362,20 @@ class Alphafold3(Module):
         return_pae_logits = exists(pae_labels)
 
         if calc_diffusion_loss and should_call_confidence_head:
+            
+            # rollout
+            pred_atom_pos = self.edm.sample(
+                num_sample_steps = num_rollout_steps,
+                atom_feats = atom_feats,
+                atompair_feats = atompair_feats,
+                atom_mask = atom_mask,
+                mask = mask,
+                single_trunk_repr = single,
+                single_inputs_repr = single_inputs,
+                pairwise_trunk = pairwise,
+                pairwise_rel_pos_feats = relative_position_encoding,
+                residue_atom_lens = residue_atom_lens
+            )
 
             if self.packed_atom_repr:
                 pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
@@ -3368,10 +3383,10 @@ class Alphafold3(Module):
                 pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
-                single_repr = single,
-                single_inputs_repr = single_inputs,
-                pairwise_repr = pairwise,
-                pred_atom_pos = pred_atom_pos,
+                single_repr = single.detach(),
+                single_inputs_repr = single_inputs.detach(),
+                pairwise_repr = pairwise.detach(),
+                pred_atom_pos = pred_atom_pos.detach(),
                 mask = mask,
                 return_pae_logits = return_pae_logits
             )
