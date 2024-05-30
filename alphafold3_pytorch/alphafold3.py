@@ -3077,6 +3077,13 @@ class Alphafold3(Module):
 
         assert exists(residue_atom_lens) or exists(atom_mask)
 
+        # if atompair inputs are not windowed, window it
+
+        is_atompair_inputs_windowed = atompair_inputs.ndim == 5
+
+        if not is_atompair_inputs_windowed:
+            atompair_inputs = full_pairwise_repr_to_windowed(atompair_inputs, window_size = self.atoms_per_window)
+
         # handle atom mask
 
         total_atoms = residue_atom_lens.sum(dim = -1)
