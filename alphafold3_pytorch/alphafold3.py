@@ -3383,10 +3383,10 @@ class Alphafold3(Module):
                 pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
-                single_repr = single,
-                single_inputs_repr = single_inputs,
-                pairwise_repr = pairwise,
-                pred_atom_pos = pred_atom_pos,
+                single_repr = single.detach(),
+                single_inputs_repr = single_inputs.detach(),
+                pairwise_repr = pairwise.detach(),
+                pred_atom_pos = pred_atom_pos.detach(),
                 mask = mask,
                 return_pae_logits = return_pae_logits
             )
