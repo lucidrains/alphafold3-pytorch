@@ -66,6 +66,7 @@ from alphafold3_pytorch.typing import (
 
 from alphafold3_pytorch.attention import (
     Attention,
+    pad_at_dim,
     full_attn_bias_to_windowed,
     full_pairwise_repr_to_windowed
 )
@@ -125,6 +126,37 @@ def save_args_and_kwargs(fn):
 
         return fn(self, *args, **kwargs)
     return inner
+
+# padding and slicing
+
+@typecheck
+def slice_at_dim(
+    t: Tensor,
+    dim_slice: slice,
+    *,
+    dim: int
+):
+    dim += (t.ndim if dim < 0 else 0)
+    colons = [slice(None)] * t.ndim
+    colons[dim] = dim_slice
+    return t[tuple(colons)]
+
+@typecheck
+def pad_or_slice_to(
+    t: Tensor,
+    length: int,
+    *,
+    dim: int,
+    pad_value = 0
+):
+    curr_length = t.shape[dim]
+
+    if curr_length < length:
+        t = pad_at_dim(t, (0, length - curr_length), dim = dim, value = pad_value)
+    elif curr_length > length:
+        t = slice_at_dim(t, slice(0, length), dim = dim)
+
+    return t
 
 # packed atom representation functions
 
@@ -1520,8 +1552,7 @@ class AtomToTokenPooler(Module):
     def __init__(
         self,
         dim,
-        dim_out = None,
-        atoms_per_window = 27
+        dim_out = None
     ):
         super().__init__()
         dim_out = default(dim_out, dim)
@@ -1530,8 +1561,6 @@ class AtomToTokenPooler(Module):
             LinearNoBias(dim, dim_out),
             nn.ReLU()
         )
-
-        self.atoms_per_window = atoms_per_window
 
     @typecheck
     def forward(
@@ -1542,35 +1571,8 @@ class AtomToTokenPooler(Module):
         residue_atom_lens: Int['b n'] | None = None
     ) -> Float['b n ds']:
 
-        w = self.atoms_per_window
-        is_unpacked_repr = exists(w)
-
-        if not is_unpacked_repr:
-            assert exists(residue_atom_lens), '`residue_atom_lens` must be passed in if using packed_atom_repr (atoms_per_window is None)'
-
         atom_feats = self.proj(atom_feats)
-
-        # packed atom representation
-
-        if exists(residue_atom_lens):
-            tokens = mean_pool_with_lens(atom_feats, residue_atom_lens)
-            return tokens
-
-        # unpacked atom representation
-        # masked mean pool the atom feats for each residue, for the token transformer
-        # this is basically a simple 2-level hierarchical transformer
-
-        windowed_atom_feats = rearrange(atom_feats, 'b (n w) da -> b n w da', w = w)
-        windowed_atom_mask = rearrange(atom_mask, 'b (n w) -> b n w', w = w)
-
-        assert windowed_atom_mask.any(dim = -1).all(), 'atom mask must contain one valid atom for each window'
-
-        windowed_atom_feats = windowed_atom_feats.masked_fill(windowed_atom_mask[..., None], 0.)
-
-        num = reduce(windowed_atom_feats, 'b n w d -> b n d', 'sum')
-        den = reduce(windowed_atom_mask.float(), 'b n w -> b n 1', 'sum')
-
-        tokens = num / den
+        tokens = mean_pool_with_lens(atom_feats, residue_atom_lens)
         return tokens
 
 class DiffusionModule(Module):
@@ -1607,7 +1609,6 @@ class DiffusionModule(Module):
         atom_encoder_kwargs: dict = dict(),
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
-        packed_atom_repr = True,
         use_linear_attn = False,
         linear_attn_kwargs: dict = dict(
             heads = 8,
@@ -1616,7 +1617,6 @@ class DiffusionModule(Module):
     ):
         super().__init__()
 
-        self.packed_atom_repr = packed_atom_repr
         self.atoms_per_window = atoms_per_window
 
         # conditioning
@@ -1677,8 +1677,7 @@ class DiffusionModule(Module):
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
             dim = dim_atom,
-            dim_out = dim_token,
-            atoms_per_window = atoms_per_window
+            dim_out = dim_token
         )
 
         # token attention related modules
@@ -1736,19 +1735,9 @@ class DiffusionModule(Module):
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
-        residue_atom_lens: Int['b n'] | None = None
+        residue_atom_lens: Int['b n']
     ):
         w = self.atoms_per_window
-        is_unpacked_repr = not self.packed_atom_repr
-
-        if self.packed_atom_repr:
-            assert exists(residue_atom_lens)
-
-        # in the paper, it seems they pack the atom feats
-        # but in this impl, will just use windows for simplicity when communicating between atom and residue resolutions. bit less efficient
-
-        if is_unpacked_repr:
-            assert divisible_by(noised_atom_pos.shape[-2], w)
 
         conditioned_single_repr = self.single_conditioner(
             times = times,
@@ -1773,10 +1762,8 @@ class DiffusionModule(Module):
 
         single_repr_cond = self.single_repr_to_atom_feat_cond(conditioned_single_repr)
 
-        if is_unpacked_repr:
-            single_repr_cond = repeat(single_repr_cond, 'b n ds -> b (n w) ds', w = w)
-        else:
-            single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, residue_atom_lens)
+        single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, residue_atom_lens)
+        single_repr_cond = pad_or_slice_to(single_repr_cond, length = atom_feats_cond.shape[1], dim = 1)
 
         atom_feats_cond = single_repr_cond + atom_feats_cond
 
@@ -1784,10 +1771,9 @@ class DiffusionModule(Module):
 
         pairwise_repr_cond = self.pairwise_repr_to_atompair_feat_cond(conditioned_pairwise_repr)
 
-        if is_unpacked_repr:
-            pairwise_repr_cond = repeat(pairwise_repr_cond, 'b i j dp -> b (i w1) (j w2) dp', w1 = w, w2 = w)
-        else:
-            pairwise_repr_cond = repeat_pairwise_consecutive_with_lens(pairwise_repr_cond, residue_atom_lens)
+        pairwise_repr_cond = repeat_pairwise_consecutive_with_lens(pairwise_repr_cond, residue_atom_lens)
+        pairwise_repr_cond = pad_or_slice_to(pairwise_repr_cond, length = atompair_feats.shape[1], dim = 1)
+        pairwise_repr_cond = pad_or_slice_to(pairwise_repr_cond, length = atompair_feats.shape[2], dim = 2)
 
         atompair_feats = pairwise_repr_cond + atompair_feats
 
@@ -1838,10 +1824,8 @@ class DiffusionModule(Module):
 
         atom_decoder_input = self.tokens_to_atom_decoder_input_cond(tokens)
 
-        if is_unpacked_repr:
-            atom_decoder_input = repeat(atom_decoder_input, 'b n da -> b (n w) da', w = w)
-        else:
-            atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, residue_atom_lens)
+        atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, residue_atom_lens)
+        atom_decoder_input = pad_or_slice_to(atom_decoder_input, length = atom_feats_skip.shape[1], dim = 1)
 
         atom_decoder_input = atom_decoder_input + atom_feats_skip
 
@@ -2114,18 +2098,18 @@ class ElucidatedAtomDiffusion(Module):
 
         if exists(additional_residue_feats):
             w = self.net.atoms_per_window
-            is_unpacked_repr = not self.net.packed_atom_repr
 
             is_nucleotide_or_ligand_fields = (additional_residue_feats[..., 7:] != 0.).unbind(dim = -1)
 
-            if is_unpacked_repr:
-                atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat(t != 0., 'b n -> b (n w)', w = w) for t in is_nucleotide_or_ligand_fields)
-            else:
-                atom_is_dna, atom_is_rna, atom_is_ligand = tuple(repeat_consecutive_with_lens(t, residue_atom_lens) for t in is_nucleotide_or_ligand_fields)
+            is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, residue_atom_lens) for t in is_nucleotide_or_ligand_fields)
+            is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
+
+            atom_is_dna, atom_is_rna, atom_is_ligand = is_nucleotide_or_ligand_fields
 
             # section 3.7.1 equation 4
 
             # upweighting of nucleotide and ligand atoms is additive per equation 4
+
             align_weights = torch.where(atom_is_dna | atom_is_rna, 1 + nucleotide_loss_weight, align_weights)
             align_weights = torch.where(atom_is_ligand, 1 + ligand_loss_weight, align_weights)
 
@@ -2543,8 +2527,7 @@ class InputFeatureEmbedder(Module):
 
         self.atom_feats_to_pooled_token = AtomToTokenPooler(
             dim = dim_atom,
-            dim_out = dim_token,
-            atoms_per_window = atoms_per_window
+            dim_out = dim_token
         )
 
         dim_single_input = dim_token + ADDITIONAL_RESIDUE_FEATS
@@ -2786,7 +2769,6 @@ class Alphafold3(Module):
         num_pae_bins = 64,
         sigma_data = 16,
         diffusion_num_augmentations = 4,
-        packed_atom_repr = False,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
         loss_diffusion_weight = 4.,
@@ -2854,11 +2836,7 @@ class Alphafold3(Module):
     ):
         super().__init__()
 
-        # whether a packed atom representation is being used
-
-        self.packed_atom_repr = packed_atom_repr
-
-        # atoms per window if using unpacked representation
+        # atoms per window
 
         self.atoms_per_window = atoms_per_window
 
@@ -2942,7 +2920,6 @@ class Alphafold3(Module):
         self.diffusion_module = DiffusionModule(
             dim_pairwise_trunk = dim_pairwise,
             dim_pairwise_rel_pos_feats = dim_pairwise,
-            packed_atom_repr = packed_atom_repr,
             atoms_per_window = atoms_per_window,
             dim_pairwise = dim_pairwise,
             sigma_data = sigma_data,
@@ -3060,7 +3037,7 @@ class Alphafold3(Module):
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'],
         additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
-        residue_atom_lens: Int['b n'] | None = None,
+        residue_atom_lens: Int['b n'],
         atom_mask: Bool['b m'] | None = None,
         token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -3087,35 +3064,19 @@ class Alphafold3(Module):
 
         assert exists(residue_atom_lens) or exists(atom_mask)
 
-        # determine whether using packed or unpacked atom rep
+        # handle atom mask
 
-        if self.packed_atom_repr:
-            assert exists(residue_atom_lens), 'residue_atom_lens must be given if using packed atom repr'
+        total_atoms = residue_atom_lens.sum(dim = -1)
+        atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
 
-        if exists(residue_atom_lens):
+        # handle offsets for residue atom indices
 
-            if self.packed_atom_repr:
-                # handle atom mask
-
-                total_atoms = residue_atom_lens.sum(dim = -1)
-                atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
-
-                # handle offsets for residue atom indices
-
-                if exists(residue_atom_indices):
-                    residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
-            else:
-                atom_mask = lens_to_mask(residue_atom_lens, max_len = self.atoms_per_window)
-                atom_mask = rearrange(atom_mask, 'b ... -> b (...)')
+        if exists(residue_atom_indices):
+            residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
 
         # get atom sequence length and residue sequence length depending on whether using packed atomic seq
 
-        if self.packed_atom_repr:
-            seq_len = residue_atom_lens.shape[-1]
-        else:
-            w = self.atoms_per_window
-            assert divisible_by(atom_seq_len, w)
-            seq_len = atom_inputs.shape[-2] // w
+        seq_len = residue_atom_lens.shape[-1]
 
         # embed inputs
 
@@ -3161,15 +3122,9 @@ class Alphafold3(Module):
 
         # residue mask and pairwise mask
 
-        if self.packed_atom_repr:
-            total_atoms = residue_atom_lens.sum(dim = -1)
-            mask = lens_to_mask(total_atoms, max_len = seq_len)
-        else:
-            if exists(residue_atom_lens):
-                mask = residue_atom_lens != 0
-            else:
-                mask = reduce(atom_mask, 'b (n w) -> b n', w = w, reduction = 'any')
-
+        total_atoms = residue_atom_lens.sum(dim = -1)
+        mask = lens_to_mask(total_atoms, max_len = seq_len)
+    
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
 
         # init recycled single and pairwise
@@ -3269,11 +3224,7 @@ class Alphafold3(Module):
 
         if not exists(distance_labels) and atom_pos_given and exists(residue_atom_indices):
 
-            if self.packed_atom_repr:
-                residue_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, residue_atom_indices)
-            else:
-                residue_pos = einx.get_at('b (n [w]) c, b n -> b n c', atom_pos, residue_atom_indices)
-
+            residue_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, residue_atom_indices)
             residue_dist = torch.cdist(residue_pos, residue_pos, p = 2)
             dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', residue_dist, self.distance_bins).abs()
             distance_labels = dist_from_dist_bins.argmin(dim = -1)
@@ -3364,6 +3315,7 @@ class Alphafold3(Module):
         if calc_diffusion_loss and should_call_confidence_head:
             
             # rollout
+
             pred_atom_pos = self.edm.sample(
                 num_sample_steps = num_rollout_steps,
                 atom_feats = atom_feats,
@@ -3377,10 +3329,7 @@ class Alphafold3(Module):
                 residue_atom_lens = residue_atom_lens
             )
 
-            if self.packed_atom_repr:
-                pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
-            else:
-                pred_atom_pos = einx.get_at('b (n [w]) c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
+            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
 
             logits = self.confidence_head(
                 single_repr = single.detach(),

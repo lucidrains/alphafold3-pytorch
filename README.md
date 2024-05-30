@@ -36,12 +36,12 @@ alphafold3 = Alphafold3(
 # mock inputs
 
 seq_len = 16
-atom_seq_len = seq_len * 27
+residue_atom_lens = torch.randint(1, 3, (2, seq_len))
+atom_seq_len = residue_atom_lens.sum(dim = -1).amax()
 
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-atom_lens = torch.randint(0, 27, (2, seq_len))
 additional_residue_feats = torch.randn(2, seq_len, 10)
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
@@ -53,7 +53,7 @@ msa_mask = torch.ones((2, 7)).bool()
 # required for training, but omitted on inference
 
 atom_pos = torch.randn(2, atom_seq_len, 3)
-residue_atom_indices = torch.randint(0, 27, (2, seq_len))
+residue_atom_indices = residue_atom_lens - 1 # last atom, as an example
 
 distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
 pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
@@ -67,7 +67,7 @@ loss = alphafold3(
     num_recycling_steps = 2,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
-    residue_atom_lens = atom_lens,
+    residue_atom_lens = residue_atom_lens,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
     msa_mask = msa_mask,
@@ -91,7 +91,7 @@ sampled_atom_pos = alphafold3(
     num_sample_steps = 16,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
-    residue_atom_lens = atom_lens,
+    residue_atom_lens = residue_atom_lens,
     additional_residue_feats = additional_residue_feats,
     msa = msa,
     msa_mask = msa_mask,
@@ -99,7 +99,7 @@ sampled_atom_pos = alphafold3(
     template_mask = template_mask
 )
 
-sampled_atom_pos.shape # (2, 16 * 27, 3)
+sampled_atom_pos.shape # (2, <atom_seqlen>, 3)
 ```
 
 ## Contributing
