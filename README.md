@@ -14,6 +14,8 @@ Getting a fair number of emails. You can chat with me about this work <a href="h
 
 - <a href="https://github.com/amorehead">Alex</a> for fixing various issues in the transcribed algorithms
 
+- <a href="https://github.com/gitabtion">Heng</a> for pointing out inconsistencies with the paper and pull requesting the solutions
+
 ## Install
 
 ```bash
