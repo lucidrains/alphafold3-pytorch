@@ -25,11 +25,11 @@ from lightning import Fabric
 class Alphafold3Input(TypedDict):
     atom_inputs:                Float['m dai']
     residue_atom_lens:          Int['n 2']
-    atompair_inputs:            Float['m m dap']
+    atompair_inputs:            Float['m m dapi'] | Float['nw w (w*3) dapi']
     additional_residue_feats:   Float['n 10']
     templates:                  Float['t n n dt']
-    template_mask:              Bool['t'] | None
     msa:                        Float['s n dm']
+    template_mask:              Bool['t'] | None
     msa_mask:                   Bool['s'] | None
     atom_pos:                   Float['m 3'] | None
     residue_atom_indices:       Int['n'] | None
