@@ -131,6 +131,15 @@ def save_args_and_kwargs(fn):
         return fn(self, *args, **kwargs)
     return inner
 
+@typecheck
+def pad_and_window(
+    t: Float['b n ...'] | Int['b n ...'],
+    window_size: int
+):
+    t = pad_to_multiple(t, window_size, dim = 1)
+    t = rearrange(t, 'b (n w) ... -> b n w ...', w = window_size)
+    return t
+
 # packed atom representation functions
 
 @typecheck
@@ -1760,11 +1769,11 @@ class DiffusionModule(Module):
 
         indices = repeat_consecutive_with_lens(indices, residue_atom_lens)
         indices = pad_or_slice_to(indices, atom_seq_len, dim = -1)
-        indices = pad_to_multiple(indices, w, dim = -1)
+        indices = pad_and_window(indices, w)
 
         row_indices = col_indices = indices
-        row_indices = rearrange(row_indices, 'b (n w) -> b n w 1', w = w)
-        col_indices = rearrange(col_indices, 'b (n w) -> b n 1 w', w = w)
+        row_indices = rearrange(row_indices, 'b n w -> b n w 1', w = w)
+        col_indices = rearrange(col_indices, 'b n w -> b n 1 w', w = w)
 
         col_indices = concat_neighboring_windows(col_indices, dim_seq = 1, dim_window = -1)
         row_indices, col_indices = torch.broadcast_tensors(row_indices, col_indices)
@@ -1776,8 +1785,7 @@ class DiffusionModule(Module):
         # condition atompair feats further with single atom repr
 
         atom_repr_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
-        atom_repr_cond = pad_to_multiple(atom_repr_cond, w, dim = 1)
-        atom_repr_cond = rearrange(atom_repr_cond, 'b (n w) dap -> b n w dap', w = w)
+        atom_repr_cond = pad_and_window(atom_repr_cond, w)
 
         atom_repr_cond_row, atom_repr_cond_col = atom_repr_cond.chunk(2, dim = -1)
 
@@ -2565,8 +2573,7 @@ class InputFeatureEmbedder(Module):
 
         atom_feats_cond = self.atom_repr_to_atompair_feat_cond(atom_feats)
 
-        atom_feats_cond = pad_to_multiple(atom_feats_cond, w, dim = 1)
-        atom_feats_cond = rearrange(atom_feats_cond, 'b (nw w) dap -> b nw w dap', w = w)
+        atom_feats_cond = pad_and_window(atom_feats_cond, w)
 
         atom_feats_cond_row, atom_feats_cond_col = atom_feats_cond.chunk(2, dim = -1)
         atom_feats_cond_col = concat_neighboring_windows(atom_feats_cond_col, dim_seq = 1, dim_window = -2)
