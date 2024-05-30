@@ -3361,6 +3361,20 @@ class Alphafold3(Module):
         return_pae_logits = exists(pae_labels)
 
         if calc_diffusion_loss and should_call_confidence_head:
+            
+            # rollout
+            pred_atom_pos = self.edm.sample(
+                num_sample_steps = num_sample_steps,
+                atom_feats = atom_feats,
+                atompair_feats = atompair_feats,
+                atom_mask = atom_mask,
+                mask = mask,
+                single_trunk_repr = single,
+                single_inputs_repr = single_inputs,
+                pairwise_trunk = pairwise,
+                pairwise_rel_pos_feats = relative_position_encoding,
+                residue_atom_lens = residue_atom_lens
+            )
 
             if self.packed_atom_repr:
                 pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
