@@ -566,7 +566,7 @@ class AttentionPairBias(Module):
         # take care of windowing logic
         # for sequence-local atom transformer
 
-        windowed_pairwise = pairwise_repr.shape[-2] != pairwise_repr.shape[-3]
+        windowed_pairwise = pairwise_repr.ndim == 5
 
         windowed_attn_bias = None
 
@@ -1469,7 +1469,7 @@ class DiffusionTransformer(Module):
 
         # handle windowing
 
-        pairwise_is_windowed = pairwise_repr.shape[-2] != pairwise_repr.shape[-3]
+        pairwise_is_windowed = pairwise_repr.ndim == 5
 
         if has_windows and not pairwise_is_windowed:
             pairwise_repr = full_pairwise_repr_to_windowed(pairwise_repr, window_size = w)
@@ -1746,7 +1746,7 @@ class DiffusionModule(Module):
 
         # window the atom pair features before passing to atom encoder and decoder if necessary
 
-        atompair_is_windowed = atompair_feats.shape[-2] != atompair_feats.shape[-3]
+        atompair_is_windowed = atompair_feats.ndim == 5
 
         if not atompair_is_windowed:
             atompair_feats = full_pairwise_repr_to_windowed(atompair_feats, window_size = self.atoms_per_window)
