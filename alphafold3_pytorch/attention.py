@@ -99,18 +99,17 @@ def pad_to_multiple(
     return pad_at_dim(t, (0, padding_needed), dim = dim, value = value)
 
 @typecheck
-def concat_neighboring_windows(
+def concat_previous_window(
     t: Tensor,
     *,
     dim_seq: int,
     dim_window: int
 ):
-    t = pad_at_dim(t, (1, 1), dim = dim_seq, value = 0.)
+    t = pad_at_dim(t, (1, 0), dim = dim_seq, value = 0.)
 
     t = torch.cat((
-        slice_at_dim(t, slice(None, -2), dim = dim_seq),
-        slice_at_dim(t, slice(1, -1), dim = dim_seq),
-        slice_at_dim(t, slice(2, None), dim = dim_seq)
+        slice_at_dim(t, slice(None, -1), dim = dim_seq),
+        slice_at_dim(t, slice(1, None), dim = dim_seq),
     ), dim = dim_window)
 
     return t
@@ -121,14 +120,14 @@ def concat_neighboring_windows(
 def full_pairwise_repr_to_windowed(
     pairwise_repr: Float['... m m dp'],
     window_size: int
-) -> Float['... n w (w*3) dp']:
+) -> Float['... n w (w*2) dp']:
 
     seq_len, device = pairwise_repr.shape[-2], pairwise_repr.device
 
     padding_needed = (window_size - (seq_len % window_size)) % window_size
     pairwise_repr = F.pad(pairwise_repr, (0, 0, 0, padding_needed, 0, padding_needed), value = 0.)
     pairwise_repr = rearrange(pairwise_repr, '... (i w1) (j w2) d -> ... i j w1 w2 d', w1 = window_size, w2 = window_size)
-    pairwise_repr = concat_neighboring_windows(pairwise_repr, dim_seq = -4, dim_window = -2)
+    pairwise_repr = concat_previous_window(pairwise_repr, dim_seq = -4, dim_window = -2)
 
     # get the diagonal
 
@@ -145,7 +144,7 @@ def full_pairwise_repr_to_windowed(
 def full_attn_bias_to_windowed(
     attn_bias: Float['... m m'],
     window_size: int
-) -> Float['... n w (w*3)']:
+) -> Float['... n w (w*2)']:
 
     attn_bias = rearrange(attn_bias, '... -> ... 1')
     attn_bias = full_pairwise_repr_to_windowed(attn_bias, window_size = window_size)
@@ -215,7 +214,7 @@ class Attention(Module):
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
-        attn_bias: Float['... i j'] | Float['... nw w (w*3)'] | None = None
+        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None
 
     ) -> Float['b i d']:
 
@@ -316,7 +315,7 @@ class Attend(Module):
         k: Float['b h n d'],
         v: Float['b h n d'],
         mask: Bool['b n'] | None = None,
-        attn_bias: Float['... n n'] | Float['... nw w (w*3)'] | None = None
+        attn_bias: Float['... n n'] | Float['... nw w (w*2)'] | None = None
     ) -> Float['b h n d']:
         """
         simple local attention with a radius of 1 window size
@@ -345,11 +344,11 @@ class Attend(Module):
         # just do radius of 1 for now
         # perhaps not even necessary, and could try shifted windows (a la Swin)
 
-        k, v = tuple(pad_at_dim(t, (1, 1), dim = -2) for t in (k, v))
-        mask = F.pad(mask, (1, 1), value = False)
+        k, v = tuple(pad_at_dim(t, (1, 0), dim = -2) for t in (k, v))
+        mask = F.pad(mask, (1, 0), value = False)
 
-        k, v = tuple(torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim = -2) for t in (k, v))
-        mask = torch.cat((mask[..., :-2], mask[..., 1:-1], mask[..., 2:]), dim = -1)
+        k, v = tuple(torch.cat((t[..., :-1, :], t[..., 1:, :]), dim = -2) for t in (k, v))
+        mask = torch.cat((mask[..., :-1], mask[..., 1:]), dim = -1)
 
         # handle attention bias (inefficiently)
 
@@ -399,7 +398,7 @@ class Attend(Module):
         k: Float['b h j d'],
         v: Float['b h j d'],
         mask: Bool['b j'] | None = None,
-        attn_bias: Float['... i j'] | Float['... nw w (w*3)'] | None = None,
+        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None,
     ) -> Float['b h i d']:
 
         is_windowed_attn_bias = None

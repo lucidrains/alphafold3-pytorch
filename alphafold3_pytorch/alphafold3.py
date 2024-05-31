@@ -32,7 +32,7 @@ from alphafold3_pytorch.attention import (
     slice_at_dim,
     pad_or_slice_to,
     pad_to_multiple,
-    concat_neighboring_windows,
+    concat_previous_window,
     full_attn_bias_to_windowed,
     full_pairwise_repr_to_windowed
 )
@@ -547,8 +547,8 @@ class AttentionPairBias(Module):
         self,
         single_repr: Float['b n ds'],
         *,
-        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*3) dp'],
-        attn_bias: Float['b n n'] | Float['b nw w (w*3)'] | None = None,
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
+        attn_bias: Float['b n n'] | Float['b nw w (w*2)'] | None = None,
         **kwargs
     ) -> Float['b n ds']:
 
@@ -1450,7 +1450,7 @@ class DiffusionTransformer(Module):
         noised_repr: Float['b n d'],
         *,
         single_repr: Float['b n ds'],
-        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*3) dp'],
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
         mask: Bool['b n'] | None = None
     ):
         w = self.attn_window_size
@@ -1691,7 +1691,7 @@ class DiffusionModule(Module):
         noised_atom_pos: Float['b m 3'],
         *,
         atom_feats: Float['b m da'],
-        atompair_feats: Float['b m m dap'] | Float['b nw w (w*3) dap'],
+        atompair_feats: Float['b m m dap'] | Float['b nw w (w*2) dap'],
         atom_mask: Bool['b m'],
         times: Float[' b'],
         mask: Bool['b n'],
@@ -1757,7 +1757,7 @@ class DiffusionModule(Module):
         row_indices = rearrange(row_indices, 'b n w -> b n w 1', w = w)
         col_indices = rearrange(col_indices, 'b n w -> b n 1 w', w = w)
 
-        col_indices = concat_neighboring_windows(col_indices, dim_seq = 1, dim_window = -1)
+        col_indices = concat_previous_window(col_indices, dim_seq = 1, dim_window = -1)
         row_indices, col_indices = torch.broadcast_tensors(row_indices, col_indices)
 
         pairwise_repr_cond = einx.get_at('b [i j] dap, b nw w1 w2, b nw w1 w2 -> b nw w1 w2 dap', pairwise_repr_cond, row_indices, col_indices)
@@ -1771,7 +1771,7 @@ class DiffusionModule(Module):
 
         atom_repr_cond_row, atom_repr_cond_col = atom_repr_cond.chunk(2, dim = -1)
 
-        atom_repr_cond_col = concat_neighboring_windows(atom_repr_cond_col, dim_seq = 1, dim_window = 2)
+        atom_repr_cond_col = concat_previous_window(atom_repr_cond_col, dim_seq = 1, dim_window = 2)
 
         atompair_feats = einx.add('b nw w1 w2 dap, b nw w1 dap -> b nw w1 w2 dap', atompair_feats, atom_repr_cond_row)
         atompair_feats = einx.add('b nw w1 w2 dap, b nw w2 dap -> b nw w1 w2 dap', atompair_feats, atom_repr_cond_col)
@@ -2556,7 +2556,7 @@ class InputFeatureEmbedder(Module):
         atom_feats_cond = pad_and_window(atom_feats_cond, w)
 
         atom_feats_cond_row, atom_feats_cond_col = atom_feats_cond.chunk(2, dim = -1)
-        atom_feats_cond_col = concat_neighboring_windows(atom_feats_cond_col, dim_seq = 1, dim_window = -2)
+        atom_feats_cond_col = concat_previous_window(atom_feats_cond_col, dim_seq = 1, dim_window = -2)
 
         atompair_feats = einx.add('b nw w1 w2 dap, b nw w1 dap',atompair_feats, atom_feats_cond_row)
         atompair_feats = einx.add('b nw w1 w2 dap, b nw w2 dap',atompair_feats, atom_feats_cond_col)
