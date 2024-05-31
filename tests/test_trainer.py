@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 from alphafold3_pytorch import (
     Alphafold3,
-    Alphafold3Input,
+    AtomInput,
     DataLoader,
     Trainer
 )
@@ -61,7 +61,7 @@ class MockAtomDataset(Dataset):
         plddt_labels = torch.randint(0, 50, (seq_len,))
         resolved_labels = torch.randint(0, 2, (seq_len,))
 
-        return Alphafold3Input(
+        return AtomInput(
             atom_inputs = atom_inputs,
             atompair_inputs = atompair_inputs,
             molecule_atom_lens = molecule_atom_lens,

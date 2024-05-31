@@ -35,7 +35,7 @@ from alphafold3_pytorch.alphafold3 import (
 from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,
-    Alphafold3Input
+    AtomInput
 )
 
 __all__ = [
@@ -66,6 +66,6 @@ __all__ = [
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
-    Alphafold3Input,
+    AtomInput,
     Trainer
 ]

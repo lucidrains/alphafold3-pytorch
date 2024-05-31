@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from functools import wraps
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
 from alphafold3_pytorch.attention import pad_at_dim
 
 from typing import TypedDict, List
+
 from alphafold3_pytorch.typing import (
     typecheck,
+    beartype_isinstance,
     Int, Bool, Float
 )
 
@@ -25,17 +28,17 @@ from lightning import Fabric
 # constants
 
 @typecheck
-class Alphafold3Input(TypedDict):
+class AtomInput(TypedDict):
     atom_inputs:                Float['m dai']
-    molecule_atom_lens:          Int[' n']
+    molecule_atom_lens:         Int[' n']
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
-    additional_molecule_feats:   Float['n 10']
+    additional_molecule_feats:  Float['n 10']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
     template_mask:              Bool[' t'] | None
     msa_mask:                   Bool[' s'] | None
     atom_pos:                   Float['m 3'] | None
-    molecule_atom_indices:       Int[' n'] | None
+    molecule_atom_indices:      Int[' n'] | None
     distance_labels:            Int['n n'] | None
     pae_labels:                 Int['n n'] | None
     pde_labels:                 Int[' n'] | None
@@ -77,9 +80,18 @@ def accum_dict(
 
 @typecheck
 def collate_af3_inputs(
-    inputs: List[Alphafold3Input],
-    int_pad_value = -1
+    inputs: List,
+    int_pad_value = -1,
+    map_input_fn: Callable | None = None
 ):
+
+    if exists(map_input_fn):
+        inputs = [map_input_fn(i) for i in inputs]
+
+    # make sure all inputs are AtomInput
+
+    assert all([beartype_isinstance(i, AtomInput) for i in inputs])
+
     # separate input dictionary into keys and values
 
     keys = inputs[0].keys()
@@ -145,8 +157,18 @@ def collate_af3_inputs(
 
     return dict(tuple(zip(keys, outputs)))
 
-def DataLoader(*args, **kwargs):
-    return OrigDataLoader(*args, collate_fn = collate_af3_inputs, **kwargs)
+@typecheck
+def DataLoader(
+    *args,
+    map_input_fn: Callable | None = None,
+    **kwargs
+):
+    collate_fn = collate_af3_inputs
+
+    if exists(map_input_fn):
+        collate_fn = partial(collate_fn, map_input_fn = map_input_fn)
+
+    return OrigDataLoader(*args, collate_fn = collate_fn, **kwargs)
 
 # default scheduler used in paper w/ warmup
 
@@ -175,6 +197,7 @@ class Trainer:
         num_train_steps: int,
         batch_size: int,
         grad_accum_every: int = 1,
+        map_dataset_input_fn: Callable | None = None,
         valid_dataset: Dataset | None = None,
         valid_every: int = 1000,
         test_dataset: Dataset | None = None,
@@ -229,9 +252,16 @@ class Trainer:
 
         self.optimizer = optimizer
 
+        # if map dataset function given, curry into DataLoader
+
+        DataLoader_ = DataLoader
+
+        if exists(map_dataset_input_fn):
+            DataLoader_ = partial(DataLoader_, map_input_fn = map_dataset_input_fn)
+
         # train dataloader
 
-        self.dataloader = DataLoader(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+        self.dataloader = DataLoader_(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
 
         # validation dataloader on the EMA model
 
@@ -241,7 +271,7 @@ class Trainer:
 
         if self.needs_valid and self.is_main:
             self.valid_dataset_size = len(valid_dataset)
-            self.valid_dataloader = DataLoader(valid_dataset, batch_size = batch_size)
+            self.valid_dataloader = DataLoader_(valid_dataset, batch_size = batch_size)
 
         # testing dataloader on EMA model
 
@@ -249,7 +279,7 @@ class Trainer:
 
         if self.needs_test and self.is_main:
             self.test_dataset_size = len(test_dataset)
-            self.test_dataloader = DataLoader(test_dataset, batch_size = batch_size)
+            self.test_dataloader = DataLoader_(test_dataset, batch_size = batch_size)
 
         # training steps and num gradient accum steps
 
