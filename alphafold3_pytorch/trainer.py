@@ -90,25 +90,46 @@ def collate_af3_inputs(
     for grouped in zip(*inputs):
         # if all None, just return None
 
-        if not any([*map(exists, grouped)]):
+        not_none_grouped = [*filter(exists, grouped)]
+
+        if len(not_none_grouped) == 0:
             outputs.append(None)
             continue
 
+        # default to empty tensor for any Nones
+
+        one_tensor = not_none_grouped[0]
+
+        dtype = one_tensor.dtype
+        ndim = one_tensor.ndim
+
         # use -1 for padding int values, for assuming int are labels - if not, handle within alphafold3
 
-        pad_value = int_pad_value if grouped[0].dtype in (torch.int, torch.long) else 0
+        if dtype in (torch.int, torch.long):
+            pad_value = int_pad_value
+        elif dtype == torch.bool:
+            pad_value = False
+        else:
+            pad_value = 0.
 
         # get the max lengths across all dimensions
 
-        shapes_as_tensor = torch.stack([Tensor(tuple(g.shape)) for g in grouped], dim = -1)
+        shapes_as_tensor = torch.stack([Tensor(tuple(g.shape) if exists(g) else ((0,) * ndim)).int() for g in grouped], dim = -1)
 
-        max_lengths = shapes_as_tensor.int().amax(dim = -1)
+        max_lengths = shapes_as_tensor.amax(dim = -1)
+
+        default_tensor = torch.full(max_lengths.tolist(), pad_value, dtype = dtype)
 
         # pad across all dimensions
 
         padded_inputs = []
 
         for inp in grouped:
+
+            if not exists(inp):
+                padded_inputs.append(default_tensor)
+                continue
+
             for dim, max_length in enumerate(max_lengths.tolist()):
                 inp = pad_at_dim(inp, (0, max_length - inp.shape[dim]), value = pad_value, dim = dim)
 

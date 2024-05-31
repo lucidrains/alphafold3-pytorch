@@ -2,7 +2,7 @@ import os
 os.environ['TYPECHECK'] = 'True'
 
 from pathlib import Path
-from random import randrange
+from random import randrange, random
 
 import pytest
 import torch
@@ -45,7 +45,10 @@ class MockAtomDataset(Dataset):
         template_mask = torch.ones((2,)).bool()
 
         msa = torch.randn(7, seq_len, 64)
-        msa_mask = torch.ones((7,)).bool()
+
+        msa_mask = None
+        if random() > 0.5:
+            msa_mask = torch.ones((7,)).bool()
 
         # required for training, but omitted on inference
 
