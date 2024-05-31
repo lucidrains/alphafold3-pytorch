@@ -27,15 +27,15 @@ from lightning import Fabric
 @typecheck
 class Alphafold3Input(TypedDict):
     atom_inputs:                Float['m dai']
-    residue_atom_lens:          Int[' n']
+    molecule_atom_lens:          Int[' n']
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
-    additional_residue_feats:   Float['n 10']
+    additional_molecule_feats:   Float['n 10']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
     template_mask:              Bool[' t'] | None
     msa_mask:                   Bool[' s'] | None
     atom_pos:                   Float['m 3'] | None
-    residue_atom_indices:       Int[' n'] | None
+    molecule_atom_indices:       Int[' n'] | None
     distance_labels:            Int['n n'] | None
     pae_labels:                 Int['n n'] | None
     pde_labels:                 Int[' n'] | None

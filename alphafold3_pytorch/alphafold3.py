@@ -53,9 +53,9 @@ global ein notation:
 b - batch
 ba - batch with augmentation
 h - heads
-n - residue sequence length
-i - residue sequence length (source)
-j - residue sequence length (target)
+n - molecule sequence length
+i - molecule sequence length (source)
+j - molecule sequence length (target)
 m - atom sequence length
 nw - windowed sequence length
 d - feature dimension
@@ -71,9 +71,9 @@ r - registers
 """
 
 """
-additional_residue_feats: [*, 10]:
+additional_molecule_feats: [*, 10]:
 
-0: residue_index
+0: molecule_index
 1: token_index
 2: asym_id
 3: entity_id
@@ -87,7 +87,7 @@ additional_residue_feats: [*, 10]:
 
 # constants
 
-ADDITIONAL_RESIDUE_FEATS = 10
+ADDITIONAL_MOLECULE_FEATS = 10
 
 LinearNoBias = partial(Linear, bias = False)
 
@@ -1084,13 +1084,13 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}']
+        additional_molecule_feats: Float[f'b n {ADDITIONAL_molecule_FEATS}']
     ) -> Float['b n n dp']:
 
-        device = additional_residue_feats.device
-        assert additional_residue_feats.shape[-1] >= 5
+        device = additional_molecule_feats.device
+        assert additional_molecule_feats.shape[-1] >= 5
 
-        res_idx, token_idx, asym_id, entity_id, sym_id = additional_residue_feats[..., :5].unbind(dim = -1)
+        res_idx, token_idx, asym_id, entity_id, sym_id = additional_molecule_feats[..., :5].unbind(dim = -1)
         
         diff_res_idx = einx.subtract('b i, b j -> b i j', res_idx, res_idx)
         diff_token_idx = einx.subtract('b i, b j -> b i j', token_idx, token_idx)
@@ -1532,11 +1532,11 @@ class AtomToTokenPooler(Module):
         *,
         atom_feats: Float['b m da'],
         atom_mask: Bool['b m'],
-        residue_atom_lens: Int['b n']
+        molecule_atom_lens: Int['b n']
     ) -> Float['b n ds']:
 
         atom_feats = self.proj(atom_feats)
-        tokens = mean_pool_with_lens(atom_feats, residue_atom_lens)
+        tokens = mean_pool_with_lens(atom_feats, molecule_atom_lens)
         return tokens
 
 class DiffusionModule(Module):
@@ -1548,7 +1548,7 @@ class DiffusionModule(Module):
         *,
         dim_pairwise_trunk,
         dim_pairwise_rel_pos_feats,
-        atoms_per_window = 27,  # for atom sequence, take the approach of (batch, seq, atoms, ..), where atom dimension is set to the residue or molecule with greatest number of atoms, the rest padded. atom_mask must be passed in - default to 27 for proteins, with tryptophan having 27 atoms
+        atoms_per_window = 27,  # for atom sequence, take the approach of (batch, seq, atoms, ..), where atom dimension is set to the molecule or molecule with greatest number of atoms, the rest padded. atom_mask must be passed in - default to 27 for proteins, with tryptophan having 27 atoms
         dim_pairwise = 128,
         sigma_data = 16,
         dim_atom = 128,
@@ -1699,7 +1699,7 @@ class DiffusionModule(Module):
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
-        residue_atom_lens: Int['b n']
+        molecule_atom_lens: Int['b n']
     ):
         w = self.atoms_per_window
         device = noised_atom_pos.device
@@ -1730,7 +1730,7 @@ class DiffusionModule(Module):
 
         single_repr_cond = self.single_repr_to_atom_feat_cond(conditioned_single_repr)
 
-        single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, residue_atom_lens)
+        single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, molecule_atom_lens)
         single_repr_cond = pad_or_slice_to(single_repr_cond, length = atom_feats_cond.shape[1], dim = 1)
 
         atom_feats_cond = single_repr_cond + atom_feats_cond
@@ -1749,7 +1749,7 @@ class DiffusionModule(Module):
         indices = torch.arange(seq_len, device = device)
         indices = repeat(indices, 'n -> b n', b = batch_size)
 
-        indices = repeat_consecutive_with_lens(indices, residue_atom_lens)
+        indices = repeat_consecutive_with_lens(indices, molecule_atom_lens)
         indices = pad_or_slice_to(indices, atom_seq_len, dim = -1)
         indices = pad_and_window(indices, w)
 
@@ -1794,7 +1794,7 @@ class DiffusionModule(Module):
         tokens = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
             atom_mask = atom_mask,
-            residue_atom_lens = residue_atom_lens
+            molecule_atom_lens = molecule_atom_lens
         )
 
         # token transformer
@@ -1814,7 +1814,7 @@ class DiffusionModule(Module):
 
         atom_decoder_input = self.tokens_to_atom_decoder_input_cond(tokens)
 
-        atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, residue_atom_lens)
+        atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, molecule_atom_lens)
         atom_decoder_input = pad_or_slice_to(atom_decoder_input, length = atom_feats_skip.shape[1], dim = 1)
 
         atom_decoder_input = atom_decoder_input + atom_feats_skip
@@ -2042,9 +2042,9 @@ class ElucidatedAtomDiffusion(Module):
         single_inputs_repr: Float['b n dsi'],
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
-        residue_atom_lens: Int['b n'],
+        molecule_atom_lens: Int['b n'],
         return_denoised_pos = False,
-        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'] | None = None,
+        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
         nucleotide_loss_weight = 5.,
@@ -2075,21 +2075,21 @@ class ElucidatedAtomDiffusion(Module):
                 single_inputs_repr = single_inputs_repr,
                 pairwise_trunk = pairwise_trunk,
                 pairwise_rel_pos_feats = pairwise_rel_pos_feats,
-                residue_atom_lens = residue_atom_lens
+                molecule_atom_lens = molecule_atom_lens
             )
         )
 
         total_loss = 0.
 
-        # if additional residue feats is provided
+        # if additional molecule feats is provided
         # calculate the weights for mse loss (wl)
 
         align_weights = atom_pos_ground_truth.new_ones(atom_pos_ground_truth.shape[:2])
 
-        if exists(additional_residue_feats):
-            is_nucleotide_or_ligand_fields = (additional_residue_feats[..., 7:] != 0.).unbind(dim = -1)
+        if exists(additional_molecule_feats):
+            is_nucleotide_or_ligand_fields = (additional_molecule_feats[..., 7:] != 0.).unbind(dim = -1)
 
-            is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, residue_atom_lens) for t in is_nucleotide_or_ligand_fields)
+            is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
             is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
 
             atom_is_dna, atom_is_rna, atom_is_ligand = is_nucleotide_or_ligand_fields
@@ -2149,7 +2149,7 @@ class ElucidatedAtomDiffusion(Module):
         smooth_lddt_loss = self.zero
 
         if add_smooth_lddt_loss:
-            assert exists(additional_residue_feats)
+            assert exists(additional_molecule_feats)
 
             smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
@@ -2518,7 +2518,7 @@ class InputFeatureEmbedder(Module):
             dim_out = dim_token
         )
 
-        dim_single_input = dim_token + ADDITIONAL_RESIDUE_FEATS
+        dim_single_input = dim_token + ADDITIONAL_MOLECULE_FEATS
 
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
@@ -2530,12 +2530,12 @@ class InputFeatureEmbedder(Module):
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         atom_mask: Bool['b m'],
-        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
-        residue_atom_lens: Int['b n'],
+        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
+        molecule_atom_lens: Int['b n'],
 
     ) -> EmbeddedInputs:
 
-        assert additional_residue_feats.shape[-1] == ADDITIONAL_RESIDUE_FEATS
+        assert additional_molecule_feats.shape[-1] == ADDITIONAL_MOLECULE_FEATS
 
         w = self.atoms_per_window
 
@@ -2574,10 +2574,10 @@ class InputFeatureEmbedder(Module):
         single_inputs = self.atom_feats_to_pooled_token(
             atom_feats = atom_feats,
             atom_mask = atom_mask,
-            residue_atom_lens = residue_atom_lens
+            molecule_atom_lens = molecule_atom_lens
         )
 
-        single_inputs = torch.cat((single_inputs, additional_residue_feats), dim = -1)
+        single_inputs = torch.cat((single_inputs, additional_molecule_feats), dim = -1)
 
         single_init = self.single_input_to_single_init(single_inputs)
         pairwise_init = self.single_input_to_pairwise_init(single_inputs)
@@ -2859,7 +2859,7 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_RESIDUE_FEATS
+        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_MOLECULE_FEATS
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -3036,8 +3036,8 @@ class Alphafold3(Module):
         *,
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
-        additional_residue_feats: Float[f'b n {ADDITIONAL_RESIDUE_FEATS}'],
-        residue_atom_lens: Int['b n'],
+        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
+        molecule_atom_lens: Int['b n'],
         atom_mask: Bool['b m'] | None = None,
         token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -3047,7 +3047,7 @@ class Alphafold3(Module):
         num_recycling_steps: int = 1,
         diffusion_add_bond_loss: bool = False,
         diffusion_add_smooth_lddt_loss: bool = False,
-        residue_atom_indices: Int['b n'] | None = None,
+        molecule_atom_indices: Int['b n'] | None = None,
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
         distance_labels: Int['b n n'] | None = None,
@@ -3064,14 +3064,15 @@ class Alphafold3(Module):
 
         # soft validate
 
-        valid_atom_len_mask = residue_atom_lens >= 0
+        valid_atom_len_mask = molecule_atom_lens >= 0
 
-        residue_atom_lens = residue_atom_lens.masked_fill(~valid_atom_len_mask, 0)
-        residue_atom_indices = residue_atom_indices.masked_fill(~valid_atom_len_mask, 0)
+        molecule_atom_lens = molecule_atom_lens.masked_fill(~valid_atom_len_mask, 0)
 
-        assert (residue_atom_indices < residue_atom_lens)[valid_atom_len_mask].all(), 'residue_atom_indices cannot have an index that exceeds the length of the atoms for that residue as given by residue_atom_lens'
+        if exists(molecule_atom_indices):
+            molecule_atom_indices = molecule_atom_indices.masked_fill(~valid_atom_len_mask, 0)
+            assert (molecule_atom_indices < molecule_atom_lens)[valid_atom_len_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
 
-        assert exists(residue_atom_lens) or exists(atom_mask)
+        assert exists(molecule_atom_lens) or exists(atom_mask)
 
         # if atompair inputs are not windowed, window it
 
@@ -3082,17 +3083,17 @@ class Alphafold3(Module):
 
         # handle atom mask
 
-        total_atoms = residue_atom_lens.sum(dim = -1)
+        total_atoms = molecule_atom_lens.sum(dim = -1)
         atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
 
-        # handle offsets for residue atom indices
+        # handle offsets for molecule atom indices
 
-        if exists(residue_atom_indices):
-            residue_atom_indices = residue_atom_indices + F.pad(residue_atom_lens, (-1, 1), value = 0)
+        if exists(molecule_atom_indices):
+            molecule_atom_indices = molecule_atom_indices + F.pad(molecule_atom_lens, (-1, 1), value = 0)
 
-        # get atom sequence length and residue sequence length depending on whether using packed atomic seq
+        # get atom sequence length and molecule sequence length depending on whether using packed atomic seq
 
-        seq_len = residue_atom_lens.shape[-1]
+        seq_len = molecule_atom_lens.shape[-1]
 
         # embed inputs
 
@@ -3106,14 +3107,14 @@ class Alphafold3(Module):
             atom_inputs = atom_inputs,
             atompair_inputs = atompair_inputs,
             atom_mask = atom_mask,
-            additional_residue_feats = additional_residue_feats,
-            residue_atom_lens = residue_atom_lens
+            additional_molecule_feats = additional_molecule_feats,
+            molecule_atom_lens = molecule_atom_lens
         )
 
         # relative positional encoding
 
         relative_position_encoding = self.relative_position_encoding(
-            additional_residue_feats = additional_residue_feats
+            additional_molecule_feats = additional_molecule_feats
         )
 
         pairwise_init = pairwise_init + relative_position_encoding
@@ -3136,9 +3137,9 @@ class Alphafold3(Module):
 
         pairwise_init = pairwise_init + token_bond_feats
 
-        # residue mask and pairwise mask
+        # molecule mask and pairwise mask
 
-        total_atoms = residue_atom_lens.sum(dim = -1)
+        total_atoms = molecule_atom_lens.sum(dim = -1)
         mask = lens_to_mask(total_atoms, max_len = seq_len)
     
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
@@ -3225,7 +3226,7 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
-                residue_atom_lens = residue_atom_lens
+                molecule_atom_lens = molecule_atom_lens
             )
 
         # losses default to 0
@@ -3238,11 +3239,11 @@ class Alphafold3(Module):
 
         # distogram head
 
-        if not exists(distance_labels) and atom_pos_given and exists(residue_atom_indices):
+        if not exists(distance_labels) and atom_pos_given and exists(molecule_atom_indices):
 
-            residue_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, residue_atom_indices)
-            residue_dist = torch.cdist(residue_pos, residue_pos, p = 2)
-            dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', residue_dist, self.distance_bins).abs()
+            molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, molecule_atom_indices)
+            molecule_dist = torch.cdist(molecule_pos, molecule_pos, p = 2)
+            dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', molecule_dist, self.distance_bins).abs()
             distance_labels = dist_from_dist_bins.argmin(dim = -1)
 
         if exists(distance_labels):
@@ -3273,9 +3274,9 @@ class Alphafold3(Module):
                     single_inputs,
                     pairwise,
                     relative_position_encoding,
-                    additional_residue_feats,
-                    residue_atom_indices,
-                    residue_atom_lens,
+                    additional_molecule_feats,
+                    molecule_atom_indices,
+                    molecule_atom_lens,
                     pae_labels,
                     pde_labels,
                     plddt_labels,
@@ -3294,9 +3295,9 @@ class Alphafold3(Module):
                         single_inputs,
                         pairwise,
                         relative_position_encoding,
-                        additional_residue_feats,
-                        residue_atom_indices,
-                        residue_atom_lens,
+                        additional_molecule_feats,
+                        molecule_atom_indices,
+                        molecule_atom_lens,
                         pae_labels,
                         pde_labels,
                         plddt_labels,
@@ -3308,7 +3309,7 @@ class Alphafold3(Module):
 
             diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,
-                additional_residue_feats = additional_residue_feats,
+                additional_molecule_feats = additional_molecule_feats,
                 add_smooth_lddt_loss = diffusion_add_smooth_lddt_loss,
                 add_bond_loss = diffusion_add_bond_loss,
                 atom_feats = atom_feats,
@@ -3319,7 +3320,7 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
-                residue_atom_lens = residue_atom_lens,
+                molecule_atom_lens = molecule_atom_lens,
                 return_denoised_pos = True,
             )
 
@@ -3342,10 +3343,10 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
-                residue_atom_lens = residue_atom_lens
+                molecule_atom_lens = molecule_atom_lens
             )
 
-            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, residue_atom_indices)
+            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, molecule_atom_indices)
 
             logits = self.confidence_head(
                 single_repr = single.detach(),

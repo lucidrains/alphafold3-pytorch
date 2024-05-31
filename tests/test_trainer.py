@@ -38,8 +38,8 @@ class MockAtomDataset(Dataset):
         atom_inputs = torch.randn(atom_seq_len, 77)
         atompair_inputs = torch.randn(atom_seq_len, atom_seq_len, 5)
 
-        residue_atom_lens = torch.randint(1, self.atoms_per_window, (seq_len,))
-        additional_residue_feats = torch.randn(seq_len, 10)
+        molecule_atom_lens = torch.randint(1, self.atoms_per_window, (seq_len,))
+        additional_molecule_feats = torch.randn(seq_len, 10)
 
         templates = torch.randn(2, seq_len, seq_len, 44)
         template_mask = torch.ones((2,)).bool()
@@ -50,7 +50,7 @@ class MockAtomDataset(Dataset):
         # required for training, but omitted on inference
 
         atom_pos = torch.randn(atom_seq_len, 3)
-        residue_atom_indices = residue_atom_lens - 1
+        molecule_atom_indices = molecule_atom_lens - 1
 
         distance_labels = torch.randint(0, 37, (seq_len, seq_len))
         pae_labels = torch.randint(0, 64, (seq_len, seq_len))
@@ -61,14 +61,14 @@ class MockAtomDataset(Dataset):
         return Alphafold3Input(
             atom_inputs = atom_inputs,
             atompair_inputs = atompair_inputs,
-            residue_atom_lens = residue_atom_lens,
-            additional_residue_feats = additional_residue_feats,
+            molecule_atom_lens = molecule_atom_lens,
+            additional_molecule_feats = additional_molecule_feats,
             templates = templates,
             template_mask = template_mask,
             msa = msa,
             msa_mask = msa_mask,
             atom_pos = atom_pos,
-            residue_atom_indices = residue_atom_indices,
+            molecule_atom_indices = molecule_atom_indices,
             distance_labels = distance_labels,
             pae_labels = pae_labels,
             pde_labels = pde_labels,
