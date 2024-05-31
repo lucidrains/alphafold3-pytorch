@@ -33,6 +33,7 @@ dependencies = [
     "lightning>=2.2.5",
     "omegaconf",
     "taylor-series-linear-attention>=0.1.9",
+    'torch_geometric',
     "torch>=2.1",
     "tqdm",
 ]
