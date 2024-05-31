@@ -3323,7 +3323,7 @@ class Alphafold3(Module):
 
             # rollout
 
-            pred_atom_pos = self.edm.sample(
+            denoised_atom_pos = self.edm.sample(
                 num_sample_steps = num_rollout_steps,
                 atom_feats = atom_feats,
                 atompair_feats = atompair_feats,
