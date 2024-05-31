@@ -34,6 +34,7 @@ from alphafold3_pytorch.alphafold3 import (
 
 from alphafold3_pytorch.trainer import (
     Trainer,
+    DataLoader,
     Alphafold3Input
 )
 

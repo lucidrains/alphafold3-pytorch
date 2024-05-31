@@ -3,16 +3,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
+from alphafold3_pytorch.attention import pad_at_dim
 
-from typing import TypedDict
+from typing import TypedDict, List
 from alphafold3_pytorch.typing import (
     typecheck,
     Int, Bool, Float
 )
 
 import torch
+from torch import Tensor
 from torch.optim import Adam, Optimizer
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader as OrigDataLoader
+from torch.nn.utils.rnn import pad_sequence
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from ema_pytorch import EMA
@@ -24,7 +27,7 @@ from lightning import Fabric
 @typecheck
 class Alphafold3Input(TypedDict):
     atom_inputs:                Float['m dai']
-    residue_atom_lens:          Int['n 2']
+    residue_atom_lens:          Int[' n']
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
     additional_residue_feats:   Float['n 10']
     templates:                  Float['t n n dt']
@@ -69,6 +72,62 @@ def accum_dict(
         past_losses[loss_name] += losses.get(loss_name, 0.)
 
     return past_losses
+
+# dataloader and collation fn
+
+@typecheck
+def collate_af3_inputs(
+    inputs: List[Alphafold3Input],
+    int_pad_value = -1
+):
+    # separate input dictionary into keys and values
+
+    keys = inputs[0].keys()
+    inputs = [i.values() for i in inputs]
+
+    outputs = []
+
+    for grouped in zip(*inputs):
+        # if all None, just return None
+
+        if not any([*map(exists, grouped)]):
+            outputs.append(None)
+            continue
+
+        # use -1 for padding int values, for assuming int are labels - if not, handle within alphafold3
+
+        pad_value = int_pad_value if grouped[0].dtype in (torch.int, torch.long) else 0
+
+        # get the max lengths across all dimensions
+
+        shapes_as_tensor = torch.stack([Tensor(tuple(g.shape)) for g in grouped], dim = -1)
+
+        max_lengths = shapes_as_tensor.int().amax(dim = -1)
+
+        # pad across all dimensions
+
+        padded_inputs = []
+
+        for inp in grouped:
+            for dim, max_length in enumerate(max_lengths.tolist()):
+                inp = pad_at_dim(inp, (0, max_length - inp.shape[dim]), value = pad_value, dim = dim)
+
+            padded_inputs.append(inp)
+
+        # stack
+
+        stacked = torch.stack(padded_inputs)
+
+        outputs.append(stacked)
+
+    # reconstitute dictionary
+
+    return dict(tuple(zip(keys, outputs)))
+
+def DataLoader(*args, **kwargs):
+    return OrigDataLoader(*args, collate_fn = collate_af3_inputs, **kwargs)
+
+# default scheduler used in paper w/ warmup
 
 def default_lambda_lr_fn(steps):
     # 1000 step warmup

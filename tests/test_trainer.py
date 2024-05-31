@@ -2,14 +2,16 @@ import os
 os.environ['TYPECHECK'] = 'True'
 
 from pathlib import Path
+from random import randrange
 
 import pytest
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 from alphafold3_pytorch import (
     Alphafold3,
     Alphafold3Input,
+    DataLoader,
     Trainer
 )
 
@@ -19,25 +21,24 @@ class MockAtomDataset(Dataset):
     def __init__(
         self,
         data_length,
-        seq_len = 16,
+        max_seq_len = 16,
         atoms_per_window = 4
     ):
         self.data_length = data_length
-        self.seq_len = seq_len
+        self.max_seq_len = max_seq_len
         self.atoms_per_window = atoms_per_window
-        self.atom_seq_len = seq_len * atoms_per_window
 
     def __len__(self):
         return self.data_length
 
     def __getitem__(self, idx):
-        seq_len = self.seq_len
-        atom_seq_len = self.atom_seq_len
+        seq_len = randrange(1, self.max_seq_len)
+        atom_seq_len = self.atoms_per_window * seq_len
 
         atom_inputs = torch.randn(atom_seq_len, 77)
         atompair_inputs = torch.randn(atom_seq_len, atom_seq_len, 5)
 
-        residue_atom_lens = torch.randint(0, self.atoms_per_window, (seq_len,))
+        residue_atom_lens = torch.randint(1, self.atoms_per_window, (seq_len,))
         additional_residue_feats = torch.randn(seq_len, 10)
 
         templates = torch.randn(2, seq_len, seq_len, 44)

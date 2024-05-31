@@ -212,7 +212,7 @@ def repeat_consecutive_with_lens(
 
     output_indices = torch.zeros((batch, max_len + 1), device = device, dtype = torch.long)
 
-    indices.masked_fill_(~mask, max_len) # scatter to sink position for padding
+    indices = indices.masked_fill(~mask, max_len) # scatter to sink position for padding
     indices = rearrange(indices, 'b n w -> b (n w)')
 
     # scatter
@@ -3062,6 +3062,15 @@ class Alphafold3(Module):
 
         atom_seq_len = atom_inputs.shape[-2]
 
+        # soft validate
+
+        valid_atom_len_mask = residue_atom_lens >= 0
+
+        residue_atom_lens = residue_atom_lens.masked_fill(~valid_atom_len_mask, 0)
+        residue_atom_indices = residue_atom_indices.masked_fill(~valid_atom_len_mask, 0)
+
+        assert (residue_atom_indices < residue_atom_lens)[valid_atom_len_mask].all(), 'residue_atom_indices cannot have an index that exceeds the length of the atoms for that residue as given by residue_atom_lens'
+
         assert exists(residue_atom_lens) or exists(atom_mask)
 
         # if atompair inputs are not windowed, window it
@@ -3079,7 +3088,7 @@ class Alphafold3(Module):
         # handle offsets for residue atom indices
 
         if exists(residue_atom_indices):
-            residue_atom_indices += F.pad(residue_atom_lens, (-1, 1), value = 0)
+            residue_atom_indices = residue_atom_indices + F.pad(residue_atom_lens, (-1, 1), value = 0)
 
         # get atom sequence length and residue sequence length depending on whether using packed atomic seq
 
@@ -3118,7 +3127,7 @@ class Alphafold3(Module):
 
             token_bond = token_bond | rearrange(token_bond, 'b i j -> b j i')
             diagonal = torch.eye(seq_len, device = self.device, dtype = torch.bool)
-            token_bond.masked_fill_(diagonal, False)
+            token_bond = token_bond.masked_fill(diagonal, False)
         else:
             seq_arange = torch.arange(seq_len, device = self.device)
             token_bond = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
