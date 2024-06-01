@@ -140,6 +140,57 @@ def pad_and_window(
     t = rearrange(t, 'b (n w) ... -> b n w ...', w = window_size)
     return t
 
+# to atompair input functions
+
+@typecheck
+def atom_ref_pos_to_atompair_inputs(
+    atom_ref_pos: Float['... m 3'],
+    atom_ref_space_uid: Int['... m'],
+) -> Float['... m m 5']:
+
+    # Algorithm 5 - lines 2-6
+    # allow for either batched or single
+
+    atom_ref_pos, batch_packed_shape = pack_one(atom_ref_pos, '* m c')
+    atom_ref_space_uid, _ = pack_one(atom_ref_space_uid, '* m')
+
+    assert atom_ref_pos.shape[0] == atom_ref_space_uid.shape[0]
+
+    # line 2
+
+    pairwise_rel_pos = einx.subtract('b i c, b j c -> b i j c', atom_ref_pos, atom_ref_pos)
+
+    # line 3
+
+    same_ref_space_mask = einx.equal('b i, b j -> b i j', atom_ref_space_uid, atom_ref_space_uid)
+
+    # line 5 - pairwise inverse squared distance
+
+    atom_inv_square_dist = (1 + pairwise_rel_pos.norm(dim = -1, p = 2) ** 2) ** -1
+
+    # concat all into atompair_inputs for projection into atompair_feats within Alphafold3
+
+    atompair_inputs, _ = pack((
+        pairwise_rel_pos,
+        atom_inv_square_dist,
+        same_ref_space_mask.float(),
+    ), 'b i j *')
+
+    # mask out
+
+    atompair_inputs = einx.where(
+        'b i j, b i j dapi, -> b i j dapi',
+        same_ref_space_mask, atompair_inputs, 0.
+    )
+
+    # reconstitute optional batch dimension
+
+    atompair_inputs = unpack_one(atompair_inputs, batch_packed_shape, '* i j dapi')
+
+    # return
+
+    return atompair_inputs
+
 # packed atom representation functions
 
 @typecheck
