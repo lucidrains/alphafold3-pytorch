@@ -32,6 +32,7 @@ dependencies = [
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
     "omegaconf",
+    "pydantic>=2.7.2",
     "taylor-series-linear-attention>=0.1.9",
     'torch_geometric',
     "torch>=2.1",
