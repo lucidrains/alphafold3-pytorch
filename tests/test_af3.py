@@ -35,7 +35,7 @@ def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
 
-    atom_ref_pos_to_atompair_inputs(atom_ref_pos, atom_ref_space_uid)
+    atompair_inputs = atom_ref_pos_to_atompair_inputs(atom_ref_pos, atom_ref_space_uid)
 
     assert atompair_inputs.shape == (16, 16, 5)
 
