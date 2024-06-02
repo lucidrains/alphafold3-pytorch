@@ -451,7 +451,7 @@ class Attend(Module):
             mk, mv = memory_kv
             mk, mv = tuple(repeat(t, 'h m d -> b h m d', b = batch) for t in (mk, mv))
             k = torch.cat((mk, k), dim = -2)
-            v = torchc.at((mv, v), dim = -2)
+            v = torch.cat((mv, v), dim = -2)
 
             if exists(attn_bias):
                 attn_bias = pad_at_dim(attn_bias, (num_mem_kv, 0), value = 0.)
