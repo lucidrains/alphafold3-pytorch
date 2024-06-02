@@ -1021,6 +1021,7 @@ class PairformerStack(Module):
         dim_single = 384,
         dim_pairwise = 128,
         depth = 48,
+        recurrent_depth = 1, # effective depth will be depth * recurrent_depth
         pair_bias_attn_dim_head = 64,
         pair_bias_attn_heads = 16,
         dropout_row_prob = 0.25,
@@ -1058,6 +1059,12 @@ class PairformerStack(Module):
 
         self.layers = layers
 
+        # https://arxiv.org/abs/2405.16039 and https://arxiv.org/abs/2405.15071
+        # although possibly recycling already takes care of this
+
+        assert recurrent_depth > 0
+        self.recurrent_depth = recurrent_depth
+
         self.num_registers = num_register_tokens
         self.has_registers = num_register_tokens > 0
 
@@ -1093,16 +1100,17 @@ class PairformerStack(Module):
 
         # main transformer block layers
 
-        for (
-            pairwise_block,
-            pair_bias_attn,
-            single_transition
-        ) in self.layers:
+        for _ in range(self.recurrent_depth):
+            for (
+                pairwise_block,
+                pair_bias_attn,
+                single_transition
+            ) in self.layers:
 
-            pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+                pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
 
-            single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
-            single_repr = single_transition(single_repr) + single_repr
+                single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
+                single_repr = single_transition(single_repr) + single_repr
 
         # splice out registers
 
