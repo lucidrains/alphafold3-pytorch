@@ -262,6 +262,9 @@ def test_diffusion_module():
         atom_encoder_depth = 1,
         atom_decoder_depth = 1,
         token_transformer_depth = 1,
+        atom_encoder_kwargs = dict(
+            attn_num_memory_kv = 2
+        ),
         token_transformer_kwargs = dict(
             num_register_tokens = 2
         )

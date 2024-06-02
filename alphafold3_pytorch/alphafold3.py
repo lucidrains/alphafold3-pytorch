@@ -570,6 +570,7 @@ class AttentionPairBias(Module):
         heads,
         dim_pairwise,
         window_size = None,
+        num_memory_kv = 0,
         **attn_kwargs
     ):
         super().__init__()
@@ -579,6 +580,7 @@ class AttentionPairBias(Module):
         self.attn = Attention(
             heads = heads,
             window_size = window_size,
+            num_memory_kv = num_memory_kv,
             **attn_kwargs
         )
 
@@ -1434,6 +1436,7 @@ class DiffusionTransformer(Module):
         dim_pairwise = 128,
         attn_window_size = None,
         attn_pair_bias_kwargs: dict = dict(),
+        attn_num_memory_kv = False,
         num_register_tokens = 0,
         serial = False,
         use_linear_attn = False,
@@ -1466,6 +1469,7 @@ class DiffusionTransformer(Module):
                 dim_pairwise = dim_pairwise,
                 heads = heads,
                 window_size = attn_window_size,
+                num_memory_kv = attn_num_memory_kv,
                 **attn_pair_bias_kwargs
             )
 
