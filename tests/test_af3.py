@@ -35,7 +35,9 @@ def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
 
-    atom_ref_pos_to_atompair_inputs(atom_ref_pos, atom_ref_space_uid)
+    atompair_inputs = atom_ref_pos_to_atompair_inputs(atom_ref_pos, atom_ref_space_uid)
+
+    assert atompair_inputs.shape == (16, 16, 5)
 
 def test_mean_pool_with_lens():
     seq = torch.tensor([[[1.], [1.], [1.], [2.], [2.], [2.], [2.], [1.], [1.]]])
