@@ -30,11 +30,12 @@
 
 # %%
 from __future__ import annotations
+
 import argparse
 import glob
 import os
 import random
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import pandas as pd
 import timeout_decorator
@@ -205,18 +206,17 @@ def parse_structure(filepath: str) -> Structure:
     structure = parser.get_structure(structure_id, filepath)
     return structure
 
+
 @typecheck
 def filter_pdb_deposition_date(
     structure: Structure, cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30")
 ) -> bool:
     """Filter based on PDB deposition date."""
-    if (
+    return (
         "deposition_date" in structure.header
         and exists(structure.header["deposition_date"])
         and pd.to_datetime(structure.header["deposition_date"]) <= cutoff_date
-    ):
-        return True
-    return False
+    )
 
 
 @typecheck
@@ -529,7 +529,7 @@ def remove_leaving_atoms(
 
 
 @typecheck
-def filter_large_ca_distances(structure: Structure) -> Structure:
+def filter_large_ca_distances(structure: Structure, max_distance: float = 10.0) -> Structure:
     """
     Filter chains with large Ca atom distances.
 
@@ -542,7 +542,7 @@ def filter_large_ca_distances(structure: Structure) -> Structure:
         ca_atoms = [res["CA"] for res in chain if "CA" in res]
         for i, ca1 in enumerate(ca_atoms[:-1]):
             ca2 = ca_atoms[i + 1]
-            if (ca1 - ca2) > 10:
+            if (ca1 - ca2) > max_distance:
                 chains_to_remove.append(chain.id)
                 break
 
@@ -769,5 +769,8 @@ if __name__ == '__main__':
         for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
     ]
     process_map(
-        process_structure, args_tuples, max_workers=args.num_workers, chunksize=args.worker_chunk_size
+        process_structure,
+        args_tuples,
+        max_workers=args.num_workers,
+        chunksize=args.worker_chunk_size,
     )
