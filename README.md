@@ -104,6 +104,38 @@ sampled_atom_pos = alphafold3(
 sampled_atom_pos.shape # (2, <atom_seqlen>, 3)
 ```
 
+## Data preparation
+
+To acquire the AlphaFold 3 PDB dataset, first download all complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The script below assumes you have downloaded the PDB in the **mmCIF file format** (e.g., placing it at `data/mmCIF/` by default). On the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
+
+> WARNING: Downloading PDB can take up to 1TB of space.
+
+After downloading, you should have a directory formatted like this:
+https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
+```bash
+00/
+01/
+02/
+..
+zz/
+```
+
+In this directory, unzip all the files:
+```bash
+find . -type f -name "*.gz" -exec gzip -d {} \;
+```
+
+Next run the commands `wget -P data/CCD/ https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz` and `wget -P data/CCD/ https://files.wwpdb.org/pub/pdb/data/component-models/complete/chem_comp_model.cif.gz` from the project's root directory to download the latest version of the PDB's Chemical Component Dictionary (CCD) and its structural models. Extract each of these files using the command `find data/CCD/ -type f -name "*.gz" -exec gzip -d {} \;`.
+
+Then run the following with <pdb_dir>, <ccd_dir>, and <out_dir> replaced with the locations of your local copies of the PDB, CCD, and your desired dataset output directory (e.g., `data/PDB_set/` by default).
+```bash
+python alphafold3_pytorch/pdb_dataset_curation.py --mmcif_dir <pdb_dir> --ccd_dir <ccd_dir> --out_dir <out_dir>
+```
+
+See the script for more options. Each mmCIF that successfully passes
+all processing steps will be written to <out_dir> within a subdirectory
+named using the mmCIF's second and third PDB ID characters (e.g. `5c`).
+
 ## Contributing
 
 At the project root, run
