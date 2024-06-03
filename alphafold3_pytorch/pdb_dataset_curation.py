@@ -30,13 +30,15 @@
 
 # %%
 from __future__ import annotations
+
 import argparse
 import glob
 import os
 import random
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import pandas as pd
+import timeout_decorator
 from Bio.PDB import MMCIFIO, PDBIO, MMCIFParser, PDBParser
 from Bio.PDB.Atom import Atom
 from Bio.PDB.NeighborSearch import NeighborSearch
@@ -103,6 +105,10 @@ os.makedirs(args.output_dir, exist_ok=True)
 # Constants
 
 Token = Residue | Atom
+
+PROCESS_STRUCTURE_MAX_SECONDS = (
+    60  # Maximum time allocated to process a single structure (in seconds)
+)
 
 # Section 2.5.4 of the AlphaFold 3 supplement
 
@@ -200,18 +206,17 @@ def parse_structure(filepath: str) -> Structure:
     structure = parser.get_structure(structure_id, filepath)
     return structure
 
+
 @typecheck
 def filter_pdb_deposition_date(
     structure: Structure, cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30")
 ) -> bool:
     """Filter based on PDB deposition date."""
-    if (
+    return (
         "deposition_date" in structure.header
         and exists(structure.header["deposition_date"])
         and pd.to_datetime(structure.header["deposition_date"]) <= cutoff_date
-    ):
-        return True
-    return False
+    )
 
 
 @typecheck
@@ -524,7 +529,7 @@ def remove_leaving_atoms(
 
 
 @typecheck
-def filter_large_ca_distances(structure: Structure) -> Structure:
+def filter_large_ca_distances(structure: Structure, max_distance: float = 10.0) -> Structure:
     """
     Filter chains with large Ca atom distances.
 
@@ -537,7 +542,7 @@ def filter_large_ca_distances(structure: Structure) -> Structure:
         ca_atoms = [res["CA"] for res in chain if "CA" in res]
         for i, ca1 in enumerate(ca_atoms[:-1]):
             ca2 = ca_atoms[i + 1]
-            if (ca1 - ca2) > 10:
+            if (ca1 - ca2) > max_distance:
                 chains_to_remove.append(chain.id)
                 break
 
@@ -712,38 +717,48 @@ def process_structure(args: Tuple[str, str, bool]):
     using AlphaFold 3's PDB dataset filtering criteria.
     """
     filepath, output_dir, skip_existing = args
-
-    # Section 2.5.4 of the AlphaFold 3 supplement
     try:
-        structure = parse_structure(filepath)
-        output_file_dir = os.path.join(output_dir, structure.id[1:3])
-        output_filepath = os.path.join(output_file_dir, f"{structure.id}.cif")
-        if skip_existing and os.path.exists(output_filepath):
-            print(f"Skipping existing output file: {output_filepath}")
-            return
-        os.makedirs(output_file_dir, exist_ok=True)
+        with timeout_decorator.timeout(PROCESS_STRUCTURE_MAX_SECONDS, use_signals=False):
+            # Section 2.5.4 of the AlphaFold 3 supplement
+            structure = parse_structure(filepath)
+            output_file_dir = os.path.join(output_dir, structure.id[1:3])
+            output_filepath = os.path.join(output_file_dir, f"{structure.id}.cif")
+            if skip_existing and os.path.exists(output_filepath):
+                print(f"Skipping existing output file: {output_filepath}")
+                return
+            os.makedirs(output_file_dir, exist_ok=True)
 
-        # Filtering of targets
-        structure = filter_target(structure)
-        if exists(structure):
-            # Filtering of bioassemblies
-            structure = remove_hydrogens(structure)
-            structure = remove_all_unknown_residue_chains(structure, STANDARD_RESIDUES)
-            structure = remove_clashing_chains(structure)
-            structure = remove_excluded_ligands(structure, LIGAND_EXCLUSION_LIST)
-            structure = remove_non_ccd_atoms(structure, CCD_READER_RESULTS)
-            structure = remove_leaving_atoms(structure, CCD_READER_RESULTS)
-            structure = filter_large_ca_distances(structure)
-            structure = select_closest_chains(
-                structure, PROTEIN_RESIDUE_CENTER_ATOMS, NUCLEIC_ACID_RESIDUE_CENTER_ATOMS
-            )
-            structure = remove_crystallization_aids(structure, CRYSTALLOGRAPHY_METHODS)
-            if list(structure.get_chains()):
-                # Save processed structure
-                write_structure(structure, output_filepath)
-                print(f"Finished processing structure: {structure.id}")
+            # Filtering of targets
+            structure = filter_target(structure)
+            if exists(structure):
+                # Filtering of bioassemblies
+                structure = remove_hydrogens(structure)
+                structure = remove_all_unknown_residue_chains(structure, STANDARD_RESIDUES)
+                structure = remove_clashing_chains(structure)
+                structure = remove_excluded_ligands(structure, LIGAND_EXCLUSION_LIST)
+                structure = remove_non_ccd_atoms(structure, CCD_READER_RESULTS)
+                structure = remove_leaving_atoms(structure, CCD_READER_RESULTS)
+                structure = filter_large_ca_distances(structure)
+                structure = select_closest_chains(
+                    structure, PROTEIN_RESIDUE_CENTER_ATOMS, NUCLEIC_ACID_RESIDUE_CENTER_ATOMS
+                )
+                structure = remove_crystallization_aids(structure, CRYSTALLOGRAPHY_METHODS)
+                if list(structure.get_chains()):
+                    # Save processed structure
+                    write_structure(structure, output_filepath)
+                    print(f"Finished processing structure: {structure.id}")
     except Exception as e:
         print(f"Skipping structure processing of {filepath} due to: {e}")
+        structure_id = os.path.splitext(os.path.basename(filepath))[0]
+        output_file_dir = os.path.join(output_dir, structure_id[1:3])
+        output_filepath = os.path.join(output_file_dir, f"{structure_id}.cif")
+        if os.path.exists(output_filepath):
+            try:
+                os.remove(output_filepath)
+            except Exception as e:
+                print(
+                    f"Failed to remove partially processed file {output_filepath} due to: {e}. Skipping its removal..."
+                )
 
 
 if __name__ == '__main__':
@@ -754,5 +769,8 @@ if __name__ == '__main__':
         for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
     ]
     process_map(
-        process_structure, args_tuples, max_workers=args.num_workers, chunksize=args.worker_chunk_size
+        process_structure,
+        args_tuples,
+        max_workers=args.num_workers,
+        chunksize=args.worker_chunk_size,
     )
