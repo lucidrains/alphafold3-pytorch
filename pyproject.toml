@@ -24,6 +24,7 @@ classifiers=[
 
 dependencies = [
     "beartype",
+    "biopython>=1.83",
     "einops>=0.8.0",
     "einx>=0.2.2",
     "ema-pytorch>=0.4.8",
@@ -32,11 +33,13 @@ dependencies = [
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
     "omegaconf",
+    "pandas>=1.5.3",
+    "pdbeccdutils>=0.8.5",
     "pydantic>=2.7.2",
     "taylor-series-linear-attention>=0.1.9",
     'torch_geometric',
     "torch>=2.1",
-    "tqdm",
+    "tqdm>=4.66.4",
 ]
 
 [project.urls]
