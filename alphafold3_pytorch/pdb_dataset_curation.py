@@ -746,12 +746,13 @@ def process_structure(args: Tuple[str, str, bool]):
         print(f"Skipping structure processing of {filepath} due to: {e}")
 
 
-# Process structures across all worker processes
+if __name__ == '__main__':
+    # Process structures across all worker processes
 
-args_tuples = [
-    (filepath, args.output_dir, args.skip_existing)
-    for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
-]
-process_map(
-    process_structure, args_tuples, max_workers=args.num_workers, chunksize=args.worker_chunk_size
-)
+    args_tuples = [
+        (filepath, args.output_dir, args.skip_existing)
+        for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
+    ]
+    process_map(
+        process_structure, args_tuples, max_workers=args.num_workers, chunksize=args.worker_chunk_size
+    )
