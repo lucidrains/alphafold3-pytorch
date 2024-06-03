@@ -1145,7 +1145,7 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_molecule_feats: Float[f'b n {ADDITIONAL_molecule_FEATS}']
+        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     ) -> Float['b n n dp']:
 
         device = additional_molecule_feats.device

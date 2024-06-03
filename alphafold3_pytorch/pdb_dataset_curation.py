@@ -29,11 +29,12 @@
 #
 
 # %%
+from __future__ import annotations
 import argparse
 import glob
 import os
 import random
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple
 
 import pandas as pd
 from Bio.PDB import MMCIFIO, PDBIO, MMCIFParser, PDBParser
@@ -44,6 +45,8 @@ from Bio.PDB.Structure import Structure
 from pdbeccdutils.core import ccd_reader
 from pdbeccdutils.core.ccd_reader import CCDReaderResult
 from tqdm.contrib.concurrent import process_map
+
+from alphafold3_pytorch.typing import typecheck
 
 # Parse command-line arguments
 
@@ -99,7 +102,7 @@ os.makedirs(args.output_dir, exist_ok=True)
 
 # Constants
 
-Token = Union[Residue, Atom]
+Token = Residue | Atom
 
 # Section 2.5.4 of the AlphaFold 3 supplement
 
@@ -184,6 +187,7 @@ def exists(v: Any) -> bool:
     return v is not None
 
 
+@typecheck
 def parse_structure(filepath: str) -> Structure:
     """Parse a structure from a PDB or mmCIF file."""
     if filepath.endswith(".pdb"):
@@ -196,7 +200,7 @@ def parse_structure(filepath: str) -> Structure:
     structure = parser.get_structure(structure_id, filepath)
     return structure
 
-
+@typecheck
 def filter_pdb_deposition_date(
     structure: Structure, cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30")
 ) -> bool:
@@ -210,17 +214,17 @@ def filter_pdb_deposition_date(
     return False
 
 
+@typecheck
 def filter_resolution(structure: Structure, max_resolution: float = 9.0) -> bool:
     """Filter based on resolution."""
-    if (
+    return (
         "resolution" in structure.header
         and exists(structure.header["resolution"])
         and structure.header["resolution"] <= max_resolution
-    ):
-        return True
-    return False
+    )
 
 
+@typecheck
 def filter_polymer_chains(
     structure: Structure, max_chains: int = 1000, for_training: bool = False
 ) -> bool:
@@ -229,6 +233,7 @@ def filter_polymer_chains(
     return count <= (300 if for_training else max_chains)
 
 
+@typecheck
 def filter_resolved_chains(structure: Structure) -> Structure:
     """Filter based on number of resolved residues."""
     chains_to_remove = [
@@ -243,7 +248,8 @@ def filter_resolved_chains(structure: Structure) -> Structure:
     return structure if list(structure.get_chains()) else None
 
 
-def filter_target(structure: Structure) -> Optional[Structure]:
+@typecheck
+def filter_target(structure: Structure) -> Structure | None:
     """Filter a target based on various criteria."""
     target_passes_prefilters = (
         filter_pdb_deposition_date(structure)
@@ -253,6 +259,7 @@ def filter_target(structure: Structure) -> Optional[Structure]:
     return filter_resolved_chains(structure) if target_passes_prefilters else None
 
 
+@typecheck
 def remove_hydrogens(structure: Structure, remove_waters: bool = True) -> Structure:
     """
     Remove hydrogens (and optionally waters) from a structure.
@@ -284,6 +291,7 @@ def remove_hydrogens(structure: Structure, remove_waters: bool = True) -> Struct
     return structure
 
 
+@typecheck
 def remove_all_unknown_residue_chains(
     structure: Structure, standard_residues: Set[str]
 ) -> Structure:
@@ -300,6 +308,7 @@ def remove_all_unknown_residue_chains(
     return structure
 
 
+@typecheck
 def remove_clashing_chains(
     structure: Structure, clash_threshold: float = 1.7, clash_percentage: float = 0.3
 ) -> Structure:
@@ -360,6 +369,7 @@ def remove_clashing_chains(
     return structure
 
 
+@typecheck
 def remove_excluded_ligands(structure: Structure, ligand_exclusion_list: Set[str]) -> Structure:
     """
     Remove ligands in the exclusion list.
@@ -385,6 +395,7 @@ def remove_excluded_ligands(structure: Structure, ligand_exclusion_list: Set[str
     return structure
 
 
+@typecheck
 def remove_non_ccd_atoms(
     structure: Structure, ccd_reader_results: Dict[str, CCDReaderResult]
 ) -> Structure:
@@ -417,6 +428,7 @@ def remove_non_ccd_atoms(
     return structure
 
 
+@typecheck
 def is_covalently_bonded(atom1: Atom, atom2: Atom) -> bool:
     """
     Check if two atoms are covalently bonded.
@@ -431,6 +443,7 @@ def is_covalently_bonded(atom1: Atom, atom2: Atom) -> bool:
     return False
 
 
+@typecheck
 def remove_leaving_atoms(
     structure: Structure, ccd_reader_results: Dict[str, CCDReaderResult]
 ) -> Structure:
@@ -510,6 +523,7 @@ def remove_leaving_atoms(
     return structure
 
 
+@typecheck
 def filter_large_ca_distances(structure: Structure) -> Structure:
     """
     Filter chains with large Ca atom distances.
@@ -533,6 +547,7 @@ def filter_large_ca_distances(structure: Structure) -> Structure:
     return structure
 
 
+@typecheck
 def select_closest_chains(
     structure: Structure,
     protein_residue_center_atoms: Dict[str, str],
@@ -541,6 +556,7 @@ def select_closest_chains(
 ) -> Structure:
     """Select the closest chains in large bioassemblies."""
 
+    @typecheck
     def get_tokens_from_residues(
         residues: List[Residue],
         protein_residue_center_atoms: Dict[str, str],
@@ -559,6 +575,7 @@ def select_closest_chains(
                     tokens.append(atom)
         return tokens
 
+    @typecheck
     def get_token_center_atom(
         token: Token,
         protein_residue_center_atoms: Dict[str, str],
@@ -574,6 +591,7 @@ def select_closest_chains(
             token_center_atom = token
         return token_center_atom
 
+    @typecheck
     def get_token_center_atoms(
         tokens: List[Token],
         protein_residue_center_atoms: Dict[str, str],
@@ -588,6 +606,7 @@ def select_closest_chains(
             token_center_atoms.append(token_center_atom)
         return token_center_atoms
 
+    @typecheck
     def get_interface_tokens(
         tokens: List[Token],
         protein_residue_center_atoms: Dict[str, str],
@@ -645,6 +664,7 @@ def select_closest_chains(
     return structure
 
 
+@typecheck
 def remove_crystallization_aids(
     structure: Structure, crystallography_methods: Dict[str, Set[str]]
 ) -> Structure:
@@ -672,6 +692,7 @@ def remove_crystallization_aids(
     return structure
 
 
+@typecheck
 def write_structure(structure: Structure, output_filepath: str):
     """Write a structure to a PDB or mmCIF file."""
     if output_filepath.endswith(".pdb"):
@@ -684,6 +705,7 @@ def write_structure(structure: Structure, output_filepath: str):
     io.save(output_filepath)
 
 
+@typecheck
 def process_structure(args: Tuple[str, str, bool]):
     """
     Given an input mmCIF file, create a new processed mmCIF file

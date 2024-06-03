@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from functools import wraps
+from functools import wraps, partial
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
 from alphafold3_pytorch.attention import pad_at_dim
 
-from typing import TypedDict, List
+from typing import TypedDict, List, Callable
 
 from alphafold3_pytorch.typing import (
     typecheck,
