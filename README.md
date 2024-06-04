@@ -152,17 +152,31 @@ Then, add your module to `alphafold3_pytorch/alphafold3.py`, add your tests to `
 $ pytest tests/
 ```
 
-## Docker
+## Docker Image
+The included `Dockerfile` contains the required dependencies to run the package and to train/inference using PyTorch with GPUs.
 
-### Build Docker Container
+The default base image is `pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime` and installs the latest version of this package from the `main` GitHub branch.
+
 ```bash
+## Build Docker Container
 docker build -t af3 .
 ```
 
-### Run Container
+Alternatively, use build arguments to rebuild the image with different software versions:
+- `PYTORCH_TAG`: Changes the base image and thus builds with different PyTorch, CUDA, and/or cuDNN versions.
+- `GIT_TAG`: Changes the tag of this repo to clone and install the package.
+
+For example:
 ```bash
-## With GPUs
-docker run  --gpus all -it af3
+## Use build argument to change versions
+docker build --build-arg "PYTORCH_TAG=2.2.1-cuda12.1-cudnn8-devel" --build-arg "GIT_TAG=0.1.15" -t af3 .
+```
+
+Then, run the container with GPUs and mount a local volume (for training) using the following command:
+
+```bash
+## Run Container
+docker run -v .:/data --gpus all -it af3
 ```
 
 ## Citations
