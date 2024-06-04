@@ -4,6 +4,8 @@ from environs import Env
 from torch import Tensor
 
 from beartype import beartype
+from beartype.door import is_bearable
+
 from jaxtyping import (
     Float,
     Int,
@@ -17,6 +19,11 @@ env = Env()
 env.read_env()
 
 # function
+
+def always(value):
+    def inner(*args, **kwargs):
+        return value
+    return inner
 
 def null_decorator(fn):
     @wraps(fn)
@@ -43,9 +50,12 @@ should_typecheck = env.bool('TYPECHECK', False)
 
 typecheck = jaxtyped(typechecker = beartype) if should_typecheck else null_decorator
 
+beartype_isinstance = is_bearable if should_typecheck else always(True)
+
 __all__ = [
     Float,
     Int,
     Bool,
-    typecheck
+    typecheck,
+    beartype_isinstance
 ]

@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import NamedTuple
+from typing import NamedTuple, Tuple
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import Module
 
@@ -53,6 +53,103 @@ def pad_at_dim(
     zeros = ((0, 0) * dims_from_right)
     return F.pad(t, (*zeros, *pad), value = value)
 
+@typecheck
+def slice_at_dim(
+    t: Tensor,
+    dim_slice: slice,
+    *,
+    dim: int
+):
+    dim += (t.ndim if dim < 0 else 0)
+    colons = [slice(None)] * t.ndim
+    colons[dim] = dim_slice
+    return t[tuple(colons)]
+
+@typecheck
+def pad_or_slice_to(
+    t: Tensor,
+    length: int,
+    *,
+    dim: int,
+    pad_value = 0
+):
+    curr_length = t.shape[dim]
+
+    if curr_length < length:
+        t = pad_at_dim(t, (0, length - curr_length), dim = dim, value = pad_value)
+    elif curr_length > length:
+        t = slice_at_dim(t, slice(0, length), dim = dim)
+
+    return t
+
+@typecheck
+def pad_to_multiple(
+    t: Tensor,
+    multiple: int,
+    *,
+    dim = -1,
+    value = 0.
+):
+    seq_len = t.shape[dim]
+    padding_needed = (multiple - (seq_len % multiple)) % multiple
+
+    if padding_needed == 0:
+        return t
+
+    return pad_at_dim(t, (0, padding_needed), dim = dim, value = value)
+
+@typecheck
+def concat_previous_window(
+    t: Tensor,
+    *,
+    dim_seq: int,
+    dim_window: int
+):
+    t = pad_at_dim(t, (1, 0), dim = dim_seq, value = 0.)
+
+    t = torch.cat((
+        slice_at_dim(t, slice(None, -1), dim = dim_seq),
+        slice_at_dim(t, slice(1, None), dim = dim_seq),
+    ), dim = dim_window)
+
+    return t
+
+# for changing full attention bias matrix to a local windowed one for atom attention
+
+@typecheck
+def full_pairwise_repr_to_windowed(
+    pairwise_repr: Float['... m m dp'],
+    window_size: int
+) -> Float['... n w (w*2) dp']:
+
+    seq_len, device = pairwise_repr.shape[-2], pairwise_repr.device
+
+    padding_needed = (window_size - (seq_len % window_size)) % window_size
+    pairwise_repr = F.pad(pairwise_repr, (0, 0, 0, padding_needed, 0, padding_needed), value = 0.)
+    pairwise_repr = rearrange(pairwise_repr, '... (i w1) (j w2) d -> ... i j w1 w2 d', w1 = window_size, w2 = window_size)
+    pairwise_repr = concat_previous_window(pairwise_repr, dim_seq = -4, dim_window = -2)
+
+    # get the diagonal
+
+    n = torch.arange(pairwise_repr.shape[-4], device = device)
+
+    pairwise_repr = einx.get_at(
+        '... [i j] w1 w2 d, n, n -> ... n w1 w2 d',
+        pairwise_repr, n, n
+    )
+
+    return pairwise_repr
+
+@typecheck
+def full_attn_bias_to_windowed(
+    attn_bias: Float['... m m'],
+    window_size: int
+) -> Float['... n w (w*2)']:
+
+    attn_bias = rearrange(attn_bias, '... -> ... 1')
+    attn_bias = full_pairwise_repr_to_windowed(attn_bias, window_size = window_size)
+    return rearrange(attn_bias, '... 1 -> ...')
+
 # multi-head attention
 
 class Attention(Module):
@@ -68,6 +165,7 @@ class Attention(Module):
         query_bias = True,
         flash = True,
         window_size = None,
+        num_memory_kv: int = 0,
         efficient_attn_config: Config = Config(True, True, True)
     ):
         super().__init__()
@@ -81,6 +179,7 @@ class Attention(Module):
         e - dimension (pairwise rep)
         i - source sequence
         j - context sequence
+        m - memory key / value seq
         """
 
         dim_inner = dim_head * heads
@@ -98,6 +197,12 @@ class Attention(Module):
         self.to_q = nn.Linear(dim, dim_inner, bias = query_bias)
         self.to_kv = nn.Linear(dim, dim_inner * 2, bias = False)
         self.to_out = nn.Linear(dim_inner, dim, bias = False)
+
+        self.memory_kv = None
+
+        if num_memory_kv > 0:
+            self.memory_kv = nn.Parameter(torch.zeros(2, heads, num_memory_kv, dim_head))
+            nn.init.normal_(self.memory_kv, std = 0.02)
 
         # gating of value
         # allows attention to attend to nothing
@@ -117,7 +222,7 @@ class Attention(Module):
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
-        attn_bias: Float['... i j'] | None = None
+        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None
 
     ) -> Float['b i d']:
 
@@ -133,7 +238,8 @@ class Attention(Module):
         out = self.attend(
             q, k, v,
             attn_bias = attn_bias,
-            mask = mask
+            mask = mask,
+            memory_kv = self.memory_kv
         )
 
         # merge heads
@@ -218,7 +324,8 @@ class Attend(Module):
         k: Float['b h n d'],
         v: Float['b h n d'],
         mask: Bool['b n'] | None = None,
-        attn_bias: Float['... n n'] | None = None
+        attn_bias: Float['... n n'] | Float['... nw w (w*2)'] | None = None,
+        memory_kv: Float['2 h m d'] | None = None
     ) -> Float['b h n d']:
         """
         simple local attention with a radius of 1 window size
@@ -233,7 +340,7 @@ class Attend(Module):
 
         # pad to multiple of window size if needed
 
-        padding_needed = (window_size - (seq_len % window_size)) % window_size        
+        padding_needed = (window_size - (seq_len % window_size)) % window_size
 
         if padding_needed > 0:
             q, k, v = tuple(pad_at_dim(t, (0, padding_needed), value = 0., dim = -2) for t in (q, k, v))
@@ -247,39 +354,42 @@ class Attend(Module):
         # just do radius of 1 for now
         # perhaps not even necessary, and could try shifted windows (a la Swin)
 
-        k, v = tuple(pad_at_dim(t, (1, 1), dim = -2) for t in (k, v))
-        mask = F.pad(mask, (1, 1), value = False)
+        k, v = tuple(pad_at_dim(t, (1, 0), dim = -2) for t in (k, v))
+        mask = F.pad(mask, (1, 0), value = False)
 
-        k, v = tuple(torch.cat((t[..., :-2, :], t[..., 1:-1, :], t[..., 2:, :]), dim = -2) for t in (k, v))
-        mask = torch.cat((mask[..., :-2], mask[..., 1:-1], mask[..., 2:]), dim = -1)
+        k, v = tuple(torch.cat((t[..., :-1, :], t[..., 1:, :]), dim = -2) for t in (k, v))
+        mask = torch.cat((mask[..., :-1], mask[..., 1:]), dim = -1)
 
         # handle attention bias (inefficiently)
 
-        if exists(attn_bias):
-            attn_bias = F.pad(attn_bias, (0, padding_needed, 0, padding_needed), value = 0.)
-            attn_bias = rearrange(attn_bias, '... (i w1) (j w2) -> ... i j w1 w2', w1 = window_size, w2 = window_size)
-            attn_bias = pad_at_dim(attn_bias, (1, 1), dim = -3, value = 0.)
+        is_full_attn_bias = attn_bias.shape[-1] == attn_bias.shape[-2]
 
-            attn_bias = torch.cat((
-                attn_bias[..., :-2, :, :],
-                attn_bias[..., 1:-1, :, :],
-                attn_bias[..., 2:, :, :]
-            ), dim = -1)
-
-            # get the diagonal
-
-            n = torch.arange(attn_bias.shape[-3], device = device)
-
-            attn_bias = einx.get_at(
-                '... [i j] w1 w2, n, n -> ... n w1 w2',
-                attn_bias, n, n
-            )
+        if exists(attn_bias) and is_full_attn_bias:
+            attn_bias = full_attn_bias_to_windowed(attn_bias, window_size = window_size)
 
         # carry out attention as usual
 
         scale = q.shape[-1] ** -0.5
 
         q = q * scale
+
+        # append memory key / values for local attention windows
+
+        if exists(memory_kv):
+            batch, seq, num_mem_kv = k.shape[0], k.shape[2], memory_kv.shape[-2]
+
+            mk, mv = memory_kv
+            mk, mv = tuple(repeat(t, 'h m d -> b h n m d', b = batch, n = seq) for t in (mk, mv))
+            k = torch.cat((mk, k), dim = -2)
+            v = torch.cat((mv, v), dim = -2)
+
+            if exists(attn_bias):
+                attn_bias = pad_at_dim(attn_bias, (num_mem_kv, 0), value = 0.)
+
+            if exists(mask):
+                mask = pad_at_dim(mask, (num_mem_kv, 0), value = True)
+
+        # similarity
 
         sim = einsum(q, k, "... i d, ... j d -> ... i j")
 
@@ -316,14 +426,38 @@ class Attend(Module):
         k: Float['b h j d'],
         v: Float['b h j d'],
         mask: Bool['b j'] | None = None,
-        attn_bias: Float['... i j'] | None = None,
+        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None,
+        memory_kv: Float['2 h m d'] | None = None
     ) -> Float['b h i d']:
+
+        is_windowed_attn_bias = None
+
+        if exists(attn_bias):
+            is_windowed_attn_bias = attn_bias.shape[-1] != attn_bias.shape[-2]
 
         # local windowed attention
         # todo (handle attn bias efficiently)
 
         if self.is_local_attn:
-            return self.local_attn(q, k, v, mask = mask, attn_bias = attn_bias)
+            return self.local_attn(q, k, v, mask = mask, attn_bias = attn_bias, memory_kv = memory_kv)
+
+        assert not exists(is_windowed_attn_bias) or not is_windowed_attn_bias
+
+        # append memory key / values
+
+        if exists(memory_kv):
+            batch, num_mem_kv = q.shape[0], memory_kv.shape[-2]
+
+            mk, mv = memory_kv
+            mk, mv = tuple(repeat(t, 'h m d -> b h m d', b = batch) for t in (mk, mv))
+            k = torch.cat((mk, k), dim = -2)
+            v = torch.cat((mv, v), dim = -2)
+
+            if exists(attn_bias):
+                attn_bias = pad_at_dim(attn_bias, (num_mem_kv, 0), value = 0.)
+
+            if exists(mask):
+                mask = pad_at_dim(mask, (num_mem_kv, 0), value = True)
 
         # forward to using flash attention if applicable
 
