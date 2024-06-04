@@ -17,7 +17,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Literal, Tuple, NamedTuple
+from typing import Literal, Tuple, NamedTuple, Callable
 
 from alphafold3_pytorch.typing import (
     Float,
@@ -36,6 +36,8 @@ from alphafold3_pytorch.attention import (
     full_attn_bias_to_windowed,
     full_pairwise_repr_to_windowed
 )
+
+from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
 
@@ -2106,6 +2108,7 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
+        frame_average_fn: Callable[[Float['b n 3']], Float['b n 3']] | None = None,
         return_denoised_pos = False,
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
@@ -2141,6 +2144,13 @@ class ElucidatedAtomDiffusion(Module):
                 molecule_atom_lens = molecule_atom_lens
             )
         )
+
+        # frame average the denoised atom positions if needed
+
+        if exists(frame_average_fn):
+            denoised_atom_pos = frame_average_fn(denoised_atom_pos)
+
+        # total loss, for accumulating all auxiliary losses
 
         total_loss = 0.
 

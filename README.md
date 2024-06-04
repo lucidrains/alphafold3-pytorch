@@ -226,3 +226,14 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:268063190}
 }
 ```
+
+```bibtex
+@article{Puny2021FrameAF,
+    title   = {Frame Averaging for Invariant and Equivariant Network Design},
+    author  = {Omri Puny and Matan Atzmon and Heli Ben-Hamu and Edward James Smith and Ishan Misra and Aditya Grover and Yaron Lipman},
+    journal = {ArXiv},
+    year    = {2021},
+    volume  = {abs/2110.03336},
+    url     = {https://api.semanticscholar.org/CorpusID:238419638}
+}
+```
