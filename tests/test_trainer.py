@@ -94,7 +94,7 @@ def test_trainer():
             depth = 1
         ),
         pairformer_stack = dict(
-            depth = 2
+            depth = 1
         ),
         diffusion_module_kwargs = dict(
             atom_encoder_depth = 1,
@@ -147,13 +147,21 @@ def test_trainer():
 
     trainer()
 
+    # assert checkpoints created
+
     assert Path('./checkpoints/af3.ckpt.1.pt').exists()
+
+    # assert can load latest checkpoint by loading from a directory
+
+    trainer.load('./checkpoints')
+
+    assert str(trainer.model_loaded_from_path) == str(Path('./checkpoints/af3.ckpt.2.pt'))
 
     # saving and loading from trainer
 
-    trainer.save('./some/nested/folder2/training', overwrite = True)
-    trainer.load('./some/nested/folder2/training')
+    trainer.save('./some/nested/folder2/training.pt', overwrite = True)
+    trainer.load('./some/nested/folder2/training.pt')
 
     # also allow for loading Alphafold3 directly from training ckpt
 
-    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training')
+    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training.pt')

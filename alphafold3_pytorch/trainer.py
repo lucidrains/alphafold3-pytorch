@@ -316,6 +316,10 @@ class Trainer:
         self.checkpoint_folder.mkdir(exist_ok = True, parents = True)
         assert self.checkpoint_folder.is_dir()
 
+        # save the path for the last loaded model, if any
+
+        self.model_loaded_from_path = None
+
     @property
     def is_main(self):
         return self.fabric.global_rank == 0
@@ -344,6 +348,23 @@ class Trainer:
             path = Path(path)
 
         assert path.exists()
+
+        # if the path is a directory, then automatically load latest checkpoint
+
+        if path.is_dir():
+            model_paths = [*path.glob('**/*.pt')]
+
+            assert len(model_paths) > 0, f'no files found in directory {path}'
+
+            model_paths = sorted(model_paths, key = lambda p: int(str(p).split('.')[-2]))
+
+            path = model_paths[-1]
+
+        # for eventually saving entire training history in filename
+
+        self.model_loaded_from_path = path
+
+        # load model from path
 
         self.model.load(path)
 
