@@ -213,6 +213,7 @@ class Trainer:
         default_lambda_lr = default_lambda_lr_fn,
         fabric: Fabric | None = None,
         accelerator = 'auto',
+        checkpoint_prefix = 'af3.ckpt.',
         checkpoint_every: int = 1000,
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
@@ -309,6 +310,7 @@ class Trainer:
 
         # checkpointing logic
 
+        self.checkpoint_prefix = checkpoint_prefix
         self.checkpoint_every = checkpoint_every
         self.overwrite_checkpoints = overwrite_checkpoints
         self.checkpoint_folder = Path(checkpoint_folder)
@@ -326,7 +328,12 @@ class Trainer:
 
     # saving and loading
 
-    def save(self, path: str | Path, overwrite = False):
+    def save(
+        self,
+        path: str | Path,
+        overwrite = False,
+        prefix: str | None = None
+    ):
         if isinstance(path, str):
             path = Path(path)
 
@@ -343,7 +350,12 @@ class Trainer:
 
         torch.save(package, str(path))
 
-    def load(self, path: str | Path, strict = True):
+    def load(
+        self,
+        path: str | Path,
+        strict = True,
+        prefix = None
+    ):
         if isinstance(path, str):
             path = Path(path)
 
@@ -352,7 +364,9 @@ class Trainer:
         # if the path is a directory, then automatically load latest checkpoint
 
         if path.is_dir():
-            model_paths = [*path.glob('**/*.pt')]
+            prefix = default(prefix, self.checkpoint_prefix)
+
+            model_paths = [*path.glob(f'**/{prefix}*.pt')]
 
             assert len(model_paths) > 0, f'no files found in directory {path}'
 
@@ -500,7 +514,7 @@ class Trainer:
             self.wait()
 
             if self.is_main and divisible_by(self.steps, self.checkpoint_every):
-                checkpoint_path = self.checkpoint_folder / f'af3.ckpt.{self.steps}.pt'
+                checkpoint_path = self.checkpoint_folder / f'{self.checkpoint_prefix}{self.steps}.pt'
 
                 self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
 
