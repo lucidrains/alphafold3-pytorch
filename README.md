@@ -237,3 +237,14 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:238419638}
 }
 ```
+
+```bibtex
+@article{Duval2023FAENetFA,
+    title   = {FAENet: Frame Averaging Equivariant GNN for Materials Modeling},
+    author  = {Alexandre Duval and Victor Schmidt and Alex Hernandez Garcia and Santiago Miret and Fragkiskos D. Malliaros and Yoshua Bengio and David Rolnick},
+    journal = {ArXiv},
+    year    = {2023},
+    volume  = {abs/2305.05577},
+    url     = {https://api.semanticscholar.org/CorpusID:258564608}
+}
+```

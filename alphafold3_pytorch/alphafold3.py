@@ -2108,7 +2108,6 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
-        frame_average_fn: Callable[[Float['b n 3']], Float['b n 3']] | None = None,
         return_denoised_pos = False,
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
@@ -2144,11 +2143,6 @@ class ElucidatedAtomDiffusion(Module):
                 molecule_atom_lens = molecule_atom_lens
             )
         )
-
-        # frame average the denoised atom positions if needed
-
-        if exists(frame_average_fn):
-            denoised_atom_pos = frame_average_fn(denoised_atom_pos)
 
         # total loss, for accumulating all auxiliary losses
 
@@ -2905,7 +2899,8 @@ class Alphafold3(Module):
             S_tmax = 50,
             S_noise = 1.003,
         ),
-        augment_kwargs: dict = dict()
+        augment_kwargs: dict = dict(),
+        stochastic_frame_average = False
     ):
         super().__init__()
 
@@ -2917,6 +2912,18 @@ class Alphafold3(Module):
 
         self.num_augmentations = diffusion_num_augmentations
         self.augmenter = CentreRandomAugmentation(**augment_kwargs)
+
+        # stochastic frame averaging
+        # https://arxiv.org/abs/2305.05577
+
+        self.stochastic_frame_average = stochastic_frame_average
+
+        if stochastic_frame_average:
+            self.frame_average = FrameAverage(
+                dim = 3,
+                stochastic = True,
+                return_stochastic_as_augmented_pos = True
+            )
 
         # input feature embedder
 
@@ -3330,7 +3337,7 @@ class Alphafold3(Module):
 
         if calc_diffusion_loss:
 
-            num_augs = self.num_augmentations
+            num_augs = self.num_augmentations + int(self.stochastic_frame_average)
 
             # take care of augmentation
             # they did 48 during training, as the trunk did the heavy lifting
@@ -3378,7 +3385,24 @@ class Alphafold3(Module):
                     )
                 )
 
+                # handle stochastic frame averaging
+
+                if self.stochastic_frame_average:
+                    fa_atom_pos, atom_pos = atom_pos[:1], atom_pos[1:]
+
+                    fa_atom_pos = self.frame_average(
+                        fa_atom_pos,
+                        frame_average_mask = atom_mask[:1]
+                    )
+
+                # normal random augmentations, 48 times in paper
+
                 atom_pos = self.augmenter(atom_pos)
+
+                # concat back the stochastic frame averaged position
+
+                if self.stochastic_frame_average:
+                    atom_pos = torch.cat((fa_atom_pos, atom_pos), dim = 0)
 
             diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,

@@ -31,6 +31,9 @@ from alphafold3_pytorch.alphafold3 import (
     atom_ref_pos_to_atompair_inputs
 )
 
+def join(str, delimiter = ','):
+    return delimiter.join(str)
+
 def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
@@ -400,9 +403,17 @@ def test_distogram_head():
 
     logits = distogram_head(pairwise_repr)
 
-@pytest.mark.parametrize('window_atompair_inputs', (True, False))
+@pytest.mark.parametrize(
+    join([
+        'window_atompair_inputs',
+        'stochastic_frame_average'
+    ]), [
+        (True, False),
+        (True, False)
+    ])
 def test_alphafold3(
-    window_atompair_inputs: bool
+    window_atompair_inputs: bool,
+    stochastic_frame_average: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -457,6 +468,7 @@ def test_alphafold3(
             token_transformer_depth = 1,
             atom_decoder_depth = 1,
         ),
+        stochastic_frame_average = stochastic_frame_average
     )
 
     loss, breakdown = alphafold3(
