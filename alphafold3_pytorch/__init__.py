@@ -38,6 +38,10 @@ from alphafold3_pytorch.trainer import (
     AtomInput
 )
 
+from alphafold3_pytorch.configs import (
+    Alphafold3Config
+)
+
 __all__ = [
     Attention,
     Attend,

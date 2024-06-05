@@ -2694,7 +2694,7 @@ class ConfidenceHead(Module):
         self,
         *,
         dim_single_inputs,
-        atompair_dist_bins: Float[' d'],
+        atompair_dist_bins: List[float],
         dim_single = 384,
         dim_pairwise = 128,
         num_plddt_bins = 50,
@@ -2704,6 +2704,8 @@ class ConfidenceHead(Module):
         pairformer_kwargs: dict = dict()
     ):
         super().__init__()
+
+        atompair_dist_bins = Tensor(atompair_dist_bins)
 
         self.register_buffer('atompair_dist_bins', atompair_dist_bins)
 
@@ -2828,7 +2830,7 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        distance_bins: Float[' dist_bins'] = torch.linspace(3, 20, 38),
+        distance_bins: List[float] = torch.linspace(3, 20, 38).tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
         num_plddt_bins = 50,
@@ -3018,6 +3020,8 @@ class Alphafold3(Module):
 
         # logit heads
 
+        distance_bins = Tensor(distance_bins)
+
         self.register_buffer('distance_bins', distance_bins)
         num_dist_bins = default(num_dist_bins, len(distance_bins))
 
@@ -3065,7 +3069,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert not path.is_dir() and (not path.exists() or overwrite)
+        assert path.is_file() and (not path.exists() or overwrite)
 
         path.parent.mkdir(exist_ok = True, parents = True)
 
@@ -3080,7 +3084,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.exists() and not path.is_dir()
+        assert path.exists() and path.is_file()
 
         package = torch.load(str(path), map_location = 'cpu')
 
@@ -3098,7 +3102,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.exists() and not path.is_dir()
+        assert path.is_file()
 
         package = torch.load(str(path), map_location = 'cpu')
 
