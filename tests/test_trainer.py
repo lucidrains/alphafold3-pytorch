@@ -13,7 +13,8 @@ from alphafold3_pytorch import (
     AtomInput,
     DataLoader,
     Trainer,
-    TrainerConfig
+    TrainerConfig,
+    create_trainer_from_yaml
 )
 
 # mock dataset
@@ -173,7 +174,7 @@ def test_trainer_config():
     curr_dir = Path(__file__).parents[0]
     trainer_yaml_path = curr_dir / 'trainer.yaml'
 
-    trainer = TrainerConfig.create_instance_from_yaml_file(
+    trainer = create_trainer_from_yaml(
         trainer_yaml_path,
         dataset = MockAtomDataset(16)
     )

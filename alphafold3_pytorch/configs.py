@@ -142,3 +142,8 @@ class TrainerConfig(BaseModelWithExtra):
 
         trainer_config = TrainerConfig.from_yaml_file(path)
         return trainer_config.create_instance(**kwargs)
+
+# convenience functions
+
+create_alphafold3_from_yaml = Alphafold3Config.create_instance_from_yaml_file
+create_trainer_from_yaml = TrainerConfig.create_instance_from_yaml_file

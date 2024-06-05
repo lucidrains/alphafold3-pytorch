@@ -22,8 +22,12 @@ from alphafold3_pytorch import (
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3,
-    Alphafold3Config
+    Alphafold3
+)
+
+from alphafold3_pytorch.configs import (
+    Alphafold3Config,
+    create_alphafold3_from_yaml
 )
 
 from alphafold3_pytorch.alphafold3 import (
@@ -574,5 +578,5 @@ def test_alphafold3_config():
     curr_dir = Path(__file__).parents[0]
     af3_yaml = curr_dir / 'alphafold3.yaml'
 
-    alphafold3 = Alphafold3Config.create_instance_from_yaml_file(af3_yaml)
+    alphafold3 = create_alphafold3_from_yaml(af3_yaml)
     assert isinstance(alphafold3, Alphafold3)

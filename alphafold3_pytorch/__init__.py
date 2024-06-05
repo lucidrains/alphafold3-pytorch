@@ -40,7 +40,9 @@ from alphafold3_pytorch.trainer import (
 
 from alphafold3_pytorch.configs import (
     Alphafold3Config,
-    TrainerConfig
+    TrainerConfig,
+    create_alphafold3_from_yaml,
+    create_trainer_from_yaml
 )
 
 __all__ = [
@@ -74,5 +76,7 @@ __all__ = [
     Alphafold3Config,
     AtomInput,
     Trainer,
-    TrainerConfig
+    TrainerConfig,
+    create_alphafold3_from_yaml,
+    create_trainer_from_yaml
 ]
