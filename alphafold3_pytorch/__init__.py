@@ -70,6 +70,7 @@ __all__ = [
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
+    Alphafold3Config,
     AtomInput,
     Trainer
 ]
