@@ -40,7 +40,7 @@ from typing import Dict, List, Set, Tuple
 import pandas as pd
 import timeout_decorator
 from Bio.PDB import MMCIFIO, PDBIO, MMCIFParser, PDBParser
-from Bio.PDB.Atom import Atom
+from Bio.PDB.Atom import Atom, DisorderedAtom
 from Bio.PDB.NeighborSearch import NeighborSearch
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
@@ -50,75 +50,13 @@ from tqdm.contrib.concurrent import process_map
 
 from alphafold3_pytorch.typing import typecheck
 
-# Parse command-line arguments
-
-parser = argparse.ArgumentParser(
-    description="Process mmCIF files to curate the AlphaFold 3 PDB dataset."
-)
-parser.add_argument(
-    "--mmcif_dir",
-    type=str,
-    default=os.path.join("data", "mmCIF"),
-    help="Path to the input directory containing mmCIF files to process.",
-)
-parser.add_argument(
-    "--ccd_dir",
-    type=str,
-    default=os.path.join("data", "CCD"),
-    help="Path to the directory containing CCD files to reference during data processing.",
-)
-parser.add_argument(
-    "--output_dir",
-    type=str,
-    default=os.path.join("data", "PDB_set"),
-    help="Path to the output directory in which to store processed mmCIF dataset files.",
-)
-parser.add_argument(
-    "--skip_existing",
-    action="store_true",
-    help="Skip processing of existing output files.",
-)
-parser.add_argument(
-    "--num_workers",
-    type=int,
-    default=1,
-    help="Number of worker processes to use for parallel processing.",
-)
-parser.add_argument(
-    "--worker_chunk_size",
-    type=int,
-    default=1,
-    help="Size of mmCIF file chunks sent to worker processes.",
-)
-args = parser.parse_args("")
-
-assert os.path.exists(args.mmcif_dir), f"Input directory {args.mmcif_dir} does not exist."
-assert os.path.exists(args.ccd_dir), f"CCD directory {args.ccd_dir} does not exist."
-assert os.path.exists(
-    os.path.join(args.ccd_dir, "chem_comp_model.cif")
-), f"CCD ligands file not found in {args.ccd_dir}."
-assert os.path.exists(
-    os.path.join(args.ccd_dir, "components.cif")
-), f"CCD components file not found in {args.ccd_dir}."
-os.makedirs(args.output_dir, exist_ok=True)
-
 # Constants
 
-Token = Residue | Atom
+Token = Residue | Atom | DisorderedAtom
 
 PROCESS_STRUCTURE_MAX_SECONDS = (
     60  # Maximum time allocated to process a single structure (in seconds)
 )
-
-# Section 2.5.4 of the AlphaFold 3 supplement
-
-print("Loading the Chemical Component Dictionary (CCD) into memory...")
-CCD_READER_RESULTS = ccd_reader.read_pdb_components_file(
-    # Load globally to share amongst all worker processes
-    os.path.join(args.ccd_dir, "components.cif"),
-    sanitize=False,  # Reduce loading time
-)
-print("Finished loading the Chemical Component Dictionary (CCD) into memory.")
 
 COVALENT_BOND_THRESHOLDS = {
     # Threshold distances for covalent bonds (in Ångströms)
@@ -239,7 +177,7 @@ def filter_polymer_chains(
 
 
 @typecheck
-def filter_resolved_chains(structure: Structure) -> Structure:
+def filter_resolved_chains(structure: Structure) -> Structure | None:
     """Filter based on number of resolved residues."""
     chains_to_remove = [
         chain.id
@@ -434,7 +372,7 @@ def remove_non_ccd_atoms(
 
 
 @typecheck
-def is_covalently_bonded(atom1: Atom, atom2: Atom) -> bool:
+def is_covalently_bonded(atom1: Atom | DisorderedAtom, atom2: Atom | DisorderedAtom) -> bool:
     """
     Check if two atoms are covalently bonded.
 
@@ -444,7 +382,7 @@ def is_covalently_bonded(atom1: Atom, atom2: Atom) -> bool:
     """
     bond_type = tuple(sorted([atom1.element, atom2.element]))
     if bond_type in COVALENT_BOND_THRESHOLDS:
-        return (atom1 - atom2) <= COVALENT_BOND_THRESHOLDS[bond_type]
+        return ((atom1 - atom2) <= COVALENT_BOND_THRESHOLDS[bond_type]).item()
     return False
 
 
@@ -585,7 +523,7 @@ def select_closest_chains(
         token: Token,
         protein_residue_center_atoms: Dict[str, str],
         nucleic_acid_residue_center_atoms: Dict[str, str],
-    ) -> Atom:
+    ) -> Atom | DisorderedAtom:
         """Get center atom of a token."""
         if isinstance(token, Residue):
             if token.resname in protein_residue_center_atoms:
@@ -601,7 +539,7 @@ def select_closest_chains(
         tokens: List[Token],
         protein_residue_center_atoms: Dict[str, str],
         nucleic_acid_residue_center_atoms: Dict[str, str],
-    ) -> List[Atom]:
+    ) -> List[Atom | DisorderedAtom]:
         """Get center atoms of tokens."""
         token_center_atoms = []
         for token in tokens:
@@ -712,22 +650,20 @@ def write_structure(structure: Structure, output_filepath: str):
 
 @typecheck
 @timeout_decorator.timeout(PROCESS_STRUCTURE_MAX_SECONDS, use_signals=False)
-def process_structure_with_timeout(filepath: str, output_dir: str, skip_existing: bool = False):
+def process_structure_with_timeout(filepath: str, output_dir: str):
     """
     Given an input mmCIF file, create a new processed mmCIF file
     using AlphaFold 3's PDB dataset filtering criteria under a
     timeout constraint.
     """
     # Section 2.5.4 of the AlphaFold 3 supplement
-    structure = parse_structure(filepath)
-    output_file_dir = os.path.join(output_dir, structure.id[1:3])
-    output_filepath = os.path.join(output_file_dir, f"{structure.id}.cif")
-    if skip_existing and os.path.exists(output_filepath):
-        print(f"Skipping existing output file: {output_filepath}")
-        return
+    structure_id = os.path.splitext(os.path.basename(filepath))[0]
+    output_file_dir = os.path.join(output_dir, structure_id[1:3])
+    output_filepath = os.path.join(output_file_dir, f"{structure_id}.cif")
     os.makedirs(output_file_dir, exist_ok=True)
 
     # Filtering of targets
+    structure = parse_structure(filepath)
     structure = filter_target(structure)
     if exists(structure):
         # Filtering of bioassemblies
@@ -755,13 +691,17 @@ def process_structure(args: Tuple[str, str, bool]):
     using AlphaFold 3's PDB dataset filtering criteria.
     """
     filepath, output_dir, skip_existing = args
+    structure_id = os.path.splitext(os.path.basename(filepath))[0]
+    output_file_dir = os.path.join(output_dir, structure_id[1:3])
+    output_filepath = os.path.join(output_file_dir, f"{structure_id}.cif")
+    if skip_existing and os.path.exists(output_filepath):
+        print(f"Skipping existing output file: {output_filepath}")
+        return
+
     try:
-        process_structure_with_timeout(filepath, output_dir, skip_existing)
+        process_structure_with_timeout(filepath, output_dir)
     except Exception as e:
         print(f"Skipping structure processing of {filepath} due to: {e}")
-        structure_id = os.path.splitext(os.path.basename(filepath))[0]
-        output_file_dir = os.path.join(output_dir, structure_id[1:3])
-        output_filepath = os.path.join(output_file_dir, f"{structure_id}.cif")
         if os.path.exists(output_filepath):
             try:
                 os.remove(output_filepath)
@@ -772,6 +712,74 @@ def process_structure(args: Tuple[str, str, bool]):
 
 
 if __name__ == '__main__':
+    # Parse command-line arguments
+
+    parser = argparse.ArgumentParser(
+        description="Process mmCIF files to curate the AlphaFold 3 PDB dataset."
+    )
+    parser.add_argument(
+        "-i",
+        "--mmcif_dir",
+        type=str,
+        default=os.path.join("data", "mmCIF"),
+        help="Path to the input directory containing mmCIF files to process.",
+    )
+    parser.add_argument(
+        "-c",
+        "--ccd_dir",
+        type=str,
+        default=os.path.join("data", "CCD"),
+        help="Path to the directory containing CCD files to reference during data processing.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_dir",
+        type=str,
+        default=os.path.join("data", "PDB_set"),
+        help="Path to the output directory in which to store processed mmCIF dataset files.",
+    )
+    parser.add_argument(
+        "-s",
+        "--skip_existing",
+        action="store_true",
+        help="Skip processing of existing output files.",
+    )
+    parser.add_argument(
+        "-n",
+        "--num_workers",
+        type=int,
+        default=1,
+        help="Number of worker processes to use for parallel processing.",
+    )
+    parser.add_argument(
+        "-w",
+        "--worker_chunk_size",
+        type=int,
+        default=1,
+        help="Size of mmCIF file chunks sent to worker processes.",
+    )
+    args = parser.parse_args()
+
+    assert os.path.exists(args.mmcif_dir), f"Input directory {args.mmcif_dir} does not exist."
+    assert os.path.exists(args.ccd_dir), f"CCD directory {args.ccd_dir} does not exist."
+    assert os.path.exists(
+        os.path.join(args.ccd_dir, "chem_comp_model.cif")
+    ), f"CCD ligands file not found in {args.ccd_dir}."
+    assert os.path.exists(
+        os.path.join(args.ccd_dir, "components.cif")
+    ), f"CCD components file not found in {args.ccd_dir}."
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Load the Chemical Component Dictionary (CCD) into memory
+
+    print("Loading the Chemical Component Dictionary (CCD) into memory...")
+    CCD_READER_RESULTS = ccd_reader.read_pdb_components_file(
+        # Load globally to share amongst all worker processes
+        os.path.join(args.ccd_dir, "components.cif"),
+        sanitize=False,  # Reduce loading time
+    )
+    print("Finished loading the Chemical Component Dictionary (CCD) into memory.")
+
     # Process structures across all worker processes
 
     args_tuples = [
