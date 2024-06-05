@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 from alphafold3_pytorch.typing import typecheck
+from typing import Callable, List
+
 from alphafold3_pytorch.alphafold3 import Alphafold3
+
+from alphafold3_pytorch.trainer import (
+    Trainer,
+    Dataset,
+    Fabric,
+    Optimizer,
+    LRScheduler
+)
 
 import yaml
 from pathlib import Path
@@ -27,7 +37,7 @@ def yaml_config_path_to_dict(
         maybe_config_dict = yaml.safe_load(f)
 
     assert exists(maybe_config_dict), f'unable to parse yaml config at {str(path)}'
-    assert isinstance(maybe_config_dict, dict), f'yaml config file is not a dictionary'
+    assert isinstance(maybe_config_dict, dict), 'yaml config file is not a dictionary'
 
     return maybe_config_dict
 
@@ -76,4 +86,59 @@ class Alphafold3Config(BaseModelWithExtra):
         return af3_config.create_instance()
 
 class TrainerConfig(BaseModelWithExtra):
-    pass
+    model: Alphafold3Config
+    num_train_steps: int
+    batch_size: int
+    grad_accum_every: int
+    valid_every: int
+    ema_decay: float
+    lr: float
+    clip_grad_norm: int | float
+    accelerator: str 
+    checkpoint_prefix: str
+    checkpoint_every: int
+    checkpoint_folder: str
+    overwrite_checkpoints: bool
+
+    @staticmethod
+    @typecheck
+    def from_yaml_file(path: str | Path):
+        config_dict = yaml_config_path_to_dict(path)
+        return TrainerConfig(**config_dict)
+
+    def create_instance(
+        self,
+        dataset: Dataset,
+        fabric: Fabric | None = None,
+        test_dataset: Dataset | None = None,
+        optimizer: Optimizer | None = None,
+        scheduler: LRScheduler | None = None,
+        valid_dataset: Dataset | None = None,
+        map_dataset_input_fn: Callable | None = None,
+    ) -> Trainer:
+
+        trainer_kwargs = self.model_dump()
+
+        alphafold3 = self.model.create_instance()
+
+        trainer_kwargs.update(dict(
+            model = alphafold3,
+            dataset = dataset,
+            fabric = fabric,
+            test_dataset = test_dataset,
+            optimizer = optimizer,
+            scheduler = scheduler,
+            valid_dataset = valid_dataset,
+            map_dataset_input_fn = map_dataset_input_fn
+        ))
+
+        trainer = Trainer(**trainer_kwargs)
+        return trainer
+
+    def create_instance_from_yaml_file(
+        path: str | Path,
+        **kwargs
+    ) -> Trainer:
+
+        trainer_config = TrainerConfig.from_yaml_file(path)
+        return trainer_config.create_instance(**kwargs)

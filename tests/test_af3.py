@@ -3,6 +3,7 @@ os.environ['TYPECHECK'] = 'True'
 
 import torch
 import pytest
+from pathlib import Path
 
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
@@ -22,6 +23,7 @@ from alphafold3_pytorch import (
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
+    Alphafold3Config
 )
 
 from alphafold3_pytorch.alphafold3 import (
@@ -361,7 +363,7 @@ def test_confidence_head():
 
     confidence_head = ConfidenceHead(
         dim_single_inputs = 77,
-        atompair_dist_bins = torch.linspace(3, 20, 37),
+        atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
         dim_single = 384,
         dim_pairwise = 128,
     )
@@ -565,3 +567,12 @@ def test_alphafold3_without_msa_and_templates():
     )
 
     loss.backward()
+
+# test creation from config
+
+def test_alphafold3_config():
+    curr_dir = Path(__file__).parents[0]
+    af3_yaml = curr_dir / 'alphafold3.yaml'
+
+    alphafold3 = Alphafold3Config.create_instance_from_yaml_file(af3_yaml)
+    assert isinstance(alphafold3, Alphafold3)

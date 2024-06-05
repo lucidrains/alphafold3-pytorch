@@ -188,7 +188,7 @@ POSEBUSTERS_V2_COMMON_NATURAL_LIGANDS = set(
 
 # Helper functions
 
-def exists(v: Any) -> bool:
+def exists(v) -> bool:
     """Return `False` if `v` is `None`, else return `True`."""
     return v is not None
 

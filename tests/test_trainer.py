@@ -12,7 +12,8 @@ from alphafold3_pytorch import (
     Alphafold3,
     AtomInput,
     DataLoader,
-    Trainer
+    Trainer,
+    TrainerConfig
 )
 
 # mock dataset
@@ -165,3 +166,20 @@ def test_trainer():
     # also allow for loading Alphafold3 directly from training ckpt
 
     alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training.pt')
+
+# test creating trainer + alphafold3 from config
+
+def test_trainer_config():
+    curr_dir = Path(__file__).parents[0]
+    trainer_yaml_path = curr_dir / 'trainer.yaml'
+
+    trainer = TrainerConfig.create_instance_from_yaml_file(
+        trainer_yaml_path,
+        dataset = MockAtomDataset(16)
+    )
+
+    assert isinstance(trainer, Trainer)
+
+    # take a single training step
+
+    trainer()

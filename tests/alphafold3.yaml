@@ -10,7 +10,6 @@ dim_input_embedder_token: 384
 dim_single: 384
 dim_pairwise: 128
 dim_token: 768
-distance_bins: 38
 ignore_index: -1
 num_dist_bins: null
 num_plddt_bins: 50

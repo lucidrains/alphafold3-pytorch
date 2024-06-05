@@ -17,7 +17,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Literal, Tuple, NamedTuple, Callable
+from typing import List, Literal, Tuple, NamedTuple, Callable
 
 from alphafold3_pytorch.typing import (
     Float,
@@ -2830,7 +2830,7 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        distance_bins: List[float] = torch.linspace(3, 20, 38).tolist(),
+        distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
         num_plddt_bins = 50,
@@ -3020,12 +3020,12 @@ class Alphafold3(Module):
 
         # logit heads
 
-        distance_bins = Tensor(distance_bins)
+        distance_bins_tensor = Tensor(distance_bins)
 
-        self.register_buffer('distance_bins', distance_bins)
-        num_dist_bins = default(num_dist_bins, len(distance_bins))
+        self.register_buffer('distance_bins', distance_bins_tensor)
+        num_dist_bins = default(num_dist_bins, len(distance_bins_tensor))
 
-        assert len(distance_bins) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
+        assert len(distance_bins_tensor) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
 
         self.distogram_head = DistogramHead(
             dim_pairwise = dim_pairwise,
