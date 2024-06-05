@@ -68,9 +68,12 @@ class Alphafold3Config(BaseModelWithExtra):
         return Alphafold3Config(**config_dict)
 
     def create_instance(self) -> Alphafold3:
-        alphafold3 = Alphafold3(**self.dict())
+        alphafold3 = Alphafold3(**self.model_dump())
         return alphafold3
 
     def create_instance_from_yaml_file(path: str | Path) -> Alphafold3:
         af3_config = Alphafold3Config.from_yaml_file(path)
         return af3_config.create_instance()
+
+class TrainerConfig(BaseModelWithExtra):
+    pass

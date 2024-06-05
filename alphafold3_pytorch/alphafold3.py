@@ -3069,7 +3069,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.is_file() and (not path.exists() or overwrite)
+        assert not path.is_dir() and (not path.exists() or overwrite)
 
         path.parent.mkdir(exist_ok = True, parents = True)
 
