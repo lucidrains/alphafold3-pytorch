@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from ema_pytorch import EMA
 
 from lightning import Fabric
+from lightning.fabric.wrappers import _unwrap_objects
 
 # constants
 
@@ -341,9 +342,12 @@ class Trainer:
 
         path.parent.mkdir(exist_ok = True, parents = True)
 
+        unwrapped_model = _unwrap_objects(self.model)
+        unwrapped_optimizer = _unwrap_objects(self.optimizer)
+
         package = dict(
-            model = self.model.state_dict_with_init_args,
-            optimizer = self.optimizer.state_dict(),
+            model = unwrapped_model.state_dict_with_init_args,
+            optimizer = unwrapped_optimizer.state_dict(),
             scheduler = self.scheduler.state_dict(),
             steps = self.steps
         )
@@ -379,9 +383,14 @@ class Trainer:
 
         self.model_loaded_from_path = path
 
+        # get unwrapped model and optimizer
+
+        unwrapped_model = _unwrap_objects(self.model)
+        unwrapped_optimizer = _unwrap_objects(self.optimizer)
+
         # load model from path
 
-        self.model.load(path)
+        unwrapped_model.load(path)
 
         if only_model:
             return
@@ -391,7 +400,7 @@ class Trainer:
         package = torch.load(str(path))
 
         if 'optimizer' in package:
-            self.optimizer.load_state_dict(package['optimizer'])
+            unwrapped_optimizer.load_state_dict(package['optimizer'])
 
         if 'scheduler' in package:
             self.scheduler.load_state_dict(package['scheduler'])
