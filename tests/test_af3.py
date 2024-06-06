@@ -576,8 +576,8 @@ def test_alphafold3_without_msa_and_templates():
 
 def test_alphafold3_config():
     curr_dir = Path(__file__).parents[0]
-    af3_yaml = curr_dir / 'alphafold3.yaml'
-    trainer_yml = curr_dir / 'trainer.yaml'
+    af3_yaml = curr_dir / 'configs/alphafold3.yaml'
+    trainer_yml = curr_dir / 'configs/trainer.yaml'
 
     alphafold3 = create_alphafold3_from_yaml(af3_yaml)
     assert isinstance(alphafold3, Alphafold3)

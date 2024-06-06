@@ -178,7 +178,7 @@ def test_trainer():
 
 def test_trainer_config():
     curr_dir = Path(__file__).parents[0]
-    trainer_yaml_path = curr_dir / 'trainer.yaml'
+    trainer_yaml_path = curr_dir / 'configs/trainer.yaml'
 
     trainer = create_trainer_from_yaml(
         trainer_yaml_path,
@@ -196,8 +196,8 @@ def test_trainer_config():
 def test_trainer_config_without_model():
     curr_dir = Path(__file__).parents[0]
 
-    af3_yaml_path = curr_dir / 'alphafold3.yaml'
-    trainer_yaml_path = curr_dir / 'trainer_without_model.yaml'
+    af3_yaml_path = curr_dir / 'configs/alphafold3.yaml'
+    trainer_yaml_path = curr_dir / 'configs/trainer_without_model.yaml'
 
     alphafold3 = create_alphafold3_from_yaml(af3_yaml_path)
 
@@ -213,7 +213,7 @@ def test_trainer_config_without_model():
 
 def test_training_config():
     curr_dir = Path(__file__).parents[0]
-    training_yaml_path = curr_dir / 'training.yaml'
+    training_yaml_path = curr_dir / 'configs/training.yaml'
 
     trainer = create_training_from_yaml(
         training_yaml_path,
