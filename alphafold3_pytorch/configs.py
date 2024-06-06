@@ -24,9 +24,26 @@ def exists(v):
     return v is not None
 
 @typecheck
+def safe_deep_get(
+    d: dict,
+    dotpath: str | List[str],  # dotpath notation, so accessing {'a': {'b'': {'c': 1}}} would be "a.b.c"
+    default = None
+):
+    if isinstance(dotpath ,str):
+        dotpath = dotpath.split('.')
+
+    for key in dotpath:
+        if key not in d:
+            return default
+
+        d = d[key]
+
+    return d
+
+@typecheck
 def yaml_config_path_to_dict(
     path: str | Path
-) -> dict | None:
+) -> dict:
 
     if isinstance(path, str):
         path = Path(path)
@@ -73,16 +90,26 @@ class Alphafold3Config(BaseModelWithExtra):
 
     @staticmethod
     @typecheck
-    def from_yaml_file(path: str | Path):
+    def from_yaml_file(
+        path: str | Path,
+        dotpath: str | List[str] = []
+    ):
         config_dict = yaml_config_path_to_dict(path)
+        config_dict = safe_deep_get(config_dict, dotpath)
+        assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
+
         return Alphafold3Config(**config_dict)
 
     def create_instance(self) -> Alphafold3:
         alphafold3 = Alphafold3(**self.model_dump())
         return alphafold3
 
-    def create_instance_from_yaml_file(path: str | Path) -> Alphafold3:
-        af3_config = Alphafold3Config.from_yaml_file(path)
+    def create_instance_from_yaml_file(
+        path: str | Path,
+        dotpath: str | List[str] = []
+    ) -> Alphafold3:
+
+        af3_config = Alphafold3Config.from_yaml_file(path, dotpath)
         return af3_config.create_instance()
 
 class TrainerConfig(BaseModelWithExtra):
@@ -102,8 +129,14 @@ class TrainerConfig(BaseModelWithExtra):
 
     @staticmethod
     @typecheck
-    def from_yaml_file(path: str | Path):
+    def from_yaml_file(
+        path: str | Path,
+        dotpath: str | List[str] = []
+    ):
         config_dict = yaml_config_path_to_dict(path)
+        config_dict = safe_deep_get(config_dict, dotpath)
+        assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
+
         return TrainerConfig(**config_dict)
 
     def create_instance(
@@ -137,10 +170,11 @@ class TrainerConfig(BaseModelWithExtra):
 
     def create_instance_from_yaml_file(
         path: str | Path,
+        dotpath: str | List[str] = [],
         **kwargs
     ) -> Trainer:
 
-        trainer_config = TrainerConfig.from_yaml_file(path)
+        trainer_config = TrainerConfig.from_yaml_file(path, dotpath)
         return trainer_config.create_instance(**kwargs)
 
 # convenience functions
