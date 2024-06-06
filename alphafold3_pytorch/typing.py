@@ -25,11 +25,8 @@ def always(value):
         return value
     return inner
 
-def null_decorator(fn):
-    @wraps(fn)
-    def inner(*args, **kwargs):
-        return fn(*args, **kwargs)
-    return inner
+def identity(t):
+    return t
 
 # jaxtyping is a misnomer, works for pytorch
 
@@ -48,7 +45,7 @@ Bool  = TorchTyping(Bool)
 
 should_typecheck = env.bool('TYPECHECK', False)
 
-typecheck = jaxtyped(typechecker = beartype) if should_typecheck else null_decorator
+typecheck = jaxtyped(typechecker = beartype) if should_typecheck else identity
 
 beartype_isinstance = is_bearable if should_typecheck else always(True)
 

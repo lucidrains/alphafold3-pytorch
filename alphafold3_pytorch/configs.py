@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from alphafold3_pytorch.typing import typecheck
-from typing import Callable, List
+from typing import Callable, List, Dict
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
 
@@ -186,7 +186,59 @@ class TrainerConfig(BaseModelWithExtra):
         trainer_config = TrainerConfig.from_yaml_file(path, dotpath)
         return trainer_config.create_instance(**kwargs)
 
+# training config
+# which contains multiple trainer configs for the main and various finetuning stages
+
+class TrainingConfig(BaseModelWithExtra):
+    model: Alphafold3Config | None = None
+    checkpoint_folder: str
+    training_order: List[str]
+    training: Dict[str, TrainerConfig]
+
+    @staticmethod
+    @typecheck
+    def from_yaml_file(
+        path: str | Path,
+        dotpath: str | List[str] = []
+    ):
+        config_dict = yaml_config_path_to_dict(path)
+        config_dict = safe_deep_get(config_dict, dotpath)
+        assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
+
+        return TrainingConfig(**config_dict)
+
+    def create_instance(
+        self,
+        trainer_name: str,
+        **kwargs
+    ) -> Trainer:
+
+        training_kwargs = self.model_dump()
+
+        assert trainer_name in self.training, f'{trainer_name} not found among available trainers {tuple(self.training.keys())}'
+
+        model = self.model.create_instance()
+
+        trainer_config = self.training[trainer_name]
+
+        trainer = trainer_config.create_instance(
+            model = model,
+            **kwargs
+        )
+
+        return trainer
+
+    def create_instance_from_yaml_file(
+        path: str | Path,
+        dotpath: str | List[str] = [],
+        **kwargs
+    ) -> Trainer:
+
+        training_config = TrainingConfig.from_yaml_file(path, dotpath)
+        return training_config.create_instance(**kwargs)
+
 # convenience functions
 
 create_alphafold3_from_yaml = Alphafold3Config.create_instance_from_yaml_file
 create_trainer_from_yaml = TrainerConfig.create_instance_from_yaml_file
+create_training_from_yaml = TrainingConfig.create_instance_from_yaml_file
