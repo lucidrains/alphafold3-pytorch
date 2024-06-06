@@ -42,7 +42,8 @@ from alphafold3_pytorch.configs import (
     Alphafold3Config,
     TrainerConfig,
     create_alphafold3_from_yaml,
-    create_trainer_from_yaml
+    create_trainer_from_yaml,
+    create_training_from_yaml
 )
 
 __all__ = [
@@ -78,5 +79,6 @@ __all__ = [
     Trainer,
     TrainerConfig,
     create_alphafold3_from_yaml,
-    create_trainer_from_yaml
+    create_trainer_from_yaml,
+    create_training_from_yaml
 ]
