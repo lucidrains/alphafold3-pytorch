@@ -29,11 +29,14 @@ def safe_deep_get(
     dotpath: str | List[str],  # dotpath notation, so accessing {'a': {'b'': {'c': 1}}} would be "a.b.c"
     default = None
 ):
-    if isinstance(dotpath ,str):
+    if isinstance(dotpath, str):
         dotpath = dotpath.split('.')
 
     for key in dotpath:
-        if key not in d:
+        if (
+            not isinstance(d, dict) or \
+            key not in d
+        ):
             return default
 
         d = d[key]
@@ -48,7 +51,7 @@ def yaml_config_path_to_dict(
     if isinstance(path, str):
         path = Path(path)
 
-    assert path.is_file()
+    assert path.is_file(), f'cannot find {str(path)}'
 
     with open(str(path), 'r') as f:
         maybe_config_dict = yaml.safe_load(f)
@@ -113,7 +116,7 @@ class Alphafold3Config(BaseModelWithExtra):
         return af3_config.create_instance()
 
 class TrainerConfig(BaseModelWithExtra):
-    model: Alphafold3Config
+    model: Alphafold3Config | None = None
     num_train_steps: int
     batch_size: int
     grad_accum_every: int
@@ -142,6 +145,7 @@ class TrainerConfig(BaseModelWithExtra):
     def create_instance(
         self,
         dataset: Dataset,
+        model: Alphafold3 | None = None,
         fabric: Fabric | None = None,
         test_dataset: Dataset | None = None,
         optimizer: Optimizer | None = None,
@@ -152,7 +156,12 @@ class TrainerConfig(BaseModelWithExtra):
 
         trainer_kwargs = self.model_dump()
 
-        alphafold3 = self.model.create_instance()
+        assert exists(self.model) ^ exists(model), 'either model is available on the trainer config, or passed in when creating the instance, but not both or neither'
+
+        if exists(self.model):
+            alphafold3 = self.model.create_instance()
+        else:
+            alphafold3 = model
 
         trainer_kwargs.update(dict(
             model = alphafold3,

@@ -14,7 +14,8 @@ from alphafold3_pytorch import (
     DataLoader,
     Trainer,
     TrainerConfig,
-    create_trainer_from_yaml
+    create_trainer_from_yaml,
+    create_alphafold3_from_yaml
 )
 
 # mock dataset
@@ -188,3 +189,21 @@ def test_trainer_config():
     # take a single training step
 
     trainer()
+
+# test creating trainer without model, given when creating instance
+
+def test_trainer_config_without_model():
+    curr_dir = Path(__file__).parents[0]
+
+    af3_yaml_path = curr_dir / 'alphafold3.yaml'
+    trainer_yaml_path = curr_dir / 'trainer_without_model.yaml'
+
+    alphafold3 = create_alphafold3_from_yaml(af3_yaml_path)
+
+    trainer = create_trainer_from_yaml(
+        trainer_yaml_path,
+        model = alphafold3,
+        dataset = MockAtomDataset(16)
+    )
+
+    assert isinstance(trainer, Trainer)
