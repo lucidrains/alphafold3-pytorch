@@ -16,7 +16,7 @@ from alphafold3_pytorch.trainer import (
 import yaml
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 # functions
 
@@ -194,6 +194,16 @@ class TrainingConfig(BaseModelWithExtra):
     checkpoint_folder: str
     training_order: List[str]
     training: Dict[str, TrainerConfig]
+
+    @model_validator(mode = 'after')
+    def check_valid_training_order(self) -> 'TrainingConfig':
+        training_order = set(self.training_order)
+        trainer_names = set(self.training.keys())
+
+        if training_order != trainer_names:
+            raise ValueError('`training_order` needs to contain all the keys (trainer name) under the `training` field')
+
+        return self
 
     @staticmethod
     @typecheck
