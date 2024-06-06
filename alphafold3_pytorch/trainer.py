@@ -354,7 +354,8 @@ class Trainer:
         self,
         path: str | Path,
         strict = True,
-        prefix = None
+        prefix = None,
+        only_model = False
     ):
         if isinstance(path, str):
             path = Path(path)
@@ -381,6 +382,11 @@ class Trainer:
         # load model from path
 
         self.model.load(path)
+
+        if only_model:
+            return
+
+        # load optimizer and scheduler states
 
         package = torch.load(str(path))
 
