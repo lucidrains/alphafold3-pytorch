@@ -248,3 +248,14 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:258564608}
 }
 ```
+
+```bibtex
+@article{Wang2022DeepNetST,
+    title   = {DeepNet: Scaling Transformers to 1, 000 Layers},
+    author  = {Hongyu Wang and Shuming Ma and Li Dong and Shaohan Huang and Dongdong Zhang and Furu Wei},
+    journal = {ArXiv},
+    year    = {2022},
+    volume  = {abs/2203.00555},
+    url     = {https://api.semanticscholar.org/CorpusID:247187905}
+}
+```
