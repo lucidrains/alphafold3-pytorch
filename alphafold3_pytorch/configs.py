@@ -91,9 +91,10 @@ class Alphafold3Config(BaseModelWithExtra):
     loss_distogram_weight: int | float
     loss_diffusion_weight: int | float
 
-    @staticmethod
+    @classmethod
     @typecheck
     def from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = []
     ):
@@ -101,18 +102,20 @@ class Alphafold3Config(BaseModelWithExtra):
         config_dict = safe_deep_get(config_dict, dotpath)
         assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
 
-        return Alphafold3Config(**config_dict)
+        return cls(**config_dict)
 
     def create_instance(self) -> Alphafold3:
         alphafold3 = Alphafold3(**self.model_dump())
         return alphafold3
 
+    @classmethod
     def create_instance_from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = []
     ) -> Alphafold3:
 
-        af3_config = Alphafold3Config.from_yaml_file(path, dotpath)
+        af3_config = cls.from_yaml_file(path, dotpath)
         return af3_config.create_instance()
 
 class TrainerConfig(BaseModelWithExtra):
@@ -130,9 +133,10 @@ class TrainerConfig(BaseModelWithExtra):
     checkpoint_folder: str
     overwrite_checkpoints: bool
 
-    @staticmethod
+    @classmethod
     @typecheck
     def from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = []
     ):
@@ -140,7 +144,7 @@ class TrainerConfig(BaseModelWithExtra):
         config_dict = safe_deep_get(config_dict, dotpath)
         assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
 
-        return TrainerConfig(**config_dict)
+        return cls(**config_dict)
 
     def create_instance(
         self,
@@ -177,19 +181,21 @@ class TrainerConfig(BaseModelWithExtra):
         trainer = Trainer(**trainer_kwargs)
         return trainer
 
+    @classmethod
     def create_instance_from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = [],
         **kwargs
     ) -> Trainer:
 
-        trainer_config = TrainerConfig.from_yaml_file(path, dotpath)
+        trainer_config = cls.from_yaml_file(path, dotpath)
         return trainer_config.create_instance(**kwargs)
 
-# training config
+# conductor config
 # which contains multiple trainer configs for the main and various finetuning stages
 
-class TrainingConfig(BaseModelWithExtra):
+class ConductorConfig(BaseModelWithExtra):
     model: Alphafold3Config | None = None
     checkpoint_folder: str
     checkpoint_prefix: str
@@ -197,7 +203,7 @@ class TrainingConfig(BaseModelWithExtra):
     training: Dict[str, TrainerConfig]
 
     @model_validator(mode = 'after')
-    def check_valid_training_order(self) -> 'TrainingConfig':
+    def check_valid_conductor_order(self) -> 'ConductorConfig':
         training_order = set(self.training_order)
         trainer_names = set(self.training.keys())
 
@@ -206,9 +212,10 @@ class TrainingConfig(BaseModelWithExtra):
 
         return self
 
-    @staticmethod
+    @classmethod
     @typecheck
     def from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = []
     ):
@@ -216,7 +223,7 @@ class TrainingConfig(BaseModelWithExtra):
         config_dict = safe_deep_get(config_dict, dotpath)
         assert exists(config_dict), f'config not found at path {".".join(dotpath)}'
 
-        return TrainingConfig(**config_dict)
+        return cls(**config_dict)
 
     def create_instance(
         self,
@@ -253,17 +260,19 @@ class TrainingConfig(BaseModelWithExtra):
 
         return trainer
 
+    @classmethod
     def create_instance_from_yaml_file(
+        cls,
         path: str | Path,
         dotpath: str | List[str] = [],
         **kwargs
     ) -> Trainer:
 
-        training_config = TrainingConfig.from_yaml_file(path, dotpath)
+        training_config = cls.from_yaml_file(path, dotpath)
         return training_config.create_instance(**kwargs)
 
 # convenience functions
 
 create_alphafold3_from_yaml = Alphafold3Config.create_instance_from_yaml_file
 create_trainer_from_yaml = TrainerConfig.create_instance_from_yaml_file
-create_training_from_yaml = TrainingConfig.create_instance_from_yaml_file
+create_trainer_from_conductor_yaml = ConductorConfig.create_instance_from_yaml_file

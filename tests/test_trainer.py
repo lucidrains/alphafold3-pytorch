@@ -13,9 +13,9 @@ from alphafold3_pytorch import (
     AtomInput,
     DataLoader,
     Trainer,
-    TrainerConfig,
+    ConductorConfig,
     create_trainer_from_yaml,
-    create_training_from_yaml,
+    create_trainer_from_conductor_yaml,
     create_alphafold3_from_yaml
 )
 
@@ -211,11 +211,11 @@ def test_trainer_config_without_model():
 
 # test creating trainer from training config yaml
 
-def test_training_config():
+def test_conductor_config():
     curr_dir = Path(__file__).parents[0]
     training_yaml_path = curr_dir / 'configs/training.yaml'
 
-    trainer = create_training_from_yaml(
+    trainer = create_trainer_from_conductor_yaml(
         training_yaml_path,
         trainer_name = 'main',
         dataset = MockAtomDataset(16)
