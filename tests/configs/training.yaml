@@ -1,5 +1,6 @@
 ---
-checkpoint_folder: ./checkpoints
+checkpoint_folder: ./main-and-finetuning
+checkpoint_prefix: af3.
 training_order:
     - main
     - nucleic_acids
@@ -36,9 +37,9 @@ training:
         lr: 0.0001
         clip_grad_norm: 10.
         accelerator: cpu
-        checkpoint_prefix: af3.ckpt.
+        checkpoint_prefix: main.ckpt.
         checkpoint_every: 1000
-        checkpoint_folder: ./checkpoints
+        checkpoint_folder: ./main
         overwrite_checkpoints: false
     nucleic_acids:
         num_train_steps: 1
@@ -49,9 +50,9 @@ training:
         lr: 0.0001
         clip_grad_norm: 10.
         accelerator: cpu
-        checkpoint_prefix: af3.ckpt.
+        checkpoint_prefix: nucleic.ckpt.
         checkpoint_every: 1000
-        checkpoint_folder: ./checkpoints
+        checkpoint_folder: ./nucleic-acids
         overwrite_checkpoints: false
     ligands:
         num_train_steps: 1
@@ -62,7 +63,7 @@ training:
         lr: 0.0001
         clip_grad_norm: 10.
         accelerator: cpu
-        checkpoint_prefix: af3.ckpt.
+        checkpoint_prefix: ligands.ckpt.
         checkpoint_every: 1000
-        checkpoint_folder: ./checkpoints
+        checkpoint_folder: ./ligands
         overwrite_checkpoints: false

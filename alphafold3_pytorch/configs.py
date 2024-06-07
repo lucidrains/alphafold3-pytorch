@@ -192,6 +192,7 @@ class TrainerConfig(BaseModelWithExtra):
 class TrainingConfig(BaseModelWithExtra):
     model: Alphafold3Config | None = None
     checkpoint_folder: str
+    checkpoint_prefix: str
     training_order: List[str]
     training: Dict[str, TrainerConfig]
 
@@ -230,6 +231,20 @@ class TrainingConfig(BaseModelWithExtra):
         model = self.model.create_instance()
 
         trainer_config = self.training[trainer_name]
+
+        # nest the checkpoint_folder of the trainer within the main checkpoint_folder
+
+        nested_checkpoint_folder = str(Path(self.checkpoint_folder) / Path(trainer_config.checkpoint_folder))
+
+        trainer_config.checkpoint_folder = nested_checkpoint_folder
+
+        # prepend the main training checkpoint_prefix
+
+        nested_checkpoint_prefix = self.checkpoint_prefix + trainer_config.checkpoint_prefix
+
+        trainer_config.checkpoint_prefix = nested_checkpoint_prefix
+
+        # create the Trainer, accounting for root level config
 
         trainer = trainer_config.create_instance(
             model = model,

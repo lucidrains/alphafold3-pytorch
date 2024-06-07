@@ -223,3 +223,5 @@ def test_training_config():
 
     assert isinstance(trainer, Trainer)
 
+    assert str(trainer.checkpoint_folder) == 'main-and-finetuning/main'
+    assert str(trainer.checkpoint_prefix) == 'af3.main.ckpt.'
