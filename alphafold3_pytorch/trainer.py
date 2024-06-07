@@ -30,6 +30,8 @@ from ema_pytorch import EMA
 from lightning import Fabric
 from lightning.fabric.wrappers import _unwrap_objects
 
+from shortuuid import uuid
+
 # helpers
 
 def exists(val):
@@ -306,13 +308,38 @@ class Trainer:
 
         # save the path for the last loaded model, if any
 
-        self.model_loaded_from_path = None
+        self.train_id = None
+
+        self.last_loaded_train_id = None
+        self.model_loaded_from_path: Path | None = None
 
     @property
     def is_main(self):
         return self.fabric.global_rank == 0
 
+    def generate_train_id(self):
+        if exists(self.train_id):
+            return
+
+        self.train_id = uuid()[:4].lower()
+
+    @property
+    def train_id_history(self) -> str:
+        if not exists(self.last_loaded_train_id):
+            return self.train_id
+
+        return f'{self.last_loaded_train_id}-{self.train_id}'
+
     # saving and loading
+
+    def save_checkpoint(self):
+        assert exists(self.train_id_history)
+
+        # formulate checkpoint path and save
+
+        checkpoint_path = self.checkpoint_folder / f'({self.train_id_history})_{self.checkpoint_prefix}{self.steps}.pt'
+
+        self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
 
     def save(
         self,
@@ -334,7 +361,8 @@ class Trainer:
             model = unwrapped_model.state_dict_with_init_args,
             optimizer = unwrapped_optimizer.state_dict(),
             scheduler = self.scheduler.state_dict(),
-            steps = self.steps
+            steps = self.steps,
+            id = self.train_id_history
         )
 
         torch.save(package, str(path))
@@ -362,7 +390,7 @@ class Trainer:
         if path.is_dir():
             prefix = default(prefix, self.checkpoint_prefix)
 
-            model_paths = [*path.glob(f'**/{prefix}*.pt')]
+            model_paths = [*path.glob(f'**/*_{prefix}*.pt')]
 
             assert len(model_paths) > 0, f'no files found in directory {path}'
 
@@ -370,9 +398,12 @@ class Trainer:
 
             path = model_paths[-1]
 
+        package = torch.load(str(path))
+
         # for eventually saving entire training history in filename
 
         self.model_loaded_from_path = path
+        self.last_loaded_train_id = package.get('id', None)
 
         # get unwrapped model and optimizer
 
@@ -387,8 +418,6 @@ class Trainer:
             return
 
         # load optimizer and scheduler states
-
-        package = torch.load(str(path))
 
         if 'optimizer' in package:
             unwrapped_optimizer.load_state_dict(package['optimizer'])
@@ -414,6 +443,11 @@ class Trainer:
     def __call__(
         self
     ):
+
+        self.generate_train_id()
+
+        # cycle through dataloader
+
         dl = cycle(self.dataloader)
 
         # while less than required number of training steps
@@ -520,9 +554,7 @@ class Trainer:
             self.wait()
 
             if self.is_main and divisible_by(self.steps, self.checkpoint_every):
-                checkpoint_path = self.checkpoint_folder / f'{self.checkpoint_prefix}{self.steps}.pt'
-
-                self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
+                self.save_checkpoint()
 
             self.wait()
 

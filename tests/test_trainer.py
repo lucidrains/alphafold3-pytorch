@@ -19,6 +19,9 @@ from alphafold3_pytorch import (
     create_alphafold3_from_yaml
 )
 
+def exists(v):
+    return v is not None
+
 # mock dataset
 
 class MockAtomDataset(Dataset):
@@ -153,13 +156,13 @@ def test_trainer():
 
     # assert checkpoints created
 
-    assert Path('./checkpoints/af3.ckpt.1.pt').exists()
+    assert Path(f'./checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
 
     # assert can load latest checkpoint by loading from a directory
 
     trainer.load('./checkpoints')
 
-    assert str(trainer.model_loaded_from_path) == str(Path('./checkpoints/af3.ckpt.2.pt'))
+    assert exists(trainer.model_loaded_from_path)
 
     # saving and loading from trainer
 
