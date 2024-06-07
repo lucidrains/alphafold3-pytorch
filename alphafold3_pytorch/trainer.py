@@ -354,6 +354,12 @@ class Trainer:
 
         torch.save(package, str(path))
 
+    def load_from_checkpoint_folder(
+        self,
+        **kwargs
+    ):
+        self.load(path = self.checkpoint_folder, **kwargs)
+
     def load(
         self,
         path: str | Path,
