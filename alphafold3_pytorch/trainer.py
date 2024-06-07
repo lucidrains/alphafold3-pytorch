@@ -324,7 +324,7 @@ class Trainer:
         self.train_id = uuid()[:4].lower()
 
     @property
-    def train_id_history(self) -> str:
+    def train_id_with_prev(self) -> str:
         if not exists(self.last_loaded_train_id):
             return self.train_id
 
@@ -333,11 +333,11 @@ class Trainer:
     # saving and loading
 
     def save_checkpoint(self):
-        assert exists(self.train_id_history)
+        assert exists(self.train_id_with_prev)
 
         # formulate checkpoint path and save
 
-        checkpoint_path = self.checkpoint_folder / f'({self.train_id_history})_{self.checkpoint_prefix}{self.steps}.pt'
+        checkpoint_path = self.checkpoint_folder / f'({self.train_id_with_prev})_{self.checkpoint_prefix}{self.steps}.pt'
 
         self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
 
@@ -362,7 +362,7 @@ class Trainer:
             optimizer = unwrapped_optimizer.state_dict(),
             scheduler = self.scheduler.state_dict(),
             steps = self.steps,
-            id = self.train_id_history
+            id = self.train_id
         )
 
         torch.save(package, str(path))
@@ -378,12 +378,13 @@ class Trainer:
         path: str | Path,
         strict = True,
         prefix = None,
-        only_model = False
+        only_model = False,
+        reset_steps = False
     ):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.exists()
+        assert path.exists(), f'{str(path)} cannot be found for loading'
 
         # if the path is a directory, then automatically load latest checkpoint
 
@@ -398,26 +399,27 @@ class Trainer:
 
             path = model_paths[-1]
 
-        package = torch.load(str(path))
+        # get unwrapped model and optimizer
+
+        unwrapped_model = _unwrap_objects(self.model)
+
+        # load model from path
+
+        model_id = unwrapped_model.load(path)
 
         # for eventually saving entire training history in filename
 
         self.model_loaded_from_path = path
-        self.last_loaded_train_id = package.get('id', None)
-
-        # get unwrapped model and optimizer
-
-        unwrapped_model = _unwrap_objects(self.model)
-        unwrapped_optimizer = _unwrap_objects(self.optimizer)
-
-        # load model from path
-
-        unwrapped_model.load(path)
+        self.last_loaded_train_id = model_id
 
         if only_model:
             return
 
         # load optimizer and scheduler states
+
+        package = torch.load(str(path))
+
+        unwrapped_optimizer = _unwrap_objects(self.optimizer)
 
         if 'optimizer' in package:
             unwrapped_optimizer.load_state_dict(package['optimizer'])
@@ -425,7 +427,10 @@ class Trainer:
         if 'scheduler' in package:
             self.scheduler.load_state_dict(package['scheduler'])
 
-        self.steps = package.get('steps', 0)
+        if reset_steps:
+            self.steps = 0
+        else:
+            self.steps = package.get('steps', 0)
 
     # shortcut methods
 

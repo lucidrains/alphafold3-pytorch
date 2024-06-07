@@ -3115,6 +3115,8 @@ class Alphafold3(Module):
 
         self.load_state_dict(model_package['state_dict'], strict = strict)
 
+        return package.get('id', None)
+
     @staticmethod
     @typecheck
     def init_and_load(path: str | Path):
