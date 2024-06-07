@@ -101,20 +101,27 @@ def exists(v):
 def default(v, d):
     return v if exists(v) else d
 
+def identity(x, *args, **kwargs):
+    return x
+
 def log(t, eps = 1e-20):
     return torch.log(t.clamp(min = eps))
 
-def max_neg_value(t: Tensor):
-    return -torch.finfo(t.dtype).max
-
 def divisible_by(num, den):
     return (num % den) == 0
+
+# tensor helpers
+
+def max_neg_value(t: Tensor):
+    return -torch.finfo(t.dtype).max
 
 def pack_one(t, pattern):
     return pack([t], pattern)
 
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
+
+# decorators
 
 def maybe(fn):
     @wraps(fn)
@@ -2039,6 +2046,8 @@ class ElucidatedAtomDiffusion(Module):
         atom_mask: Bool['b m'] | None = None,
         num_sample_steps = None,
         clamp = False,
+        use_tqdm_pbar = True,
+        tqdm_pbar_title = 'sampling time step',
         **network_condition_kwargs
     ):
         num_sample_steps = default(num_sample_steps, self.num_sample_steps)
@@ -2067,7 +2076,9 @@ class ElucidatedAtomDiffusion(Module):
 
         # gradually denoise
 
-        for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
+        maybe_tqdm_wrapper = tqdm if use_tqdm_pbar else identity
+
+        for sigma, sigma_next, gamma in maybe_tqdm_wrapper(sigmas_and_gammas, desc = tqdm_pbar_title):
             sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
 
             eps = self.S_noise * torch.randn(shape, device = self.device) # stochastic sampling
@@ -3150,6 +3161,7 @@ class Alphafold3(Module):
         return_loss_breakdown = False,
         return_loss_if_possible: bool = True,
         num_rollout_steps: int = 20,
+        rollout_show_tqdm_pbar: bool = False
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
 
         atom_seq_len = atom_inputs.shape[-2]
@@ -3452,7 +3464,9 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
-                molecule_atom_lens = molecule_atom_lens
+                molecule_atom_lens = molecule_atom_lens,
+                use_tqdm_pbar = rollout_show_tqdm_pbar,
+                tqdm_pbar_title = 'training rollout'
             )
 
             pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, molecule_atom_indices)
