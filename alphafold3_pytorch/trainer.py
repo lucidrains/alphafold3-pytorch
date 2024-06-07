@@ -328,7 +328,9 @@ class Trainer:
         if not exists(self.last_loaded_train_id):
             return self.train_id
 
-        return f'{self.last_loaded_train_id}-{self.train_id}'
+        ckpt_num = str(self.model_loaded_from_path).split('.')[-2]
+
+        return f'{self.last_loaded_train_id}.{ckpt_num}-{self.train_id}'
 
     # saving and loading
 
