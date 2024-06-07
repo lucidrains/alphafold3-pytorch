@@ -231,8 +231,6 @@ class ConductorConfig(BaseModelWithExtra):
         **kwargs
     ) -> Trainer:
 
-        training_kwargs = self.model_dump()
-
         assert trainer_name in self.training, f'{trainer_name} not found among available trainers {tuple(self.training.keys())}'
 
         model = self.model.create_instance()
