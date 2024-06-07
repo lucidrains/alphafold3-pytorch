@@ -17,7 +17,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Literal, Tuple, NamedTuple
+from typing import List, Literal, Tuple, NamedTuple, Callable
 
 from alphafold3_pytorch.typing import (
     Float,
@@ -36,6 +36,8 @@ from alphafold3_pytorch.attention import (
     full_attn_bias_to_windowed,
     full_pairwise_repr_to_windowed
 )
+
+from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
 
@@ -898,7 +900,8 @@ class MSAModule(Module):
         msa_pwa_heads = 8,
         msa_pwa_dim_head = 32,
         pairwise_block_kwargs: dict = dict(),
-        max_num_msa: int | None = None
+        max_num_msa: int | None = None,
+        layerscale_output: bool = True
     ):
         super().__init__()
 
@@ -944,6 +947,8 @@ class MSAModule(Module):
             ]))
 
         self.layers = layers
+
+        self.layerscale_output = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
 
     @typecheck
     def forward(
@@ -1010,7 +1015,7 @@ class MSAModule(Module):
                 has_msa, pairwise_repr, 0.
             )
 
-        return pairwise_repr
+        return pairwise_repr * self.layerscale_output
 
 # pairformer stack
 
@@ -1212,7 +1217,8 @@ class TemplateEmbedder(Module):
         dim_pairwise = 128,
         pairformer_stack_depth = 2,
         pairwise_block_kwargs: dict = dict(),
-        eps = 1e-5
+        eps = 1e-5,
+        layerscale_output = True
     ):
         super().__init__()
         self.eps = eps
@@ -1243,6 +1249,8 @@ class TemplateEmbedder(Module):
             LinearNoBias(dim, dim_pairwise),
             nn.ReLU()
         )
+
+        self.layerscale = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
 
     @typecheck
     def forward(
@@ -1297,7 +1305,7 @@ class TemplateEmbedder(Module):
             has_templates, out, 0.
         )
 
-        return out
+        return out * self.layerscale
 
 # diffusion related
 # both diffusion transformer as well as atom encoder / decoder
@@ -2142,6 +2150,8 @@ class ElucidatedAtomDiffusion(Module):
             )
         )
 
+        # total loss, for accumulating all auxiliary losses
+
         total_loss = 0.
 
         # if additional molecule feats is provided
@@ -2690,7 +2700,7 @@ class ConfidenceHead(Module):
         self,
         *,
         dim_single_inputs,
-        atompair_dist_bins: Float[' d'],
+        atompair_dist_bins: List[float],
         dim_single = 384,
         dim_pairwise = 128,
         num_plddt_bins = 50,
@@ -2700,6 +2710,8 @@ class ConfidenceHead(Module):
         pairformer_kwargs: dict = dict()
     ):
         super().__init__()
+
+        atompair_dist_bins = Tensor(atompair_dist_bins)
 
         self.register_buffer('atompair_dist_bins', atompair_dist_bins)
 
@@ -2824,7 +2836,7 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        distance_bins: Float[' dist_bins'] = torch.linspace(3, 20, 38),
+        distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
         num_plddt_bins = 50,
@@ -2846,6 +2858,7 @@ class Alphafold3(Module):
         template_embedder_kwargs: dict = dict(
             pairformer_stack_depth = 2,
             pairwise_block_kwargs = dict(),
+            layerscale_output = True,
         ),
         msa_module_kwargs: dict = dict(
             depth = 4,
@@ -2855,7 +2868,8 @@ class Alphafold3(Module):
             msa_pwa_dropout_row_prob = 0.15,
             msa_pwa_heads = 8,
             msa_pwa_dim_head = 32,
-            pairwise_block_kwargs = dict()
+            pairwise_block_kwargs = dict(),
+            layerscale_output = True,
         ),
         pairformer_stack: dict = dict(
             depth = 48,
@@ -2895,7 +2909,8 @@ class Alphafold3(Module):
             S_tmax = 50,
             S_noise = 1.003,
         ),
-        augment_kwargs: dict = dict()
+        augment_kwargs: dict = dict(),
+        stochastic_frame_average = False
     ):
         super().__init__()
 
@@ -2907,6 +2922,18 @@ class Alphafold3(Module):
 
         self.num_augmentations = diffusion_num_augmentations
         self.augmenter = CentreRandomAugmentation(**augment_kwargs)
+
+        # stochastic frame averaging
+        # https://arxiv.org/abs/2305.05577
+
+        self.stochastic_frame_average = stochastic_frame_average
+
+        if stochastic_frame_average:
+            self.frame_average = FrameAverage(
+                dim = 3,
+                stochastic = True,
+                return_stochastic_as_augmented_pos = True
+            )
 
         # input feature embedder
 
@@ -3001,10 +3028,12 @@ class Alphafold3(Module):
 
         # logit heads
 
-        self.register_buffer('distance_bins', distance_bins)
-        num_dist_bins = default(num_dist_bins, len(distance_bins))
+        distance_bins_tensor = Tensor(distance_bins)
 
-        assert len(distance_bins) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
+        self.register_buffer('distance_bins', distance_bins_tensor)
+        num_dist_bins = default(num_dist_bins, len(distance_bins_tensor))
+
+        assert len(distance_bins_tensor) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
 
         self.distogram_head = DistogramHead(
             dim_pairwise = dim_pairwise,
@@ -3063,7 +3092,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.exists() and not path.is_dir()
+        assert path.exists() and path.is_file()
 
         package = torch.load(str(path), map_location = 'cpu')
 
@@ -3081,7 +3110,7 @@ class Alphafold3(Module):
         if isinstance(path, str):
             path = Path(path)
 
-        assert path.exists() and not path.is_dir()
+        assert path.is_file()
 
         package = torch.load(str(path), map_location = 'cpu')
 
@@ -3320,7 +3349,7 @@ class Alphafold3(Module):
 
         if calc_diffusion_loss:
 
-            num_augs = self.num_augmentations
+            num_augs = self.num_augmentations + int(self.stochastic_frame_average)
 
             # take care of augmentation
             # they did 48 during training, as the trunk did the heavy lifting
@@ -3368,7 +3397,24 @@ class Alphafold3(Module):
                     )
                 )
 
+                # handle stochastic frame averaging
+
+                if self.stochastic_frame_average:
+                    fa_atom_pos, atom_pos = atom_pos[:1], atom_pos[1:]
+
+                    fa_atom_pos = self.frame_average(
+                        fa_atom_pos,
+                        frame_average_mask = atom_mask[:1]
+                    )
+
+                # normal random augmentations, 48 times in paper
+
                 atom_pos = self.augmenter(atom_pos)
+
+                # concat back the stochastic frame averaged position
+
+                if self.stochastic_frame_average:
+                    atom_pos = torch.cat((fa_atom_pos, atom_pos), dim = 0)
 
             diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,

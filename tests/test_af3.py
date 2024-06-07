@@ -3,6 +3,7 @@ os.environ['TYPECHECK'] = 'True'
 
 import torch
 import pytest
+from pathlib import Path
 
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
@@ -21,7 +22,12 @@ from alphafold3_pytorch import (
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3,
+    Alphafold3
+)
+
+from alphafold3_pytorch.configs import (
+    Alphafold3Config,
+    create_alphafold3_from_yaml
 )
 
 from alphafold3_pytorch.alphafold3 import (
@@ -30,6 +36,9 @@ from alphafold3_pytorch.alphafold3 import (
     full_pairwise_repr_to_windowed,
     atom_ref_pos_to_atompair_inputs
 )
+
+def join(str, delimiter = ','):
+    return delimiter.join(str)
 
 def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
@@ -358,7 +367,7 @@ def test_confidence_head():
 
     confidence_head = ConfidenceHead(
         dim_single_inputs = 77,
-        atompair_dist_bins = torch.linspace(3, 20, 37),
+        atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
         dim_single = 384,
         dim_pairwise = 128,
     )
@@ -400,9 +409,17 @@ def test_distogram_head():
 
     logits = distogram_head(pairwise_repr)
 
-@pytest.mark.parametrize('window_atompair_inputs', (True, False))
+@pytest.mark.parametrize(
+    join([
+        'window_atompair_inputs',
+        'stochastic_frame_average'
+    ]), [
+        (True, False),
+        (True, False)
+    ])
 def test_alphafold3(
-    window_atompair_inputs: bool
+    window_atompair_inputs: bool,
+    stochastic_frame_average: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -457,6 +474,7 @@ def test_alphafold3(
             token_transformer_depth = 1,
             atom_decoder_depth = 1,
         ),
+        stochastic_frame_average = stochastic_frame_average
     )
 
     loss, breakdown = alphafold3(
@@ -553,3 +571,16 @@ def test_alphafold3_without_msa_and_templates():
     )
 
     loss.backward()
+
+# test creation from config
+
+def test_alphafold3_config():
+    curr_dir = Path(__file__).parents[0]
+    af3_yaml = curr_dir / 'configs/alphafold3.yaml'
+    trainer_yml = curr_dir / 'configs/trainer.yaml'
+
+    alphafold3 = create_alphafold3_from_yaml(af3_yaml)
+    assert isinstance(alphafold3, Alphafold3)
+
+    alphafold3_from_trainer_yml = create_alphafold3_from_yaml(trainer_yml, 'model')
+    assert isinstance(alphafold3_from_trainer_yml, Alphafold3)

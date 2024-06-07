@@ -226,3 +226,36 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:268063190}
 }
 ```
+
+```bibtex
+@article{Puny2021FrameAF,
+    title   = {Frame Averaging for Invariant and Equivariant Network Design},
+    author  = {Omri Puny and Matan Atzmon and Heli Ben-Hamu and Edward James Smith and Ishan Misra and Aditya Grover and Yaron Lipman},
+    journal = {ArXiv},
+    year    = {2021},
+    volume  = {abs/2110.03336},
+    url     = {https://api.semanticscholar.org/CorpusID:238419638}
+}
+```
+
+```bibtex
+@article{Duval2023FAENetFA,
+    title   = {FAENet: Frame Averaging Equivariant GNN for Materials Modeling},
+    author  = {Alexandre Duval and Victor Schmidt and Alex Hernandez Garcia and Santiago Miret and Fragkiskos D. Malliaros and Yoshua Bengio and David Rolnick},
+    journal = {ArXiv},
+    year    = {2023},
+    volume  = {abs/2305.05577},
+    url     = {https://api.semanticscholar.org/CorpusID:258564608}
+}
+```
+
+```bibtex
+@article{Wang2022DeepNetST,
+    title   = {DeepNet: Scaling Transformers to 1, 000 Layers},
+    author  = {Hongyu Wang and Shuming Ma and Li Dong and Shaohan Huang and Dongdong Zhang and Furu Wei},
+    journal = {ArXiv},
+    year    = {2022},
+    volume  = {abs/2203.00555},
+    url     = {https://api.semanticscholar.org/CorpusID:247187905}
+}
+```

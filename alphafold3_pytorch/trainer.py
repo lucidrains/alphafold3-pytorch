@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from ema_pytorch import EMA
 
 from lightning import Fabric
+from lightning.fabric.wrappers import _unwrap_objects
 
 # constants
 
@@ -213,6 +214,7 @@ class Trainer:
         default_lambda_lr = default_lambda_lr_fn,
         fabric: Fabric | None = None,
         accelerator = 'auto',
+        checkpoint_prefix = 'af3.ckpt.',
         checkpoint_every: int = 1000,
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
@@ -309,6 +311,7 @@ class Trainer:
 
         # checkpointing logic
 
+        self.checkpoint_prefix = checkpoint_prefix
         self.checkpoint_every = checkpoint_every
         self.overwrite_checkpoints = overwrite_checkpoints
         self.checkpoint_folder = Path(checkpoint_folder)
@@ -316,13 +319,22 @@ class Trainer:
         self.checkpoint_folder.mkdir(exist_ok = True, parents = True)
         assert self.checkpoint_folder.is_dir()
 
+        # save the path for the last loaded model, if any
+
+        self.model_loaded_from_path = None
+
     @property
     def is_main(self):
         return self.fabric.global_rank == 0
 
     # saving and loading
 
-    def save(self, path: str | Path, overwrite = False):
+    def save(
+        self,
+        path: str | Path,
+        overwrite = False,
+        prefix: str | None = None
+    ):
         if isinstance(path, str):
             path = Path(path)
 
@@ -330,27 +342,65 @@ class Trainer:
 
         path.parent.mkdir(exist_ok = True, parents = True)
 
+        unwrapped_model = _unwrap_objects(self.model)
+        unwrapped_optimizer = _unwrap_objects(self.optimizer)
+
         package = dict(
-            model = self.model.state_dict_with_init_args,
-            optimizer = self.optimizer.state_dict(),
+            model = unwrapped_model.state_dict_with_init_args,
+            optimizer = unwrapped_optimizer.state_dict(),
             scheduler = self.scheduler.state_dict(),
             steps = self.steps
         )
 
         torch.save(package, str(path))
 
-    def load(self, path: str | Path, strict = True):
+    def load(
+        self,
+        path: str | Path,
+        strict = True,
+        prefix = None,
+        only_model = False
+    ):
         if isinstance(path, str):
             path = Path(path)
 
         assert path.exists()
 
-        self.model.load(path)
+        # if the path is a directory, then automatically load latest checkpoint
+
+        if path.is_dir():
+            prefix = default(prefix, self.checkpoint_prefix)
+
+            model_paths = [*path.glob(f'**/{prefix}*.pt')]
+
+            assert len(model_paths) > 0, f'no files found in directory {path}'
+
+            model_paths = sorted(model_paths, key = lambda p: int(str(p).split('.')[-2]))
+
+            path = model_paths[-1]
+
+        # for eventually saving entire training history in filename
+
+        self.model_loaded_from_path = path
+
+        # get unwrapped model and optimizer
+
+        unwrapped_model = _unwrap_objects(self.model)
+        unwrapped_optimizer = _unwrap_objects(self.optimizer)
+
+        # load model from path
+
+        unwrapped_model.load(path)
+
+        if only_model:
+            return
+
+        # load optimizer and scheduler states
 
         package = torch.load(str(path))
 
         if 'optimizer' in package:
-            self.optimizer.load_state_dict(package['optimizer'])
+            unwrapped_optimizer.load_state_dict(package['optimizer'])
 
         if 'scheduler' in package:
             self.scheduler.load_state_dict(package['scheduler'])
@@ -479,7 +529,7 @@ class Trainer:
             self.wait()
 
             if self.is_main and divisible_by(self.steps, self.checkpoint_every):
-                checkpoint_path = self.checkpoint_folder / f'af3.ckpt.{self.steps}.pt'
+                checkpoint_path = self.checkpoint_folder / f'{self.checkpoint_prefix}{self.steps}.pt'
 
                 self.save(checkpoint_path, overwrite = self.overwrite_checkpoints)
 

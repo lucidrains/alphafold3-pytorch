@@ -1,0 +1,13 @@
+---
+num_train_steps: 1
+batch_size: 1
+grad_accum_every: 1
+valid_every: 1
+ema_decay: 0.999
+lr: 0.0001
+clip_grad_norm: 10.
+accelerator: cpu
+checkpoint_prefix: af3.ckpt.
+checkpoint_every: 1000
+checkpoint_folder: ./checkpoints
+overwrite_checkpoints: false

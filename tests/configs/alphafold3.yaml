@@ -1,0 +1,22 @@
+---
+dim_atom_inputs: 10
+dim_template_feats: 10
+dim_template_model: 64
+atoms_per_window: 27
+dim_atom: 128
+dim_atompair_inputs: 5
+dim_atompair: 16
+dim_input_embedder_token: 384
+dim_single: 384
+dim_pairwise: 128
+dim_token: 768
+ignore_index: -1
+num_dist_bins: null
+num_plddt_bins: 50
+num_pde_bins: 64
+num_pae_bins: 64
+sigma_data: 16
+diffusion_num_augmentations: 4
+loss_confidence_weight: 0.0001
+loss_distogram_weight: 0.01
+loss_diffusion_weight: 4.

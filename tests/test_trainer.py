@@ -12,7 +12,11 @@ from alphafold3_pytorch import (
     Alphafold3,
     AtomInput,
     DataLoader,
-    Trainer
+    Trainer,
+    TrainerConfig,
+    create_trainer_from_yaml,
+    create_training_from_yaml,
+    create_alphafold3_from_yaml
 )
 
 # mock dataset
@@ -94,7 +98,7 @@ def test_trainer():
             depth = 1
         ),
         pairformer_stack = dict(
-            depth = 2
+            depth = 1
         ),
         diffusion_module_kwargs = dict(
             atom_encoder_depth = 1,
@@ -147,13 +151,75 @@ def test_trainer():
 
     trainer()
 
+    # assert checkpoints created
+
     assert Path('./checkpoints/af3.ckpt.1.pt').exists()
+
+    # assert can load latest checkpoint by loading from a directory
+
+    trainer.load('./checkpoints')
+
+    assert str(trainer.model_loaded_from_path) == str(Path('./checkpoints/af3.ckpt.2.pt'))
 
     # saving and loading from trainer
 
-    trainer.save('./some/nested/folder2/training', overwrite = True)
-    trainer.load('./some/nested/folder2/training')
+    trainer.save('./some/nested/folder2/training.pt', overwrite = True)
+    trainer.load('./some/nested/folder2/training.pt')
+
+    # allow for only loading model, needed for fine-tuning logic
+
+    trainer.load('./some/nested/folder2/training.pt', only_model = True)
 
     # also allow for loading Alphafold3 directly from training ckpt
 
-    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training')
+    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training.pt')
+
+# test creating trainer + alphafold3 from config
+
+def test_trainer_config():
+    curr_dir = Path(__file__).parents[0]
+    trainer_yaml_path = curr_dir / 'configs/trainer.yaml'
+
+    trainer = create_trainer_from_yaml(
+        trainer_yaml_path,
+        dataset = MockAtomDataset(16)
+    )
+
+    assert isinstance(trainer, Trainer)
+
+    # take a single training step
+
+    trainer()
+
+# test creating trainer without model, given when creating instance
+
+def test_trainer_config_without_model():
+    curr_dir = Path(__file__).parents[0]
+
+    af3_yaml_path = curr_dir / 'configs/alphafold3.yaml'
+    trainer_yaml_path = curr_dir / 'configs/trainer_without_model.yaml'
+
+    alphafold3 = create_alphafold3_from_yaml(af3_yaml_path)
+
+    trainer = create_trainer_from_yaml(
+        trainer_yaml_path,
+        model = alphafold3,
+        dataset = MockAtomDataset(16)
+    )
+
+    assert isinstance(trainer, Trainer)
+
+# test creating trainer from training config yaml
+
+def test_training_config():
+    curr_dir = Path(__file__).parents[0]
+    training_yaml_path = curr_dir / 'configs/training.yaml'
+
+    trainer = create_training_from_yaml(
+        training_yaml_path,
+        trainer_name = 'main',
+        dataset = MockAtomDataset(16)
+    )
+
+    assert isinstance(trainer, Trainer)
+

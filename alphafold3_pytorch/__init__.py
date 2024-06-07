@@ -38,6 +38,15 @@ from alphafold3_pytorch.trainer import (
     AtomInput
 )
 
+from alphafold3_pytorch.configs import (
+    Alphafold3Config,
+    TrainerConfig,
+    TrainingConfig,
+    create_alphafold3_from_yaml,
+    create_trainer_from_yaml,
+    create_training_from_yaml
+)
+
 __all__ = [
     Attention,
     Attend,
@@ -66,6 +75,12 @@ __all__ = [
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
+    Alphafold3Config,
     AtomInput,
-    Trainer
+    Trainer,
+    TrainerConfig,
+    TrainingConfig,
+    create_alphafold3_from_yaml,
+    create_trainer_from_yaml,
+    create_training_from_yaml
 ]
