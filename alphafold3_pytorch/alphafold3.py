@@ -2847,6 +2847,8 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
+        num_atom_embeds: int | None = None,
+        num_atompair_embeds: int | None = None,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
@@ -2924,6 +2926,20 @@ class Alphafold3(Module):
         stochastic_frame_average = False
     ):
         super().__init__()
+
+        # optional atom and atom bond embeddings
+
+        has_atom_embeds = exists(num_atom_embeds)
+        has_atompair_embeds = exists(num_atompair_embeds)
+
+        if has_atom_embeds:
+            self.atom_embeds = nn.Embedding(num_atom_embeds, dim_atom)
+
+        if has_atompair_embeds:
+            self.atompair_embeds = nn.Embedding(num_atompair_embeds, dim_atompair)
+
+        self.has_atom_embeds = has_atom_embeds
+        self.has_atompair_embeds = has_atompair_embeds
 
         # atoms per window
 
@@ -3143,6 +3159,8 @@ class Alphafold3(Module):
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         molecule_atom_lens: Int['b n'],
+        atom_ids: Int['b m'] | None = None,
+        atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         token_bond: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -3216,6 +3234,23 @@ class Alphafold3(Module):
             additional_molecule_feats = additional_molecule_feats,
             molecule_atom_lens = molecule_atom_lens
         )
+
+        # handle maybe atom and atompair embeddings
+
+        assert not (exists(atom_ids) ^ self.has_atom_embeds), 'you either set `num_atom_embeds` and did not pass in `atom_ids` or vice versa'
+        assert not (exists(atompair_ids) ^ self.has_atompair_embeds), 'you either set `num_atompair_embeds` and did not pass in `atompair_ids` or vice versa'
+
+        if self.has_atom_embeds:
+            atom_embeds = self.atom_embeds(atom_ids)
+            atom_feats = atom_feats + atom_embeds
+
+        if self.has_atompair_embeds:
+            atompair_embeds = self.atompair_embeds(atompair_ids)
+
+            if atompair_embeds.ndim == 4:
+                atompair_embeds = full_pairwise_repr_to_windowed(atompair_embeds, window_size = self.atoms_per_window)
+
+            atompair_feats = atompair_feats + atompair_embeds
 
         # relative positional encoding
 

@@ -635,6 +635,71 @@ def test_alphafold3_force_return_loss():
 
     assert loss == 0.
 
+def test_alphafold3_with_atom_and_bond_embeddings():
+    alphafold3 = Alphafold3(
+        num_atom_embeds = 7,
+        num_atompair_embeds = 3,
+        dim_atom_inputs = 77,
+        dim_template_feats = 44
+    )
+
+    # mock inputs
+
+    seq_len = 16
+
+    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    atom_ids = torch.randint(0, 7, (2, atom_seq_len))
+    atompair_ids = torch.randint(0, 3, (2, atom_seq_len, atom_seq_len))
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
+    additional_molecule_feats = torch.randn(2, seq_len, 10)
+
+    template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
+    template_mask = torch.ones((2, 2)).bool()
+
+    msa = torch.randn(2, 7, seq_len, 64)
+    msa_mask = torch.ones((2, 7)).bool()
+
+    # required for training, but omitted on inference
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    molecule_atom_indices = molecule_atom_lens - 1 # last atom, as an example
+
+    distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
+
+    # train
+
+    loss = alphafold3(
+        num_recycling_steps = 2,
+        atom_ids = atom_ids,
+        atompair_ids = atompair_ids,
+        atom_inputs = atom_inputs,
+        atompair_inputs = atompair_inputs,
+        molecule_atom_lens = molecule_atom_lens,
+        additional_molecule_feats = additional_molecule_feats,
+        msa = msa,
+        msa_mask = msa_mask,
+        templates = template_feats,
+        template_mask = template_mask,
+        atom_pos = atom_pos,
+        molecule_atom_indices = molecule_atom_indices,
+        distance_labels = distance_labels,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels
+    )
+
+    assert loss.numel() == 0
+
 # test creation from config
 
 def test_alphafold3_config():
