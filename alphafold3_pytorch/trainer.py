@@ -15,7 +15,8 @@ from alphafold3_pytorch.typing import (
 )
 
 from alphafold3_pytorch.inputs import (
-    AtomInput
+    AtomInput,
+    INPUT_TO_ATOM_TRANSFORM
 )
 
 import torch
@@ -77,18 +78,31 @@ def collate_af3_inputs(
     if exists(map_input_fn):
         inputs = [map_input_fn(i) for i in inputs]
 
-    # make sure all inputs are AtomInput
+    # go through all the inputs
+    # and for any that is not AtomInput, try to transform it with the registered input type to corresponding registered function
 
-    assert all([beartype_isinstance(i, AtomInput) for i in inputs])
+    atom_inputs = []
+
+    for i in inputs:
+        if beartype_isinstance(i, AtomInput):
+            atom_inputs.append(i)
+            continue
+
+        maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
+
+        if not exists(maybe_to_atom_fn):
+            raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
+
+        atom_inputs = maybe_to_atom_fn(i)
 
     # separate input dictionary into keys and values
 
-    keys = inputs[0].keys()
-    inputs = [i.values() for i in inputs]
+    keys = atom_inputs[0].keys()
+    atom_inputs = [i.values() for i in atom_inputs]
 
     outputs = []
 
-    for grouped in zip(*inputs):
+    for grouped in zip(*atom_inputs):
         # if all None, just return None
 
         not_none_grouped = [*filter(exists, grouped)]
@@ -144,7 +158,8 @@ def collate_af3_inputs(
 
     # reconstitute dictionary
 
-    return AtomInput(tuple(zip(keys, outputs)))
+    batched_atom_inputs = AtomInput(tuple(zip(keys, outputs)))
+    return batched_atom_inputs
 
 @typecheck
 def DataLoader(
