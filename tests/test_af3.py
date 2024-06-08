@@ -698,7 +698,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
         resolved_labels = resolved_labels
     )
 
-    assert loss.numel() == 0
+    assert loss.numel() == 1
 
 # test creation from config
 
