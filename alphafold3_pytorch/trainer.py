@@ -71,7 +71,8 @@ def collate_af3_inputs(
     inputs: List,
     int_pad_value = -1,
     map_input_fn: Callable | None = None
-):
+
+) -> AtomInput:
 
     if exists(map_input_fn):
         inputs = [map_input_fn(i) for i in inputs]
@@ -143,7 +144,7 @@ def collate_af3_inputs(
 
     # reconstitute dictionary
 
-    return dict(tuple(zip(keys, outputs)))
+    return AtomInput(tuple(zip(keys, outputs)))
 
 @typecheck
 def DataLoader(
