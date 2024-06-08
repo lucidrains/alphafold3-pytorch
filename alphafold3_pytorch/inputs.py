@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Literal
 
 from alphafold3_pytorch.typing import (
     typecheck,
@@ -29,7 +29,7 @@ class AtomInput(TypedDict):
 # residue level - single chain proteins for starters
 
 @typecheck
-class ProteinInput(TypedDict):
+class SingleProteinInput(TypedDict):
     residue_ids:                Int['*b n']
     residue_atom_lens:          Int['*b n']
     templates:                  Float['*b t n n dt']
@@ -44,7 +44,34 @@ class ProteinInput(TypedDict):
 
 @typecheck
 def single_protein_input_to_atom_input(
-    residue_input: ProteinInput
+    input: SingleProteinInput
+) -> AtomInput:
+
+    raise NotImplementedError
+
+# single chain protein with single ds nucleic acid
+
+# o - for nucleOtide seq
+
+@typecheck
+class SingleProteinSingleNucleicAcidInput(TypedDict):
+    residue_ids:                Int['*b n']
+    residue_atom_lens:          Int['*b n']
+    nucleotide_ids:             Int['*b o']
+    nucleic_acid_type:          Literal['dna', 'rna']
+    templates:                  Float['*b t n n dt']
+    msa:                        Float['*b s n dm']
+    template_mask:              Bool['*b t'] | None
+    msa_mask:                   Bool['*b s'] | None
+    atom_pos:                   Float['*b m 3'] | None
+    distance_labels:            Int['*b n n'] | None
+    pae_labels:                 Int['*b n n'] | None
+    pde_labels:                 Int['*b n'] | None
+    resolved_labels:            Int['*b n'] | None
+
+@typecheck
+def single_protein_input_and_single_nucleic_acid_to_atom_input(
+    input: SingleProteinSingleNucleicAcidInput
 ) -> AtomInput:
 
     raise NotImplementedError
@@ -53,5 +80,6 @@ def single_protein_input_to_atom_input(
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation
 
 INPUT_TO_ATOM_TRANSFORM = {
-    ProteinInput: single_protein_input_to_atom_input
+    SingleProteinInput: single_protein_input_to_atom_input,
+    SingleProteinSingleNucleicAcidInput: single_protein_input_and_single_nucleic_acid_to_atom_input
 }
