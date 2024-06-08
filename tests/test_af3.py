@@ -37,9 +37,6 @@ from alphafold3_pytorch.alphafold3 import (
     atom_ref_pos_to_atompair_inputs
 )
 
-def join(str, delimiter = ','):
-    return delimiter.join(str)
-
 def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
@@ -409,14 +406,8 @@ def test_distogram_head():
 
     logits = distogram_head(pairwise_repr)
 
-@pytest.mark.parametrize(
-    join([
-        'window_atompair_inputs',
-        'stochastic_frame_average'
-    ]), [
-        (True, False),
-        (True, False)
-    ])
+@pytest.mark.parametrize('window_atompair_inputs', (True, False))
+@pytest.mark.parametrize('stochastic_frame_average', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool
@@ -571,6 +562,78 @@ def test_alphafold3_without_msa_and_templates():
     )
 
     loss.backward()
+
+def test_alphafold3_force_return_loss():
+    seq_len = 16
+    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+    additional_molecule_feats = torch.randn(2, seq_len, 10)
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    molecule_atom_indices = molecule_atom_lens - 1
+
+    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
+    )
+
+    sampled_atom_pos = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        molecule_atom_lens = molecule_atom_lens,
+        atompair_inputs = atompair_inputs,
+        additional_molecule_feats = additional_molecule_feats,
+        atom_pos = atom_pos,
+        molecule_atom_indices = molecule_atom_indices,
+        distance_labels = distance_labels,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels,
+        return_loss_breakdown = True,
+        return_loss = False # force sampling even if labels are given
+    )
+
+    assert sampled_atom_pos.ndim == 3
+
+    loss, _ = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        molecule_atom_lens = molecule_atom_lens,
+        atompair_inputs = atompair_inputs,
+        additional_molecule_feats = additional_molecule_feats,
+        return_loss_breakdown = True,
+        return_loss = True # force returning loss even if no labels given
+    )
+
+    assert loss == 0.
 
 # test creation from config
 

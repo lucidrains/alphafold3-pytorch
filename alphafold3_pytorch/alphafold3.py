@@ -3161,7 +3161,7 @@ class Alphafold3(Module):
         plddt_labels: Int['b n'] | None = None,
         resolved_labels: Int['b n'] | None = None,
         return_loss_breakdown = False,
-        return_loss_if_possible: bool = True,
+        return_loss: bool = None,
         num_rollout_steps: int = 20,
         rollout_show_tqdm_pbar: bool = False
     ) -> Float['b m 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
@@ -3317,11 +3317,15 @@ class Alphafold3(Module):
 
         has_labels = any([*map(exists, all_labels)])
 
-        return_loss = atom_pos_given or has_labels
+        can_return_loss = atom_pos_given or has_labels
+
+        # default whether to return loss by whether labels or atom positions are given
+
+        return_loss = default(return_loss, can_return_loss)
 
         # if neither atom positions or any labels are passed in, sample a structure and return
 
-        if not return_loss_if_possible or not return_loss:
+        if not return_loss:
             return self.edm.sample(
                 num_sample_steps = num_sample_steps,
                 atom_feats = atom_feats,
@@ -3334,6 +3338,16 @@ class Alphafold3(Module):
                 pairwise_rel_pos_feats = relative_position_encoding,
                 molecule_atom_lens = molecule_atom_lens
             )
+
+        # if being forced to return loss, but do not have sufficient information to return losses, just return 0
+
+        if return_loss and not can_return_loss:
+            zero = self.zero.requires_grad_()
+
+            if not return_loss_breakdown:
+                return zero
+
+            return zero, LossBreakdown(*((zero,) * 11))
 
         # losses default to 0
 
