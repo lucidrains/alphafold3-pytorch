@@ -32,6 +32,10 @@ from alphafold3_pytorch.alphafold3 import (
     Alphafold3
 )
 
+from alphafold3_pytorch.inputs import (
+    register_input_transform
+)
+
 from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,

@@ -1,4 +1,4 @@
-from typing import TypedDict, Literal
+from typing import Type, TypedDict, Literal, Callable
 
 from alphafold3_pytorch.typing import (
     typecheck,
@@ -83,3 +83,12 @@ INPUT_TO_ATOM_TRANSFORM = {
     SingleProteinInput: single_protein_input_to_atom_input,
     SingleProteinSingleNucleicAcidInput: single_protein_input_and_single_nucleic_acid_to_atom_input
 }
+
+# function for extending the config
+
+@typecheck
+def register_input_transform(
+    input_type: Type,
+    fn: Callable[[Type], AtomInput]
+):
+    INPUT_TO_ATOM_TRANSFORM[input_type] = fn
