@@ -15,6 +15,8 @@ class AtomInput(TypedDict):
     additional_molecule_feats:  Float['n 10']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
+    atom_ids:                   Int[' m'] | None
+    atompair_ids:               Int[' m m'] | Int['nw w (w*2)'] | None
     template_mask:              Bool[' t'] | None
     msa_mask:                   Bool[' s'] | None
     atom_pos:                   Float['m 3'] | None
