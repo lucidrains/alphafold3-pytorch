@@ -93,7 +93,7 @@ def collate_af3_inputs(
         if not exists(maybe_to_atom_fn):
             raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
 
-        atom_inputs = maybe_to_atom_fn(i)
+        atom_inputs.append(maybe_to_atom_fn(i))
 
     # separate input dictionary into keys and values
 
