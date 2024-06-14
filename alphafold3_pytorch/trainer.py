@@ -222,7 +222,9 @@ class Trainer:
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
         fabric_kwargs: dict = dict(),
-        ema_kwargs: dict = dict()
+        ema_kwargs: dict = dict(
+            use_foreach = True
+        )
     ):
         super().__init__()
 

@@ -149,7 +149,12 @@ def test_trainer():
         valid_every = 1,
         grad_accum_every = 2,
         checkpoint_every = 1,
-        overwrite_checkpoints = True
+        overwrite_checkpoints = True,
+        ema_kwargs = dict(
+            use_foreach = True,
+            update_after_step = 0,
+            update_every = 1
+        )
     )
 
     trainer()
