@@ -49,6 +49,8 @@ from tqdm import tqdm
 
 from importlib.metadata import version
 
+from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
+
 """
 global ein notation:
 
@@ -2828,7 +2830,7 @@ class LossBreakdown(NamedTuple):
     diffusion_bond: Float['']
     diffusion_smooth_lddt: Float['']
 
-class Alphafold3(Module):
+class Alphafold3(Module, PyTorchModelHubMixin):
     """ Algorithm 1 """
 
     @save_args_and_kwargs
@@ -3087,6 +3089,46 @@ class Alphafold3(Module):
 
         self.register_buffer('zero', torch.tensor(0.), persistent = False)
 
+    @classmethod
+    def _from_pretrained(
+        cls,
+        *,
+        model_id: str,
+        revision: str | None,
+        cache_dir: str | Path | None,
+        force_download: bool,
+        proxies: Dict | None,
+        resume_download: bool,
+        local_files_only: bool,
+        token: str | bool | None,
+        map_location: str = 'cpu',
+        strict: bool = False,
+        **model_kwargs,
+    ):
+        model_filename = "alphafold3.bin"
+        model_file = Path(model_id) / model_filename
+
+        if not model_file.exists():
+            model_file = hf_hub_download(
+                repo_id = model_id,
+                filename = model_filename,
+                revision = revision,
+                cache_dir = cache_dir,
+                force_download = force_download,
+                proxies = proxies,
+                resume_download = resume_download,
+                token = token,
+                local_files_only = local_files_only,
+            )
+
+        model = cls.init_and_load(
+            model_file,
+            strict = strict,
+            map_location = map_location
+        )
+
+        return model
+
     @property
     def device(self):
         return self.zero.device
@@ -3115,13 +3157,18 @@ class Alphafold3(Module):
         torch.save(package, str(path))
 
     @typecheck
-    def load(self, path: str | Path, strict = False):
+    def load(
+        self,
+        path: str | Path,
+        strict = False,
+        map_location = 'cpu'
+    ):
         if isinstance(path, str):
             path = Path(path)
 
         assert path.exists() and path.is_file()
 
-        package = torch.load(str(path), map_location = 'cpu')
+        package = torch.load(str(path), map_location = map_location)
 
         model_package = package['model']
         current_version = version('alphafold3_pytorch')
@@ -3135,13 +3182,16 @@ class Alphafold3(Module):
 
     @staticmethod
     @typecheck
-    def init_and_load(path: str | Path):
+    def init_and_load(
+        path: str | Path,
+        map_location = 'cpu'
+    ):
         if isinstance(path, str):
             path = Path(path)
 
         assert path.is_file()
 
-        package = torch.load(str(path), map_location = 'cpu')
+        package = torch.load(str(path), map_location = map_location)
 
         model_package = package['model']
 
