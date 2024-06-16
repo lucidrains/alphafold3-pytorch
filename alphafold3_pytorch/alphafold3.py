@@ -41,6 +41,8 @@ from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
 
+from colt5_attention import ConditionalRoutedAttention
+
 import einx
 from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
@@ -1460,7 +1462,15 @@ class DiffusionTransformer(Module):
         linear_attn_kwargs = dict(
             heads = 8,
             dim_head = 16
+        ),
+        use_colt5_attn = False,
+        colt5_attn_kwargs = dict(
+            heavy_dim_head = 64,
+            heavy_heads = 8,
+            num_heavy_tokens_q = 512,
+            num_heavy_tokens_kv = 512
         )
+
     ):
         super().__init__()
         self.attn_window_size = attn_window_size
@@ -1479,6 +1489,15 @@ class DiffusionTransformer(Module):
                     prenorm = True,
                     gate_value_heads = True,
                     **linear_attn_kwargs
+                )
+
+            colt5_attn = None
+
+            if use_colt5_attn:
+                colt5_attn = ConditionalRoutedAttention(
+                    dim = dim,
+                    has_light_attn = False,
+                    **colt5_attn_kwargs
                 )
 
             pair_bias_attn = AttentionPairBias(
@@ -1508,6 +1527,7 @@ class DiffusionTransformer(Module):
 
             layers.append(ModuleList([
                 linear_attn,
+                colt5_attn,
                 conditionable_pair_bias,
                 conditionable_transition
             ]))
@@ -1560,10 +1580,13 @@ class DiffusionTransformer(Module):
 
         # main transformer
 
-        for linear_attn, attn, transition in self.layers:
+        for linear_attn, colt5_attn, attn, transition in self.layers:
 
             if exists(linear_attn):
                 noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
+
+            if exists(colt5_attn):
+                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
 
             attn_out = attn(
                 noised_repr,
