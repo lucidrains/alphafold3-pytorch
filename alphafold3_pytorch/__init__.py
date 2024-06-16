@@ -29,7 +29,8 @@ from alphafold3_pytorch.alphafold3 import (
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3
+    Alphafold3,
+    Alphafold3WithHubMixin
 )
 
 from alphafold3_pytorch.inputs import (
@@ -79,6 +80,7 @@ __all__ = [
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
+    Alphafold3WithHubMixin,
     Alphafold3Config,
     AtomInput,
     Trainer,
