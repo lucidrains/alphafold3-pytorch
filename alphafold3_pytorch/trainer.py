@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import wraps, partial
 from pathlib import Path
 
-from alphafold3_pytorch.alphafold3 import Alphafold3
+from alphafold3_pytorch.alphafold3 import Alphafold3, Alphafold3WithHubMixin
 from alphafold3_pytorch.attention import pad_at_dim
 
 from typing import TypedDict, List, Callable
@@ -195,7 +195,7 @@ class Trainer:
     @typecheck
     def __init__(
         self,
-        model: Alphafold3,
+        model: Alphafold3 | Alphafold3WithHubMixin,
         *,
         dataset: Dataset,
         num_train_steps: int,

@@ -2830,7 +2830,7 @@ class LossBreakdown(NamedTuple):
     diffusion_bond: Float['']
     diffusion_smooth_lddt: Float['']
 
-class Alphafold3(Module, PyTorchModelHubMixin):
+class Alphafold3(Module):
     """ Algorithm 1 """
 
     @save_args_and_kwargs
@@ -3088,46 +3088,6 @@ class Alphafold3(Module, PyTorchModelHubMixin):
         self.loss_diffusion_weight = loss_diffusion_weight
 
         self.register_buffer('zero', torch.tensor(0.), persistent = False)
-
-    @classmethod
-    def _from_pretrained(
-        cls,
-        *,
-        model_id: str,
-        revision: str | None,
-        cache_dir: str | Path | None,
-        force_download: bool,
-        proxies: Dict | None,
-        resume_download: bool,
-        local_files_only: bool,
-        token: str | bool | None,
-        map_location: str = 'cpu',
-        strict: bool = False,
-        **model_kwargs,
-    ):
-        model_filename = "alphafold3.bin"
-        model_file = Path(model_id) / model_filename
-
-        if not model_file.exists():
-            model_file = hf_hub_download(
-                repo_id = model_id,
-                filename = model_filename,
-                revision = revision,
-                cache_dir = cache_dir,
-                force_download = force_download,
-                proxies = proxies,
-                resume_download = resume_download,
-                token = token,
-                local_files_only = local_files_only,
-            )
-
-        model = cls.init_and_load(
-            model_file,
-            strict = strict,
-            map_location = map_location
-        )
-
-        return model
 
     @property
     def device(self):
@@ -3623,3 +3583,46 @@ class Alphafold3(Module, PyTorchModelHubMixin):
         )
 
         return loss, loss_breakdown
+
+# an alphafold3 that can download pretrained weights from huggingface
+
+class Alphafold3WithHubMixin(Alphafold3, PyTorchModelHubMixin):
+    @classmethod
+    def _from_pretrained(
+        cls,
+        *,
+        model_id: str,
+        revision: str | None,
+        cache_dir: str | Path | None,
+        force_download: bool,
+        proxies: Dict | None,
+        resume_download: bool,
+        local_files_only: bool,
+        token: str | bool | None,
+        map_location: str = 'cpu',
+        strict: bool = False,
+        **model_kwargs,
+    ):
+        model_filename = "alphafold3.bin"
+        model_file = Path(model_id) / model_filename
+
+        if not model_file.exists():
+            model_file = hf_hub_download(
+                repo_id = model_id,
+                filename = model_filename,
+                revision = revision,
+                cache_dir = cache_dir,
+                force_download = force_download,
+                proxies = proxies,
+                resume_download = resume_download,
+                token = token,
+                local_files_only = local_files_only,
+            )
+
+        model = cls.init_and_load(
+            model_file,
+            strict = strict,
+            map_location = map_location
+        )
+
+        return model
