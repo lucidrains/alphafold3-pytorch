@@ -6,6 +6,8 @@ Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">A
 
 You can chat with other researchers about this work <a href="https://discord.gg/x6FuzQPQXY">here</a>
 
+<a href="https://www.youtube.com/watch?v=qjFgthkKxcA">Review of the paper</a> by <a href="https://x.com/sokrypton">Sergey</a>
+
 ## Appreciation
 
 - <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
