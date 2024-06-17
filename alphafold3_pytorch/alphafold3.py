@@ -77,23 +77,22 @@ r - registers
 """
 
 """
-additional_molecule_feats: [*, 10]:
+additional_molecule_feats: [*, 9]:
 
 0: molecule_index
 1: token_index
 2: asym_id
 3: entity_id
 4: sym_id
-5: restype (must be one hot encoded to 32)
-6: is_protein
-7: is_rna
-8: is_dna
-9: is_ligand
+5: is_protein
+6: is_rna
+7: is_dna
+8: is_ligand
 """
 
 # constants
 
-ADDITIONAL_MOLECULE_FEATS = 10
+ADDITIONAL_MOLECULE_FEATS = 9
 
 LinearNoBias = partial(Linear, bias = False)
 
@@ -2196,7 +2195,7 @@ class ElucidatedAtomDiffusion(Module):
         align_weights = atom_pos_ground_truth.new_ones(atom_pos_ground_truth.shape[:2])
 
         if exists(additional_molecule_feats):
-            is_nucleotide_or_ligand_fields = (additional_molecule_feats[..., 7:] != 0.).unbind(dim = -1)
+            is_nucleotide_or_ligand_fields = (additional_molecule_feats[..., -3:] != 0.).unbind(dim = -1)
 
             is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
             is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
@@ -2587,6 +2586,7 @@ class InputFeatureEmbedder(Module):
         dim_token = 384,
         dim_single = 384,
         dim_pairwise = 128,
+        num_molecule_types = 32,
         atom_transformer_blocks = 3,
         atom_transformer_heads = 4,
         atom_transformer_kwargs: dict = dict(),
@@ -2632,6 +2632,11 @@ class InputFeatureEmbedder(Module):
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
 
+        # this accounts for the `restypes` in the additional molecule features
+
+        self.single_molecule_embed = nn.Embedding(num_molecule_types, dim_single)
+        self.pairwise_molecule_embed = nn.Embedding(num_molecule_types, dim_pairwise)
+
     @typecheck
     def forward(
         self,
@@ -2641,6 +2646,7 @@ class InputFeatureEmbedder(Module):
         atom_mask: Bool['b m'],
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         molecule_atom_lens: Int['b n'],
+        molecule_ids: Int['b n']
 
     ) -> EmbeddedInputs:
 
@@ -2690,6 +2696,20 @@ class InputFeatureEmbedder(Module):
 
         single_init = self.single_input_to_single_init(single_inputs)
         pairwise_init = self.single_input_to_pairwise_init(single_inputs)
+
+        # account for molecule id (restypes)
+
+        molecule_ids = torch.where(molecule_ids >= 0, molecule_ids, 0) # account for padding
+
+        single_molecule_embed = self.single_molecule_embed(molecule_ids)
+
+        pairwise_molecule_embed = self.pairwise_molecule_embed(molecule_ids)
+        pairwise_molecule_embed = einx.add('b i dp, b j dp -> b i j dp', pairwise_molecule_embed, pairwise_molecule_embed)
+
+        # sum to single init and pairwise init, equivalent to one-hot in additional residue features
+
+        single_init = single_init + single_molecule_embed
+        pairwise_init = pairwise_init + pairwise_molecule_embed
 
         return EmbeddedInputs(single_inputs, single_init, pairwise_init, atom_feats, atompair_feats)
 
@@ -2872,6 +2892,7 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
+        num_molecule_types: int = 32,  # restype in additional residue information, apparently 32 (must be human amino acids + nucleotides + something else)
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
@@ -3192,6 +3213,7 @@ class Alphafold3(Module):
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         molecule_atom_lens: Int['b n'],
+        molecule_ids: Int['b n'],
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
         atom_mask: Bool['b m'] | None = None,
@@ -3265,7 +3287,8 @@ class Alphafold3(Module):
             atompair_inputs = atompair_inputs,
             atom_mask = atom_mask,
             additional_molecule_feats = additional_molecule_feats,
-            molecule_atom_lens = molecule_atom_lens
+            molecule_atom_lens = molecule_atom_lens,
+            molecule_ids = molecule_ids
         )
 
         # handle maybe atom and atompair embeddings

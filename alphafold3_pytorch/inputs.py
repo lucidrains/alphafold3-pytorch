@@ -10,6 +10,7 @@ from alphafold3_pytorch.typing import (
 @typecheck
 class AtomInput(TypedDict):
     atom_inputs:                Float['*b m dai']
+    molecule_ids:               Int['*b n']
     molecule_atom_lens:         Int['*b n']
     atompair_inputs:            Float['*b m m dapi'] | Float['*b nw w (w*2) dapi']
     additional_molecule_feats:  Float['*b n 10']

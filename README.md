@@ -50,7 +50,8 @@ atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-additional_molecule_feats = torch.randn(2, seq_len, 10)
+additional_molecule_feats = torch.randn(2, seq_len, 9)
+molecule_ids = torch.randint(0, 32, (2, seq_len))
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
 template_mask = torch.ones((2, 2)).bool()
@@ -75,6 +76,7 @@ loss = alphafold3(
     num_recycling_steps = 2,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
+    molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
     msa = msa,
@@ -99,6 +101,7 @@ sampled_atom_pos = alphafold3(
     num_sample_steps = 16,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
+    molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
     msa = msa,
