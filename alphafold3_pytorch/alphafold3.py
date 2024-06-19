@@ -1962,7 +1962,7 @@ class ElucidatedAtomDiffusion(Module):
         rho = 7,               # controls the sampling schedule
         P_mean = -1.2,         # mean of log-normal distribution from which noise is drawn for training
         P_std = 1.5,           # standard deviation of log-normal distribution from which noise is drawn for training
-        S_churn = 80,          # parameters for stochastic sampling - depends on dataset, Table 5 in apper
+        S_churn = 80,          # parameters for stochastic sampling - depends on dataset, Table 5 in paper
         S_tmin = 0.05,
         S_tmax = 50,
         S_noise = 1.003,
