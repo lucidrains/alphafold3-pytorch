@@ -20,6 +20,8 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 - <a href="https://github.com/gitabtion">Heng</a> for pointing out inconsistencies with the paper and pull requesting the solutions
 
+- <a href="https://github.com/luwei0917">Wei Lu</a> for catching a few erroneous hyperparameters
+
 - <a href="https://github.com/amorehead">Alex</a> for the PDB dataset preparation script!
 
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
