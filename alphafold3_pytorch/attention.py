@@ -10,7 +10,7 @@ import einx
 from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
-from alphafold3_pytorch.typing import (
+from alphafold3_pytorch.custom_typing import (
     Float,
     Int,
     Bool,
