@@ -3270,7 +3270,7 @@ class Alphafold3(Module):
         # handle offsets for molecule atom indices
 
         if exists(molecule_atom_indices):
-            molecule_atom_indices = molecule_atom_indices + F.pad(molecule_atom_lens, (-1, 1), value = 0)
+            molecule_atom_indices = molecule_atom_indices + F.pad(molecule_atom_lens.cumsum(dim = -1), (1, -1), value = 0)
 
         # get atom sequence length and molecule sequence length depending on whether using packed atomic seq
 
