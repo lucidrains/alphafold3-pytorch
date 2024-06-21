@@ -124,6 +124,9 @@ def pack_one(t, pattern):
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
 
+def exclusive_cumsum(t, dim = -1):
+    return t.cumsum(dim = dim) - t
+
 # decorators
 
 def maybe(fn):
@@ -262,8 +265,7 @@ def repeat_consecutive_with_lens(
     window_size = mask.shape[-1]
     arange = torch.arange(window_size, device = device)
 
-    cumsum_len = lens.cumsum(dim = -1)
-    offsets = F.pad(cumsum_len, (1, -1), value = 0)
+    offsets = exclusive_cumsum(lens)
     indices = einx.add('w, b n -> b n w', arange, offsets)
 
     # create output tensor + a sink position on the very right (index max_len)
@@ -3270,7 +3272,7 @@ class Alphafold3(Module):
         # handle offsets for molecule atom indices
 
         if exists(molecule_atom_indices):
-            molecule_atom_indices = molecule_atom_indices + F.pad(molecule_atom_lens.cumsum(dim = -1), (1, -1), value = 0)
+            molecule_atom_indices = molecule_atom_indices + exclusive_cumsum(molecule_atom_lens)
 
         # get atom sequence length and molecule sequence length depending on whether using packed atomic seq
 

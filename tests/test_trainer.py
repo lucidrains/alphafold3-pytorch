@@ -174,11 +174,11 @@ def test_trainer():
     # saving and loading from trainer
 
     trainer.save('./some/nested/folder2/training.pt', overwrite = True)
-    trainer.load('./some/nested/folder2/training.pt')
+    trainer.load('./some/nested/folder2/training.pt', strict = False)
 
     # allow for only loading model, needed for fine-tuning logic
 
-    trainer.load('./some/nested/folder2/training.pt', only_model = True)
+    trainer.load('./some/nested/folder2/training.pt', only_model = True, strict = False)
 
     # also allow for loading Alphafold3 directly from training ckpt
 
