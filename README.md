@@ -20,6 +20,8 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 - <a href="https://github.com/gitabtion">Heng</a> for pointing out inconsistencies with the paper and pull requesting the solutions
 
+- <a href="https://github.com/gitabtion">Heng</a> for finding an issue with the molecular atom indices for the distogram loss
+
 - <a href="https://github.com/luwei0917">Wei Lu</a> for catching a few erroneous hyperparameters
 
 - <a href="https://github.com/amorehead">Alex</a> for the PDB dataset preparation script!
