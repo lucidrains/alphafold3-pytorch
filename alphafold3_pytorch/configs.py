@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from alphafold3_pytorch.typing import typecheck
+from alphafold3_pytorch.custom_typing import typecheck
 from typing import Callable, List, Dict
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
