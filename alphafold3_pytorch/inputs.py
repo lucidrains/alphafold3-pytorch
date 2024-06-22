@@ -16,6 +16,7 @@ class AtomInput(TypedDict):
     additional_molecule_feats:  Float['n 9']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
+    token_bonds:                Bool['n n'] | None
     atom_ids:                   Int['m'] | None
     atompair_ids:               Int['m m'] | Int['nw w (w*2)'] | None
     template_mask:              Bool['t'] | None
@@ -36,6 +37,7 @@ class BatchedAtomInput(TypedDict):
     additional_molecule_feats:  Float['b n 9']
     templates:                  Float['b t n n dt']
     msa:                        Float['b s n dm']
+    token_bonds:                Bool['b n n'] | None
     atom_ids:                   Int['b m'] | None
     atompair_ids:               Int['b m m'] | Int['b nw w (w*2)'] | None
     template_mask:              Bool['b t'] | None

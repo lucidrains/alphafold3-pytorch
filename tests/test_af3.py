@@ -422,7 +422,7 @@ def test_alphafold3(
     molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
     atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 
-    token_bond = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
+    token_bonds = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
 
@@ -480,7 +480,7 @@ def test_alphafold3(
         molecule_atom_lens = molecule_atom_lens,
         atompair_inputs = atompair_inputs,
         additional_molecule_feats = additional_molecule_feats,
-        token_bond = token_bond,
+        token_bonds = token_bonds,
         msa = msa,
         msa_mask = msa_mask,
         templates = template_feats,
