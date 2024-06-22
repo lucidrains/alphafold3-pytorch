@@ -14,6 +14,11 @@ from alphafold3_pytorch.custom_typing import (
     Int, Bool, Float
 )
 
+from alphafold3_pytorch.attention import (
+    full_pairwise_repr_to_windowed,
+    full_attn_bias_to_windowed
+)
+
 from alphafold3_pytorch.inputs import (
     AtomInput,
     BatchedAtomInput,
@@ -72,6 +77,7 @@ def accum_dict(
 def collate_af3_inputs(
     inputs: List,
     int_pad_value = -1,
+    atoms_per_window: int | None = None,
     map_input_fn: Callable | None = None
 
 ) -> BatchedAtomInput:
@@ -95,6 +101,24 @@ def collate_af3_inputs(
             raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
 
         atom_inputs.append(maybe_to_atom_fn(i))
+
+    # take care of windowing the atompair_inputs and atompair_ids if they are not windowed already
+
+    if exists(atoms_per_window):
+        for atom_input in atom_inputs:
+            atompair_inputs = atom_input['atompair_inputs']
+            atompair_ids = atom_input.get('atompair_ids', None)
+
+            atompair_inputs_is_windowed = atompair_inputs.ndim == 4
+
+            if not atompair_inputs_is_windowed:
+                atom_input['atompair_inputs'] = full_pairwise_repr_to_windowed(atompair_inputs, window_size = atoms_per_window)
+
+            if exists(atompair_ids):
+                atompair_ids_is_windowed = atompair_ids.ndim == 3
+
+                if not atompair_ids_is_windowed:
+                    atom_input['atompair_ids'] = full_attn_bias_to_windowed(atompair_ids, window_size = atoms_per_window)
 
     # separate input dictionary into keys and values
 
@@ -165,10 +189,11 @@ def collate_af3_inputs(
 @typecheck
 def DataLoader(
     *args,
+    atoms_per_window: int | None = None,
     map_input_fn: Callable | None = None,
     **kwargs
 ):
-    collate_fn = collate_af3_inputs
+    collate_fn = partial(collate_af3_inputs, atoms_per_window = atoms_per_window)
 
     if exists(map_input_fn):
         collate_fn = partial(collate_fn, map_input_fn = map_input_fn)
@@ -262,7 +287,7 @@ class Trainer:
 
         # if map dataset function given, curry into DataLoader
 
-        DataLoader_ = DataLoader
+        DataLoader_ = partial(DataLoader, atoms_per_window = model.atoms_per_window)
 
         if exists(map_dataset_input_fn):
             DataLoader_ = partial(DataLoader_, map_input_fn = map_dataset_input_fn)
