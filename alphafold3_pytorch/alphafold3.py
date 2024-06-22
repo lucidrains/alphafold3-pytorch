@@ -1907,7 +1907,7 @@ class DiffusionModule(Module):
 
         tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
 
-        self.token_transformer(
+        tokens = self.token_transformer(
             tokens,
             mask = mask,
             single_repr = conditioned_single_repr,
