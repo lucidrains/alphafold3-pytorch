@@ -3221,7 +3221,7 @@ class Alphafold3(Module):
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
         atom_mask: Bool['b m'] | None = None,
-        token_bond: Bool['b n n'] | None = None,
+        token_bonds: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
         msa_mask: Bool['b s'] | None = None,
         templates: Float['b t n n dt'] | None = None,
@@ -3322,21 +3322,21 @@ class Alphafold3(Module):
 
         # token bond features
 
-        if exists(token_bond):
+        if exists(token_bonds):
             # well do some precautionary standardization
             # (1) mask out diagonal - token to itself does not count as a bond
             # (2) symmetrize, in case it is not already symmetrical (could also throw an error)
 
-            token_bond = token_bond | rearrange(token_bond, 'b i j -> b j i')
+            token_bonds = token_bonds | rearrange(token_bonds, 'b i j -> b j i')
             diagonal = torch.eye(seq_len, device = self.device, dtype = torch.bool)
-            token_bond = token_bond.masked_fill(diagonal, False)
+            token_bonds = token_bonds.masked_fill(diagonal, False)
         else:
             seq_arange = torch.arange(seq_len, device = self.device)
-            token_bond = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
+            token_bonds = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
 
-        token_bond_feats = self.token_bond_to_pairwise_feat(token_bond.float())
+        token_bonds_feats = self.token_bond_to_pairwise_feat(token_bonds.float())
 
-        pairwise_init = pairwise_init + token_bond_feats
+        pairwise_init = pairwise_init + token_bonds_feats
 
         # molecule mask and pairwise mask
 
