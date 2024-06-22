@@ -16,6 +16,7 @@ from alphafold3_pytorch.custom_typing import (
 
 from alphafold3_pytorch.inputs import (
     AtomInput,
+    BatchedAtomInput,
     INPUT_TO_ATOM_TRANSFORM
 )
 
@@ -73,7 +74,7 @@ def collate_af3_inputs(
     int_pad_value = -1,
     map_input_fn: Callable | None = None
 
-) -> AtomInput:
+) -> BatchedAtomInput:
 
     if exists(map_input_fn):
         inputs = [map_input_fn(i) for i in inputs]
