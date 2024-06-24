@@ -183,7 +183,7 @@ def collate_af3_inputs(
 
     # reconstitute dictionary
 
-    batched_atom_inputs = AtomInput(tuple(zip(keys, outputs)))
+    batched_atom_inputs = BatchedAtomInput(tuple(zip(keys, outputs)))
     return batched_atom_inputs
 
 @typecheck
