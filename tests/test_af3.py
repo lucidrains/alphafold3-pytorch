@@ -412,9 +412,11 @@ def test_distogram_head():
 
 @pytest.mark.parametrize('window_atompair_inputs', (True, False))
 @pytest.mark.parametrize('stochastic_frame_average', (True, False))
+@pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
-    stochastic_frame_average: bool
+    stochastic_frame_average: bool,
+    atom_transformer_intramolecular_attn: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -433,6 +435,11 @@ def test_alphafold3(
 
     additional_molecule_feats = torch.randn(2, seq_len, 9)
     molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    atom_parent_ids = None
+
+    if atom_transformer_intramolecular_attn:
+        atom_parent_ids = torch.ones(2, atom_seq_len).long()
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
     template_mask = torch.ones((2, 2)).bool()
@@ -478,6 +485,7 @@ def test_alphafold3(
         atom_inputs = atom_inputs,
         molecule_ids = molecule_ids,
         molecule_atom_lens = molecule_atom_lens,
+        atom_parent_ids = atom_parent_ids,
         atompair_inputs = atompair_inputs,
         additional_molecule_feats = additional_molecule_feats,
         token_bonds = token_bonds,
