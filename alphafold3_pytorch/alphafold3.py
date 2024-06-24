@@ -3652,9 +3652,9 @@ class Alphafold3WithHubMixin(Alphafold3, PyTorchModelHubMixin):
         token: str | bool | None,
         map_location: str = 'cpu',
         strict: bool = False,
+        model_filename: str = 'alphafold3.bin',
         **model_kwargs,
     ):
-        model_filename = "alphafold3.bin"
         model_file = Path(model_id) / model_filename
 
         if not model_file.exists():
