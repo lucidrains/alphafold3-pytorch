@@ -9,6 +9,7 @@ import torch
 from torch import nn, sigmoid
 from torch import Tensor
 import torch.nn.functional as F
+from loguru import logger
 
 from torch.nn import (
     Module,
@@ -2380,7 +2381,7 @@ class WeightedRigidAlign(Module):
         true_coords_centered = true_coords - true_centroid
 
         if num_points < (dim + 1):
-            print(
+            logger.warning(
                 "Warning: The size of one of the point clouds is <= dim+1. "
                 + "`WeightedRigidAlign` cannot return a unique rotation."
             )
@@ -2393,7 +2394,7 @@ class WeightedRigidAlign(Module):
 
         # Catch ambiguous rotation by checking the magnitude of singular values
         if (S.abs() <= 1e-15).any() and not (num_points < (dim + 1)):
-            print(
+            logger.warning(
                 "Warning: Excessively low rank of "
                 + "cross-correlation between aligned point clouds. "
                 + "`WeightedRigidAlign` cannot return a unique rotation."
@@ -3182,7 +3183,7 @@ class Alphafold3(Module):
         current_version = version('alphafold3_pytorch')
 
         if model_package['version'] != current_version:
-            print(f'loading a saved model from version {model_package["version"]} but you are on version {current_version}')
+            logger.warning(f'loading a saved model from version {model_package["version"]} but you are on version {current_version}')
 
         self.load_state_dict(model_package['state_dict'], strict = strict)
 
