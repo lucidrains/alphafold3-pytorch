@@ -20,7 +20,7 @@ from torch.nn import (
 
 from typing import List, Literal, Tuple, NamedTuple, Callable
 
-from alphafold3_pytorch.custom_typing import (
+from alphafold3_pytorch.tensor_typing import (
     Float,
     Int,
     Bool,

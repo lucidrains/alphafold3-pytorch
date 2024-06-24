@@ -1,6 +1,6 @@
 from typing import Type, TypedDict, Literal, Callable
 
-from alphafold3_pytorch.custom_typing import (
+from alphafold3_pytorch.tensor_typing import (
     typecheck,
     Int, Bool, Float
 )
