@@ -6,7 +6,7 @@ from functools import partial, wraps
 from collections import namedtuple
 
 import torch
-from torch import nn, sigmoid
+from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
 from loguru import logger
@@ -18,7 +18,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import List, Literal, Tuple, NamedTuple, Callable
+from typing import List, Literal, Tuple, NamedTuple, Dict, Callable
 
 from alphafold3_pytorch.tensor_typing import (
     Float,
