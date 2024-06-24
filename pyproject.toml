@@ -45,6 +45,7 @@ dependencies = [
     'torch_geometric',
     "torch>=2.1",
     "tqdm>=4.66.4",
+    "loguru",
 ]
 
 [project.urls]
