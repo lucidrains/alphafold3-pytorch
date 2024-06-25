@@ -801,19 +801,21 @@ class OuterProductMean(Module):
 
         a, b = self.to_hidden(msa).chunk(2, dim = -1)
 
-        outer_product = einsum(a, b, 'b s i d, b s j e -> b i j d e s')
-
         # maybe masked mean for outer product
 
         if exists(msa_mask):
-            outer_product = einx.multiply('b i j d e s, b s -> b i j d e s', outer_product, msa_mask.float())
+            a = einx.multiply('b s i d, b s -> b s i d', a, msa_mask.float())
+            b = einx.multiply('b s j e, b s -> b s j e', b, msa_mask.float())
 
-            num = reduce(outer_product, '... s -> ...', 'sum')
-            den = reduce(msa_mask.float(), '... s -> ...', 'sum')
+            outer_product = einsum(a, b, 'b s i d, b s j e -> b i j d e')
 
-            outer_product_mean = einx.divide('b i j d e, b', num, den.clamp(min = self.eps))
+            num_msa = reduce(msa_mask.float(), '... s -> ...', 'sum')
+
+            outer_product_mean = einx.divide('b i j d e, b', outer_product, num_msa.clamp(min = self.eps))
         else:
-            outer_product_mean = reduce(outer_product, '... s -> ...', 'mean')
+            num_msa = msa.shape[1]
+            outer_product = einsum(a, b, 'b s i d, b s j e -> b i j d e')
+            outer_product_mean = outer_product / num_msa
 
         # flatten
 
