@@ -18,6 +18,7 @@ class AtomInput(TypedDict):
     msa:                        Float['s n dm']
     token_bonds:                Bool['n n'] | None
     atom_ids:                   Int['m'] | None
+    atom_parent_ids:            Int['m'] | None
     atompair_ids:               Int['m m'] | Int['nw w (w*2)'] | None
     template_mask:              Bool['t'] | None
     msa_mask:                   Bool['s'] | None
@@ -39,6 +40,7 @@ class BatchedAtomInput(TypedDict):
     msa:                        Float['b s n dm']
     token_bonds:                Bool['b n n'] | None
     atom_ids:                   Int['b m'] | None
+    atom_parent_ids:            Int['b m'] | None
     atompair_ids:               Int['b m m'] | Int['b nw w (w*2)'] | None
     template_mask:              Bool['b t'] | None
     msa_mask:                   Bool['b s'] | None
