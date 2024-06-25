@@ -86,11 +86,39 @@ NUCLEOTIDES = dict(
     )
 )
 
+# metal ions
+
+METALS = dict(
+    Mg = dict(
+        smile = '[Mg]'
+    ),
+    Mn = dict(
+        smile = '[Mn]'
+    ),
+    Fe = dict(
+        smile = '[Fe]'
+    ),
+    Co = dict(
+        smile = '[Co]'
+    ),
+    Ni = dict(
+        smile = '[Ni]'
+    ),
+    Cu = dict(
+        smile = '[Cu]'
+    ),
+    Zn = dict(
+        smile = '[Zn]'
+    )
+)
+
 # initialize rdkit.Chem with canonical SMILES
 
 for aa_dict in HUMAN_AMINO_ACIDS.values():
-    aa_dict['rdkit_chem'] = Chem.MolFromSmiles(aa_dict['smile'])
-
+    aa_dict['rdchem_mol'] = Chem.MolFromSmiles(aa_dict['smile'])
 
 for nuc_dict in NUCLEOTIDES.values():
-    nuc_dict['rdkit_chem'] = Chem.MolFromSmiles(nuc_dict['smile'])
+    nuc_dict['rdchem_mol'] = Chem.MolFromSmiles(nuc_dict['smile'])
+
+for metal_dict in METALS.values():
+    metal_dict['rdchem_mol'] = Chem.MolFromSmiles(metal_dict['smile'])
