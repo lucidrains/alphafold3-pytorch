@@ -8,6 +8,12 @@ from alphafold3_pytorch.tensor_typing import (
     Int, Bool, Float
 )
 
+from alphafold3_pytorch.life import (
+    HUMAN_AMINO_ACIDS,
+    NUCLEOTIDES,
+    METALS
+)
+
 # constants
 
 IS_MOLECULE_TYPES = 4
