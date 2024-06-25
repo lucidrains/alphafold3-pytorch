@@ -1,4 +1,7 @@
-from typing import Type, TypedDict, Literal, Callable
+from typing import Type, TypedDict, Literal, Callable, List
+
+from rdkit import Chem
+from rdkit.Chem.rdchem import Mol
 
 from alphafold3_pytorch.tensor_typing import (
     typecheck,
@@ -50,6 +53,33 @@ class BatchedAtomInput(TypedDict):
     pae_labels:                 Int['b n n'] | None
     pde_labels:                 Int['b n'] | None
     resolved_labels:            Int['b n'] | None
+
+# molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
+
+@typecheck
+class MoleculeInput(TypedDict):
+    molecules:                  List[Mol]
+    molecule_atom_lens:         List[Int['t']]
+    molecule_ids:               Int['n']
+    additional_molecule_feats:  Float['n 9']
+    templates:                  Float['t n n dt']
+    msa:                        Float['s n dm']
+    token_bonds:                Bool['n n'] | None
+    template_mask:              Bool['t'] | None
+    msa_mask:                   Bool['s'] | None
+    atom_pos:                   Float['m 3'] | None
+    molecule_atom_indices:      Int['n'] | None
+    distance_labels:            Int['n n'] | None
+    pae_labels:                 Int['n n'] | None
+    pde_labels:                 Int['n'] | None
+    resolved_labels:            Int['n'] | None
+
+@typecheck
+def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
+    raise NotImplementedError
+
+def validate_molecule_input(molecule_input: MoleculeInput):
+    assert True
 
 # residue level - single chain proteins for starters
 
@@ -105,6 +135,7 @@ def single_protein_input_and_single_nucleic_acid_to_atom_input(
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation
 
 INPUT_TO_ATOM_TRANSFORM = {
+    MoleculeInput: molecule_to_atom_input,
     SingleProteinInput: single_protein_input_to_atom_input,
     SingleProteinSingleNucleicAcidInput: single_protein_input_and_single_nucleic_acid_to_atom_input
 }
