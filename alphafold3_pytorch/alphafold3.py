@@ -78,22 +78,30 @@ r - registers
 """
 
 """
-additional_molecule_feats: [*, 9]:
+additional_molecule_feats: [*, 5]:
 
 0: molecule_index
 1: token_index
 2: asym_id
 3: entity_id
 4: sym_id
-5: is_protein
-6: is_rna
-7: is_dna
-8: is_ligand
+"""
+
+"""
+is_molecule_types: [*, 4]
+
+0: is_protein
+1: is_rna
+2: is_dna
+3: is_ligand
 """
 
 # constants
 
-ADDITIONAL_MOLECULE_FEATS = 9
+from alphafold3_pytorch.inputs import (
+    IS_MOLECULE_TYPES,
+    ADDITIONAL_MOLECULE_FEATS
+)
 
 LinearNoBias = partial(Linear, bias = False)
 
@@ -1169,9 +1177,8 @@ class RelativePositionEncoding(Module):
     ) -> Float['b n n dp']:
 
         device = additional_molecule_feats.device
-        assert additional_molecule_feats.shape[-1] >= 5
 
-        res_idx, token_idx, asym_id, entity_id, sym_id = additional_molecule_feats[..., :5].unbind(dim = -1)
+        res_idx, token_idx, asym_id, entity_id, sym_id = additional_molecule_feats.unbind(dim = -1)
         
         diff_res_idx = einx.subtract('b i, b j -> b i j', res_idx, res_idx)
         diff_token_idx = einx.subtract('b i, b j -> b i j', token_idx, token_idx)
@@ -2173,6 +2180,7 @@ class ElucidatedAtomDiffusion(Module):
         molecule_atom_lens: Int['b n'],
         atom_parent_ids: Int['b m'] | None = None,
         return_denoised_pos = False,
+        is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'] | None = None,
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
@@ -2218,13 +2226,13 @@ class ElucidatedAtomDiffusion(Module):
 
         align_weights = atom_pos_ground_truth.new_ones(atom_pos_ground_truth.shape[:2])
 
-        if exists(additional_molecule_feats):
-            is_nucleotide_or_ligand_fields = (additional_molecule_feats[..., -3:] != 0.).unbind(dim = -1)
+        if exists(is_molecule_types):
+            is_nucleotide_or_ligand_fields = is_molecule_types.unbind(dim = -1)
 
             is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
             is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
 
-            atom_is_dna, atom_is_rna, atom_is_ligand = is_nucleotide_or_ligand_fields
+            _, atom_is_dna, atom_is_rna, atom_is_ligand = is_nucleotide_or_ligand_fields
 
             # section 3.7.1 equation 4
 
@@ -2281,7 +2289,7 @@ class ElucidatedAtomDiffusion(Module):
         smooth_lddt_loss = self.zero
 
         if add_smooth_lddt_loss:
-            assert exists(additional_molecule_feats)
+            assert exists(is_molecule_types)
 
             smooth_lddt_loss = self.smooth_lddt_loss(
                 denoised_atom_pos,
@@ -2651,7 +2659,7 @@ class InputFeatureEmbedder(Module):
             dim_out = dim_token
         )
 
-        dim_single_input = dim_token + ADDITIONAL_MOLECULE_FEATS
+        dim_single_input = dim_token + ADDITIONAL_MOLECULE_FEATS + IS_MOLECULE_TYPES
 
         self.single_input_to_single_init = LinearNoBias(dim_single_input, dim_single)
         self.single_input_to_pairwise_init = LinearNoBiasThenOuterSum(dim_single_input, dim_pairwise)
@@ -2668,6 +2676,7 @@ class InputFeatureEmbedder(Module):
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         atom_mask: Bool['b m'],
+        is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n']
@@ -2716,7 +2725,11 @@ class InputFeatureEmbedder(Module):
             molecule_atom_lens = molecule_atom_lens
         )
 
-        single_inputs = torch.cat((single_inputs, additional_molecule_feats), dim = -1)
+        single_inputs = torch.cat((
+            single_inputs,
+            additional_molecule_feats,
+            is_molecule_types.float()
+        ), dim = -1)
 
         single_init = self.single_input_to_single_init(single_inputs)
         pairwise_init = self.single_input_to_pairwise_init(single_inputs)
@@ -3046,7 +3059,7 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_MOLECULE_FEATS
+        dim_single_inputs = dim_input_embedder_token + ADDITIONAL_MOLECULE_FEATS + IS_MOLECULE_TYPES
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -3236,6 +3249,7 @@ class Alphafold3(Module):
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
+        is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n'],
         atom_ids: Int['b m'] | None = None,
@@ -3311,6 +3325,7 @@ class Alphafold3(Module):
             atom_inputs = atom_inputs,
             atompair_inputs = atompair_inputs,
             atom_mask = atom_mask,
+            is_molecule_types = is_molecule_types,
             additional_molecule_feats = additional_molecule_feats,
             molecule_atom_lens = molecule_atom_lens,
             molecule_ids = molecule_ids
@@ -3513,6 +3528,7 @@ class Alphafold3(Module):
                     pairwise,
                     relative_position_encoding,
                     additional_molecule_feats,
+                    is_molecule_types,
                     molecule_atom_indices,
                     molecule_atom_lens,
                     pae_labels,
@@ -3535,6 +3551,7 @@ class Alphafold3(Module):
                         pairwise,
                         relative_position_encoding,
                         additional_molecule_feats,
+                        is_molecule_types,
                         molecule_atom_indices,
                         molecule_atom_lens,
                         pae_labels,
@@ -3566,6 +3583,7 @@ class Alphafold3(Module):
             diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,
                 additional_molecule_feats = additional_molecule_feats,
+                is_molecule_types = is_molecule_types,
                 add_smooth_lddt_loss = diffusion_add_smooth_lddt_loss,
                 add_bond_loss = diffusion_add_bond_loss,
                 atom_feats = atom_feats,

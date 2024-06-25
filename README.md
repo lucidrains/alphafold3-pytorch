@@ -54,7 +54,8 @@ atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-additional_molecule_feats = torch.randn(2, seq_len, 9)
+additional_molecule_feats = torch.randn(2, seq_len, 5)
+is_molecule_types = torch.randint(0, 2, (2, seq_len)).bool()
 molecule_ids = torch.randint(0, 32, (2, seq_len))
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
@@ -83,6 +84,7 @@ loss = alphafold3(
     molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    is_molecule_types = is_molecule_types,
     msa = msa,
     msa_mask = msa_mask,
     templates = template_feats,

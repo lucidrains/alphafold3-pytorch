@@ -47,7 +47,8 @@ class MockAtomDataset(Dataset):
         atompair_inputs = torch.randn(atom_seq_len, atom_seq_len, 5)
 
         molecule_atom_lens = torch.randint(1, self.atoms_per_window, (seq_len,))
-        additional_molecule_feats = torch.randn(seq_len, 9)
+        additional_molecule_feats = torch.randn(seq_len, 5)
+        is_molecule_types = torch.randint(0, 2, (seq_len, 4)).bool()
         molecule_ids = torch.randint(0, 32, (seq_len,))
         token_bonds = torch.randint(0, 2, (seq_len, seq_len)).bool()
 
@@ -78,6 +79,7 @@ class MockAtomDataset(Dataset):
             token_bonds = token_bonds,
             molecule_atom_lens = molecule_atom_lens,
             additional_molecule_feats = additional_molecule_feats,
+            is_molecule_types = is_molecule_types,
             templates = templates,
             template_mask = template_mask,
             msa = msa,
