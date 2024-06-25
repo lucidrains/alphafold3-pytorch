@@ -3376,10 +3376,13 @@ class Alphafold3(Module):
 
         # molecule mask and pairwise mask
 
-        total_atoms = molecule_atom_lens.sum(dim = -1)
-        mask = lens_to_mask(total_atoms, max_len = seq_len)
-    
+        mask = molecule_atom_lens > 0
         pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
+
+        # prepare mask for msa module and template embedder
+        # which is equivalent to the `is_protein` of the `is_molecular_types` input
+
+        is_protein_mask = is_molecule_types[..., 0]
 
         # init recycled single and pairwise
 
@@ -3412,7 +3415,7 @@ class Alphafold3(Module):
                     templates = templates,
                     template_mask = template_mask,
                     pairwise_repr = pairwise,
-                    mask = mask
+                    mask = is_protein_mask
                 )
 
                 pairwise = embedded_template + pairwise
@@ -3424,7 +3427,7 @@ class Alphafold3(Module):
                     msa = msa,
                     single_repr = single,
                     pairwise_repr = pairwise,
-                    mask = mask,
+                    mask = is_protein_mask,
                     msa_mask = msa_mask
                 )
 
