@@ -59,16 +59,15 @@ class BatchedAtomInput(TypedDict):
 @typecheck
 class MoleculeInput(TypedDict):
     molecules:                  List[Mol]
-    molecule_atom_lens:         List[Int['t']]
+    molecule_token_pool_lens:   List[List[int]]
+    molecule_atom_indices:      List[List[int] | None]
     molecule_ids:               Int['n']
     additional_molecule_feats:  Float['n 9']
-    templates:                  Float['t n n dt']
-    msa:                        Float['s n dm']
-    token_bonds:                Bool['n n'] | None
-    template_mask:              Bool['t'] | None
-    msa_mask:                   Bool['s'] | None
     atom_pos:                   Float['m 3'] | None
-    molecule_atom_indices:      Int['n'] | None
+    templates:                  Float['t n n dt']
+    template_mask:              Bool['t'] | None
+    msa:                        Float['s n dm']
+    msa_mask:                   Bool['s'] | None
     distance_labels:            Int['n n'] | None
     pae_labels:                 Int['n n'] | None
     pde_labels:                 Int['n'] | None
