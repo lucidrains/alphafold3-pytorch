@@ -181,6 +181,7 @@ def register_input_transform(
 
 # functions for transforming to atom inputs
 
+@typecheck
 def maybe_transform_to_atom_inputs(inputs: List[Any]) -> List[AtomInput]:
     atom_inputs = []
 
