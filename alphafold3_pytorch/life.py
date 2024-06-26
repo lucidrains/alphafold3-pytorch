@@ -1,6 +1,9 @@
 import rdkit
 from rdkit import Chem
 
+from typing import Literal
+from alphafold3_pytorch.tensor_typing import typecheck
+
 # human amino acids
 
 HUMAN_AMINO_ACIDS = dict(
@@ -71,40 +74,52 @@ HUMAN_AMINO_ACIDS = dict(
 DNA_NUCLEOTIDES = dict(
     A = dict(
         smile = 'C1C(C(OC1N2C=NC3=C(N=CN=C32)N)CO)O',
-        rc = 'T'
+        complement = 'T'
     ),
     G = dict(
         smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)CO)O',
-        rc = 'C'
+        complement = 'C'
     ),
     C = dict(
         smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)CO)O',
-        rc = 'G'
+        complement = 'G'
     ),
     T = dict(
         smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)CO)O',
-        rc = 'A'
+        complement = 'A'
     )
 )
 
 RNA_NUCLEOTIDES = dict(
     A = dict(
         smile = 'C1=NC(=C2C(=N1)N(C=N2)C3C(C(C(O3)COP(=O)(O)O)O)O)N',
-        rc = 'U'
+        complement = 'U'
     ),
     G = dict(
         smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
-        rc = 'C'
+        complement = 'C'
     ),
     C = dict(
         smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
-        rc = 'G'
+        complement = 'G'
     ),
     U = dict(
         smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
-        rc = 'A'
+        complement = 'A'
     )
 )
+
+@typecheck
+def reverse_complement(seq: str, nucleic_acid_type: Literal['dna', 'rna'] = 'dna'):
+    if nucleic_acid_type == 'dna':
+        nucleic_acid_entries = DNA_NUCLEOTIDES
+    elif nucleic_acid_type == 'rna':
+        nucleic_acid_entries = RNA_NUCLEOTIDES
+
+    assert all([nuc in nucleic_acid_entries for nuc in seq]), 'unknown nucleotide for given nucleic acid type'
+
+    complement = [nucleic_acid_entries[nuc]['complement'] for nuc in seq]
+    return ''.join(complement[::-1])
 
 # metal ions
 
