@@ -11,7 +11,8 @@ from alphafold3_pytorch.tensor_typing import (
 from alphafold3_pytorch.life import (
     HUMAN_AMINO_ACIDS,
     NUCLEOTIDES,
-    METALS
+    METALS,
+    MISC
 )
 
 # constants
@@ -75,8 +76,9 @@ class MoleculeInput(TypedDict):
     molecule_token_pool_lens:   List[List[int]]
     molecule_atom_indices:      List[List[int] | None]
     molecule_ids:               Int['n']
-    additional_molecule_feats:  Float['n 9']
-    atom_pos:                   Float['m 3'] | None
+    additional_molecule_feats:  Float['n 5']
+    is_molecule_types:          Bool['n 4']
+    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None
     templates:                  Float['t n n dt']
     template_mask:              Bool['t'] | None
     msa:                        Float['s n dm']

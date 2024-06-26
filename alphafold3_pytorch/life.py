@@ -112,6 +112,14 @@ METALS = dict(
     )
 )
 
+# miscellaneous
+
+MISC = dict(
+    Phospholipid = dict(
+        smile = 'CCCCCCCCCCCCCCCC(=O)OCC(COP(=O)(O)OCC(CO)O)OC(=O)CCCCCCCC1CC1CCCCCC'
+    )
+)
+
 # initialize rdkit.Chem with canonical SMILES
 
 for aa_dict in HUMAN_AMINO_ACIDS.values():
@@ -122,3 +130,6 @@ for nuc_dict in NUCLEOTIDES.values():
 
 for metal_dict in METALS.values():
     metal_dict['rdchem_mol'] = Chem.MolFromSmiles(metal_dict['smile'])
+
+for misc_dict in MISC.values():
+    misc_dict['rdchem_mol'] = Chem.MolFromSmiles(misc_dict['smile'])
