@@ -51,8 +51,8 @@ class AtomInput:
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
     additional_molecule_feats:  Float[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    templates:                  Float['t n n dt']
-    msa:                        Float['s n dm']
+    templates:                  Float['t n n dt'] | None = None
+    msa:                        Float['s n dm'] | None = None
     token_bonds:                Bool['n n'] | None = None
     atom_ids:                   Int[' m'] | None = None
     atom_parent_ids:            Int[' m'] | None = None
@@ -76,8 +76,8 @@ class BatchedAtomInput:
     atompair_inputs:            Float['b m m dapi'] | Float['b nw w (w*2) dapi']
     additional_molecule_feats:  Float[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'b n {IS_MOLECULE_TYPES}']
-    templates:                  Float['b t n n dt']
-    msa:                        Float['b s n dm']
+    templates:                  Float['b t n n dt'] | None = None
+    msa:                        Float['b s n dm'] | None = None
     token_bonds:                Bool['b n n'] | None = None
     atom_ids:                   Int['b m'] | None = None
     atom_parent_ids:            Int['b m'] | None = None
@@ -103,8 +103,8 @@ class MoleculeInput:
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Float[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    templates:                  Float['t n n dt']
-    msa:                        Float['s n dm']
+    templates:                  Float['t n n dt'] | None = None
+    msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
@@ -123,14 +123,12 @@ def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
 @dataclass
 class Alphafold3Input:
     proteins:                   List[Int[' _']]
-    protein_atom_lens:          List[Int[' _']]
     nucleic_acids:              List[Int[' _']]
-    nucleic_acid_atom_lens:     List[Int[' _']]
     metal_ions:                 Int[' _']
     misc_molecule_ids:          Int[' _']
     ligands:                    List[Mol | str] # can be given as smiles
-    templates:                  Float['t n n dt']
-    msa:                        Float['s n dm']
+    templates:                  Float['t n n dt'] | None = None
+    msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
