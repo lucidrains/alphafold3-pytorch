@@ -139,7 +139,7 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
 
 @typecheck
-def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> AtomInput:
+def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeInput:
     raise NotImplementedError
 
 # pdb input
