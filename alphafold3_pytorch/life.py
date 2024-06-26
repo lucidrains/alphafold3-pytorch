@@ -128,14 +128,15 @@ MISC = dict(
 
 # initialize rdkit.Chem with canonical SMILES
 
-for aa_dict in HUMAN_AMINO_ACIDS.values():
-    aa_dict['rdchem_mol'] = Chem.MolFromSmiles(aa_dict['smile'])
+ALL_ENTRIES = [
+    *HUMAN_AMINO_ACIDS.values(),
+    *NUCLEOTIDES.values(),
+    *METALS.values(),
+    *MISC.values(),
+]
 
-for nuc_dict in NUCLEOTIDES.values():
-    nuc_dict['rdchem_mol'] = Chem.MolFromSmiles(nuc_dict['smile'])
+for entry in ALL_ENTRIES:
+    mol = Chem.MolFromSmiles(entry['smile'])
 
-for metal_dict in METALS.values():
-    metal_dict['rdchem_mol'] = Chem.MolFromSmiles(metal_dict['smile'])
-
-for misc_dict in MISC.values():
-    misc_dict['rdchem_mol'] = Chem.MolFromSmiles(misc_dict['smile'])
+    entry['num_atoms'] = mol.GetNumAtoms()
+    entry['rdchem_mol'] = mol
