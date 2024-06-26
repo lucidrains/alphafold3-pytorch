@@ -103,10 +103,10 @@ class MoleculeInput:
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Float['n 5']
     is_molecule_types:          Bool['n 4']
-    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
     templates:                  Float['t n n dt']
-    template_mask:              Bool[' t'] | None = None
     msa:                        Float['s n dm']
+    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
+    template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
     pae_labels:                 Int['n n'] | None = None
@@ -129,9 +129,9 @@ class Alphafold3Input:
     metal_ions:                 Int[' _']
     misc_molecule_ids:          Int[' _']
     ligands:                    List[Mol | str] # can be given as smiles
-    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
+    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
@@ -140,7 +140,7 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
 
 @typecheck
-def af3_input_to_molecule_input(af3_input: Alphafold3Input) -> AtomInput:
+def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> AtomInput:
     raise NotImplementedError
 
 # pdb input
@@ -161,12 +161,12 @@ INPUT_TO_ATOM_TRANSFORM = {
     AtomInput: identity,
     MoleculeInput: molecule_to_atom_input,
     Alphafold3Input: compose(
-        af3_input_to_molecule_input,
+        alphafold3_input_to_molecule_input,
         molecule_to_atom_input
     ),
     PDBInput: compose(
         pdb_input_to_alphafold3_input,
-        af3_input_to_molecule_input,
+        alphafold3_input_to_molecule_input,
         molecule_to_atom_input
     )
 }
