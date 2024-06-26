@@ -101,8 +101,8 @@ class MoleculeInput:
     molecule_token_pool_lens:   List[List[int]]
     molecule_atom_indices:      List[List[int] | None]
     molecule_ids:               Int[' n']
-    additional_molecule_feats:  Float['n 5']
-    is_molecule_types:          Bool['n 4']
+    additional_molecule_feats:  Float[f'n {ADDITIONAL_MOLECULE_FEATS}']
+    is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
