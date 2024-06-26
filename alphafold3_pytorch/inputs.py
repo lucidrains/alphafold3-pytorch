@@ -123,9 +123,10 @@ def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
 @dataclass
 class Alphafold3Input:
     proteins:                   List[Int[' _'] | str]
-    nucleic_acids:              List[Int[' _'] | str]
-    metal_ions:                 Int[' _']
-    misc_molecule_ids:          Int[' _']
+    ds_nucleic_acids:           List[Int[' _'] | str]
+    ss_nucleic_acids:           List[Int[' _'] | str]
+    metal_ions:                 Int[' _'] | List[str]
+    misc_molecule_ids:          Int[' _'] | List[str]
     ligands:                    List[Mol | str] # can be given as smiles
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -182,16 +183,14 @@ def register_input_transform(
 # functions for transforming to atom inputs
 
 @typecheck
+def maybe_transform_to_atom_input(i: Any) -> AtomInput:
+    maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
+
+    if not exists(maybe_to_atom_fn):
+        raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
+
+    return maybe_to_atom_fn(i)
+
+@typecheck
 def maybe_transform_to_atom_inputs(inputs: List[Any]) -> List[AtomInput]:
-    atom_inputs = []
-
-    for i in inputs:
-
-        maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
-
-        if not exists(maybe_to_atom_fn):
-            raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
-
-        atom_inputs.append(maybe_to_atom_fn(i))
-
-    return atom_inputs
+    return [maybe_transform_to_atom_input(i) for i in inputs]

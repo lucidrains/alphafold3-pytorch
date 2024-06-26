@@ -36,7 +36,11 @@ from alphafold3_pytorch.alphafold3 import (
 from alphafold3_pytorch.inputs import (
     register_input_transform,
     AtomInput,
-    BatchedAtomInput
+    BatchedAtomInput,
+    MoleculeInput,
+    Alphafold3Input,
+    maybe_transform_to_atom_input,
+    maybe_transform_to_atom_inputs
 )
 
 from alphafold3_pytorch.trainer import (
