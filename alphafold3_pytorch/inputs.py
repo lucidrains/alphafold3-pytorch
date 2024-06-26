@@ -122,8 +122,8 @@ def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
 @typecheck
 @dataclass
 class Alphafold3Input:
-    proteins:                   List[Int[' _']]
-    nucleic_acids:              List[Int[' _']]
+    proteins:                   List[Int[' _'] | str]
+    nucleic_acids:              List[Int[' _'] | str]
     metal_ions:                 Int[' _']
     misc_molecule_ids:          Int[' _']
     ligands:                    List[Mol | str] # can be given as smiles
