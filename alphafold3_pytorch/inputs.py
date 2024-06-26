@@ -1,3 +1,4 @@
+from functools import wraps
 from typing import Type, TypedDict, Literal, Callable, List
 
 from rdkit import Chem
@@ -19,6 +20,16 @@ from alphafold3_pytorch.life import (
 
 IS_MOLECULE_TYPES = 4
 ADDITIONAL_MOLECULE_FEATS = 5
+
+# simple compose function
+# for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
+
+def compose(*fns: Callable):
+    def inner(x, *args, **kwargs):
+        for fn in fns:
+            x = fn(x, *args, **kwargs)
+        return x
+    return inner
 
 # atom level, what Alphafold3 accepts
 
