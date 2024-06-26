@@ -76,13 +76,13 @@ DNA_NUCLEOTIDES = dict(
         smile = 'C1C(C(OC1N2C=NC3=C(N=CN=C32)N)CO)O',
         complement = 'T'
     ),
-    G = dict(
-        smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)CO)O',
-        complement = 'C'
-    ),
     C = dict(
         smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)CO)O',
         complement = 'G'
+    ),
+    G = dict(
+        smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)CO)O',
+        complement = 'C'
     ),
     T = dict(
         smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)CO)O',
@@ -95,13 +95,13 @@ RNA_NUCLEOTIDES = dict(
         smile = 'C1=NC(=C2C(=N1)N(C=N2)C3C(C(C(O3)COP(=O)(O)O)O)O)N',
         complement = 'U'
     ),
-    G = dict(
-        smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
-        complement = 'C'
-    ),
     C = dict(
         smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
         complement = 'G'
+    ),
+    G = dict(
+        smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
+        complement = 'C'
     ),
     U = dict(
         smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
