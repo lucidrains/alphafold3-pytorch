@@ -103,57 +103,29 @@ class MoleculeInput(TypedDict):
 def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
     raise NotImplementedError
 
-def validate_molecule_input(molecule_input: MoleculeInput):
-    assert True
-
-# residue level - single chain proteins for starters
+# alphafold3 input - support polypeptides, nucleic acids, metal ions + any number of ligands + misc biomolecules
 
 @typecheck
-class SingleProteinInput(TypedDict):
-    residue_ids:                Int['n']
-    residue_atom_lens:          Int['n']
+class Alphafold3Input(TypedDict):
+    proteins:                   List[Int['_']]
+    protein_atom_lens:          List[Int['_']]
+    nucleic_acids:              List[Int['_']]
+    nucleic_acid_atom_lens:     List[Int['_']]
+    metal_ions:                 List[int]
+    misc_molecule_ids:          List[int]
+    ligands:                    List[Mol | str] # can be given as smiles
+    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None
     templates:                  Float['t n n dt']
     msa:                        Float['s n dm']
     template_mask:              Bool['t'] | None
     msa_mask:                   Bool['s'] | None
-    atom_pos:                   Float['m 3'] | None
     distance_labels:            Int['n n'] | None
     pae_labels:                 Int['n n'] | None
     pde_labels:                 Int['n'] | None
     resolved_labels:            Int['n'] | None
 
 @typecheck
-def single_protein_input_to_atom_input(
-    input: SingleProteinInput
-) -> AtomInput:
-
-    raise NotImplementedError
-
-# single chain protein with single ds nucleic acid
-
-# o - for nucleOtide seq
-
-@typecheck
-class SingleProteinSingleNucleicAcidInput(TypedDict):
-    residue_ids:                Int['n']
-    residue_atom_lens:          Int['n']
-    nucleotide_ids:             Int['o']
-    nucleic_acid_type:          Literal['dna', 'rna']
-    templates:                  Float['t n n dt']
-    msa:                        Float['s n dm']
-    template_mask:              Bool['t'] | None
-    msa_mask:                   Bool['s'] | None
-    atom_pos:                   Float['m 3'] | None
-    distance_labels:            Int['n n'] | None
-    pae_labels:                 Int['n n'] | None
-    pde_labels:                 Int['n'] | None
-    resolved_labels:            Int['n'] | None
-
-@typecheck
-def single_protein_input_and_single_nucleic_acid_to_atom_input(
-    input: SingleProteinSingleNucleicAcidInput
-) -> AtomInput:
-
+def af3_input_to_molecule_input(af3_input: Alphafold3Input) -> AtomInput:
     raise NotImplementedError
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
@@ -161,8 +133,7 @@ def single_protein_input_and_single_nucleic_acid_to_atom_input(
 
 INPUT_TO_ATOM_TRANSFORM = {
     MoleculeInput: molecule_to_atom_input,
-    SingleProteinInput: single_protein_input_to_atom_input,
-    SingleProteinSingleNucleicAcidInput: single_protein_input_and_single_nucleic_acid_to_atom_input
+    Alphafold3Input: compose(af3_input_to_molecule_input, molecule_to_atom_input)
 }
 
 # function for extending the config
