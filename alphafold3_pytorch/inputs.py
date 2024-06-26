@@ -13,7 +13,8 @@ from alphafold3_pytorch.tensor_typing import (
 
 from alphafold3_pytorch.life import (
     HUMAN_AMINO_ACIDS,
-    NUCLEOTIDES,
+    DNA_NUCLEOTIDES,
+    RNA_NUCLEOTIDES,
     METALS,
     MISC
 )
@@ -123,11 +124,13 @@ def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
 @dataclass
 class Alphafold3Input:
     proteins:                   List[Int[' _'] | str]
-    ds_nucleic_acids:           List[Int[' _'] | str]
-    ss_nucleic_acids:           List[Int[' _'] | str]
+    ss_dna:                     List[Int[' _'] | str]
+    ss_rna:                     List[Int[' _'] | str]
     metal_ions:                 Int[' _'] | List[str]
     misc_molecule_ids:          Int[' _'] | List[str]
     ligands:                    List[Mol | str] # can be given as smiles
+    ds_dna:                     List[Int[' _'] | str]
+    ds_rna:                     List[Int[' _'] | str]
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
