@@ -109,6 +109,12 @@ METALS = dict(
     ),
     Zn = dict(
         smile = '[Zn]'
+    ),
+    Na = dict(
+        smile = '[Na]'
+    ),
+    Cl = dict(
+        smile = '[Cl]'
     )
 )
 
