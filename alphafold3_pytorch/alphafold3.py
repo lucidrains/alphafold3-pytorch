@@ -38,6 +38,11 @@ from alphafold3_pytorch.attention import (
     full_pairwise_repr_to_windowed
 )
 
+from alphafold3_pytorch.inputs import (
+    IS_MOLECULE_TYPES,
+    ADDITIONAL_MOLECULE_FEATS
+)
+
 from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
@@ -97,11 +102,6 @@ is_molecule_types: [*, 4]
 """
 
 # constants
-
-from alphafold3_pytorch.inputs import (
-    IS_MOLECULE_TYPES,
-    ADDITIONAL_MOLECULE_FEATS
-)
 
 LinearNoBias = partial(Linear, bias = False)
 

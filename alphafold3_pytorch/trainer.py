@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps, partial
+from dataclasses import asdict
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
@@ -10,7 +11,6 @@ from typing import TypedDict, List, Callable
 
 from alphafold3_pytorch.tensor_typing import (
     typecheck,
-    beartype_isinstance,
     Int, Bool, Float
 )
 
@@ -22,7 +22,7 @@ from alphafold3_pytorch.attention import (
 from alphafold3_pytorch.inputs import (
     AtomInput,
     BatchedAtomInput,
-    INPUT_TO_ATOM_TRANSFORM
+    maybe_transform_to_atom_inputs
 )
 
 import torch
@@ -88,43 +88,32 @@ def collate_af3_inputs(
     # go through all the inputs
     # and for any that is not AtomInput, try to transform it with the registered input type to corresponding registered function
 
-    atom_inputs = []
-
-    for i in inputs:
-        if beartype_isinstance(i, AtomInput):
-            atom_inputs.append(i)
-            continue
-
-        maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
-
-        if not exists(maybe_to_atom_fn):
-            raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
-
-        atom_inputs.append(maybe_to_atom_fn(i))
+    atom_inputs = maybe_transform_to_atom_inputs(inputs)
 
     # take care of windowing the atompair_inputs and atompair_ids if they are not windowed already
 
     if exists(atoms_per_window):
         for atom_input in atom_inputs:
-            atompair_inputs = atom_input['atompair_inputs']
-            atompair_ids = atom_input.get('atompair_ids', None)
+            atompair_inputs = atom_input.atompair_inputs
+            atompair_ids = atom_input.atompair_ids
 
             atompair_inputs_is_windowed = atompair_inputs.ndim == 4
 
             if not atompair_inputs_is_windowed:
-                atom_input['atompair_inputs'] = full_pairwise_repr_to_windowed(atompair_inputs, window_size = atoms_per_window)
+                atom_input.atompair_inputs = full_pairwise_repr_to_windowed(atompair_inputs, window_size = atoms_per_window)
 
             if exists(atompair_ids):
                 atompair_ids_is_windowed = atompair_ids.ndim == 3
 
                 if not atompair_ids_is_windowed:
-                    atom_input['atompair_ids'] = full_attn_bias_to_windowed(atompair_ids, window_size = atoms_per_window)
+                    atom_input.atompair_ids = full_attn_bias_to_windowed(atompair_ids, window_size = atoms_per_window)
 
     # separate input dictionary into keys and values
 
-    keys = atom_inputs[0].keys()
-    atom_inputs = [i.values() for i in atom_inputs]
+    keys = asdict(atom_inputs[0]).keys()
+    atom_inputs = [asdict(i).values() for i in atom_inputs]
 
+    print(keys)
     outputs = []
 
     for grouped in zip(*atom_inputs):
@@ -183,7 +172,7 @@ def collate_af3_inputs(
 
     # reconstitute dictionary
 
-    batched_atom_inputs = BatchedAtomInput(tuple(zip(keys, outputs)))
+    batched_atom_inputs = BatchedAtomInput(**dict(tuple(zip(keys, outputs))))
     return batched_atom_inputs
 
 @typecheck
@@ -522,7 +511,7 @@ class Trainer:
                     # model forwards
 
                     loss, loss_breakdown = self.model(
-                        **inputs,
+                        **asdict(inputs),
                         return_loss_breakdown = True
                     )
 
@@ -582,11 +571,11 @@ class Trainer:
 
                     for valid_batch in self.valid_dataloader:
                         valid_loss, loss_breakdown = self.ema_model(
-                            **valid_batch,
+                            **asdict(valid_batch),
                             return_loss_breakdown = True
                         )
 
-                        valid_batch_size = valid_batch.get('atom_inputs').shape[0]
+                        valid_batch_size = valid_batch.atom_inputs.shape[0]
                         scale = valid_batch_size / self.valid_dataset_size
 
                         total_valid_loss += valid_loss.item() * scale
@@ -620,11 +609,11 @@ class Trainer:
 
                 for test_batch in self.test_dataloader:
                     test_loss, loss_breakdown = self.ema_model(
-                        **test_batch,
+                        **asdict(test_batch),
                         return_loss_breakdown = True
                     )
 
-                    test_batch_size = test_batch.get('atom_inputs').shape[0]
+                    test_batch_size = test_batch.atom_inputs.shape[0]
                     scale = test_batch_size / self.test_dataset_size
 
                     total_test_loss += test_loss.item() * scale

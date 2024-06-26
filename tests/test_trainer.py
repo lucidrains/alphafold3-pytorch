@@ -3,6 +3,7 @@ os.environ['TYPECHECK'] = 'True'
 
 from pathlib import Path
 from random import randrange, random
+from dataclasses import asdict
 
 import pytest
 import torch
@@ -127,7 +128,7 @@ def test_trainer():
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
     before_distogram = breakdown.distogram
 
     path = './some/nested/folder/af3'
@@ -138,7 +139,7 @@ def test_trainer():
     alphafold3 = Alphafold3.init_and_load(path)
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
@@ -219,7 +220,7 @@ def test_collate_fn():
 
     batched_atom_inputs = collate_af3_inputs([dataset[0]])
 
-    _, breakdown = alphafold3(**batched_atom_inputs, return_loss_breakdown = True)
+    _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
 
 # test creating trainer + alphafold3 from config
 
