@@ -70,31 +70,39 @@ HUMAN_AMINO_ACIDS = dict(
 
 DNA_NUCLEOTIDES = dict(
     A = dict(
-        smile = 'C1C(C(OC1N2C=NC3=C(N=CN=C32)N)CO)O'
+        smile = 'C1C(C(OC1N2C=NC3=C(N=CN=C32)N)CO)O',
+        rc = 'T'
     ),
     G = dict(
-        smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)CO)O'
+        smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)CO)O',
+        rc = 'C'
     ),
     C = dict(
-        smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)CO)O'
+        smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)CO)O',
+        rc = 'G'
     ),
     T = dict(
-        smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)CO)O'
+        smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)CO)O',
+        rc = 'A'
     )
 )
 
 RNA_NUCLEOTIDES = dict(
     A = dict(
-        smile = 'C1=NC(=C2C(=N1)N(C=N2)C3C(C(C(O3)COP(=O)(O)O)O)O)N'
+        smile = 'C1=NC(=C2C(=N1)N(C=N2)C3C(C(C(O3)COP(=O)(O)O)O)O)N',
+        rc = 'U'
     ),
     G = dict(
-        smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N'
+        smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
+        rc = 'C'
     ),
     C = dict(
-        smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O'
+        smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
+        rc = 'G'
     ),
     U = dict(
-        smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O'
+        smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
+        rc = 'A'
     )
 )
 
