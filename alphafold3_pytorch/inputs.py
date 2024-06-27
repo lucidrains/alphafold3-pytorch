@@ -36,6 +36,9 @@ def exists(v):
 def identity(t):
     return t
 
+def flatten(arr):
+    return [el for sub_arr in arr for el in sub_arr]
+
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
 
@@ -103,8 +106,8 @@ class BatchedAtomInput:
 @dataclass
 class MoleculeInput:
     molecules:                  List[Mol]
-    molecule_token_pool_lens:   List[List[int]]
-    molecule_atom_indices:      List[List[int] | None]
+    molecule_token_pool_lens:   List[int]
+    molecule_atom_indices:      List[int | None]
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
@@ -146,7 +149,9 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
 
 @typecheck
-def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeInput:
+def alphafold3_input_to_molecule_input(
+    alphafold3_input: Alphafold3Input
+) -> MoleculeInput:
 
     ss_dnas = list(alphafold3_input.ss_dna)
     ss_rnas = list(alphafold3_input.ss_rna)
@@ -220,7 +225,44 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     ligands = list(alphafold3_input.ligands)
     mol_ligands = [(Chem.MolFromSmiles(l) if isinstance(l, str) else l) for l in ligands]
 
-    raise NotImplementedError
+    # create the molecule input
+
+    molecules_without_ligands = [
+        *flatten(mol_proteins),
+        *flatten(mol_ss_dnas),
+        *flatten(mol_ss_rnas),
+        *mol_metal_ions
+    ]
+
+    molecule_token_pool_lens_without_ligands = [mol.GetNumAtoms() for mol in molecules_without_ligands]
+
+    # in the paper, they treat each atom of the ligands as a token
+
+    ligands_token_pool_lens = [[1] * mol.GetNumAtoms() for mol in mol_ligands]
+
+    # all molecules, layout is
+    # proteins | ss dna | ss rna | metal ions | ligands
+
+    molecules = [
+        *molecules_without_ligands,
+        *mol_ligands
+    ]
+
+    num_molecules = len(molecules)
+
+    molecule_input = MoleculeInput(
+        molecules = molecules,
+        molecule_token_pool_lens = [
+            *molecule_token_pool_lens_without_ligands,
+            *flatten(ligands_token_pool_lens)
+        ],
+        molecule_atom_indices = [0] * num_molecules,
+        molecule_ids = torch.zeros(num_molecules).long(),
+        additional_molecule_feats = torch.zeros(num_molecules, 5).long(),
+        is_molecule_types = torch.zeros(num_molecules, 4).bool()
+    )
+
+    return molecule_input
 
 # pdb input
 
