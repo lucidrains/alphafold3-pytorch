@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Type, Literal, Callable, List, Any
 
 import torch
+import einx
 
 from rdkit import Chem
 from rdkit.Chem.rdchem import Mol
@@ -101,7 +102,7 @@ class BatchedAtomInput:
     resolved_labels:            Int['b n'] | None = None
 
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
-
+ 
 @typecheck
 @dataclass
 class MoleculeInput:
@@ -220,39 +221,79 @@ def alphafold3_input_to_molecule_input(
 
     # create the molecule input
 
+    all_protein_mols = flatten(mol_proteins)
+    all_rna_mols = flatten(mol_ss_rnas)
+    all_dna_mols = flatten(mol_ss_dnas)
+
     molecules_without_ligands = [
-        *flatten(mol_proteins),
-        *flatten(mol_ss_dnas),
-        *flatten(mol_ss_rnas),
-        *mol_metal_ions
+        *all_protein_mols,
+        *all_rna_mols,
+        *all_dna_mols,
     ]
 
     molecule_token_pool_lens_without_ligands = [mol.GetNumAtoms() for mol in molecules_without_ligands]
+
+    # metal ions pool lens
+
+    metal_ions_pool_lens = [1] * len(mol_metal_ions)
 
     # in the paper, they treat each atom of the ligands as a token
 
     ligands_token_pool_lens = [[1] * mol.GetNumAtoms() for mol in mol_ligands]
 
+    total_ligand_tokens = sum([mol.GetNumAtoms() for mol in mol_ligands])
+
+    # correctly generate the is_molecule_types, which is a boolean tensor of shape [*, 4]
+    # is_protein | is_rna | is_dna | is_ligand
+    # this is needed for their special diffusion loss
+
+    molecule_type_token_lens = [
+        len(all_protein_mols),
+        len(all_rna_mols),
+        len(all_dna_mols),
+        total_ligand_tokens
+    ]
+
+    arange = torch.arange(sum(molecule_type_token_lens))
+
+    is_molecule_types_lens_cumsum = torch.tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
+
+    gt_equal_mask = einx.greater_equal(
+        'n, is_type -> n is_type',
+        arange, is_molecule_types_lens_cumsum[:-1]
+    )
+
+    lt_mask = einx.less(
+        'n, is_type -> n is_type',
+        arange, is_molecule_types_lens_cumsum[1:]
+    )
+
+    is_molecule_types = gt_equal_mask & lt_mask
+
     # all molecules, layout is
-    # proteins | ss dna | ss rna | metal ions | ligands
+    # proteins | ss rna | ss dna | ligands | metal ions
 
     molecules = [
         *molecules_without_ligands,
-        *mol_ligands
+        *mol_ligands,
+        *mol_metal_ions
+    ]
+
+    token_pool_lens = [
+        *molecule_token_pool_lens_without_ligands,
+        *flatten(ligands_token_pool_lens),
+        *metal_ions_pool_lens
     ]
 
     num_molecules = len(molecules)
 
     molecule_input = MoleculeInput(
         molecules = molecules,
-        molecule_token_pool_lens = [
-            *molecule_token_pool_lens_without_ligands,
-            *flatten(ligands_token_pool_lens)
-        ],
+        molecule_token_pool_lens = token_pool_lens,
         molecule_atom_indices = [0] * num_molecules,
         molecule_ids = torch.zeros(num_molecules).long(),
         additional_molecule_feats = torch.zeros(num_molecules, 5).long(),
-        is_molecule_types = torch.zeros(num_molecules, 4).bool()
+        is_molecule_types = is_molecule_types
     )
 
     return molecule_input
