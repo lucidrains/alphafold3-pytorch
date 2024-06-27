@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from typing import Type, Literal, Callable, List, Any
 
 import torch
-import torch.nn.functional as F
-
 import einx
 
 from rdkit import Chem
@@ -257,7 +255,9 @@ def alphafold3_input_to_molecule_input(
         total_ligand_tokens
     ]
 
-    arange = torch.arange(sum(molecule_type_token_lens))
+    num_tokens = sum(molecule_type_token_lens) + num_metal_ions
+
+    arange = torch.arange(num_tokens)
 
     is_molecule_types_lens_cumsum = torch.tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
 
@@ -272,7 +272,6 @@ def alphafold3_input_to_molecule_input(
     )
 
     is_molecule_types = gt_equal_mask & lt_mask
-    is_molecule_types = F.pad(is_molecule_types, (0, 0, 0, num_metal_ions))
 
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
@@ -288,8 +287,6 @@ def alphafold3_input_to_molecule_input(
         *flatten(ligands_token_pool_lens),
         *metal_ions_pool_lens
     ]
-
-    num_tokens = sum(molecule_type_token_lens) + num_metal_ions
 
     molecule_input = MoleculeInput(
         molecules = molecules,
