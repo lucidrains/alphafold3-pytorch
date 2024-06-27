@@ -1,8 +1,13 @@
+import torch
+
 import rdkit
 from rdkit import Chem
 
 from typing import Literal
-from alphafold3_pytorch.tensor_typing import typecheck
+from alphafold3_pytorch.tensor_typing import (
+    Int,
+    typecheck
+)
 
 # human amino acids
 
@@ -109,8 +114,17 @@ RNA_NUCLEOTIDES = dict(
     )
 )
 
+# complements in tensor form, following the ordering ACG(T|U)N
+
+NUCLEIC_ACID_COMPLEMENT_TENSOR = torch.tensor([3, 2, 1, 0, 4], dtype = torch.long)
+
+# some functions for nucleic acids
+
 @typecheck
-def reverse_complement(seq: str, nucleic_acid_type: Literal['dna', 'rna'] = 'dna'):
+def reverse_complement(
+    seq: str,
+    nucleic_acid_type: Literal['dna', 'rna'] = 'dna'
+):
     if nucleic_acid_type == 'dna':
         nucleic_acid_entries = DNA_NUCLEOTIDES
     elif nucleic_acid_type == 'rna':
@@ -120,6 +134,12 @@ def reverse_complement(seq: str, nucleic_acid_type: Literal['dna', 'rna'] = 'dna
 
     complement = [nucleic_acid_entries[nuc]['complement'] for nuc in seq]
     return ''.join(complement[::-1])
+
+@typecheck
+def reverse_complement_tensor(t: Int['n']):
+    complement = NUCLEIC_ACID_COMPLEMENT_TENSOR[t]
+    reverse_complement = t.flip(dims = (-1,))
+    return reverse_complement
 
 # metal ions
 
