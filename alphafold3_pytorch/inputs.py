@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import Type, Literal, Callable, List, Any
 
 import torch
+import torch.nn.functional as F
+
 import einx
 
 from rdkit import Chem
@@ -235,7 +237,8 @@ def alphafold3_input_to_molecule_input(
 
     # metal ions pool lens
 
-    metal_ions_pool_lens = [1] * len(mol_metal_ions)
+    num_metal_ions = len(mol_metal_ions)
+    metal_ions_pool_lens = [1] * num_metal_ions
 
     # in the paper, they treat each atom of the ligands as a token
 
@@ -269,6 +272,7 @@ def alphafold3_input_to_molecule_input(
     )
 
     is_molecule_types = gt_equal_mask & lt_mask
+    is_molecule_types = F.pad(is_molecule_types, (0, 0, 0, num_metal_ions))
 
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
@@ -285,14 +289,14 @@ def alphafold3_input_to_molecule_input(
         *metal_ions_pool_lens
     ]
 
-    num_molecules = len(molecules)
+    num_tokens = sum(molecule_type_token_lens) + num_metal_ions
 
     molecule_input = MoleculeInput(
         molecules = molecules,
         molecule_token_pool_lens = token_pool_lens,
-        molecule_atom_indices = [0] * num_molecules,
-        molecule_ids = torch.zeros(num_molecules).long(),
-        additional_molecule_feats = torch.zeros(num_molecules, 5).long(),
+        molecule_atom_indices = [0] * num_tokens,
+        molecule_ids = torch.zeros(num_tokens).long(),
+        additional_molecule_feats = torch.zeros(num_tokens, 5).long(),
         is_molecule_types = is_molecule_types
     )
 
