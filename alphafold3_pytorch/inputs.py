@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, partial
 from dataclasses import dataclass
 from typing import Type, Literal, Callable, List, Any
 
@@ -16,7 +16,9 @@ from alphafold3_pytorch.life import (
     DNA_NUCLEOTIDES,
     RNA_NUCLEOTIDES,
     METALS,
-    MISC
+    MISC,
+    reverse_complement,
+    reverse_complement_tensor
 )
 
 # constants
@@ -143,6 +145,23 @@ class Alphafold3Input:
 
 @typecheck
 def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeInput:
+
+    ss_dnas = list(alphafold3_input.ss_dna)
+    ss_rnas = list(alphafold3_input.ss_rna)
+
+    # any double stranded nucleic acids is added to single stranded lists with its reverse complement
+    # rc stands for reverse complement
+
+    for seq in alphafold3_input.ds_dna:
+        rc_fn = partial(reverse_complement, nucleic_acid_type = 'dna') if isinstance(seq, str) else reverse_complement_tensor
+        rc_seq = rc_fn(seq)
+        ss_dnas.extend([seq, rc_seq])
+
+    for seq in alphafold3_input.ds_rna:
+        rc_fn = partial(reverse_complement, nucleic_acid_type = 'rna') if isinstance(seq, str) else reverse_complement_tensor
+        rc_seq = rc_fn(seq)
+        ss_rnas.extend([seq, rc_seq])
+
     raise NotImplementedError
 
 # pdb input
@@ -153,7 +172,7 @@ class PDBInput:
     filepath: str
 
 @typecheck
-def pdb_input_to_alphafold3_input(pdb_input: PDBInput) -> Alphafold3Input:
+def pdb_input_to_alphafold3_input(input: PDBInput) -> Alphafold3Input:
     raise NotImplementedError
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
