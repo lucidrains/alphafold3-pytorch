@@ -15,7 +15,7 @@ from alphafold3_pytorch import (
     DataLoader,
     Trainer,
     ConductorConfig,
-    collate_af3_inputs,
+    collate_inputs_to_batched_atom_input,
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml,
     create_alphafold3_from_yaml
@@ -218,7 +218,7 @@ def test_collate_fn():
 
     dataset = MockAtomDataset(1)
 
-    batched_atom_inputs = collate_af3_inputs([dataset[0]])
+    batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[0]])
 
     _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
 

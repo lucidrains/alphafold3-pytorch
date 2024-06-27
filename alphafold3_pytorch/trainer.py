@@ -74,7 +74,7 @@ def accum_dict(
 # dataloader and collation fn
 
 @typecheck
-def collate_af3_inputs(
+def collate_inputs_to_batched_atom_input(
     inputs: List,
     int_pad_value = -1,
     atoms_per_window: int | None = None,
@@ -182,7 +182,7 @@ def DataLoader(
     map_input_fn: Callable | None = None,
     **kwargs
 ):
-    collate_fn = partial(collate_af3_inputs, atoms_per_window = atoms_per_window)
+    collate_fn = partial(collate_inputs_to_batched_atom_input, atoms_per_window = atoms_per_window)
 
     if exists(map_input_fn):
         collate_fn = partial(collate_fn, map_input_fn = map_input_fn)
