@@ -149,6 +149,23 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
 
 @typecheck
+def map_int_or_string_indices_to_mol(
+    entries: dict,
+    indices: Int[' _'] | List[str],
+    mol_keyname = 'rdchem_mol'
+) -> List[Mol]:
+
+    entries_list = list(entries.values())
+
+    if torch.is_tensor(indices):
+        indices = indices.tolist()
+        mols = [entries_list[i][mol_keyname] for i in indices]
+    else:
+        mols = [entries[s][mol_keyname] for s in indices]
+
+    return mols
+
+@typecheck
 def alphafold3_input_to_molecule_input(
     alphafold3_input: Alphafold3Input
 ) -> MoleculeInput:
@@ -173,15 +190,9 @@ def alphafold3_input_to_molecule_input(
 
     proteins = alphafold3_input.proteins
     mol_proteins = []
-    aa_list = [*HUMAN_AMINO_ACIDS.values()]
 
     for protein in proteins:
-        if torch.is_tensor(protein):
-            protein = protein.tolist()
-            mol_peptides = [aa_list[peptide_id]['rdchem_mol'] for peptide_id in protein]
-        else:
-            mol_peptides = [HUMAN_AMINO_ACIDS[peptide_id]['rdchem_mol'] for peptide_id in protein]
-
+        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, list(protein))
         mol_proteins.append(mol_peptides)
 
     # convert all single stranded nucleic acids to mol
@@ -189,36 +200,18 @@ def alphafold3_input_to_molecule_input(
     mol_ss_dnas = []
     mol_ss_rnas = []
 
-    dna_nuc_list = [*DNA_NUCLEOTIDES.values()]
-    rna_nuc_list = [*RNA_NUCLEOTIDES.values()]
-
     for seq in ss_dnas:
-        if torch.is_tensor(seq):
-            seq = seq.tolist()
-            mol_seq = [dna_nuc_list[nuc_id]['rdchem_mol'] for nuc_id in seq]
-        else:
-            mol_seq = [DNA_NUCLEOTIDES[nuc_id]['rdchem_mol'] for nuc_id in seq]
-
+        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, list(seq))
         mol_ss_dnas.append(mol_seq)
 
     for seq in ss_rnas:
-        if torch.is_tensor(seq):
-            seq = seq.tolist()
-            mol_seq = [rna_nuc_list[nuc_id]['rdchem_mol'] for nuc_id in seq]
-        else:
-            mol_seq = [RNA_NUCLEOTIDES[nuc_id]['rdchem_mol'] for nuc_id in seq]
-
+        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, list(seq))
         mol_ss_rnas.append(mol_seq)
 
     # convert metal ions to rdchem.Mol
 
     metal_ions = alphafold3_input.metal_ions
-
-    if torch.is_tensor(metal_ions):
-        metal_ions_list = [*METALS.values()]
-        mol_metal_ions = [metal_ions_list[metal_ion_id]['rdchem_mol'] for metal_ion_id in metal_ions.tolist()]
-    else:
-        mol_metal_ions = [METALS[metal_ion]['rdchem_mol'] for metal_ion in metal_ions]
+    mol_metal_ions = map_int_or_string_indices_to_mol(METALS, metal_ions)
 
     # convert ligands to rdchem.Mol
 
