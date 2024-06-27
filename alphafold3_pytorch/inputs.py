@@ -50,7 +50,7 @@ class AtomInput:
     molecule_ids:               Int[' n']
     molecule_atom_lens:         Int[' n']
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
-    additional_molecule_feats:  Float[f'n {ADDITIONAL_MOLECULE_FEATS}']
+    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -75,7 +75,7 @@ class BatchedAtomInput:
     molecule_ids:               Int['b n']
     molecule_atom_lens:         Int['b n']
     atompair_inputs:            Float['b m m dapi'] | Float['b nw w (w*2) dapi']
-    additional_molecule_feats:  Float[f'b n {ADDITIONAL_MOLECULE_FEATS}']
+    additional_molecule_feats:  Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'b n {IS_MOLECULE_TYPES}']
     templates:                  Float['b t n n dt'] | None = None
     msa:                        Float['b s n dm'] | None = None
@@ -102,7 +102,7 @@ class MoleculeInput:
     molecule_token_pool_lens:   List[List[int]]
     molecule_atom_indices:      List[List[int] | None]
     molecule_ids:               Int[' n']
-    additional_molecule_feats:  Float[f'n {ADDITIONAL_MOLECULE_FEATS}']
+    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None

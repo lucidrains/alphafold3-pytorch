@@ -1173,7 +1173,7 @@ class RelativePositionEncoding(Module):
     def forward(
         self,
         *,
-        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}']
+        additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     ) -> Float['b n n dp']:
 
         device = additional_molecule_feats.device
@@ -2181,7 +2181,7 @@ class ElucidatedAtomDiffusion(Module):
         atom_parent_ids: Int['b m'] | None = None,
         return_denoised_pos = False,
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'] | None = None,
-        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
+        additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}'] | None = None,
         add_smooth_lddt_loss = False,
         add_bond_loss = False,
         nucleotide_loss_weight = 5.,
@@ -2677,7 +2677,7 @@ class InputFeatureEmbedder(Module):
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
         atom_mask: Bool['b m'],
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
-        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
+        additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n']
 
@@ -2727,7 +2727,7 @@ class InputFeatureEmbedder(Module):
 
         single_inputs = torch.cat((
             single_inputs,
-            additional_molecule_feats,
+            additional_molecule_feats.float(),
             is_molecule_types.float()
         ), dim = -1)
 
@@ -3248,7 +3248,7 @@ class Alphafold3(Module):
         *,
         atom_inputs: Float['b m dai'],
         atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
-        additional_molecule_feats: Float[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
+        additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n'],

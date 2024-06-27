@@ -54,7 +54,7 @@ atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-additional_molecule_feats = torch.randn(2, seq_len, 5)
+additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
 is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
 molecule_ids = torch.randint(0, 32, (2, seq_len))
 
