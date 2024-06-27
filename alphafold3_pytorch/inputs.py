@@ -2,6 +2,8 @@ from functools import wraps, partial
 from dataclasses import dataclass
 from typing import Type, Literal, Callable, List, Any
 
+import torch
+
 from rdkit import Chem
 from rdkit.Chem.rdchem import Mol
 
@@ -162,6 +164,62 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         rc_seq = rc_fn(seq)
         ss_rnas.extend([seq, rc_seq])
 
+    # convert all proteins to a List[Mol] of each peptide
+
+    proteins = alphafold3_input.proteins
+    mol_proteins = []
+    aa_list = [*HUMAN_AMINO_ACIDS.values()]
+
+    for protein in proteins:
+        if torch.is_tensor(protein):
+            protein = protein.tolist()
+            mol_peptides = [aa_list[peptide_id]['rdchem_mol'] for peptide_id in protein]
+        else:
+            mol_peptides = [HUMAN_AMINO_ACIDS[peptide_id]['rdchem_mol'] for peptide_id in protein]
+
+        mol_proteins.append(mol_peptides)
+
+    # convert all single stranded nucleic acids to mol
+
+    mol_ss_dnas = []
+    mol_ss_rnas = []
+
+    dna_nuc_list = [*DNA_NUCLEOTIDES.values()]
+    rna_nuc_list = [*RNA_NUCLEOTIDES.values()]
+
+    for seq in ss_dnas:
+        if torch.is_tensor(seq):
+            seq = seq.tolist()
+            mol_seq = [dna_nuc_list[nuc_id]['rdchem_mol'] for nuc_id in seq]
+        else:
+            mol_seq = [DNA_NUCLEOTIDES[nuc_id]['rdchem_mol'] for nuc_id in seq]
+
+        mol_ss_dnas.append(mol_seq)
+
+    for seq in ss_rnas:
+        if torch.is_tensor(seq):
+            seq = seq.tolist()
+            mol_seq = [rna_nuc_list[nuc_id]['rdchem_mol'] for nuc_id in seq]
+        else:
+            mol_seq = [RNA_NUCLEOTIDES[nuc_id]['rdchem_mol'] for nuc_id in seq]
+
+        mol_ss_rnas.append(mol_seq)
+
+    # convert metal ions to rdchem.Mol
+
+    metal_ions = alphafold3_input.metal_ions
+
+    if torch.is_tensor(metal_ions):
+        metal_ions_list = [*METALS.values()]
+        mol_metal_ions = [metal_ions_list[metal_ion_id]['rdchem_mol'] for metal_ion_id in metal_ions.tolist()]
+    else:
+        mol_metal_ions = [METALS[metal_ion]['rdchem_mol'] for metal_ion in metal_ions]
+
+    # convert ligands to rdchem.Mol
+
+    ligands = list(alphafold3_input.ligands)
+    mol_ligands = [(Chem.MolFromSmiles(l) if isinstance(l, str) else l) for l in ligands]
+
     raise NotImplementedError
 
 # pdb input
@@ -172,7 +230,7 @@ class PDBInput:
     filepath: str
 
 @typecheck
-def pdb_input_to_alphafold3_input(input: PDBInput) -> Alphafold3Input:
+def pdb_input_to_alphafold3_input(pdb_input: PDBInput) -> Alphafold3Input:
     raise NotImplementedError
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
