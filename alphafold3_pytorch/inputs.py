@@ -152,9 +152,12 @@ class Alphafold3Input:
 @typecheck
 def map_int_or_string_indices_to_mol(
     entries: dict,
-    indices: Int[' _'] | List[str],
+    indices: Int[' _'] | List[str] | str,
     mol_keyname = 'rdchem_mol'
 ) -> List[Mol]:
+
+    if isinstance(indices, str):
+        indices = list(indices)
 
     entries_list = list(entries.values())
 
@@ -202,11 +205,11 @@ def alphafold3_input_to_molecule_input(
     mol_ss_rnas = []
 
     for seq in ss_dnas:
-        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, list(seq))
+        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq)
         mol_ss_dnas.append(mol_seq)
 
     for seq in ss_rnas:
-        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, list(seq))
+        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq)
         mol_ss_rnas.append(mol_seq)
 
     # convert metal ions to rdchem.Mol
