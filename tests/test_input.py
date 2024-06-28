@@ -32,7 +32,8 @@ def test_alphafold3_input():
         ss_rna = ['CGCAUA'],
         metal_ions = ['Na', 'Na', 'Fe'],
         misc_molecule_ids = ['Phospholipid'],
-        ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5']
+        ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
+        add_atom_ids = True
     )
 
     atom_input = maybe_transform_to_atom_input(alphafold3_input)
@@ -46,6 +47,7 @@ def test_alphafold3_input():
     alphafold3 = Alphafold3(
         dim_atom_inputs = 1,
         dim_atompair_inputs = 1,
+        num_atom_embeds = 47,
         atoms_per_window = 27,
         dim_template_feats = 44,
         num_dist_bins = 38,

@@ -182,6 +182,19 @@ MISC = dict(
     )
 )
 
+# atoms - for atom embeddings
+
+ATOM_ORDER = [
+    'C',
+    'O',
+    'N',
+    'S',
+    'P',
+    *METALS
+]
+
+assert len(ATOM_ORDER) == len({*ATOM_ORDER})
+
 # some rdkit helper function
 
 @typecheck
