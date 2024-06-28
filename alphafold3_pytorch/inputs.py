@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from functools import wraps, partial
 from dataclasses import dataclass, asdict
 from typing import Type, Literal, Callable, List, Any
