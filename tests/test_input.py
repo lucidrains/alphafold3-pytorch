@@ -46,7 +46,7 @@ def test_alphafold3_input():
     batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window = 27)
 
     alphafold3 = Alphafold3(
-        dim_atom_inputs = 1,
+        dim_atom_inputs = 3,
         dim_atompair_inputs = 1,
         num_atom_embeds = 47,
         num_atompair_embeds = 6,

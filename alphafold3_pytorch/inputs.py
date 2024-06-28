@@ -226,8 +226,11 @@ def molecule_to_atom_input(
         atom_feats = []
 
         for atom in atoms:
-            charge = atom.GetFormalCharge()
-            atom_feats.append([charge])
+            atom_feats.append([
+                atom.GetFormalCharge(),
+                atom.GetImplicitValence(),
+                atom.GetExplicitValence(),
+            ])
 
         atom_inputs.extend(atom_feats)
 
