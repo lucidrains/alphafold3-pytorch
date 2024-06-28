@@ -19,6 +19,7 @@ from alphafold3_pytorch.life import (
     RNA_NUCLEOTIDES,
     METALS,
     MISC,
+    mol_from_smile,
     reverse_complement,
     reverse_complement_tensor
 )
@@ -166,12 +167,6 @@ def molecule_to_atom_input(
 
     for mol in mol_input.molecules:
 
-        # add hydrogens, add a conformation, then remove hydrogens
-
-        mol = Chem.AddHs(mol)
-        Chem.EmbedMultipleConfs(mol, numConfs = 1)
-        mol = Chem.RemoveHs(mol)
-
         all_atom_pos = []
 
         for i, atom in enumerate(mol.GetAtoms()):
@@ -294,7 +289,7 @@ def alphafold3_input_to_molecule_input(
     # convert ligands to rdchem.Mol
 
     ligands = list(alphafold3_input.ligands)
-    mol_ligands = [(Chem.MolFromSmiles(l) if isinstance(l, str) else l) for l in ligands]
+    mol_ligands = [(mol_from_smile(l) if isinstance(l, str) else l) for l in ligands]
 
     # create the molecule input
 

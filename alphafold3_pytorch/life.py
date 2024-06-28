@@ -1,7 +1,8 @@
 import torch
 
 import rdkit
-from rdkit import Chem
+from rdkit.Chem import AllChem as Chem
+from rdkit.Chem.rdchem import Mol
 
 from typing import Literal
 from alphafold3_pytorch.tensor_typing import (
@@ -181,6 +182,19 @@ MISC = dict(
     )
 )
 
+# some rdkit helper function
+
+@typecheck
+def generate_conformation(mol: Mol) -> Mol:
+    mol = Chem.AddHs(mol)
+    Chem.EmbedMultipleConfs(mol, numConfs = 1)
+    mol = Chem.RemoveHs(mol)
+    return mol
+
+def mol_from_smile(smile: str) -> Mol:
+    mol = Chem.MolFromSmiles(smile)
+    return generate_conformation(mol)
+
 # initialize rdkit.Chem with canonical SMILES
 
 ALL_ENTRIES = [
@@ -192,7 +206,5 @@ ALL_ENTRIES = [
 ]
 
 for entry in ALL_ENTRIES:
-    mol = Chem.MolFromSmiles(entry['smile'])
-
-    entry['num_atoms'] = mol.GetNumAtoms()
+    mol = mol_from_smile(entry['smile'])
     entry['rdchem_mol'] = mol
