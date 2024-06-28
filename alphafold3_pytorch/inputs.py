@@ -196,12 +196,15 @@ def molecule_to_atom_input(
                 atom_start_index = bond.GetBeginAtomIdx()
                 atom_end_index = bond.GetEndAtomIdx()
 
-                coordinates.append([atom_start_index, atom_end_index])
+                coordinates.extend([
+                    [atom_start_index, atom_end_index],
+                    [atom_end_index, atom_start_index]
+                ])
 
                 bond_type = bond.GetBondType()
                 bond_id = atom_bond_index.get(bond_type, other_index)
 
-                updates.append(bond_id)
+                updates.extend([bond_id, bond_id])
 
             coordinates = torch.tensor(coordinates).long()
             updates = torch.tensor(updates).long()
