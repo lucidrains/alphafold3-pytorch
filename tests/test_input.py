@@ -1,9 +1,11 @@
 import torch
 
 from alphafold3_pytorch import (
+    Alphafold3,
     Alphafold3Input,
     AtomInput,
-    maybe_transform_to_atom_input
+    maybe_transform_to_atom_input,
+    collate_inputs_to_batched_atom_input
 )
 
 from alphafold3_pytorch.life import (
@@ -23,7 +25,7 @@ def test_tensor_reverse_complement():
 def test_alphafold3_input():
 
     alphafold3_input = Alphafold3Input(
-        proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDFEPQGLSEAARWNSKENLLAGPSENDPNLFVALYDFVASGDNTLSITKGEKLRVLGYNHNGEWCEAQTKNGQGWVPSNYITPVNSLEKHSWYHGPVSRNAAEYLLSSGINGSFLVRESESSPGQRSISLRYEGRVYHYRINTASDGKLYVSSESRFNTLAELVHHHSTVADGLITTLHYPAPKRNKPTVYGVSPNYDKWEMERTDITMKHKLGGGQYGEVYEGVWKKYSLTVAVKTLKEDTMEVEEFLKEAAVMKEIKHPNLVQLLGVCTREPPFYIITEFMTYGNLLDYLRECNRQEVNAVVLLYMATQISSAMEYLEKKNFIHRDLAARNCLVGENHLVKVADFGLSRLMTGDTYTAHAGAKFPIKWTAPESLAYNKFSIKSDVWAFGVLLWEIATYGMSPYPGIDLSQVYELLEKDYRMERPEGCPEKVYELMRACWQWNPSDRPSFAEIHQAFETMFQESSISDEVEKELGKQGVRGAVSTLLQAPELPTKTRTSRRAAEHRDTTDVPEMPHSKGQGESDPLDHEPAVSPLLPRKERGPPEGGLNEDERLLPKDKKTNLFSALIKKKKKTAPTPPKRSSSFREMDGQPERRGAGEEEGRDISNGALAFTPLDTADPAKSPKPSNGAGVPNGALRESGGSGFRSPHLWKKSSTLTSSRLATGEEEGGGSSSKRFLRSCSASCVPHGAKDTEWRSVTLPRDLQSTGRQFDSSTFGGHKSEKPALPRKRAGENRSDQVTRGTVTPPPRLVKKNEEAADEVFKDIMESSPGSSPPNLTPKPLRRQVTVAPASGLPHKEEAGKGSALGTPAAAEPVTPTSKAGSGAPGGTSKGPAEESRVRRHKHSSESPGRDKGKLSRLKPAPPPPPAASAGKAGGKPSQSPSQEAAGEAVLGAKTKATSLVDAVNSDAAKPSQPGEGLKKPVLPATPKPQSAKPSGTPISPAPVPSTLPSASSALAGDQPSSTAFIPLISTRVSLRKTRQPPERIASGAITKGVVLDSTEALCLAISRNSEQMASHSAVLEAGKNLYTFCVSYVDSIQQMRNKFAFREAINKLENNLRELQICPATAGSGPAATQDFSKLLSSVKEISDIVQR', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
+        proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
         ds_dna = ['ACGTT'],
         ds_rna = ['GCCAU'],
         ss_dna = ['GCCTA'],
@@ -36,3 +38,34 @@ def test_alphafold3_input():
     atom_input = maybe_transform_to_atom_input(alphafold3_input)
 
     assert isinstance(atom_input, AtomInput)
+
+    # feed it into alphafold3
+
+    batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window = 27)
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 1,
+        dim_atompair_inputs = 1,
+        atoms_per_window = 27,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        )
+    )
+
+    alphafold3(**batched_atom_input.dict(), num_sample_steps = 1)

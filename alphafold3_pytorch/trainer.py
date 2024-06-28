@@ -110,10 +110,9 @@ def collate_inputs_to_batched_atom_input(
 
     # separate input dictionary into keys and values
 
-    keys = asdict(atom_inputs[0]).keys()
-    atom_inputs = [asdict(i).values() for i in atom_inputs]
+    keys = atom_inputs[0].dict().keys()
+    atom_inputs = [i.dict().values() for i in atom_inputs]
 
-    print(keys)
     outputs = []
 
     for grouped in zip(*atom_inputs):
@@ -511,7 +510,7 @@ class Trainer:
                     # model forwards
 
                     loss, loss_breakdown = self.model(
-                        **asdict(inputs),
+                        **inputs.dict(),
                         return_loss_breakdown = True
                     )
 
@@ -571,7 +570,7 @@ class Trainer:
 
                     for valid_batch in self.valid_dataloader:
                         valid_loss, loss_breakdown = self.ema_model(
-                            **asdict(valid_batch),
+                            **valid_batch.dict(),
                             return_loss_breakdown = True
                         )
 
@@ -609,7 +608,7 @@ class Trainer:
 
                 for test_batch in self.test_dataloader:
                     test_loss, loss_breakdown = self.ema_model(
-                        **asdict(test_batch),
+                        **test_batch.dict(),
                         return_loss_breakdown = True
                     )
 

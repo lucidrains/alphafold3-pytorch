@@ -1,9 +1,8 @@
 from functools import wraps, partial
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Type, Literal, Callable, List, Any
 
 import torch
-import einx
 
 from rdkit import Chem
 from rdkit.Chem.rdchem import Mol
@@ -76,6 +75,9 @@ class AtomInput:
     plddt_labels:               Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
 
+    def dict(self):
+        return asdict(self)
+
 @typecheck
 @dataclass
 class BatchedAtomInput:
@@ -101,6 +103,9 @@ class BatchedAtomInput:
     plddt_labels:               Int['b n'] | None = None
     resolved_labels:            Int['b n'] | None = None
 
+    def dict(self):
+        return asdict(self)
+
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
  
 @typecheck
@@ -123,8 +128,60 @@ class MoleculeInput:
     resolved_labels:            Int[' n'] | None = None
 
 @typecheck
-def molecule_to_atom_input(molecule_input: MoleculeInput) -> AtomInput:
-    raise NotImplementedError
+def molecule_to_atom_input(
+    mol_input: MoleculeInput
+) -> AtomInput:
+
+    # molecule_atom_lens
+
+    atom_lens = []
+
+    for mol, is_ligand in zip(mol_input.molecules, mol_input.is_molecule_types[:, -1]):
+        if is_ligand:
+            atom_lens.extend([1] * mol.GetNumAtoms())
+        else:
+            atom_lens.append(mol.GetNumAtoms())
+
+    total_atoms = sum(atom_lens)
+
+    # atom_inputs
+
+    atom_inputs = []
+
+    for mol in mol_input.molecules:
+        atoms = mol.GetAtoms()
+        atom_feats = []
+
+        for atom in atoms:
+            charge = atom.GetFormalCharge()
+            atom_feats.append([charge])
+
+        atom_inputs.extend(atom_feats)
+
+    # atompair_inputs
+
+    atompair_inputs = torch.zeros((total_atoms, total_atoms, 1))
+
+    offset = 0
+
+    for mol in mol_input.molecules:
+        dist_matrix = Chem.GetDistanceMatrix(mol)
+        dist_matrix = torch.tensor(dist_matrix)
+        num_atoms = mol.GetNumAtoms()
+
+        row_col_slice = slice(offset, offset + num_atoms)
+        atompair_inputs[row_col_slice, row_col_slice, 0] = dist_matrix
+
+    atom_input = AtomInput(
+        atom_inputs = torch.tensor(atom_inputs, dtype = torch.float),
+        atompair_inputs = atompair_inputs,
+        molecule_atom_lens = torch.tensor(atom_lens, dtype = torch.long),
+        molecule_ids = mol_input.molecule_ids,
+        additional_molecule_feats = mol_input.additional_molecule_feats,
+        is_molecule_types = mol_input.is_molecule_types
+    )
+
+    return atom_input
 
 # alphafold3 input - support polypeptides, nucleic acids, metal ions + any number of ligands + misc biomolecules
 
@@ -260,21 +317,12 @@ def alphafold3_input_to_molecule_input(
 
     num_tokens = sum(molecule_type_token_lens) + num_metal_ions
 
-    arange = torch.arange(num_tokens)
+    arange = torch.arange(num_tokens)[:, None]
 
-    is_molecule_types_lens_cumsum = torch.tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
+    molecule_types_lens_cumsum = torch.tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
+    left, right = molecule_types_lens_cumsum[:-1], molecule_types_lens_cumsum[1:]
 
-    gt_equal_mask = einx.greater_equal(
-        'n, is_type -> n is_type',
-        arange, is_molecule_types_lens_cumsum[:-1]
-    )
-
-    lt_mask = einx.less(
-        'n, is_type -> n is_type',
-        arange, is_molecule_types_lens_cumsum[1:]
-    )
-
-    is_molecule_types = gt_equal_mask & lt_mask
+    is_molecule_types = (arange >= left) & (arange < right)
 
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
