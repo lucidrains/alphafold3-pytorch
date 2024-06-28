@@ -3,6 +3,7 @@ from dataclasses import dataclass, asdict
 from typing import Type, Literal, Callable, List, Any
 
 import torch
+import torch.nn.functional as F
 import einx
 
 from rdkit.Chem import AllChem as Chem
@@ -312,6 +313,22 @@ def map_int_or_string_indices_to_mol(
     return mols
 
 @typecheck
+def maybe_string_to_int(
+    entries: dict,
+    indices: Int[' _'] | List[str] | str,
+    other_index: int = 0
+) -> Int[' _']:
+    if isinstance(indices, str):
+        indices = list(indices)
+
+    if torch.is_tensor(indices):
+        return indices
+
+    index = {symbol: i for i, symbol in enumerate(entries.keys())}
+
+    return torch.tensor([index[c] for c in indices]).long()
+
+@typecheck
 def alphafold3_input_to_molecule_input(
     alphafold3_input: Alphafold3Input
 ) -> MoleculeInput:
@@ -332,27 +349,45 @@ def alphafold3_input_to_molecule_input(
         rc_seq = rc_fn(seq)
         ss_rnas.extend([seq, rc_seq])
 
+    # keep track of molecule_ids - for now it is
+    # other(1) | proteins (20) | rna (4) | dna (4)
+
+    protein_offset = 1
+    rna_offset = len(HUMAN_AMINO_ACIDS) + protein_offset
+    dna_offset = len(RNA_NUCLEOTIDES) + rna_offset
+
+    molecule_ids = []
+
     # convert all proteins to a List[Mol] of each peptide
 
     proteins = alphafold3_input.proteins
     mol_proteins = []
 
     for protein in proteins:
-        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, list(protein))
+        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein)
         mol_proteins.append(mol_peptides)
+
+        protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
+        molecule_ids.append(protein_ids)
 
     # convert all single stranded nucleic acids to mol
 
     mol_ss_dnas = []
     mol_ss_rnas = []
 
+    for seq in ss_rnas:
+        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq)
+        mol_ss_rnas.append(mol_seq)
+
+        rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
+        molecule_ids.append(rna_ids)
+
     for seq in ss_dnas:
         mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq)
         mol_ss_dnas.append(mol_seq)
 
-    for seq in ss_rnas:
-        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq)
-        mol_ss_rnas.append(mol_seq)
+        dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
+        molecule_ids.append(dna_ids)
 
     # convert metal ions to rdchem.Mol
 
@@ -424,11 +459,18 @@ def alphafold3_input_to_molecule_input(
         *metal_ions_pool_lens
     ]
 
+    # handle molecule ids
+
+    molecule_ids = torch.cat(molecule_ids)
+    molecule_ids = F.pad(molecule_ids, (0, num_tokens - molecule_ids.shape[-1]), value = 0)
+
+    # create molecule input
+
     molecule_input = MoleculeInput(
         molecules = molecules,
         molecule_token_pool_lens = token_pool_lens,
         molecule_atom_indices = [0] * num_tokens,
-        molecule_ids = torch.zeros(num_tokens).long(),
+        molecule_ids = molecule_ids,
         additional_molecule_feats = torch.zeros(num_tokens, 5).long(),
         is_molecule_types = is_molecule_types,
         add_atom_ids = alphafold3_input.add_atom_ids,
