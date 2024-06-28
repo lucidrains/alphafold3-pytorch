@@ -10,6 +10,9 @@ from alphafold3_pytorch.tensor_typing import (
     typecheck
 )
 
+def is_unique(arr):
+    return len(arr) == len({*arr})
+
 # human amino acids
 
 HUMAN_AMINO_ACIDS = dict(
@@ -184,7 +187,7 @@ MISC = dict(
 
 # atoms - for atom embeddings
 
-ATOM_ORDER = [
+ATOMS = [
     'C',
     'O',
     'N',
@@ -193,7 +196,18 @@ ATOM_ORDER = [
     *METALS
 ]
 
-assert len(ATOM_ORDER) == len({*ATOM_ORDER})
+assert is_unique(ATOMS)
+
+# bonds for atom bond embeddings
+
+ATOM_BONDS = [
+    'SINGLE',
+    'DOUBLE',
+    'TRIPLE',
+    'AROMATIC'
+]
+
+assert is_unique(ATOM_BONDS)
 
 # some rdkit helper function
 
