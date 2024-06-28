@@ -4,7 +4,7 @@ from typing import Type, Literal, Callable, List, Any
 
 import torch
 
-from rdkit import Chem
+from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.rdchem import Mol
 
 from alphafold3_pytorch.tensor_typing import (
@@ -165,12 +165,29 @@ def molecule_to_atom_input(
     offset = 0
 
     for mol in mol_input.molecules:
-        dist_matrix = Chem.GetDistanceMatrix(mol)
-        dist_matrix = torch.tensor(dist_matrix)
+
+        # add hydrogens, add a conformation, then remove hydrogens
+
+        mol = Chem.AddHs(mol)
+        Chem.EmbedMultipleConfs(mol, numConfs = 1)
+        mol = Chem.RemoveHs(mol)
+
+        all_atom_pos = []
+
+        for i, atom in enumerate(mol.GetAtoms()):
+            pos = mol.GetConformer().GetAtomPosition(i)
+            all_atom_pos.append([pos.x, pos.y, pos.z])
+
+        all_atom_pos_tensor = torch.tensor(all_atom_pos)
+
+        dist_matrix = torch.cdist(all_atom_pos_tensor, all_atom_pos_tensor)
+
         num_atoms = mol.GetNumAtoms()
 
         row_col_slice = slice(offset, offset + num_atoms)
         atompair_inputs[row_col_slice, row_col_slice, 0] = dist_matrix
+
+        offset += num_atoms
 
     atom_input = AtomInput(
         atom_inputs = torch.tensor(atom_inputs, dtype = torch.float),
