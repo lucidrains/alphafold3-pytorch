@@ -11,6 +11,7 @@ from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
 from alphafold3_pytorch.tensor_typing import (
+    Shaped,
     Float,
     Int,
     Bool,
@@ -118,9 +119,9 @@ def concat_previous_window(
 
 @typecheck
 def full_pairwise_repr_to_windowed(
-    pairwise_repr: Float['... m m dp'] | Int['... m m dp'],
+    pairwise_repr: Shaped['... m m dp'],
     window_size: int
-) -> Float['... n w (w*2) dp'] | Int['... n w (w*2) dp']:
+) -> Shaped['... n w (w*2) dp']:
 
     seq_len, device = pairwise_repr.shape[-2], pairwise_repr.device
 
@@ -142,9 +143,9 @@ def full_pairwise_repr_to_windowed(
 
 @typecheck
 def full_attn_bias_to_windowed(
-    attn_bias: Float['... m m'] | Int['... m m'],
+    attn_bias: Shaped['... m m'],
     window_size: int
-) -> Float['... n w (w*2)'] | Int['... n w (w*2)']:
+) -> Shaped['... n w (w*2)']:
 
     attn_bias = rearrange(attn_bias, '... -> ... 1')
     attn_bias = full_pairwise_repr_to_windowed(attn_bias, window_size = window_size)
