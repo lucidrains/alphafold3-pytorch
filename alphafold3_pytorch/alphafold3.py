@@ -3397,7 +3397,10 @@ class Alphafold3(Module):
         is_chained_biomol = is_molecule_types[..., :3].any(dim = -1) # first three types are chained biomolecules (protein, rna, dna)
         paired_is_chained_biomol = einx.logical_and('b i, b j -> b i j', is_chained_biomol, is_chained_biomol)
 
-        relative_position_encoding = einx.multiply('b i j d, b i j -> b i j d', relative_position_encoding, paired_is_chained_biomol.float())
+        relative_position_encoding = einx.where(
+            'b i j, b i j d, -> b i j d',
+            paired_is_chained_biomol, relative_position_encoding, 0.
+        )
 
         # add relative positional encoding to pairwise init
 
