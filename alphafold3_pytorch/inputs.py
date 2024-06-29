@@ -40,6 +40,9 @@ ADDITIONAL_MOLECULE_FEATS = 5
 def exists(v):
     return v is not None
 
+def default(v, d):
+    return v if exists(v) else d
+
 def identity(t):
     return t
 
@@ -66,6 +69,7 @@ class AtomInput:
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
+    additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     token_bonds:                Bool['n n'] | None = None
@@ -94,6 +98,7 @@ class BatchedAtomInput:
     atompair_inputs:            Float['b m m dapi'] | Float['b nw w (w*2) dapi']
     additional_molecule_feats:  Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'b n {IS_MOLECULE_TYPES}']
+    additional_token_feats:     Float[f'b n dtf'] | None = None
     templates:                  Float['b t n n dt'] | None = None
     msa:                        Float['b s n dm'] | None = None
     token_bonds:                Bool['b n n'] | None = None
@@ -125,6 +130,7 @@ class MoleculeInput:
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     token_bonds:                Bool['n n']
+    additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
@@ -267,6 +273,7 @@ def molecule_to_atom_input(
         atompair_inputs = atompair_inputs,
         molecule_atom_lens = torch.tensor(atom_lens, dtype = torch.long),
         molecule_ids = mol_input.molecule_ids,
+        additional_token_feats = mol_input.additional_token_feats,
         additional_molecule_feats = mol_input.additional_molecule_feats,
         is_molecule_types = mol_input.is_molecule_types,
         token_bonds = mol_input.token_bonds,
@@ -289,6 +296,7 @@ class Alphafold3Input:
     ligands:                    List[Mol | str] # can be given as smiles
     ds_dna:                     List[Int[' _'] | str]
     ds_rna:                     List[Int[' _'] | str]
+    additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
@@ -529,6 +537,7 @@ def alphafold3_input_to_molecule_input(
         molecule_ids = molecule_ids,
         token_bonds = token_bonds,
         additional_molecule_feats = torch.zeros(num_tokens, 5).long(),
+        additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
         atom_pos = i.atom_pos,
         templates = i.templates,

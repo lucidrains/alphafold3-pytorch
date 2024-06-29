@@ -55,6 +55,7 @@ atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
 additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+additional_token_feats = torch.randn(0, 2, (2, seq_len, 2))
 is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
 molecule_ids = torch.randint(0, 32, (2, seq_len))
 
@@ -84,6 +85,7 @@ loss = alphafold3(
     molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_token_feats = additional_token_feats,
     is_molecule_types = is_molecule_types,
     msa = msa,
     msa_mask = msa_mask,
@@ -110,6 +112,7 @@ sampled_atom_pos = alphafold3(
     molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_token_feats = additional_token_feats,
     is_molecule_types = is_molecule_types,
     msa = msa,
     msa_mask = msa_mask,
