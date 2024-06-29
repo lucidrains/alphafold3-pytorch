@@ -520,6 +520,8 @@ def alphafold3_input_to_molecule_input(
 
     # create molecule input
 
+    i = alphafold3_input
+
     molecule_input = MoleculeInput(
         molecules = molecules,
         molecule_token_pool_lens = token_pool_lens,
@@ -528,8 +530,14 @@ def alphafold3_input_to_molecule_input(
         token_bonds = token_bonds,
         additional_molecule_feats = torch.zeros(num_tokens, 5).long(),
         is_molecule_types = is_molecule_types,
+        atom_pos = i.atom_pos,
+        templates = i.templates,
+        msa = i.msa,
+        template_mask = i.template_mask,
+        msa_mask = i.msa_mask,
         add_atom_ids = alphafold3_input.add_atom_ids,
-        add_atompair_ids = alphafold3_input.add_atompair_ids
+        add_atompair_ids = alphafold3_input.add_atompair_ids,
+
     )
 
     return molecule_input
