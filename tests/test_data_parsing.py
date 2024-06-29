@@ -93,6 +93,7 @@ def test_unfiltered_random_mmcif_objects_parsing(
         os.path.join(mmcif_dir, subdir)
         for subdir in os.listdir(mmcif_dir)
         if os.path.isdir(os.path.join(mmcif_dir, subdir))
+        and os.listdir(os.path.join(mmcif_dir, subdir))
     ]
     for complex_index in range(num_random_complexes_to_parse):
         random_mmcif_subdir = random.choice(mmcif_subdirs)
@@ -160,6 +161,7 @@ def test_filtered_random_mmcif_objects_parsing(
         os.path.join(mmcif_dir, subdir)
         for subdir in os.listdir(mmcif_dir)
         if os.path.isdir(os.path.join(mmcif_dir, subdir))
+        and os.listdir(os.path.join(mmcif_dir, subdir))
     ]
     for complex_index in range(num_random_complexes_to_parse):
         random_mmcif_subdir = random.choice(mmcif_subdirs)
