@@ -163,4 +163,3 @@ cython_debug/
 
 # alphafold3-pytorch
 /data/
-!/data/CCD/.gitkeep

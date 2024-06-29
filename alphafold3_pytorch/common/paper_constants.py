@@ -1,3 +1,5 @@
+"""Constants used in AlphaFold."""
+
 # Table 9 of the AlphaFold 3 supplement
 CRYSTALLIZATION_AIDS = set(
     "SO4, GOL, EDO, PO4, ACT, PEG, DMS, TRS, PGE, PG4, FMT, EPE, MPD, MES, CD, IOD".split(", ")
