@@ -6,6 +6,10 @@ Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">A
 
 You can chat with other researchers about this work <a href="https://discord.gg/x6FuzQPQXY">here</a>
 
+<a href="https://www.youtube.com/watch?v=qjFgthkKxcA">Review of the paper</a> by <a href="https://x.com/sokrypton">Sergey</a>
+
+A fork with full Lightning + Hydra support is being maintained by <a href="https://github.com/amorehead">Alex</a> at <a href="https://github.com/amorehead/alphafold3-pytorch-lightning-hydra">this repository</a>
+
 ## Appreciation
 
 - <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
@@ -15,6 +19,10 @@ You can chat with other researchers about this work <a href="https://discord.gg/
 - <a href="https://github.com/amorehead">Alex</a> for fixing various issues in the transcribed algorithms
 
 - <a href="https://github.com/gitabtion">Heng</a> for pointing out inconsistencies with the paper and pull requesting the solutions
+
+- <a href="https://github.com/gitabtion">Heng</a> for finding an issue with the molecular atom indices for the distogram loss
+
+- <a href="https://github.com/luwei0917">Wei Lu</a> for catching a few erroneous hyperparameters
 
 - <a href="https://github.com/amorehead">Alex</a> for the PDB dataset preparation script!
 
@@ -46,7 +54,10 @@ atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
-additional_molecule_feats = torch.randn(2, seq_len, 10)
+additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+additional_token_feats = torch.randn(2, seq_len, 2)
+is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
+molecule_ids = torch.randint(0, 32, (2, seq_len))
 
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
 template_mask = torch.ones((2, 2)).bool()
@@ -71,8 +82,11 @@ loss = alphafold3(
     num_recycling_steps = 2,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
+    molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_token_feats = additional_token_feats,
+    is_molecule_types = is_molecule_types,
     msa = msa,
     msa_mask = msa_mask,
     templates = template_feats,
@@ -95,8 +109,11 @@ sampled_atom_pos = alphafold3(
     num_sample_steps = 16,
     atom_inputs = atom_inputs,
     atompair_inputs = atompair_inputs,
+    molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_token_feats = additional_token_feats,
+    is_molecule_types = is_molecule_types,
     msa = msa,
     msa_mask = msa_mask,
     templates = template_feats,
@@ -129,13 +146,13 @@ find . -type f -name "*.gz" -exec gzip -d {} \;
 
 Next run the commands `wget -P data/CCD/ https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz` and `wget -P data/CCD/ https://files.wwpdb.org/pub/pdb/data/component-models/complete/chem_comp_model.cif.gz` from the project's root directory to download the latest version of the PDB's Chemical Component Dictionary (CCD) and its structural models. Extract each of these files using the command `find data/CCD/ -type f -name "*.gz" -exec gzip -d {} \;`.
 
-Then run the following with <pdb_dir>, <ccd_dir>, and <out_dir> replaced with the locations of your local copies of the PDB, CCD, and your desired dataset output directory (e.g., `data/PDB_set/` by default).
+Then run the following with <pdb_dir>, <ccd_dir>, and <output_dir> replaced with the locations of your local copies of the PDB, CCD, and your desired dataset output directory (e.g., `data/PDB_set/` by default).
 ```bash
-python alphafold3_pytorch/pdb_dataset_curation.py --mmcif_dir <pdb_dir> --ccd_dir <ccd_dir> --out_dir <out_dir>
+python alphafold3_pytorch/pdb_dataset_curation.py --mmcif_dir <pdb_dir> --ccd_dir <ccd_dir> --output_dir <output_dir>
 ```
 
 See the script for more options. Each mmCIF that successfully passes
-all processing steps will be written to <out_dir> within a subdirectory
+all processing steps will be written to <output_dir> within a subdirectory
 named using the mmCIF's second and third PDB ID characters (e.g. `5c`).
 
 ## Contributing
@@ -257,5 +274,13 @@ docker run -v .:/data --gpus all -it af3
     year    = {2022},
     volume  = {abs/2203.00555},
     url     = {https://api.semanticscholar.org/CorpusID:247187905}
+}
+```
+
+```bibtex
+@inproceedings{Ainslie2023CoLT5FL,
+    title   = {CoLT5: Faster Long-Range Transformers with Conditional Computation},
+    author  = {Joshua Ainslie and Tao Lei and Michiel de Jong and Santiago Ontan'on and Siddhartha Brahma and Yury Zemlyanskiy and David Uthus and Mandy Guo and James Lee-Thorp and Yi Tay and Yun-Hsuan Sung and Sumit Sanghai},
+    year    = {2023}
 }
 ```

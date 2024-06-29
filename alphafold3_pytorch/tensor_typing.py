@@ -10,6 +10,7 @@ from jaxtyping import (
     Float,
     Int,
     Bool,
+    Shaped,
     jaxtyped
 )
 
@@ -37,9 +38,10 @@ class TorchTyping:
     def __getitem__(self, shapes: str):
         return self.abstract_dtype[Tensor, shapes]
 
-Float = TorchTyping(Float)
-Int   = TorchTyping(Int)
-Bool  = TorchTyping(Bool)
+Shaped = TorchTyping(Shaped)
+Float  = TorchTyping(Float)
+Int    = TorchTyping(Int)
+Bool   = TorchTyping(Bool)
 
 # use env variable TYPECHECK to control whether to use beartype + jaxtyping
 
@@ -50,6 +52,7 @@ typecheck = jaxtyped(typechecker = beartype) if should_typecheck else identity
 beartype_isinstance = is_bearable if should_typecheck else always(True)
 
 __all__ = [
+    Shaped,
     Float,
     Int,
     Bool,

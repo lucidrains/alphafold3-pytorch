@@ -3,6 +3,7 @@ os.environ['TYPECHECK'] = 'True'
 
 from pathlib import Path
 from random import randrange, random
+from dataclasses import asdict
 
 import pytest
 import torch
@@ -14,10 +15,14 @@ from alphafold3_pytorch import (
     DataLoader,
     Trainer,
     ConductorConfig,
+    collate_inputs_to_batched_atom_input,
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml,
     create_alphafold3_from_yaml
 )
+
+def exists(v):
+    return v is not None
 
 # mock dataset
 
@@ -43,7 +48,11 @@ class MockAtomDataset(Dataset):
         atompair_inputs = torch.randn(atom_seq_len, atom_seq_len, 5)
 
         molecule_atom_lens = torch.randint(1, self.atoms_per_window, (seq_len,))
-        additional_molecule_feats = torch.randn(seq_len, 10)
+        additional_molecule_feats = torch.randint(0, 2, (seq_len, 5))
+        additional_token_feats = torch.randn(seq_len, 2)
+        is_molecule_types = torch.randint(0, 2, (seq_len, 4)).bool()
+        molecule_ids = torch.randint(0, 32, (seq_len,))
+        token_bonds = torch.randint(0, 2, (seq_len, seq_len)).bool()
 
         templates = torch.randn(2, seq_len, seq_len, 44)
         template_mask = torch.ones((2,)).bool()
@@ -68,8 +77,12 @@ class MockAtomDataset(Dataset):
         return AtomInput(
             atom_inputs = atom_inputs,
             atompair_inputs = atompair_inputs,
+            molecule_ids = molecule_ids,
+            token_bonds = token_bonds,
             molecule_atom_lens = molecule_atom_lens,
             additional_molecule_feats = additional_molecule_feats,
+            additional_token_feats = additional_token_feats,
+            is_molecule_types = is_molecule_types,
             templates = templates,
             template_mask = template_mask,
             msa = msa,
@@ -117,7 +130,7 @@ def test_trainer():
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
     before_distogram = breakdown.distogram
 
     path = './some/nested/folder/af3'
@@ -128,7 +141,7 @@ def test_trainer():
     alphafold3 = Alphafold3.init_and_load(path)
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**inputs, return_loss_breakdown = True)
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
@@ -146,33 +159,70 @@ def test_trainer():
         valid_every = 1,
         grad_accum_every = 2,
         checkpoint_every = 1,
-        overwrite_checkpoints = True
+        overwrite_checkpoints = True,
+        ema_kwargs = dict(
+            use_foreach = True,
+            update_after_step = 0,
+            update_every = 1
+        )
     )
 
     trainer()
 
     # assert checkpoints created
 
-    assert Path('./checkpoints/af3.ckpt.1.pt').exists()
+    assert Path(f'./checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
 
     # assert can load latest checkpoint by loading from a directory
 
     trainer.load('./checkpoints')
 
-    assert str(trainer.model_loaded_from_path) == str(Path('./checkpoints/af3.ckpt.2.pt'))
+    assert exists(trainer.model_loaded_from_path)
 
     # saving and loading from trainer
 
     trainer.save('./some/nested/folder2/training.pt', overwrite = True)
-    trainer.load('./some/nested/folder2/training.pt')
+    trainer.load('./some/nested/folder2/training.pt', strict = False)
 
     # allow for only loading model, needed for fine-tuning logic
 
-    trainer.load('./some/nested/folder2/training.pt', only_model = True)
+    trainer.load('./some/nested/folder2/training.pt', only_model = True, strict = False)
 
     # also allow for loading Alphafold3 directly from training ckpt
 
     alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training.pt')
+
+# test use of collation fn outside of trainer
+
+def test_collate_fn():
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 1
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
+    )
+
+    dataset = MockAtomDataset(1)
+
+    batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[0]])
+
+    _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
 
 # test creating trainer + alphafold3 from config
 

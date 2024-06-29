@@ -29,13 +29,24 @@ from alphafold3_pytorch.alphafold3 import (
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3
+    Alphafold3,
+    Alphafold3WithHubMixin
+)
+
+from alphafold3_pytorch.inputs import (
+    register_input_transform,
+    AtomInput,
+    BatchedAtomInput,
+    MoleculeInput,
+    Alphafold3Input,
+    maybe_transform_to_atom_input,
+    maybe_transform_to_atom_inputs
 )
 
 from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,
-    AtomInput
+    collate_inputs_to_batched_atom_input
 )
 
 from alphafold3_pytorch.configs import (
@@ -75,6 +86,7 @@ __all__ = [
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
+    Alphafold3WithHubMixin,
     Alphafold3Config,
     AtomInput,
     Trainer,

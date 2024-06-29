@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from alphafold3_pytorch.typing import typecheck
+from alphafold3_pytorch.tensor_typing import typecheck
 from typing import Callable, List, Dict
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
@@ -230,8 +230,6 @@ class ConductorConfig(BaseModelWithExtra):
         trainer_name: str,
         **kwargs
     ) -> Trainer:
-
-        training_kwargs = self.model_dump()
 
         assert trainer_name in self.training, f'{trainer_name} not found among available trainers {tuple(self.training.keys())}'
 

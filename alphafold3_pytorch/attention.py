@@ -10,7 +10,8 @@ import einx
 from einops import einsum, repeat, rearrange, pack, unpack
 from einops.layers.torch import Rearrange
 
-from alphafold3_pytorch.typing import (
+from alphafold3_pytorch.tensor_typing import (
+    Shaped,
     Float,
     Int,
     Bool,
@@ -118,9 +119,9 @@ def concat_previous_window(
 
 @typecheck
 def full_pairwise_repr_to_windowed(
-    pairwise_repr: Float['... m m dp'],
+    pairwise_repr: Shaped['... m m dp'],
     window_size: int
-) -> Float['... n w (w*2) dp']:
+) -> Shaped['... n w (w*2) dp']:
 
     seq_len, device = pairwise_repr.shape[-2], pairwise_repr.device
 
@@ -142,9 +143,9 @@ def full_pairwise_repr_to_windowed(
 
 @typecheck
 def full_attn_bias_to_windowed(
-    attn_bias: Float['... m m'],
+    attn_bias: Shaped['... m m'],
     window_size: int
-) -> Float['... n w (w*2)']:
+) -> Shaped['... n w (w*2)']:
 
     attn_bias = rearrange(attn_bias, '... -> ... 1')
     attn_bias = full_pairwise_repr_to_windowed(attn_bias, window_size = window_size)
@@ -222,6 +223,7 @@ class Attention(Module):
         seq: Float['b i d'],
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None,
         attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None
 
     ) -> Float['b i d']:
@@ -239,6 +241,7 @@ class Attention(Module):
             q, k, v,
             attn_bias = attn_bias,
             mask = mask,
+            windowed_mask = windowed_mask,
             memory_kv = self.memory_kv
         )
 
@@ -324,6 +327,7 @@ class Attend(Module):
         k: Float['b h n d'],
         v: Float['b h n d'],
         mask: Bool['b n'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None,
         attn_bias: Float['... n n'] | Float['... nw w (w*2)'] | None = None,
         memory_kv: Float['2 h m d'] | None = None
     ) -> Float['b h n d']:
@@ -386,6 +390,9 @@ class Attend(Module):
             if exists(attn_bias):
                 attn_bias = pad_at_dim(attn_bias, (num_mem_kv, 0), value = 0.)
 
+            if exists(windowed_mask):
+                windowed_mask = pad_at_dim(windowed_mask, (num_mem_kv, 0), value = True)
+
             if exists(mask):
                 mask = pad_at_dim(mask, (num_mem_kv, 0), value = True)
 
@@ -400,12 +407,26 @@ class Attend(Module):
             assert attn_bias.ndim == sim.ndim
             sim = sim + attn_bias
 
+        # windowed masking - for masking out atoms not belonging to the same molecule / polypeptide / nucleic acid in sequence-local attention
+
+        if exists(windowed_mask):
+            sim = einx.where(
+                'b n i j, b h n i j, -> b h n i j',
+                windowed_mask, sim, max_neg_value(sim)
+            )
+
+        # mask out buckets of padding
+
         sim = einx.where(
             'b n j, b h n i j, -> b h n i j',
             mask, sim, max_neg_value(sim)
         )
 
+        # local attention
+
         attn = sim.softmax(dim = -1)
+
+        # aggregate
 
         out = einsum(attn, v, "... i j, ... j d -> ... i d")
 
@@ -426,6 +447,7 @@ class Attend(Module):
         k: Float['b h j d'],
         v: Float['b h j d'],
         mask: Bool['b j'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None,
         attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None,
         memory_kv: Float['2 h m d'] | None = None
     ) -> Float['b h i d']:
@@ -439,7 +461,7 @@ class Attend(Module):
         # todo (handle attn bias efficiently)
 
         if self.is_local_attn:
-            return self.local_attn(q, k, v, mask = mask, attn_bias = attn_bias, memory_kv = memory_kv)
+            return self.local_attn(q, k, v, mask = mask, windowed_mask = windowed_mask, attn_bias = attn_bias, memory_kv = memory_kv)
 
         assert not exists(is_windowed_attn_bias) or not is_windowed_attn_bias
 
