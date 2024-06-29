@@ -49,6 +49,9 @@ def identity(t):
 def flatten(arr):
     return [el for sub_arr in arr for el in sub_arr]
 
+def pad_to_len(t, length, value = 0):
+    return F.pad(t, (0, max(0, length - t.shape[-1])), value = value)
+
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
 
@@ -350,21 +353,21 @@ def alphafold3_input_to_molecule_input(
     alphafold3_input: Alphafold3Input
 ) -> MoleculeInput:
 
-    ss_dnas = list(alphafold3_input.ss_dna)
     ss_rnas = list(alphafold3_input.ss_rna)
+    ss_dnas = list(alphafold3_input.ss_dna)
 
     # any double stranded nucleic acids is added to single stranded lists with its reverse complement
     # rc stands for reverse complement
-
-    for seq in alphafold3_input.ds_dna:
-        rc_fn = partial(reverse_complement, nucleic_acid_type = 'dna') if isinstance(seq, str) else reverse_complement_tensor
-        rc_seq = rc_fn(seq)
-        ss_dnas.extend([seq, rc_seq])
 
     for seq in alphafold3_input.ds_rna:
         rc_fn = partial(reverse_complement, nucleic_acid_type = 'rna') if isinstance(seq, str) else reverse_complement_tensor
         rc_seq = rc_fn(seq)
         ss_rnas.extend([seq, rc_seq])
+
+    for seq in alphafold3_input.ds_dna:
+        rc_fn = partial(reverse_complement, nucleic_acid_type = 'dna') if isinstance(seq, str) else reverse_complement_tensor
+        rc_seq = rc_fn(seq)
+        ss_dnas.extend([seq, rc_seq])
 
     # keep track of molecule_ids - for now it is
     # other(1) | proteins (20) | rna (4) | dna (4)
@@ -524,7 +527,34 @@ def alphafold3_input_to_molecule_input(
     # handle molecule ids
 
     molecule_ids = torch.cat(molecule_ids)
-    molecule_ids = F.pad(molecule_ids, (0, num_tokens - molecule_ids.shape[-1]), value = 0)
+    molecule_ids = pad_to_len(molecule_ids, num_tokens)
+
+    # constructing the additional_molecule_feats
+    # which is in turn used to derive relative positions
+    # (todo) offer a way to precompute relative positions at data prep
+
+    # residue_index - reuse molecular_ids here
+    # token_index   - just an arange
+    # asym_id       - unique id for each chain of a biomolecule type
+    # entity_id     - unique id for each biomolecule - multimeric protein, ds dna
+    # sym_id        - unique id for each chain within each biomolecule
+
+    num_protein_tokens = [len(protein) for protein in mol_proteins]
+    num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
+    num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
+
+    unflattened_asym_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens])]
+
+    asym_ids = torch.tensor(flatten(unflattened_asym_ids))
+    asym_ids = pad_to_len(asym_ids, num_tokens)
+
+    additional_molecule_feats = torch.stack((
+        molecule_ids,
+        torch.arange(num_tokens),
+        asym_ids,
+        torch.zeros(num_tokens).long(),
+        torch.zeros(num_tokens).long(),
+    ), dim = -1)
 
     # create molecule input
 
@@ -536,7 +566,7 @@ def alphafold3_input_to_molecule_input(
         molecule_atom_indices = [0] * num_tokens,
         molecule_ids = molecule_ids,
         token_bonds = token_bonds,
-        additional_molecule_feats = torch.zeros(num_tokens, 5).long(),
+        additional_molecule_feats = additional_molecule_feats,
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
         atom_pos = i.atom_pos,
