@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 from typing import Type, Literal, Callable, List, Any
 
 import torch
+from torch import tensor
 import torch.nn.functional as F
 import einx
 
@@ -169,7 +170,7 @@ def molecule_to_atom_input(
             else:
                 atom_lens.append(num_atoms)
 
-    atom_lens = torch.tensor(atom_lens)
+    atom_lens = tensor(atom_lens)
     total_atoms = atom_lens.sum().item()
 
     # molecule_atom_lens
@@ -194,7 +195,7 @@ def molecule_to_atom_input(
 
             atom_ids.append(atom_index[atom_symbol])
 
-        atom_ids = torch.tensor(atom_ids, dtype = torch.long)
+        atom_ids = tensor(atom_ids, dtype = torch.long)
 
     # handle maybe atompair embeds
 
@@ -228,8 +229,8 @@ def molecule_to_atom_input(
 
                 updates.extend([bond_id, bond_id])
 
-            coordinates = torch.tensor(coordinates).long()
-            updates = torch.tensor(updates).long()
+            coordinates = tensor(coordinates).long()
+            updates = tensor(updates).long()
 
             mol_atompair_ids = einx.set_at('[h w], c [2], c -> [h w]', mol_atompair_ids, coordinates, updates)
 
@@ -269,7 +270,7 @@ def molecule_to_atom_input(
             pos = mol.GetConformer().GetAtomPosition(i)
             all_atom_pos.append([pos.x, pos.y, pos.z])
 
-        all_atom_pos_tensor = torch.tensor(all_atom_pos)
+        all_atom_pos_tensor = tensor(all_atom_pos)
 
         dist_matrix = torch.cdist(all_atom_pos_tensor, all_atom_pos_tensor)
 
@@ -281,9 +282,9 @@ def molecule_to_atom_input(
         offset += num_atoms
 
     atom_input = AtomInput(
-        atom_inputs = torch.tensor(atom_inputs, dtype = torch.float),
+        atom_inputs = tensor(atom_inputs, dtype = torch.float),
         atompair_inputs = atompair_inputs,
-        molecule_atom_lens = torch.tensor(atom_lens, dtype = torch.long),
+        molecule_atom_lens = tensor(atom_lens, dtype = torch.long),
         molecule_ids = mol_input.molecule_ids,
         additional_token_feats = mol_input.additional_token_feats,
         additional_molecule_feats = mol_input.additional_molecule_feats,
@@ -380,25 +381,27 @@ def maybe_string_to_int(
 
     index = {symbol: i for i, symbol in enumerate(entries.keys())}
 
-    return torch.tensor([index[c] for c in indices]).long()
+    return tensor([index[c] for c in indices]).long()
 
 @typecheck
 def alphafold3_input_to_molecule_input(
     alphafold3_input: Alphafold3Input
 ) -> MoleculeInput:
 
-    ss_rnas = list(alphafold3_input.ss_rna)
-    ss_dnas = list(alphafold3_input.ss_dna)
+    i = alphafold3_input
+
+    ss_rnas = list(i.ss_rna)
+    ss_dnas = list(i.ss_dna)
 
     # any double stranded nucleic acids is added to single stranded lists with its reverse complement
     # rc stands for reverse complement
 
-    for seq in alphafold3_input.ds_rna:
+    for seq in i.ds_rna:
         rc_fn = partial(reverse_complement, nucleic_acid_type = 'rna') if isinstance(seq, str) else reverse_complement_tensor
         rc_seq = rc_fn(seq)
         ss_rnas.extend([seq, rc_seq])
 
-    for seq in alphafold3_input.ds_dna:
+    for seq in i.ds_dna:
         rc_fn = partial(reverse_complement, nucleic_acid_type = 'dna') if isinstance(seq, str) else reverse_complement_tensor
         rc_seq = rc_fn(seq)
         ss_dnas.extend([seq, rc_seq])
@@ -414,7 +417,7 @@ def alphafold3_input_to_molecule_input(
 
     # convert all proteins to a List[Mol] of each peptide
 
-    proteins = alphafold3_input.proteins
+    proteins = i.proteins
     mol_proteins = []
     protein_entries = []
     molecule_atom_indices = []
@@ -497,7 +500,7 @@ def alphafold3_input_to_molecule_input(
 
     arange = torch.arange(num_tokens)[:, None]
 
-    molecule_types_lens_cumsum = torch.tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
+    molecule_types_lens_cumsum = tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
     left, right = molecule_types_lens_cumsum[:-1], molecule_types_lens_cumsum[1:]
 
     is_molecule_types = (arange >= left) & (arange < right)
@@ -552,8 +555,8 @@ def alphafold3_input_to_molecule_input(
 
             updates.extend([True, True])
 
-        coordinates = torch.tensor(coordinates).long()
-        updates = torch.tensor(updates).bool()
+        coordinates = tensor(coordinates).long()
+        updates = tensor(updates).bool()
 
         has_bond = einx.set_at('[h w], c [2], c -> [h w]', has_bond, coordinates, updates)
 
@@ -590,7 +593,7 @@ def alphafold3_input_to_molecule_input(
 
     unflattened_atom_parent_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_atoms, *num_ss_rna_atoms, *num_ss_dna_atoms, *num_ligand_atoms, num_metal_ions])]
 
-    atom_parent_ids = torch.tensor(flatten(unflattened_atom_parent_ids))
+    atom_parent_ids = tensor(flatten(unflattened_atom_parent_ids))
 
     # constructing the additional_molecule_feats
     # which is in turn used to derive relative positions
@@ -609,7 +612,39 @@ def alphafold3_input_to_molecule_input(
 
     unflattened_asym_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens, *num_ligand_tokens, num_metal_ions])]
 
-    asym_ids = torch.tensor(flatten(unflattened_asym_ids))
+    asym_ids = tensor(flatten(unflattened_asym_ids))
+
+    # entity ids
+
+    entity_ids = []
+    curr_id = 0
+
+    def add_entity_id(length):
+        nonlocal curr_id
+        entity_ids.extend([curr_id] * length)
+        curr_id += 1
+
+    add_entity_id(sum(num_protein_tokens))
+
+    for ss_rna in i.ss_rna:
+        add_entity_id(len(ss_rna))
+
+    for ds_rna in i.ds_rna:
+        add_entity_id(len(ds_rna) * 2)
+
+    for ss_dna in i.ss_dna:
+        add_entity_id(len(ss_dna))
+        curr_id += 1
+
+    for ds_dna in i.ds_dna:
+        add_entity_id(len(ds_dna) * 2)
+
+    for l in mol_ligands:
+        add_entity_id(l.GetNumAtoms())
+
+    add_entity_id(num_metal_ions)
+
+    entity_ids = tensor(entity_ids).long()
 
     # concat for all of additional_molecule_feats
 
@@ -617,18 +652,16 @@ def alphafold3_input_to_molecule_input(
         molecule_ids,
         torch.arange(num_tokens),
         asym_ids,
-        torch.zeros(num_tokens).long(),
+        entity_ids,
         torch.zeros(num_tokens).long(),
     ), dim = -1)
 
     # molecule atom indices
 
-    molecule_atom_indices = torch.tensor(molecule_atom_indices)
+    molecule_atom_indices = tensor(molecule_atom_indices)
     molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value = -1)
 
     # create molecule input
-
-    i = alphafold3_input
 
     molecule_input = MoleculeInput(
         molecules = molecules,
