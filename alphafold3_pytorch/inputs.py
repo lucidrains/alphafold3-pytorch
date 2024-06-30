@@ -26,6 +26,7 @@ from alphafold3_pytorch.life import (
     ATOM_BONDS,
     MISC,
     mol_from_smile,
+    remove_atom_from_mol,
     reverse_complement,
     reverse_complement_tensor
 )
@@ -326,7 +327,9 @@ class Alphafold3Input:
 def map_int_or_string_indices_to_mol(
     entries: dict,
     indices: Int[' _'] | List[str] | str,
-    mol_keyname = 'rdchem_mol'
+    mol_keyname = 'rdchem_mol',
+    remove_hydroxyl = False,
+    hydroxyl_idx_keyname = 'hydroxyl_idx'
 ) -> List[Mol]:
 
     if isinstance(indices, str):
@@ -334,11 +337,28 @@ def map_int_or_string_indices_to_mol(
 
     entries_list = list(entries.values())
 
+    # first get all the peptide or nucleotide entries
+
     if torch.is_tensor(indices):
         indices = indices.tolist()
-        mols = [entries_list[i][mol_keyname] for i in indices]
+        entries = [entries_list[i] for i in indices]
     else:
-        mols = [entries[s][mol_keyname] for s in indices]
+        entries = [entries[s] for s in indices]
+
+    # for all peptides or nucleotide except last, remove hydroxl
+
+    mols = []
+
+    for idx, entry in enumerate(entries):
+        is_last = idx == (len(entries) - 1)
+
+        mol = entry[mol_keyname]
+
+        if remove_hydroxyl and not is_last:
+            hydroxyl_idx = entry[hydroxyl_idx_keyname]
+            mol = remove_atom_from_mol(mol, hydroxyl_idx)
+
+        mols.append(mol)
 
     return mols
 
@@ -394,7 +414,7 @@ def alphafold3_input_to_molecule_input(
     mol_proteins = []
 
     for protein in proteins:
-        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein)
+        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, remove_hydroxyl = True)
         mol_proteins.append(mol_peptides)
 
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
@@ -406,14 +426,14 @@ def alphafold3_input_to_molecule_input(
     mol_ss_rnas = []
 
     for seq in ss_rnas:
-        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq)
+        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, remove_hydroxyl = True)
         mol_ss_rnas.append(mol_seq)
 
         rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
         molecule_ids.append(rna_ids)
 
     for seq in ss_dnas:
-        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq)
+        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, remove_hydroxyl = True)
         mol_ss_dnas.append(mol_seq)
 
         dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
