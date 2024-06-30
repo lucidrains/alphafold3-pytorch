@@ -624,7 +624,7 @@ def alphafold3_input_to_molecule_input(
     # molecule atom indices
 
     molecule_atom_indices = torch.tensor(molecule_atom_indices)
-    molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens)
+    molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value = -1)
 
     # create molecule input
 
