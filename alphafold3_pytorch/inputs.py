@@ -133,6 +133,7 @@ class MoleculeInput:
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     token_bonds:                Bool['n n']
+    atom_parent_ids:            Int[' m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -287,6 +288,7 @@ def molecule_to_atom_input(
         additional_molecule_feats = mol_input.additional_molecule_feats,
         is_molecule_types = mol_input.is_molecule_types,
         token_bonds = mol_input.token_bonds,
+        atom_parent_ids = mol_input.atom_parent_ids,
         atom_ids = atom_ids,
         atompair_ids = atompair_ids
     )
@@ -306,6 +308,7 @@ class Alphafold3Input:
     ligands:                    List[Mol | str] # can be given as smiles
     ds_dna:                     List[Int[' _'] | str]
     ds_rna:                     List[Int[' _'] | str]
+    atom_parent_ids:            Int['m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -536,6 +539,31 @@ def alphafold3_input_to_molecule_input(
     molecule_ids = torch.cat(molecule_ids)
     molecule_ids = pad_to_len(molecule_ids, num_tokens)
 
+    # handle atom_parent_ids
+    # this governs in the atom encoder / decoder, which atom attends to which
+    # a design choice is taken so metal ions attend to each other, in case there are more than one
+
+    @typecheck
+    def get_num_atoms_per_chain(chains: List[List[Mol]]) -> List[int]:
+        atoms_per_chain = []
+
+        for chain in chains:
+            num_atoms = 0
+            for mol in chain:
+                num_atoms += mol.GetNumAtoms()
+            atoms_per_chain.append(num_atoms)
+
+        return atoms_per_chain
+
+    num_protein_atoms = get_num_atoms_per_chain(mol_proteins)
+    num_ss_rna_atoms = get_num_atoms_per_chain(mol_ss_rnas)
+    num_ss_dna_atoms = get_num_atoms_per_chain(mol_ss_dnas)
+    num_ligand_atoms = [l.GetNumAtoms() for l in mol_ligands]
+
+    unflattened_atom_parent_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_atoms, *num_ss_rna_atoms, *num_ss_dna_atoms, *num_ligand_atoms, num_metal_ions])]
+
+    atom_parent_ids = torch.tensor(flatten(unflattened_atom_parent_ids))
+
     # constructing the additional_molecule_feats
     # which is in turn used to derive relative positions
     # (todo) offer a way to precompute relative positions at data prep
@@ -546,14 +574,14 @@ def alphafold3_input_to_molecule_input(
     # entity_id     - unique id for each biomolecule - multimeric protein, ds dna
     # sym_id        - unique id for each chain within each biomolecule
 
-    num_protein_tokens = [len(protein) for protein in mol_proteins]
+    num_protein_tokens = [len(protein) for protein in proteins]
     num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
+    num_ligand_tokens = [l.GetNumAtoms() for l in mol_ligands]
 
-    unflattened_asym_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens])]
+    unflattened_asym_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens, *num_ligand_tokens, num_metal_ions])]
 
     asym_ids = torch.tensor(flatten(unflattened_asym_ids))
-    asym_ids = pad_to_len(asym_ids, num_tokens)
 
     additional_molecule_feats = torch.stack((
         molecule_ids,
@@ -581,6 +609,7 @@ def alphafold3_input_to_molecule_input(
         msa = i.msa,
         template_mask = i.template_mask,
         msa_mask = i.msa_mask,
+        atom_parent_ids = atom_parent_ids,
         add_atom_ids = alphafold3_input.add_atom_ids,
         add_atompair_ids = alphafold3_input.add_atompair_ids,
 
