@@ -42,6 +42,9 @@ def pack_one(t, pattern):
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
 
+def softclamp(t, value):
+    return (t / value).tanh() * value
+
 @typecheck
 def pad_at_dim(
     t,
@@ -164,10 +167,12 @@ class Attention(Module):
         dropout = 0.,
         gate_output = True,
         query_bias = True,
-        flash = True,
+        flash = False,
         window_size = None,
         num_memory_kv: int = 0,
-        efficient_attn_config: Config = Config(True, True, True)
+        efficient_attn_config: Config = Config(True, True, True),
+        enable_attn_softclamp = False,
+        attn_softclamp_value = 30.
     ):
         super().__init__()
         """
@@ -189,7 +194,9 @@ class Attention(Module):
             flash = flash,
             dropout = dropout,
             window_size = window_size,
-            attn_config = efficient_attn_config
+            attn_config = efficient_attn_config,
+            enable_attn_softclamp = enable_attn_softclamp,
+            attn_softclamp_value = attn_softclamp_value,
         )
 
         self.split_heads = Rearrange('b n (h d) -> b h n d', h = heads)
@@ -268,7 +275,9 @@ class Attend(Module):
         flash = False,
         window_size = None,
         scale: float | None = None,
-        attn_config: Config = Config(True, True, True)
+        attn_config: Config = Config(True, True, True),
+        enable_attn_softclamp = False,
+        attn_softclamp_value = 30.
     ):
         super().__init__()
         """
@@ -293,6 +302,14 @@ class Attend(Module):
         self.flash = flash
         self.attn_config = attn_config
         self.attn_dropout = nn.Dropout(dropout)
+
+        assert not (flash and enable_attn_softclamp), 'softclamp of attn logits not compatible with flash yet'
+
+        # softclamp attention logits
+        # being adopted by a number of recent llms (gemma, grok)
+
+        self.enable_attn_softclamp = enable_attn_softclamp
+        self.attn_softclamp_value = attn_softclamp_value
 
     @typecheck
     def flash_attn(
@@ -398,7 +415,7 @@ class Attend(Module):
 
         # similarity
 
-        sim = einsum(q, k, "... i d, ... j d -> ... i j")
+        sim = einsum(q, k, '... i d, ... j d -> ... i j')
 
         if exists(attn_bias):
             if attn_bias.ndim == 4:
@@ -406,6 +423,11 @@ class Attend(Module):
 
             assert attn_bias.ndim == sim.ndim
             sim = sim + attn_bias
+
+        # maybe softclamp
+
+        if self.enable_attn_softclamp:
+            sim = softclamp_value(sim, self.attn_softclamp_value)
 
         # windowed masking - for masking out atoms not belonging to the same molecule / polypeptide / nucleic acid in sequence-local attention
 
@@ -502,6 +524,11 @@ class Attend(Module):
 
         if exists(attn_bias):
             sim = sim + attn_bias
+
+        # maybe softclamp
+
+        if self.enable_attn_softclamp:
+            sim = softclamp_value(sim, self.attn_softclamp_value)
 
         # masking
 
