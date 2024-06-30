@@ -329,8 +329,9 @@ def map_int_or_string_indices_to_mol(
     indices: Int[' _'] | List[str] | str,
     mol_keyname = 'rdchem_mol',
     remove_hydroxyl = False,
-    hydroxyl_idx_keyname = 'hydroxyl_idx'
-) -> List[Mol]:
+    hydroxyl_idx_keyname = 'hydroxyl_idx',
+    return_entries = False
+) -> List[Mol] | Tuple[List[Mol], List[dict]]:
 
     if isinstance(indices, str):
         indices = list(indices)
@@ -360,7 +361,10 @@ def map_int_or_string_indices_to_mol(
 
         mols.append(mol)
 
-    return mols
+    if not return_entries:
+        return mols
+
+    return mols, entries
 
 @typecheck
 def maybe_string_to_int(
@@ -412,10 +416,14 @@ def alphafold3_input_to_molecule_input(
 
     proteins = alphafold3_input.proteins
     mol_proteins = []
+    protein_entries = []
+    molecule_atom_indices = []
 
     for protein in proteins:
-        mol_peptides = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, remove_hydroxyl = True)
+        mol_peptides, protein_entries = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, remove_hydroxyl = True, return_entries = True)
         mol_proteins.append(mol_peptides)
+
+        molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in protein_entries])
 
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
         molecule_ids.append(protein_ids)
@@ -603,6 +611,8 @@ def alphafold3_input_to_molecule_input(
 
     asym_ids = torch.tensor(flatten(unflattened_asym_ids))
 
+    # concat for all of additional_molecule_feats
+
     additional_molecule_feats = torch.stack((
         molecule_ids,
         torch.arange(num_tokens),
@@ -611,6 +621,11 @@ def alphafold3_input_to_molecule_input(
         torch.zeros(num_tokens).long(),
     ), dim = -1)
 
+    # molecule atom indices
+
+    molecule_atom_indices = torch.tensor(molecule_atom_indices)
+    molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens)
+
     # create molecule input
 
     i = alphafold3_input
@@ -618,7 +633,7 @@ def alphafold3_input_to_molecule_input(
     molecule_input = MoleculeInput(
         molecules = molecules,
         molecule_token_pool_lens = token_pool_lens,
-        molecule_atom_indices = [0] * num_tokens,
+        molecule_atom_indices = molecule_atom_indices,
         molecule_ids = molecule_ids,
         token_bonds = token_bonds,
         additional_molecule_feats = additional_molecule_feats,

@@ -18,83 +18,103 @@ def is_unique(arr):
 HUMAN_AMINO_ACIDS = dict(
     A = dict(
         smile = 'CC(C(=O)O)N',
-        hydroxyl_idx = 4
+        hydroxyl_idx = 4,
+        distogram_atom_idx = 0
     ),
     R = dict(
         smile = 'C(CC(C(=O)O)N)CN=C(N)N',
-        hydroxyl_idx = 5
+        hydroxyl_idx = 5,
+        distogram_atom_idx = 0
     ),
     N = dict(
         smile = 'C(C(C(=O)O)N)C(=O)N',
-        hydroxyl_idx = 4
+        hydroxyl_idx = 4,
+        distogram_atom_idx = 0
     ),
     D = dict(
         smile = 'C(C(C(=O)O)N)C(=O)O',
-        hydroxyl_idx = 8
+        hydroxyl_idx = 8,
+        distogram_atom_idx = 0
     ),
     C = dict(
         smile = 'C(C(C(=O)O)N)S',
-        hydroxyl_idx = 4
+        hydroxyl_idx = 4,
+        distogram_atom_idx = 0
     ),
     Q = dict(
         smile = 'C(CC(=O)N)C(C(=O)O)N',
-        hydroxyl_idx = 8
+        hydroxyl_idx = 8,
+        distogram_atom_idx = 0
     ),
     E = dict(
         smile = 'C(CC(=O)O)C(C(=O)O)N',
-        hydroxyl_idx = 8
+        hydroxyl_idx = 8,
+        distogram_atom_idx = 0
     ),
     G = dict(
         smile = 'C(C(=O)O)N',
-        hydroxyl_idx = 3
+        hydroxyl_idx = 3,
+        distogram_atom_idx = 0
     ),
     H = dict(
         smile = 'NC(C(=O)O)Cc1c[nH]cn1',
-        hydroxyl_idx = 4
+        hydroxyl_idx = 4,
+        distogram_atom_idx = 0
     ),
     I = dict(
         smile = 'CCC(C)C(C(=O)O)N',
-        hydroxyl_idx = 7
+        hydroxyl_idx = 7,
+        distogram_atom_idx = 0
     ),
     L = dict(
         smile = 'CC(C)CC(C(=O)O)N',
-        hydroxyl_idx = 7
+        hydroxyl_idx = 7,
+        distogram_atom_idx = 0
     ),
     K = dict(
         smile = 'C(CCN)CC(C(=O)O)N',
-        hydroxyl_idx = 8
+        hydroxyl_idx = 8,
+        distogram_atom_idx = 0
     ),
     M = dict(
         smile = 'CSCCC(C(=O)O)N',
-        hydroxyl_idx = 7
+        hydroxyl_idx = 7,
+        distogram_atom_idx = 0
     ),
     F = dict(
         smile = 'C1=CC=C(C=C1)CC(C(=O)O)N',
-        hydroxyl_idx = 10
+        hydroxyl_idx = 10,
+        distogram_atom_idx = 0
     ),
     P = dict(
         smile = 'C1CC(NC1)C(=O)O',
-        hydroxyl_idx = 7
+        hydroxyl_idx = 7,
+        distogram_atom_idx = 0
     ),
     S = dict(
         smile = 'C(C(C(=O)O)N)O',
-        hydroxyl_idx = 4
+        hydroxyl_idx = 4,
+        distogram_atom_idx = 0
     ),
     T = dict(
         smile = 'CC(C(C(=O)O)N)O',
-        hydroxyl_idx = 5
+        hydroxyl_idx = 5,
+        distogram_atom_idx = 0
     ),
     W = dict(
         smile = 'C1=CC=C2C(=C1)C(=CN2)CC(C(=O)O)N',
-        hydroxyl_idx = 13
+        hydroxyl_idx = 13,
+        distogram_atom_idx = 0
     ),
     Y = dict(
         smile = 'C1=CC(=CC=C1CC(C(=O)O)N)O',
-        hydroxyl_idx = 10
+        hydroxyl_idx = 10,
+        distogram_atom_idx = 0
     ),
     V = dict(
         smile = 'CC(C)C(C(=O)O)N',
-        hydroxyl_idx = 6
+        hydroxyl_idx = 6,
+        distogram_atom_idx = 0
     )
 )
 
