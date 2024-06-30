@@ -634,7 +634,6 @@ def alphafold3_input_to_molecule_input(
 
     for ss_dna in i.ss_dna:
         add_entity_id(len(ss_dna))
-        curr_id += 1
 
     for ds_dna in i.ds_dna:
         add_entity_id(len(ds_dna) * 2)
@@ -646,6 +645,44 @@ def alphafold3_input_to_molecule_input(
 
     entity_ids = tensor(entity_ids).long()
 
+    # sym_id
+
+    sym_ids = []
+    curr_id = 0
+
+    def add_sym_id(length, reset = False):
+        nonlocal curr_id
+
+        if reset:
+            curr_id = 0
+
+        sym_ids.extend([curr_id] * length)
+        curr_id += 1
+
+    for protein_chain_num_tokens in num_protein_tokens:
+        add_sym_id(protein_chain_num_tokens)
+
+    for ss_rna in i.ss_rna:
+        add_sym_id(len(ss_rna), reset = True)
+
+    for ds_rna in i.ds_rna:
+        add_sym_id(len(ds_rna), reset = True)
+        add_sym_id(len(ds_rna))
+
+    for ss_dna in i.ss_dna:
+        add_sym_id(len(ss_dna), reset = True)
+
+    for ds_dna in i.ds_dna:
+        add_sym_id(len(ds_dna), reset = True)
+        add_sym_id(len(ds_dna))
+
+    for l in mol_ligands:
+        add_sym_id(l.GetNumAtoms(), reset = True)
+
+    add_sym_id(num_metal_ions, reset = True)
+
+    sym_ids = tensor(sym_ids).long()
+
     # concat for all of additional_molecule_feats
 
     additional_molecule_feats = torch.stack((
@@ -653,7 +690,7 @@ def alphafold3_input_to_molecule_input(
         torch.arange(num_tokens),
         asym_ids,
         entity_ids,
-        torch.zeros(num_tokens).long(),
+        sym_ids
     ), dim = -1)
 
     # molecule atom indices
