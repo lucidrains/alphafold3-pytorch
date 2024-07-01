@@ -173,14 +173,14 @@ See the script for more options. Each mmCIF that successfully passes
 all processing steps will be written to `mmcif_output_dir` within a subdirectory
 named according to the mmCIF's second and third PDB ID characters (e.g. `5c`).
 
-### PDB dataset clustering (WIP)
+### PDB dataset clustering
 
-Next, run the following with `mmcif_dir`, `ccd_dir`, and `clustering_output_dir` replaced, respectively, with your local output directory created using the dataset curation script above; with the location of your local CCD copy; and with your desired clustering output directory (i.e., `./data/pdb_data/mmcifs/`, `./data/ccd_data/`, and `./data/pdb_data/data_caches/clusterings/`):
+Next, run the following with `mmcif_dir` and `clustering_output_dir` replaced, respectively, with your local output directory created using the dataset filtering script above and with your desired clustering output directory (i.e., `./data/pdb_data/mmcifs/` and `./data/pdb_data/data_caches/clusterings/`):
 ```bash
-python scripts/cluster_pdb_mmcifs.py --mmcif_dir <mmcif_dir> --ccd_dir <ccd_dir> --output_dir <clustering_output_dir>
+python scripts/cluster_pdb_mmcifs.py --mmcif_dir <mmcif_dir> --output_dir <clustering_output_dir> --clustering_filtered_pdb_dataset
 ```
 
-See the script above for more options.
+**Note**: The `--clustering_filtered_pdb_dataset` flag is recommended when clustering the filtered PDB dataset as curated using the script above, as this flag will enable faster runtimes in this context (since filtering leaves each chain's residue IDs 1-based). However, this flag must **not** be provided when clustering other (i.e., non-PDB) datasets of mmCIF files. Otherwise, interface clustering may be performed incorrectly, as these datasets' mmCIF files may not use strict 1-based residue indexing for each chain.
 
 ### PDB dataset caching (WIP)
 
