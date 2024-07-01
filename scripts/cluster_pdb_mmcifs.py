@@ -34,7 +34,7 @@ from loguru import logger
 from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 
-from alphafold3_pytorch.utils.tensor_typing import IntType, typecheck
+from alphafold3_pytorch.tensor_typing import IntType, typecheck
 from alphafold3_pytorch.utils.utils import exists
 from scripts.filter_pdb_mmcifs import parse_mmcif_object
 
