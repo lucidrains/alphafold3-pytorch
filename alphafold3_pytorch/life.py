@@ -160,27 +160,36 @@ HUMAN_AMINO_ACIDS = dict(
 )
 
 # nucleotides
+# reordered from 5' to 3', so [O][P][...][C(3')][OH] - hydroxyl group removed when chaining into a nucleic acid chain
 
 DNA_NUCLEOTIDES = dict(
     A = dict(
         smile = 'C1C(C(OC1N2C=NC3=C(N=CN=C32)N)COP(=O)(O)O)O',
         complement = 'T',
-        hydroxyl_idx = 20,
+        first_atom_idx = 20,
+        last_atom_idx = 1,
+        hydroxyl_idx = 21,
     ),
     C = dict(
         smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)O)O',
         complement = 'G',
-        hydroxyl_idx = 17
+        first_atom_idx = 17,
+        last_atom_idx = 1,
+        hydroxyl_idx = 19
     ),
     G = dict(
         smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)COP(=O)(O)O)O',
         complement = 'C',
-        hydroxyl_idx= 21
+        first_atom_idx = 21,
+        last_atom_idx = 1,
+        hydroxyl_idx = 22
     ),
     T = dict(
         smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)COP(=O)(O)O)O',
         complement = 'A',
-        hydroxyl_idx = 19
+        first_atom_idx = 19,
+        last_atom_idx = 11,
+        hydroxyl_idx = 20
     )
 )
 
