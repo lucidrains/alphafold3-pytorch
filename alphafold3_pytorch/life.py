@@ -335,14 +335,38 @@ def remove_atom_from_mol(mol: Mol, atom_idx: int) -> Mol:
 
 # initialize rdkit.Chem with canonical SMILES
 
-ALL_ENTRIES = [
+CHAINABLE_BIOMOLECULES = [
     *HUMAN_AMINO_ACIDS.values(),
     *DNA_NUCLEOTIDES.values(),
-    *RNA_NUCLEOTIDES.values(),
+    *RNA_NUCLEOTIDES.values()
+]
+
+METALS_AND_MISC = [
     *METALS.values(),
     *MISC.values(),
 ]
 
-for entry in ALL_ENTRIES:
+for entry in [*CHAINABLE_BIOMOLECULES, *METALS_AND_MISC]:
     mol = mol_from_smile(entry['smile'])
     entry['rdchem_mol'] = mol
+
+# reorder all the chainable biomolecules
+# to simplify chaining them up and specifying the peptide or phosphodiesterase bonds
+
+for entry in CHAINABLE_BIOMOLECULES:
+    mol = entry['rdchem_mol']
+
+    atom_order = torch.arange(mol.GetNumAtoms())
+
+    atom_order[entry['first_atom_idx']] = -1
+    atom_order[entry['last_atom_idx']] = 1e4
+    atom_order[entry['hydroxyl_idx']] = 1e4 + 1
+
+    atom_reorder = atom_order.argsort().tolist()
+
+    mol = Chem.RenumberAtoms(mol, atom_reorder)
+
+    entry.update(
+        atom_reorder = atom_reorder,
+        rdchem_mol = mol
+    )

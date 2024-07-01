@@ -329,8 +329,7 @@ def map_int_or_string_indices_to_mol(
     entries: dict,
     indices: Int[' _'] | List[str] | str,
     mol_keyname = 'rdchem_mol',
-    remove_hydroxyl = False,
-    hydroxyl_idx_keyname = 'hydroxyl_idx',
+    chain = False,
     return_entries = False
 ) -> List[Mol] | Tuple[List[Mol], List[dict]]:
 
@@ -356,8 +355,9 @@ def map_int_or_string_indices_to_mol(
 
         mol = entry[mol_keyname]
 
-        if remove_hydroxyl and not is_last:
-            hydroxyl_idx = entry[hydroxyl_idx_keyname]
+        if chain and not is_last:
+            # hydroxyl oxygen to be removed should be the last atom
+            hydroxyl_idx = mol.GetNumAtoms() - 1
             mol = remove_atom_from_mol(mol, hydroxyl_idx)
 
         mols.append(mol)
@@ -423,7 +423,7 @@ def alphafold3_input_to_molecule_input(
     molecule_atom_indices = []
 
     for protein in proteins:
-        mol_peptides, protein_entries = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, remove_hydroxyl = True, return_entries = True)
+        mol_peptides, protein_entries = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, chain = True, return_entries = True)
         mol_proteins.append(mol_peptides)
 
         molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in protein_entries])
@@ -437,14 +437,14 @@ def alphafold3_input_to_molecule_input(
     mol_ss_rnas = []
 
     for seq in ss_rnas:
-        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, remove_hydroxyl = True)
+        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, chain = True)
         mol_ss_rnas.append(mol_seq)
 
         rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
         molecule_ids.append(rna_ids)
 
     for seq in ss_dnas:
-        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, remove_hydroxyl = True)
+        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, chain = True)
         mol_ss_dnas.append(mol_seq)
 
         dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
