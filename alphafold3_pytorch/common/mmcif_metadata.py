@@ -4,7 +4,9 @@ from typing import Mapping, Sequence
 
 import numpy as np
 
-alphafold_version = "3.0.0"
+from importlib.metadata import version
+
+alphafold_version = version("alphafold3_pytorch")
 
 _DISCLAIMER = """THE INFORMATION IS NOT INTENDED FOR, HAS NOT BEEN VALIDATED FOR, AND IS NOT
 APPROVED FOR CLINICAL USE. IT SHOULD NOT BE USED FOR CLINICAL PURPOSE OR RELIED
