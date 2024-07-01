@@ -4,7 +4,7 @@ from typing import Mapping, Sequence
 
 import numpy as np
 
-from alphafold3_pytorch import version
+alphafold_version = "3.0.0"
 
 _DISCLAIMER = """THE INFORMATION IS NOT INTENDED FOR, HAS NOT BEEN VALIDATED FOR, AND IS NOT
 APPROVED FOR CLINICAL USE. IT SHOULD NOT BE USED FOR CLINICAL PURPOSE OR RELIED
@@ -107,14 +107,14 @@ def add_metadata_to_mmcif(
         cif["_ma_model_list.model_group_id"] = ["1"]
         cif["_ma_model_list.model_name"] = ["Top ranked model"]
 
-        cif["_ma_model_list.model_group_name"] = [f"AlphaFold v{version.__version__}"]
+        cif["_ma_model_list.model_group_name"] = [f"AlphaFold v{alphafold_version}"]
         cif["_ma_model_list.data_id"] = ["1"]
         cif["_ma_model_list.model_type"] = ["Ab initio model"]
 
         # Software used.
         cif["_software.pdbx_ordinal"] = ["1"]
         cif["_software.name"] = ["AlphaFold"]
-        cif["_software.version"] = [f"v{version.__version__}"]
+        cif["_software.version"] = [f"v{alphafold_version}"]
         cif["_software.type"] = ["package"]
         cif["_software.description"] = ["Structure prediction"]
         cif["_software.classification"] = ["other"]
