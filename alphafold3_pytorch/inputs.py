@@ -154,15 +154,17 @@ def molecule_to_atom_input(
     mol_input: MoleculeInput
 ) -> AtomInput:
 
-    molecules = mol_input.molecules
-    atom_lens = mol_input.molecule_token_pool_lens
+    i = mol_input
+
+    molecules = i.molecules
+    atom_lens = i.molecule_token_pool_lens
 
     # get total number of atoms
 
     if not exists(atom_lens):
         atom_lens = []
 
-        for mol, is_ligand in zip(molecules, mol_input.is_molecule_types[:, -1]):
+        for mol, is_ligand in zip(molecules, i.is_molecule_types[:, -1]):
             num_atoms = mol.GetNumAtoms()
 
             if is_ligand:
@@ -184,7 +186,7 @@ def molecule_to_atom_input(
 
     atom_ids = None
 
-    if mol_input.add_atom_ids:
+    if i.add_atom_ids:
         atom_index = {symbol: i for i, symbol in enumerate(ATOMS)}
 
         atom_ids = []
@@ -201,14 +203,22 @@ def molecule_to_atom_input(
 
     atompair_ids = None
 
-    if mol_input.add_atompair_ids:
-        atom_bond_index = {symbol: (i + 1) for i, symbol in enumerate(ATOM_BONDS)}
+    if i.add_atompair_ids:
+        atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
         other_index = len(ATOM_BONDS) + 1
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
+
         offset = 0
 
-        for mol in molecules:
+        # need the asym_id (each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
+        # will do a single bond from a peptide or nucleotide to the one before, if `asym_id` != 0 (first in the chain)
+
+        asym_ids = i.additional_molecule_feats[..., 2]
+        is_chainable_biomolecules = i.is_molecule_types[..., :3].any(dim = -1)
+
+        for idx, (mol, asym_id, is_chainable_biomolecule) in enumerate(zip(molecules, asym_ids, is_chainable_biomolecules)):
+
             coordinates = []
             updates = []
 
@@ -225,7 +235,7 @@ def molecule_to_atom_input(
                 ])
 
                 bond_type = bond.GetBondType()
-                bond_id = atom_bond_index.get(bond_type, other_index)
+                bond_id = atom_bond_index.get(bond_type, other_index) + 1
 
                 updates.extend([bond_id, bond_id])
 
@@ -237,7 +247,15 @@ def molecule_to_atom_input(
             row_col_slice = slice(offset, offset + num_atoms)
             atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
 
+            # if is chainable biomolecule
+            # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom  of the last biomolecule
+
+            if is_chainable_biomolecule and asym_id != 0:
+                atompair_ids[offset, offset - 1] = 1
+                atompair_ids[offset - 1, offset] = 1
+
             offset += num_atoms
+        exit()
 
     # atom_inputs
 
@@ -266,8 +284,8 @@ def molecule_to_atom_input(
 
         all_atom_pos = []
 
-        for i, atom in enumerate(mol.GetAtoms()):
-            pos = mol.GetConformer().GetAtomPosition(i)
+        for idx, atom in enumerate(mol.GetAtoms()):
+            pos = mol.GetConformer().GetAtomPosition(idx)
             all_atom_pos.append([pos.x, pos.y, pos.z])
 
         all_atom_pos_tensor = tensor(all_atom_pos)
@@ -285,12 +303,12 @@ def molecule_to_atom_input(
         atom_inputs = tensor(atom_inputs, dtype = torch.float),
         atompair_inputs = atompair_inputs,
         molecule_atom_lens = tensor(atom_lens, dtype = torch.long),
-        molecule_ids = mol_input.molecule_ids,
-        additional_token_feats = mol_input.additional_token_feats,
-        additional_molecule_feats = mol_input.additional_molecule_feats,
-        is_molecule_types = mol_input.is_molecule_types,
-        token_bonds = mol_input.token_bonds,
-        atom_parent_ids = mol_input.atom_parent_ids,
+        molecule_ids = i.molecule_ids,
+        additional_token_feats = i.additional_token_feats,
+        additional_molecule_feats = i.additional_molecule_feats,
+        is_molecule_types = i.is_molecule_types,
+        token_bonds = i.token_bonds,
+        atom_parent_ids = i.atom_parent_ids,
         atom_ids = atom_ids,
         atompair_ids = atompair_ids
     )
