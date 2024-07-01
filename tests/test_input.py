@@ -49,7 +49,7 @@ def test_alphafold3_input():
         dim_atom_inputs = 3,
         dim_atompair_inputs = 1,
         num_atom_embeds = 47,
-        num_atompair_embeds = 6,
+        num_atompair_embeds = 6 + 1,
         atoms_per_window = 27,
         dim_template_feats = 44,
         num_dist_bins = 38,
