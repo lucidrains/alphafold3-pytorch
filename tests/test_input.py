@@ -27,7 +27,7 @@ def test_alphafold3_input():
     alphafold3_input = Alphafold3Input(
         proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
         ds_dna = ['ACGTT'],
-        ds_rna = ['GCCAU'],
+        ds_rna = ['GCCAU', 'CCAGU'],
         ss_dna = ['GCCTA'],
         ss_rna = ['CGCAUA'],
         metal_ions = ['Na', 'Na', 'Fe'],

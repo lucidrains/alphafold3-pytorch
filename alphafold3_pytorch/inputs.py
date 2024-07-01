@@ -591,9 +591,12 @@ def alphafold3_input_to_molecule_input(
     num_ss_dna_atoms = get_num_atoms_per_chain(mol_ss_dnas)
     num_ligand_atoms = [l.GetNumAtoms() for l in mol_ligands]
 
-    unflattened_atom_parent_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_atoms, *num_ss_rna_atoms, *num_ss_dna_atoms, *num_ligand_atoms, num_metal_ions])]
+    atom_counts = [*num_protein_atoms, *num_ss_rna_atoms, *num_ss_dna_atoms, *num_ligand_atoms, num_metal_ions]
 
-    atom_parent_ids = tensor(flatten(unflattened_atom_parent_ids))
+    atom_parent_ids = torch.repeat_interleave(
+        torch.arange(len(atom_counts)),
+        tensor(atom_counts)
+    )
 
     # constructing the additional_molecule_feats
     # which is in turn used to derive relative positions
@@ -610,78 +613,60 @@ def alphafold3_input_to_molecule_input(
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
     num_ligand_tokens = [l.GetNumAtoms() for l in mol_ligands]
 
-    unflattened_asym_ids = [([asym_id] * num_tokens) for asym_id, num_tokens in enumerate([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens, *num_ligand_tokens, num_metal_ions])]
+    token_repeats = tensor([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens, *num_ligand_tokens, num_metal_ions])
 
-    asym_ids = tensor(flatten(unflattened_asym_ids))
+    asym_ids = torch.repeat_interleave(
+        torch.arange(len(token_repeats)),
+        token_repeats
+    )
 
     # entity ids
 
-    entity_ids = []
-    curr_id = 0
+    unrepeated_entity_ids = tensor([
+        0,
+        *[*range(len(i.ss_rna))],
+        *[*range(len(i.ds_rna))],
+        *[*range(len(i.ss_dna))],
+        *[*range(len(i.ds_dna))],
+        *([1] * len(mol_ligands)),
+        1
+    ]).cumsum(dim = -1)
 
-    def add_entity_id(length):
-        nonlocal curr_id
-        entity_ids.extend([curr_id] * length)
-        curr_id += 1
+    entity_id_counts = [
+        sum(num_protein_tokens),
+        *[len(rna) for rna in i.ss_rna],
+        *[len(rna) * 2 for rna in i.ds_rna],
+        *[len(dna) for dna in i.ss_dna],
+        *[len(dna) * 2 for dna in i.ds_dna],
+        *num_ligand_tokens,
+        num_metal_ions
+    ]
 
-    add_entity_id(sum(num_protein_tokens))
-
-    for ss_rna in i.ss_rna:
-        add_entity_id(len(ss_rna))
-
-    for ds_rna in i.ds_rna:
-        add_entity_id(len(ds_rna) * 2)
-
-    for ss_dna in i.ss_dna:
-        add_entity_id(len(ss_dna))
-
-    for ds_dna in i.ds_dna:
-        add_entity_id(len(ds_dna) * 2)
-
-    for l in mol_ligands:
-        add_entity_id(l.GetNumAtoms())
-
-    add_entity_id(num_metal_ions)
-
-    entity_ids = tensor(entity_ids).long()
+    entity_ids = torch.repeat_interleave(unrepeated_entity_ids, tensor(entity_id_counts))
 
     # sym_id
 
-    sym_ids = []
-    curr_id = 0
+    unrepeated_sym_ids = [
+        *[*range(len(i.proteins))],
+        *[*range(len(i.ss_rna))],
+        *[i for rna in i.ds_rna for i in range(2)],
+        *[*range(len(i.ss_dna))],
+        *[i for dna in i.ds_dna for i in range(2)],
+        *([0] * len(mol_ligands)),
+        0
+    ]
 
-    def add_sym_id(length, reset = False):
-        nonlocal curr_id
+    sym_id_counts = [
+        *num_protein_tokens,
+        *[len(rna) for rna in i.ss_rna],
+        *flatten([((len(rna),) * 2) for rna in i.ds_rna]),
+        *[len(dna) for dna in i.ss_dna],
+        *flatten([((len(dna),) * 2) for dna in i.ds_dna]),
+        *num_ligand_tokens,
+        num_metal_ions
+    ]
 
-        if reset:
-            curr_id = 0
-
-        sym_ids.extend([curr_id] * length)
-        curr_id += 1
-
-    for protein_chain_num_tokens in num_protein_tokens:
-        add_sym_id(protein_chain_num_tokens)
-
-    for ss_rna in i.ss_rna:
-        add_sym_id(len(ss_rna), reset = True)
-
-    for ds_rna in i.ds_rna:
-        add_sym_id(len(ds_rna), reset = True)
-        add_sym_id(len(ds_rna))
-
-    for ss_dna in i.ss_dna:
-        add_sym_id(len(ss_dna), reset = True)
-
-    for ds_dna in i.ds_dna:
-        add_sym_id(len(ds_dna), reset = True)
-        add_sym_id(len(ds_dna))
-
-    for l in mol_ligands:
-        add_sym_id(l.GetNumAtoms(), reset = True)
-
-    add_sym_id(num_metal_ions, reset = True)
-
-    sym_ids = tensor(sym_ids).long()
+    sym_ids = torch.repeat_interleave(tensor(unrepeated_sym_ids), tensor(sym_id_counts))
 
     # concat for all of additional_molecule_feats
 
