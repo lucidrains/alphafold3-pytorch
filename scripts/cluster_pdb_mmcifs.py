@@ -23,7 +23,6 @@ import argparse
 import glob
 import os
 import subprocess
-from collections import defaultdict
 from typing import Dict, List, Literal, Optional, Set, Tuple
 
 import numpy as np
