@@ -746,18 +746,15 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
 
 
 @typecheck
-def filter_structure(args: Tuple[str, str, bool]):
+def filter_structure(args: Tuple[str, str]):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
     using AlphaFold 3's PDB dataset filtering criteria.
     """
-    filepath, output_dir, skip_existing = args
+    filepath, output_dir = args
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     output_file_dir = os.path.join(output_dir, file_id[1:3])
     output_filepath = os.path.join(output_file_dir, f"{file_id}.cif")
-    if skip_existing and os.path.exists(output_filepath):
-        logger.info(f"Skipping existing output file: {output_filepath}")
-        return
 
     try:
         filter_structure_with_timeout(filepath, output_dir)
@@ -844,8 +841,17 @@ if __name__ == "__main__":
     # Filter structures across all worker processes
 
     args_tuples = [
-        (filepath, args.output_dir, args.skip_existing)
+        (filepath, args.output_dir)
         for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
+        if not (
+            args.skip_existing and os.path.exists(
+                os.path.join(
+                    args.output_dir,
+                    os.path.splitext(os.path.basename(filepath))[0][1:3],
+                    f"{os.path.splitext(os.path.basename(filepath))[0]}.cif"
+                )
+            )
+        )
     ]
     process_map(
         filter_structure,
