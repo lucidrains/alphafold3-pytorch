@@ -197,22 +197,30 @@ RNA_NUCLEOTIDES = dict(
     A = dict(
         smile = 'C1=NC(=C2C(=N1)N(C=N2)C3C(C(C(O3)COP(=O)(O)O)O)O)N',
         complement = 'U',
-        hydroxyl_idx = 19
+        first_atom_idx = 19,
+        last_atom_idx = 11,
+        hydroxyl_idx = 20
     ),
     C = dict(
         smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
         complement = 'G',
-        hydroxyl_idx = 17
+        first_atom_idx = 17,
+        last_atom_idx = 10,
+        hydroxyl_idx = 19
     ),
     G = dict(
         smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
         complement = 'C',
-        hydroxyl_idx = 14
+        first_atom_idx = 14,
+        last_atom_idx = 7,
+        hydroxyl_idx = 16
     ),
     U = dict(
         smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
         complement = 'A',
-        hydroxyl_idx = 18
+        first_atom_idx = 18,
+        last_atom_idx = 10,
+        hydroxyl_idx = 19
     )
 )
 
