@@ -84,6 +84,7 @@ class AtomInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     atom_pos:                   Float['m 3'] | None = None
+    output_atompos_indices:     Int[' m'] | None = None
     molecule_atom_indices:      Int[' n'] | None = None
     distance_labels:            Int['n n'] | None = None
     pae_labels:                 Int['n n'] | None = None
@@ -113,6 +114,7 @@ class BatchedAtomInput:
     template_mask:              Bool['b t'] | None = None
     msa_mask:                   Bool['b s'] | None = None
     atom_pos:                   Float['b m 3'] | None = None
+    output_atompos_indices:     Int['b m'] | None = None
     molecule_atom_indices:      Int['b n'] | None = None
     distance_labels:            Int['b n n'] | None = None
     pae_labels:                 Int['b n n'] | None = None

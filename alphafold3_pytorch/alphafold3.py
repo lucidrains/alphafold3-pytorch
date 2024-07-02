@@ -3302,6 +3302,7 @@ class Alphafold3(Module):
         molecule_atom_indices: Int['b n'] | None = None,
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
+        output_atompos_indices: Int['b m'] | None = None,
         distance_labels: Int['b n n'] | None = None,
         pae_labels: Int['b n n'] | None = None,
         pde_labels: Int['b n n'] | None = None,
@@ -3512,7 +3513,7 @@ class Alphafold3(Module):
         # if neither atom positions or any labels are passed in, sample a structure and return
 
         if not return_loss:
-            return self.edm.sample(
+            sampled_atom_pos = self.edm.sample(
                 num_sample_steps = num_sample_steps,
                 atom_feats = atom_feats,
                 atompair_feats = atompair_feats,
@@ -3525,6 +3526,28 @@ class Alphafold3(Module):
                 pairwise_rel_pos_feats = relative_position_encoding,
                 molecule_atom_lens = molecule_atom_lens
             )
+
+            if not exists(output_atompos_indices):
+                return sampled_atom_pos
+
+            # in the case the atoms are passed in not ordered canonically
+
+            order_mask = output_atompos_indices >= 0   # -1 is padding, which means do not order (metal ions, ligands, or entire row if None was passed in)
+
+            output_atompos_indices = einx.where(
+                'b m, b m, m -> b m',
+                order_mask,
+                output_atompos_indices,
+                torch.arange(atom_seq_len, device = self.device)
+            )
+
+            sampled_atom_pos = einx.get_at(
+                'b [m] 3, b rm -> b rm 3',
+                sampled_atom_pos,
+                output_atompos_indices
+            )
+
+            return sampled_atom_pos
 
         # if being forced to return loss, but do not have sufficient information to return losses, just return 0
 
