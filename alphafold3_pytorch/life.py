@@ -22,49 +22,49 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 1
     ),
     R = dict(
         smile = 'C(CC(C(=O)O)N)CN=C(N)N',
         first_atom_idx = 6,
         last_atom_idx = 3,
         hydroxyl_idx = 5,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 2
     ),
     N = dict(
         smile = 'C(C(C(=O)O)N)C(=O)N',
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 1
     ),
     D = dict(
         smile = 'C(C(C(=O)O)N)C(=O)O',
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 1
     ),
     C = dict(
         smile = 'C(C(C(=O)O)N)S',
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 1
     ),
     Q = dict(
         smile = 'C(CC(=O)N)C(C(=O)O)N',
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 5
     ),
     E = dict(
         smile = 'C(CC(=O)O)C(C(=O)O)N',
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 5
     ),
     G = dict(
         smile = 'C(C(=O)O)N',
@@ -92,70 +92,70 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 8,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 4
     ),
     K = dict(
         smile = 'C(CCN)CC(C(=O)O)N',
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 5
     ),
     M = dict(
         smile = 'CSCCC(C(=O)O)N',
         first_atom_idx = 8,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 4
     ),
     F = dict(
         smile = 'C1=CC=C(C=C1)CC(C(=O)O)N',
         first_atom_idx = 11,
         last_atom_idx = 8,
         hydroxyl_idx = 10,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 7
     ),
     P = dict(
         smile = 'C1CC(NC1)C(=O)O',
         first_atom_idx = 3,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 2
     ),
     S = dict(
         smile = 'C(C(C(=O)O)N)O',
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 1
     ),
     T = dict(
         smile = 'CC(C(C(=O)O)N)O',
         first_atom_idx = 6,
         last_atom_idx = 3,
         hydroxyl_idx = 5,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 2
     ),
     W = dict(
         smile = 'C1=CC=C2C(=C1)C(=CN2)CC(C(=O)O)N',
         first_atom_idx = 14,
         last_atom_idx = 11,
         hydroxyl_idx = 13,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 10
     ),
     Y = dict(
         smile = 'C1=CC(=CC=C1CC(C(=O)O)N)O',
         first_atom_idx = 11,
         last_atom_idx = 8,
         hydroxyl_idx = 10,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 7
     ),
     V = dict(
         smile = 'CC(C)C(C(=O)O)N',
         first_atom_idx = 7,
         last_atom_idx = 4,
         hydroxyl_idx = 6,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 3
     )
 )
 
