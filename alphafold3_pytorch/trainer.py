@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
-from alphafold3_pytorch.attention import pad_at_dim
+from alphafold3_pytorch.attention import pad_at_dim, pad_or_slice_to
 
 from typing import TypedDict, List, Callable
 
@@ -169,9 +169,21 @@ def collate_inputs_to_batched_atom_input(
 
         outputs.append(stacked)
 
+    # batched atom input dictionary
+
+    batched_atom_input_dict = dict(tuple(zip(keys, outputs)))
+
+    # just ensure output_atompos_indices has full atom_seq_len manually for now
+
+    output_atompos_indices = batched_atom_input_dict.get('output_atompos_indices', None)
+
+    if exists(output_atompos_indices):
+        atom_seq_len = batched_atom_input_dict['atom_inputs'].shape[-2]
+        batched_atom_input_dict.update(output_atompos_indices = pad_or_slice_to(output_atompos_indices, atom_seq_len, dim = -1, pad_value = -1))
+
     # reconstitute dictionary
 
-    batched_atom_inputs = BatchedAtomInput(**dict(tuple(zip(keys, outputs))))
+    batched_atom_inputs = BatchedAtomInput(**batched_atom_input_dict)
     return batched_atom_inputs
 
 @typecheck

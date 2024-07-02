@@ -225,9 +225,9 @@ def test_collate_fn():
         ),
     )
 
-    dataset = MockAtomDataset(1)
+    dataset = MockAtomDataset(5)
 
-    batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[0]])
+    batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[i] for i in range(3)])
 
     _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
 
