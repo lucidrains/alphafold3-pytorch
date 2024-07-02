@@ -426,6 +426,8 @@ def alphafold3_input_to_molecule_input(
 
     i = alphafold3_input
 
+    chainable_biomol_entries: List[List[dict]] = []  # for reordering the atom positions at the end
+
     ss_rnas = list(i.ss_rna)
     ss_dnas = list(i.ss_dna)
 
@@ -467,24 +469,30 @@ def alphafold3_input_to_molecule_input(
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
         molecule_ids.append(protein_ids)
 
+        chainable_biomol_entries.append(protein_entries)
+
     # convert all single stranded nucleic acids to mol
 
     mol_ss_dnas = []
     mol_ss_rnas = []
 
     for seq in ss_rnas:
-        mol_seq = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, chain = True)
+        mol_seq, ss_rna_entries = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, chain = True, return_entries = True)
         mol_ss_rnas.append(mol_seq)
 
         rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
         molecule_ids.append(rna_ids)
 
+        chainable_biomol_entries.append(ss_rna_entries)
+
     for seq in ss_dnas:
-        mol_seq = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, chain = True)
+        mol_seq, ss_dna_entries = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, chain = True, return_entries = True)
         mol_ss_dnas.append(mol_seq)
 
         dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
         molecule_ids.append(dna_ids)
+
+        chainable_biomol_entries.append(ss_dna_entries)
 
     # convert metal ions to rdchem.Mol
 
@@ -557,6 +565,8 @@ def alphafold3_input_to_molecule_input(
         *flatten(ligands_token_pool_lens),
         *metal_ions_pool_lens
     ]
+
+    total_atoms = sum(token_pool_lens)
 
     # construct the token bonds
 
@@ -724,10 +734,37 @@ def alphafold3_input_to_molecule_input(
     # handle atom positions
 
     atom_pos = i.atom_pos
+    output_atompos_indices = None
 
     if exists(atom_pos):
         if isinstance(atom_pos, list):
             atom_pos = torch.cat(atom_pos, dim = -2)
+
+        # to automatically reorder the atom positions back to canonical
+
+        if i.add_output_atompos_indices:
+            offset = 0
+            output_atompos_indices = []
+
+            for chain in chainable_biomol_entries:
+                for idx, entry in enumerate(chain):
+                    is_last = idx == (len(chain) - 1)
+
+                    mol = entry['rdchem_mol']
+                    num_atoms = mol.GetNumAtoms()
+                    atom_reorder_indices = entry['atom_reorder_indices']
+
+                    if not is_last:
+                        num_atoms -= 1
+                        atom_reorder_indices = atom_reorder_indices[:-1]
+
+                    reorder_back_indices = atom_reorder_indices.argsort()
+                    output_atompos_indices.append(reorder_back_indices + offset)
+
+                    offset += num_atoms
+
+            output_atompos_indices = torch.cat(output_atompos_indices, dim = -1)
+            output_atompos_indices = F.pad(output_atompos_indices, (0, total_atoms - output_atompos_indices.shape[-1]), value = -1)
 
     # create molecule input
 
@@ -741,6 +778,7 @@ def alphafold3_input_to_molecule_input(
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
         atom_pos = atom_pos,
+        output_atompos_indices = output_atompos_indices,
         templates = i.templates,
         msa = i.msa,
         template_mask = i.template_mask,

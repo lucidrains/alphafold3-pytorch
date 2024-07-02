@@ -362,11 +362,11 @@ for entry in CHAINABLE_BIOMOLECULES:
     atom_order[entry['last_atom_idx']] = 1e4
     atom_order[entry['hydroxyl_idx']] = 1e4 + 1
 
-    atom_reorder = atom_order.argsort().tolist()
+    atom_reorder = atom_order.argsort()
 
-    mol = Chem.RenumberAtoms(mol, atom_reorder)
+    mol = Chem.RenumberAtoms(mol, atom_reorder.tolist())
 
     entry.update(
-        atom_reorder = atom_reorder,
+        atom_reorder_indices = atom_reorder,
         rdchem_mol = mol
     )
