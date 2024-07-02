@@ -740,6 +740,8 @@ def alphafold3_input_to_molecule_input(
         if isinstance(atom_pos, list):
             atom_pos = torch.cat(atom_pos, dim = -2)
 
+        assert atom_pos.shape[-2] == total_atoms
+
         # to automatically reorder the atom positions back to canonical
 
         if i.add_output_atompos_indices:
