@@ -22,7 +22,9 @@ from alphafold3_pytorch.attention import (
 from alphafold3_pytorch.inputs import (
     AtomInput,
     BatchedAtomInput,
-    maybe_transform_to_atom_inputs
+    Alphafold3Input,
+    maybe_transform_to_atom_inputs,
+    alphafold3_input_to_molecule_input
 )
 
 import torch
@@ -185,6 +187,18 @@ def collate_inputs_to_batched_atom_input(
 
     batched_atom_inputs = BatchedAtomInput(**batched_atom_input_dict)
     return batched_atom_inputs
+
+@typecheck
+def alphafold3_inputs_to_batched_atom_input(
+    inp: Alphafold3Input | List[Alphafold3Input],
+    **collate_kwargs
+) -> BatchedAtomInput:
+
+    if isinstance(inp, Alphafold3Input):
+        inp = [inp]
+
+    atom_inputs = maybe_transform_to_atom_inputs(inp)
+    return collate_inputs_to_batched_atom_input(atom_inputs, **collate_kwargs)
 
 @typecheck
 def DataLoader(

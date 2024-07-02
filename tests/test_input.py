@@ -5,7 +5,8 @@ from alphafold3_pytorch import (
     Alphafold3Input,
     AtomInput,
     maybe_transform_to_atom_input,
-    collate_inputs_to_batched_atom_input
+    collate_inputs_to_batched_atom_input,
+    alphafold3_inputs_to_batched_atom_input
 )
 
 from alphafold3_pytorch.life import (
@@ -37,13 +38,9 @@ def test_alphafold3_input():
         add_atompair_ids = True
     )
 
-    atom_input = maybe_transform_to_atom_input(alphafold3_input)
-
-    assert isinstance(atom_input, AtomInput)
+    batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input)
 
     # feed it into alphafold3
-
-    batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window = 27)
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 3,
@@ -92,13 +89,9 @@ def test_atompos_input():
         proteins = [contrived_protein]
     )
 
-    atom_input = maybe_transform_to_atom_input(train_alphafold3_input)
-
-    assert isinstance(atom_input, AtomInput)
+    batched_atom_input = alphafold3_inputs_to_batched_atom_input(train_alphafold3_input, atoms_per_window = 27)
 
     # training
-
-    batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window = 27)
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 3,
@@ -130,8 +123,7 @@ def test_atompos_input():
 
     # sampling
 
-    eval_atom_input = maybe_transform_to_atom_input(eval_alphafold3_input)
-    batched_eval_atom_input = collate_inputs_to_batched_atom_input([eval_atom_input], atoms_per_window = 27)
+    batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
 
     alphafold3.eval()
     sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())

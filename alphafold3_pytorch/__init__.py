@@ -46,7 +46,8 @@ from alphafold3_pytorch.inputs import (
 from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,
-    collate_inputs_to_batched_atom_input
+    collate_inputs_to_batched_atom_input,
+    alphafold3_inputs_to_batched_atom_input
 )
 
 from alphafold3_pytorch.configs import (
