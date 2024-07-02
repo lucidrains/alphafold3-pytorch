@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps, partial
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Type, Literal, Callable, List, Any
 
 import torch
@@ -306,6 +306,13 @@ def molecule_to_atom_input(
 
         offset += num_atoms
 
+    # handle atom positions
+
+    atom_pos = i.atom_pos
+
+    if exists(atom_pos) and isinstance(atom_pos, list):
+        atom_pos = torch.cat(atom_pos, dim = -2)
+
     atom_input = AtomInput(
         atom_inputs = tensor(atom_inputs, dtype = torch.float),
         atompair_inputs = atompair_inputs,
@@ -314,6 +321,7 @@ def molecule_to_atom_input(
         additional_token_feats = i.additional_token_feats,
         additional_molecule_feats = i.additional_molecule_feats,
         is_molecule_types = i.is_molecule_types,
+        atom_pos = atom_pos,
         token_bonds = i.token_bonds,
         atom_parent_ids = i.atom_parent_ids,
         atom_ids = atom_ids,
@@ -324,17 +332,19 @@ def molecule_to_atom_input(
 
 # alphafold3 input - support polypeptides, nucleic acids, metal ions + any number of ligands + misc biomolecules
 
+imm_list = partial(field, default_factory = list)
+
 @typecheck
 @dataclass
 class Alphafold3Input:
-    proteins:                   List[Int[' _'] | str]
-    ss_dna:                     List[Int[' _'] | str]
-    ss_rna:                     List[Int[' _'] | str]
-    metal_ions:                 Int[' _'] | List[str]
-    misc_molecule_ids:          Int[' _'] | List[str]
-    ligands:                    List[Mol | str] # can be given as smiles
-    ds_dna:                     List[Int[' _'] | str]
-    ds_rna:                     List[Int[' _'] | str]
+    proteins:                   List[Int[' _'] | str] = imm_list()
+    ss_dna:                     List[Int[' _'] | str] = imm_list()
+    ss_rna:                     List[Int[' _'] | str] = imm_list()
+    metal_ions:                 Int[' _'] | List[str] = imm_list()
+    misc_molecule_ids:          Int[' _'] | List[str] = imm_list()
+    ligands:                    List[Mol | str] = imm_list() # can be given as smiles
+    ds_dna:                     List[Int[' _'] | str] = imm_list()
+    ds_rna:                     List[Int[' _'] | str] = imm_list()
     atom_parent_ids:            Int['m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
@@ -524,6 +534,8 @@ def alphafold3_input_to_molecule_input(
 
     num_tokens = sum(molecule_type_token_lens) + num_metal_ions
 
+    assert num_tokens > 0, f'you have an empty alphafold3 input'
+
     arange = torch.arange(num_tokens)[:, None]
 
     molecule_types_lens_cumsum = tensor([0, *molecule_type_token_lens]).cumsum(dim = -1)
@@ -709,6 +721,14 @@ def alphafold3_input_to_molecule_input(
     molecule_atom_indices = tensor(molecule_atom_indices)
     molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value = -1)
 
+    # handle atom positions
+
+    atom_pos = i.atom_pos
+
+    if exists(atom_pos):
+        if isinstance(atom_pos, list):
+            atom_pos = torch.cat(atom_pos, dim = -2)
+
     # create molecule input
 
     molecule_input = MoleculeInput(
@@ -720,14 +740,14 @@ def alphafold3_input_to_molecule_input(
         additional_molecule_feats = additional_molecule_feats,
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
-        atom_pos = i.atom_pos,
+        atom_pos = atom_pos,
         templates = i.templates,
         msa = i.msa,
         template_mask = i.template_mask,
         msa_mask = i.msa_mask,
         atom_parent_ids = atom_parent_ids,
-        add_atom_ids = alphafold3_input.add_atom_ids,
-        add_atompair_ids = alphafold3_input.add_atompair_ids,
+        add_atom_ids = i.add_atom_ids,
+        add_atompair_ids = i.add_atompair_ids,
 
     )
 
