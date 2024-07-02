@@ -211,13 +211,18 @@ def molecule_to_atom_input(
 
         offset = 0
 
-        # need the asym_id (each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
-        # will do a single bond from a peptide or nucleotide to the one before, if `asym_id` != 0 (first in the chain)
+        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
+        # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
 
         asym_ids = i.additional_molecule_feats[..., 2]
+        asym_ids = F.pad(asym_ids, (1, 0), value = -1)
+        is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
+
         is_chainable_biomolecules = i.is_molecule_types[..., :3].any(dim = -1)
 
-        for idx, (mol, asym_id, is_chainable_biomolecule) in enumerate(zip(molecules, asym_ids, is_chainable_biomolecules)):
+        # for every molecule, build the bonds id matrix and add to `atompair_ids`
+
+        for idx, (mol, is_first_mol_in_chain, is_chainable_biomolecule) in enumerate(zip(molecules, is_first_mol_in_chains, is_chainable_biomolecules)):
 
             coordinates = []
             updates = []
@@ -250,7 +255,7 @@ def molecule_to_atom_input(
             # if is chainable biomolecule
             # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom  of the last biomolecule
 
-            if is_chainable_biomolecule and asym_id != 0:
+            if is_chainable_biomolecule and not is_first_mol_in_chain:
                 atompair_ids[offset, offset - 1] = 1
                 atompair_ids[offset - 1, offset] = 1
 
