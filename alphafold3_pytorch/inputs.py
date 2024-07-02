@@ -142,6 +142,7 @@ class MoleculeInput:
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
+    output_atompos_indices:     Int[' m'] | None = None
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
@@ -347,6 +348,7 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
+    add_output_atompos_indices: bool = True
 
 @typecheck
 def map_int_or_string_indices_to_mol(
