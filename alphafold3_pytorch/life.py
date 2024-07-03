@@ -246,9 +246,9 @@ def reverse_complement(
     return ''.join(complement[::-1])
 
 @typecheck
-def reverse_complement_tensor(t: Int['n']):
+def reverse_complement_tensor(t: Int[' n']):
     complement = NUCLEIC_ACID_COMPLEMENT_TENSOR[t]
-    reverse_complement = t.flip(dims = (-1,))
+    reverse_complement = complement.flip(dims = (-1,))
     return reverse_complement
 
 # metal ions

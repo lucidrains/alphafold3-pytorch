@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import wraps, partial
 from dataclasses import dataclass, asdict, field
-from typing import Type, Literal, Callable, List, Any
+from typing import Type, Literal, Callable, List, Any, Tuple
 
 import torch
 from torch import tensor
@@ -350,7 +350,7 @@ class Alphafold3Input:
     ligands:                    List[Mol | str] = imm_list() # can be given as smiles
     ds_dna:                     List[Int[' _'] | str] = imm_list()
     ds_rna:                     List[Int[' _'] | str] = imm_list()
-    atom_parent_ids:            Int['m'] | None = None
+    atom_parent_ids:            Int[' m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -508,7 +508,7 @@ def alphafold3_input_to_molecule_input(
     # convert ligands to rdchem.Mol
 
     ligands = list(alphafold3_input.ligands)
-    mol_ligands = [(mol_from_smile(l) if isinstance(l, str) else l) for l in ligands]
+    mol_ligands = [(mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands]
 
     # create the molecule input
 
@@ -643,7 +643,7 @@ def alphafold3_input_to_molecule_input(
     num_protein_atoms = get_num_atoms_per_chain(mol_proteins)
     num_ss_rna_atoms = get_num_atoms_per_chain(mol_ss_rnas)
     num_ss_dna_atoms = get_num_atoms_per_chain(mol_ss_dnas)
-    num_ligand_atoms = [l.GetNumAtoms() for l in mol_ligands]
+    num_ligand_atoms = [ligand.GetNumAtoms() for ligand in mol_ligands]
 
     atom_counts = [*num_protein_atoms, *num_ss_rna_atoms, *num_ss_dna_atoms, *num_ligand_atoms, num_metal_ions]
 
@@ -665,7 +665,7 @@ def alphafold3_input_to_molecule_input(
     num_protein_tokens = [len(protein) for protein in proteins]
     num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
-    num_ligand_tokens = [l.GetNumAtoms() for l in mol_ligands]
+    num_ligand_tokens = [ligand.GetNumAtoms() for ligand in mol_ligands]
 
     token_repeats = tensor([*num_protein_tokens, *num_ss_rna_tokens, *num_ss_dna_tokens, *num_ligand_tokens, num_metal_ions])
 
