@@ -126,7 +126,14 @@ class BatchedAtomInput:
         return asdict(self)
 
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
- 
+
+def default_extract_atom_feats_fn(atom):
+    return [
+        atom.GetFormalCharge(),
+        atom.GetImplicitValence(),
+        atom.GetExplicitValence()
+    ]
+
 @typecheck
 @dataclass
 class MoleculeInput:
@@ -151,6 +158,7 @@ class MoleculeInput:
     resolved_labels:            Int[' n'] | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
+    extract_atom_feats_fn:      Callable[[Any], List[float]] = default_extract_atom_feats_fn
 
 @typecheck
 def molecule_to_atom_input(
@@ -161,6 +169,7 @@ def molecule_to_atom_input(
 
     molecules = i.molecules
     atom_lens = i.molecule_token_pool_lens
+    extract_atom_feats_fn = i.extract_atom_feats_fn
 
     # get total number of atoms
 
@@ -273,11 +282,7 @@ def molecule_to_atom_input(
         atom_feats = []
 
         for atom in atoms:
-            atom_feats.append([
-                atom.GetFormalCharge(),
-                atom.GetImplicitValence(),
-                atom.GetExplicitValence(),
-            ])
+            atom_feats.append(extract_atom_feats_fn(atom))
 
         atom_inputs.extend(atom_feats)
 
@@ -359,6 +364,7 @@ class Alphafold3Input:
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     add_output_atompos_indices: bool = True
+    extract_atom_feats_fn:      Callable[[Any], List[float]] = default_extract_atom_feats_fn
 
 @typecheck
 def map_int_or_string_indices_to_mol(
@@ -788,7 +794,7 @@ def alphafold3_input_to_molecule_input(
         atom_parent_ids = atom_parent_ids,
         add_atom_ids = i.add_atom_ids,
         add_atompair_ids = i.add_atompair_ids,
-
+        extract_atom_feats_fn = i.extract_atom_feats_fn
     )
 
     return molecule_input
