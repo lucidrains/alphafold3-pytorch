@@ -123,6 +123,13 @@ class BatchedAtomInput:
 
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
  
+def default_extract_atom_feats_fn(atom):
+    return [
+        atom.GetFormalCharge(),
+        atom.GetImplicitValence(),
+        atom.GetExplicitValence()
+    ]
+
 @typecheck
 @dataclass
 class MoleculeInput:
@@ -145,6 +152,7 @@ class MoleculeInput:
     resolved_labels:            Int[' n'] | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
+    extract_atom_feats_fn:      Callable[[Any], List[float]] = default_extract_atom_feats_fn
 
 @typecheck
 def molecule_to_atom_input(
@@ -153,6 +161,8 @@ def molecule_to_atom_input(
 
     molecules = mol_input.molecules
     atom_lens = mol_input.molecule_token_pool_lens
+
+    extract_atom_feats_fn = mol_input.extract_atom_feats_fn
 
     # get total number of atoms
 
@@ -245,11 +255,7 @@ def molecule_to_atom_input(
         atom_feats = []
 
         for atom in atoms:
-            atom_feats.append([
-                atom.GetFormalCharge(),
-                atom.GetImplicitValence(),
-                atom.GetExplicitValence(),
-            ])
+            atom_feats.append(extract_atom_feats_fn(atom))
 
         atom_inputs.extend(atom_feats)
 
@@ -261,16 +267,8 @@ def molecule_to_atom_input(
 
     for mol in molecules:
 
-        all_atom_pos = []
-
-        for i, atom in enumerate(mol.GetAtoms()):
-            pos = mol.GetConformer().GetAtomPosition(i)
-            all_atom_pos.append([pos.x, pos.y, pos.z])
-
-        all_atom_pos_tensor = torch.tensor(all_atom_pos)
-
-        dist_matrix = torch.cdist(all_atom_pos_tensor, all_atom_pos_tensor)
-
+        dist_matrix = Chem.GetDistanceMatrix(mol)
+        dist_matrix = torch.from_numpy(dist_matrix)
         num_atoms = mol.GetNumAtoms()
 
         row_col_slice = slice(offset, offset + num_atoms)
