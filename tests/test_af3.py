@@ -150,7 +150,7 @@ def test_compute_alignment_error():
     error_fn = ComputeAlignmentError()
     alignment_errors = error_fn(pred_coords, pred_coords, pred_frames, pred_frames)
 
-    assert alignment_errors.shape == (2, 100)
+    assert alignment_errors.shape == (2, 100, 100)
     assert (alignment_errors.mean(-1) < 1e-3).all()
 
 def test_centre_random_augmentation():
