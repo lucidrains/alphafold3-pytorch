@@ -381,7 +381,7 @@ class Alphafold3Input:
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     add_output_atompos_indices: bool = True
-    extract_atom_feats_fn:      Callable[[Any], List[float]] = default_extract_atom_feats_fn
+    extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
     extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
 
 @typecheck
