@@ -2540,13 +2540,13 @@ class ComputeAlignmentError(Module):
         """
         num_res = pred_coords.shape[1]
         
-        pair2seq = partial(einops.rearrange, pattern='b n m ... -> b (n m) ...')
-        seq2pair = partial(einops.rearrange, pattern='b (n m) ... -> b n m ...', n = num_res, m = num_res)
+        pair2seq = partial(rearrange, pattern='b n m ... -> b (n m) ...')
+        seq2pair = partial(rearrange, pattern='b (n m) ... -> b n m ...', n = num_res, m = num_res)
         
-        pair_pred_coords = pair2seq(einops.repeat(pred_coords, 'b n d -> b n m d', m = num_res))
-        pair_true_coords = pair2seq(einops.repeat(true_coords, 'b n d -> b n m d', m = num_res))
-        pair_pred_frames = pair2seq(einops.repeat(pred_frames, 'b n d e -> b m n d e', m = num_res))
-        pair_true_frames = pair2seq(einops.repeat(true_frames, 'b n d e -> b m n d e', m = num_res))
+        pair_pred_coords = pair2seq(repeat(pred_coords, 'b n d -> b n m d', m = num_res))
+        pair_true_coords = pair2seq(repeat(true_coords, 'b n d -> b n m d', m = num_res))
+        pair_pred_frames = pair2seq(repeat(pred_frames, 'b n d e -> b m n d e', m = num_res))
+        pair_true_frames = pair2seq(repeat(true_frames, 'b n d e -> b m n d e', m = num_res))
         
         # Express predicted coordinates in predicted frames
         pred_coords_transformed = self.express_coordinates_in_frame(pair_pred_coords, pair_pred_frames)
