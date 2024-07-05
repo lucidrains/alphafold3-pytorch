@@ -21,8 +21,10 @@
 
 import argparse
 import glob
+import json
 import os
 import subprocess
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, List, Literal, Optional, Set, Tuple
 
 import numpy as np
@@ -156,7 +158,7 @@ def convert_modified_residue_three_to_one(
 
 
 @typecheck
-def parse_chain_sequences_and_interfaces_from_mmcif_file(
+def parse_chain_sequences_and_interfaces_from_mmcif(
     filepath: str,
     assume_one_based_residue_ids: bool = False,
     min_num_residues_for_protein_classification: int = 10,
@@ -273,33 +275,54 @@ def parse_chain_sequences_and_interfaces_from_mmcif_file(
     return sequences, interface_chain_ids
 
 
+def parse_chain_sequences_and_interfaces_from_mmcif_file(
+    cif_filepath: str, assume_one_based_residue_ids: bool = False
+) -> Tuple[str, Dict[str, Dict[str, str]], Set[str]]:
+    """Parse chain sequences and interfaces from an mmCIF file."""
+    structure_id = os.path.splitext(os.path.basename(cif_filepath))[0]
+    try:
+        chain_sequences, interface_chain_ids = parse_chain_sequences_and_interfaces_from_mmcif(
+            cif_filepath, assume_one_based_residue_ids=assume_one_based_residue_ids
+        )
+        return structure_id, chain_sequences, interface_chain_ids
+    except Exception as e:
+        logger.warning(
+            f"Failed to parse chain sequences and interfaces from mmCIF file '{cif_filepath}' due to: {e}"
+        )
+        return structure_id, {}, set()
+
+
 @typecheck
 def parse_chain_sequences_and_interfaces_from_mmcif_directory(
-    mmcif_dir: str, assume_one_based_residue_ids: bool = False
+    mmcif_dir: str, max_workers: int = 2, assume_one_based_residue_ids: bool = False
 ) -> Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """
-    Parse all mmCIF files in a directory and return a dictionary for each complex mapping chain IDs to sequences
-    as well as a set of chain ID pairs denoting structural interfaces for each complex."""
+    Parse all mmCIF files in a directory and return a list of dictionaries mapping chain IDs to sequences
+    as well as a dictionary mapping complex IDs to a list of chain ID pairs denoting structural interfaces.
+    """
     all_chain_sequences = []
     all_interface_chain_ids = {}
 
     mmcif_filepaths = list(glob.glob(os.path.join(mmcif_dir, "*", "*.cif")))
-    for cif_filepath in tqdm(mmcif_filepaths, desc="Parsing chain sequences"):
-        structure_id = os.path.splitext(os.path.basename(cif_filepath))[0]
-        try:
-            (
-                chain_sequences,
-                interface_chain_ids,
-            ) = parse_chain_sequences_and_interfaces_from_mmcif_file(
-                cif_filepath, assume_one_based_residue_ids=assume_one_based_residue_ids
-            )
-        except Exception as e:
-            logger.warning(
-                f"Failed to parse chain sequences and interfaces from mmCIF file '{cif_filepath}' due to: {e}"
-            )
-            continue
-        all_chain_sequences.append({structure_id: chain_sequences})
-        all_interface_chain_ids[structure_id] = list(interface_chain_ids)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                parse_chain_sequences_and_interfaces_from_mmcif_file,
+                cif_filepath,
+                assume_one_based_residue_ids,
+            ): cif_filepath
+            for cif_filepath in mmcif_filepaths
+        }
+        for future in tqdm(
+            as_completed(futures),
+            total=len(futures),
+            desc="Parsing chain sequences and interfaces",
+        ):
+            structure_id, chain_sequences, interface_chain_ids = future.result()
+            if chain_sequences:
+                all_chain_sequences.append({structure_id: chain_sequences})
+                all_interface_chain_ids[structure_id] = list(interface_chain_ids)
 
     return all_chain_sequences, all_interface_chain_ids
 
@@ -524,6 +547,13 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the clustering is being performed on the filtered PDB dataset.",
     )
+    parser.add_argument(
+        "-n",
+        "--no_workers",
+        type=int,
+        default=2,
+        help="Number of workers to use for clustering.",
+    )
     args = parser.parse_args()
 
     # Validate input arguments
@@ -536,14 +566,35 @@ if __name__ == "__main__":
     aligned_fasta_filepath = os.path.join(args.output_dir, "aligned_sequences.fasta")
     distmat_filepath = os.path.join(args.output_dir, "distmat.txt")
 
-    # Parse all chain sequences from mmCIF files
+    # Attempt to load existing chain sequences and interfaces from local storage
 
-    (
-        all_chain_sequences,
-        interface_chain_ids,
-    ) = parse_chain_sequences_and_interfaces_from_mmcif_directory(
-        args.mmcif_dir, assume_one_based_residue_ids=args.clustering_filtered_pdb_dataset
-    )
+    if os.path.exists(
+        os.path.join(args.output_dir, "all_chain_sequences.json")
+    ) and os.path.exists(os.path.join(args.output_dir, "interface_chain_ids.json")):
+        with open(os.path.join(args.output_dir, "all_chain_sequences.json"), "r") as f:
+            all_chain_sequences = json.load(f)
+
+        with open(os.path.join(args.output_dir, "interface_chain_ids.json"), "r") as f:
+            interface_chain_ids = json.load(f)
+    else:
+        # Parse all chain sequences and interfaces from mmCIF files
+
+        (
+            all_chain_sequences,
+            interface_chain_ids,
+        ) = parse_chain_sequences_and_interfaces_from_mmcif_directory(
+            args.mmcif_dir,
+            max_workers=args.no_workers,
+            assume_one_based_residue_ids=args.clustering_filtered_pdb_dataset,
+        )
+
+        # Cache chain sequences and interfaces to local storage
+
+        with open(os.path.join(args.output_dir, "all_chain_sequences.json"), "w") as f:
+            json.dump(all_chain_sequences, f)
+
+        with open(os.path.join(args.output_dir, "interface_chain_ids.json"), "w") as f:
+            json.dump(interface_chain_ids, f)
 
     # Attempt to load existing chain cluster mappings from local storage
 
