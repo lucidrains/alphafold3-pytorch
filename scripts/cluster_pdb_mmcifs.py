@@ -707,7 +707,7 @@ if __name__ == "__main__":
             # Cluster proteins at 40% sequence homology
             AgglomerativeClustering(
                 n_clusters=None,
-                distance_threshold=40.0 + 1e-6,
+                distance_threshold=60.0 + 1e-6,
                 metric="precomputed",
                 linkage="complete",
             ).fit_predict(protein_dist_matrix)
