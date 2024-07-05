@@ -34,7 +34,7 @@ from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
-from alphafold3_pytorch.utils.utils import exists
+from alphafold3_pytorch.utils.utils import exists, np_mode
 from scripts.filter_pdb_mmcifs import parse_mmcif_object
 
 # Constants
@@ -60,6 +60,7 @@ RNA_LETTERS_1TO3 = {
     "A": "A",
     "C": "C",
     "G": "G",
+    "T": "U",  # NOTE: This mapping is required for PDBs such as `41Od`
     "U": "U",
 }
 DNA_LETTERS_1TO3 = {
@@ -67,6 +68,7 @@ DNA_LETTERS_1TO3 = {
     "C": "DC",
     "G": "DG",
     "T": "DT",
+    "U": "DT",  # NOTE: This mapping is present as a precaution based on outlier PDBs such as `410d`
 }
 
 
@@ -177,7 +179,7 @@ def parse_chain_sequences_and_interfaces_from_mmcif_file(
     interface_chain_ids = set()
     for chain in model:
         one_letter_seq_tokens = []
-        token_molecule_types = set()
+        token_molecule_types = []
 
         for res_index, res in enumerate(chain):
             # Convert each residue to a one-letter code if applicable
@@ -195,7 +197,7 @@ def parse_chain_sequences_and_interfaces_from_mmcif_file(
                 sequences[f"{chain.id}:{clustering_molecule_type}-{res_id}"] = one_letter_residue
             else:
                 one_letter_seq_tokens.append(one_letter_residue)
-                token_molecule_types.add(clustering_molecule_type)
+                token_molecule_types.append(clustering_molecule_type)
 
             # Find all interfaces defined as pairs of chains with minimum heavy atom (i.e. non-hydrogen) separation less than 5 Å
             for atom in res:
@@ -245,12 +247,20 @@ def parse_chain_sequences_and_interfaces_from_mmcif_file(
             len(one_letter_seq_tokens) > 0
         ), f"No residues found in chain {chain.id} within the mmCIF file {filepath}."
 
-        token_molecule_types = list(token_molecule_types)
-        assert (
-            len(token_molecule_types) == 1
-        ), f"More than one molecule type found (i.e., {token_molecule_types}) in chain {chain.id} within the mmCIF file {filepath}."
+        unique_token_molecule_types = set(token_molecule_types)
+        if len(unique_token_molecule_types) > 1:
+            # Handle cases where a chain contains multiple polymer molecule types, such as in PDB `5a0f`
+            molecule_type = np_mode(np.array(token_molecule_types))[0].item()
+            logger.warning(
+                f"More than one molecule type found (i.e., {unique_token_molecule_types}) in chain {chain.id} within the mmCIF file {filepath}."
+                f" Assigning the most common molecule type to the chain (i.e., {molecule_type}), and setting the type of all outlier residues to the unknown residue type (i.e., X)."
+            )
+            for token_index in range(len(one_letter_seq_tokens)):
+                if token_molecule_types[token_index] != molecule_type:
+                    one_letter_seq_tokens[token_index] = "X"
+        else:
+            molecule_type = token_molecule_types[0]
 
-        molecule_type = token_molecule_types[0]
         if (
             molecule_type == "protein"
             and len(one_letter_seq_tokens) < min_num_residues_for_protein_classification
@@ -276,12 +286,18 @@ def parse_chain_sequences_and_interfaces_from_mmcif_directory(
     mmcif_filepaths = list(glob.glob(os.path.join(mmcif_dir, "*", "*.cif")))
     for cif_filepath in tqdm(mmcif_filepaths, desc="Parsing chain sequences"):
         structure_id = os.path.splitext(os.path.basename(cif_filepath))[0]
-        (
-            chain_sequences,
-            interface_chain_ids,
-        ) = parse_chain_sequences_and_interfaces_from_mmcif_file(
-            cif_filepath, assume_one_based_residue_ids=assume_one_based_residue_ids
-        )
+        try:
+            (
+                chain_sequences,
+                interface_chain_ids,
+            ) = parse_chain_sequences_and_interfaces_from_mmcif_file(
+                cif_filepath, assume_one_based_residue_ids=assume_one_based_residue_ids
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse chain sequences and interfaces from mmCIF file '{cif_filepath}' due to: {e}"
+            )
+            continue
         all_chain_sequences.append({structure_id: chain_sequences})
         all_interface_chain_ids[structure_id] = list(interface_chain_ids)
 
