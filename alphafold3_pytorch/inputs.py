@@ -791,10 +791,10 @@ def alphafold3_input_to_molecule_input(
                         num_atoms -= 1
                         atom_reorder_indices = atom_reorder_indices[:-1]
 
-                    reorder_atompos_indices.append(atom_reorder_indices)
-
                     reorder_back_indices = atom_reorder_indices.argsort()
+
                     output_atompos_indices.append(reorder_back_indices + offset)
+                    reorder_atompos_indices.append(atom_reorder_indices + offset)
 
                     offset += num_atoms
 
