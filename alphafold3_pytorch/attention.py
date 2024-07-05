@@ -56,11 +56,26 @@ def slice_at_dim(
     dim_slice: slice,
     *,
     dim: int
-):
+) -> Tensor:
     dim += (t.ndim if dim < 0 else 0)
     colons = [slice(None)] * t.ndim
     colons[dim] = dim_slice
     return t[tuple(colons)]
+
+@typecheck
+def pad_to_length(
+    t: Tensor,
+    length: int,
+    *,
+    dim: int = -1,
+    value = 0
+) -> Tensor:
+    padding = max(length - t.shape[dim], 0)
+
+    if padding == 0:
+        return t
+
+    return pad_at_dim(t, (0, padding), dim = dim, value = value)
 
 @typecheck
 def pad_or_slice_to(
@@ -69,11 +84,11 @@ def pad_or_slice_to(
     *,
     dim: int,
     pad_value = 0
-):
+) -> Tensor:
     curr_length = t.shape[dim]
 
     if curr_length < length:
-        t = pad_at_dim(t, (0, length - curr_length), dim = dim, value = pad_value)
+        t = pad_to_length(t, length, dim = dim, value = pad_value)
     elif curr_length > length:
         t = slice_at_dim(t, slice(0, length), dim = dim)
 
@@ -86,7 +101,7 @@ def pad_to_multiple(
     *,
     dim = -1,
     value = 0.
-):
+) -> Tensor:
     seq_len = t.shape[dim]
     padding_needed = (multiple - (seq_len % multiple)) % multiple
 
@@ -101,7 +116,7 @@ def concat_previous_window(
     *,
     dim_seq: int,
     dim_window: int
-):
+) -> Tensor:
     t = pad_at_dim(t, (1, 0), dim = dim_seq, value = 0.)
 
     t = torch.cat((

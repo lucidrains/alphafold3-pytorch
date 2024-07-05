@@ -12,6 +12,10 @@ import einx
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.rdchem import Atom, Mol
 
+from alphafold3_pytorch.attention import (
+    pad_to_length
+)
+
 from alphafold3_pytorch.tensor_typing import (
     typecheck,
     beartype_isinstance,
@@ -795,7 +799,7 @@ def alphafold3_input_to_molecule_input(
                     offset += num_atoms
 
             output_atompos_indices = torch.cat(output_atompos_indices, dim = -1)
-            output_atompos_indices = F.pad(output_atompos_indices, (0, total_atoms - output_atompos_indices.shape[-1]), value = -1)
+            output_atompos_indices = pad_to_length(output_atompos_indices, total_atoms, value = -1)
 
         # if atom positions are passed in, need to be reordered for the bonds between residues / nucleotides to be contiguous
         # todo - fix to have no reordering needed (bonds are built not contiguous, just hydroxyl removed)
@@ -803,7 +807,7 @@ def alphafold3_input_to_molecule_input(
         if i.reorder_atom_pos:
             orig_order = torch.arange(total_atoms)
             reorder_atompos_indices = torch.cat(reorder_atompos_indices, dim = -1)
-            reorder_atompos_indices = F.pad(reorder_atompos_indices, (0, total_atoms - reorder_atompos_indices.shape[-1]), value = -1)
+            reorder_atompos_indices = pad_to_length(reorder_atompos_indices, total_atoms, value = -1)
 
             reorder_indices = torch.where(reorder_atompos_indices != -1, reorder_atompos_indices, orig_order)
 
