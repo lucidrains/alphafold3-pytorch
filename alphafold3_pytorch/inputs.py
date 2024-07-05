@@ -372,6 +372,7 @@ class Alphafold3Input:
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
+    reorder_atom_pos:           bool = True
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
@@ -770,6 +771,8 @@ def alphafold3_input_to_molecule_input(
 
         if i.add_output_atompos_indices:
             offset = 0
+
+            reorder_atompos_indices = []
             output_atompos_indices = []
 
             for chain in chainable_biomol_entries:
@@ -784,6 +787,8 @@ def alphafold3_input_to_molecule_input(
                         num_atoms -= 1
                         atom_reorder_indices = atom_reorder_indices[:-1]
 
+                    reorder_atompos_indices.append(atom_reorder_indices)
+
                     reorder_back_indices = atom_reorder_indices.argsort()
                     output_atompos_indices.append(reorder_back_indices + offset)
 
@@ -791,6 +796,18 @@ def alphafold3_input_to_molecule_input(
 
             output_atompos_indices = torch.cat(output_atompos_indices, dim = -1)
             output_atompos_indices = F.pad(output_atompos_indices, (0, total_atoms - output_atompos_indices.shape[-1]), value = -1)
+
+        # if atom positions are passed in, need to be reordered for the bonds between residues / nucleotides to be contiguous
+        # todo - fix to have no reordering needed (bonds are built not contiguous, just hydroxyl removed)
+
+        if i.reorder_atom_pos:
+            orig_order = torch.arange(total_atoms)
+            reorder_atompos_indices = torch.cat(reorder_atompos_indices, dim = -1)
+            reorder_atompos_indices = F.pad(reorder_atompos_indices, (0, total_atoms - reorder_atompos_indices.shape[-1]), value = -1)
+
+            reorder_indices = torch.where(reorder_atompos_indices != -1, reorder_atompos_indices, orig_order)
+
+            atom_pos = atom_pos[reorder_indices]
 
     # create molecule input
 
