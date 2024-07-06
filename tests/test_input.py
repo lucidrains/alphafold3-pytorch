@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from alphafold3_pytorch import (
@@ -23,7 +24,8 @@ def test_tensor_reverse_complement():
     rc = reverse_complement_tensor(seq)
     assert torch.allclose(reverse_complement_tensor(rc), seq)
 
-def test_alphafold3_input():
+@pytest.mark.parametrize('directed_bonds', (False, True))
+def test_alphafold3_input(directed_bonds):
 
     alphafold3_input = Alphafold3Input(
         proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
@@ -35,18 +37,21 @@ def test_alphafold3_input():
         misc_molecule_ids = ['Phospholipid'],
         ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
         add_atom_ids = True,
-        add_atompair_ids = True
+        add_atompair_ids = True,
+        directed_bonds = directed_bonds
     )
 
     batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input)
 
     # feed it into alphafold3
 
+    num_atom_bond_types = (6 * (2 if directed_bonds else 1))
+
     alphafold3 = Alphafold3(
         dim_atom_inputs = 3,
         dim_atompair_inputs = 1,
         num_atom_embeds = 47,
-        num_atompair_embeds = 6 + 1,
+        num_atompair_embeds = num_atom_bond_types + 1, # 0 is for no bond
         atoms_per_window = 27,
         dim_template_feats = 44,
         num_dist_bins = 38,

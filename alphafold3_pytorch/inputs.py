@@ -180,6 +180,7 @@ class MoleculeInput:
     resolved_labels:            Int[' n'] | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
+    directed_bonds:             bool = False
     extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
     extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
 
@@ -247,6 +248,8 @@ def molecule_to_atom_input(
 
     if i.add_atompair_ids:
         atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
+        num_atom_bond_types = len(atom_bond_index)
+
         other_index = len(ATOM_BONDS) + 1
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
@@ -284,7 +287,17 @@ def molecule_to_atom_input(
                 bond_type = bond.GetBondType()
                 bond_id = atom_bond_index.get(bond_type, other_index) + 1
 
-                updates.extend([bond_id, bond_id])
+                # default to symmetric bond type (undirected atom bonds)
+
+                bond_to = bond_from = bond_id
+
+                # if allowing for directed bonds, assume num_atompair_embeds = (2 * num_atom_bond_types) + 1
+                # offset other edge by num_atom_bond_types
+
+                if i.directed_bonds:
+                    bond_from += num_atom_bond_types
+
+                updates.extend([bond_to, bond_from])
 
             coordinates = tensor(coordinates).long()
             updates = tensor(updates).long()
@@ -386,6 +399,7 @@ class Alphafold3Input:
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     add_output_atompos_indices: bool = True
+    directed_bonds:             bool = False
     extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
     extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
 
@@ -833,6 +847,7 @@ def alphafold3_input_to_molecule_input(
         atom_parent_ids = atom_parent_ids,
         add_atom_ids = i.add_atom_ids,
         add_atompair_ids = i.add_atompair_ids,
+        directed_bonds = i.directed_bonds,
         extract_atom_feats_fn = i.extract_atom_feats_fn,
         extract_atompair_feats_fn = i.extract_atompair_feats_fn
     )
