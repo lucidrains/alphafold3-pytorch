@@ -32,12 +32,11 @@ import pandas as pd
 from Bio.Data import PDBData
 from Bio.PDB.NeighborSearch import NeighborSearch
 from loguru import logger
-from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
-from alphafold3_pytorch.utils.utils import exists, np_mode
+from alphafold3_pytorch.utils.utils import np_mode
 
 # Constants
 
@@ -360,79 +359,121 @@ def write_sequences_to_fasta(
 
 
 @typecheck
-def run_clustalo(
+def cluster_sequences_using_mmseqs2(
     input_filepath: str,
-    output_filepath: str,
-    distmat_filepath: str,
+    output_dir: str,
     molecule_type: CLUSTERING_MOLECULE_TYPE,
-):
-    """Run Clustal Omega on the input FASTA file and write the aligned FASTA sequences and corresponding distance matrix to respective output files."""
+    min_seq_id: float = 0.5,
+    coverage: float = 0.8,
+    coverage_mode: Literal[0, 1, 2, 3] = 1,
+    k_mer_length: int = 14,
+    spaced_k_mer_pattern: Optional[str] = None,
+) -> Dict[str, int]:
+    """Run MMseqs2 on the input FASTA file and write the resulting clusters to a local output directory."""
     assert input_filepath.endswith(".fasta"), "The input file must be a FASTA file."
-    assert output_filepath.endswith(".fasta"), "The output file must be a FASTA file."
-    assert distmat_filepath.endswith(".txt"), "The distance matrix file must be a text file."
 
     input_filepath = input_filepath.replace(".fasta", f"_{molecule_type}.fasta")
-    output_filepath = output_filepath.replace(".fasta", f"_{molecule_type}.fasta")
-    distmat_filepath = distmat_filepath.replace(".txt", f"_{molecule_type}.txt")
+    output_db_filepath = os.path.join(output_dir, molecule_type, f"DB_{molecule_type}")
+    tmp_output_dir = os.path.join(output_dir, molecule_type, "tmp")
+    output_cluster_filepath = os.path.join(
+        args.output_dir, molecule_type, f"DB_{molecule_type}_cluster.tsv"
+    )
+    os.makedirs(os.path.join(output_dir, molecule_type), exist_ok=True)
 
     assert os.path.isfile(input_filepath), f"Input file '{input_filepath}' does not exist."
 
-    subprocess.run(
-        [
-            "clustalo",
-            "-i",
-            input_filepath,
-            "-o",
-            output_filepath,
-            f"--distmat-out={distmat_filepath}",
-            "--percent-id",
-            "--full",
-            "--force",
-        ]
+    # Cluster sequences
+    mmseqs_command = [
+        "mmseqs",
+        "easy-cluster",
+        input_filepath,
+        output_db_filepath,
+        tmp_output_dir,
+        "--min-seq-id",
+        str(min_seq_id),
+        "-c",
+        str(coverage),
+        "--cov-mode",
+        str(coverage_mode),
+        "-k",
+        str(k_mer_length),
+    ]
+    if spaced_k_mer_pattern:
+        mmseqs_command.extend(["--spaced-kmer-pattern", spaced_k_mer_pattern])
+    subprocess.run(mmseqs_command)
+    assert os.path.isfile(
+        output_cluster_filepath
+    ), f"Output cluster file '{output_cluster_filepath}' does not exist."
+
+    chain_cluster_mapping = pd.read_csv(
+        output_cluster_filepath,
+        sep="\t",
+        header=None,
+        names=["cluster_rep", "cluster_member"],
     )
+    chain_cluster_mapping["cluster_id"] = pd.factorize(chain_cluster_mapping["cluster_rep"])[0]
+    chain_cluster_mappings = (
+        chain_cluster_mapping[["cluster_member", "cluster_id"]]
+        .set_index("cluster_member")["cluster_id"]
+        .to_dict()
+    )
+
+    # Cache chain cluster mappings to local (CSV) storage
+    local_chain_cluster_mapping = pd.DataFrame(
+        chain_cluster_mapping["cluster_member"]
+        .apply(lambda x: pd.Series((x[:4].split(":")[0], x[4:].split(":")[0], x.split(":")[1])))
+        .values,
+        columns=["pdb_id", "chain_id", "molecule_id"],
+    )
+    local_chain_cluster_mapping["cluster_id"] = chain_cluster_mapping["cluster_id"]
+    local_chain_cluster_mapping.to_csv(
+        os.path.join(output_dir, f"{molecule_type}_chain_cluster_mapping.csv"), index=False
+    )
+
+    return chain_cluster_mappings
 
 
 @typecheck
-def cluster_ligands_by_ccd_code(input_filepath: str, distmat_filepath: str):
-    """Cluster ligands based on their CCD codes and write the resulting sequence distance matrix to a file."""
-    assert input_filepath.endswith(".fasta"), "The input file must be a FASTA file."
-    assert distmat_filepath.endswith(".txt"), "The distance matrix file must be a text file."
+def cluster_ligands_by_ccd_code(
+    all_chain_sequences: CHAIN_SEQUENCES, output_dir: str
+) -> Dict[str, int]:
+    """Cluster ligands based on their CCD codes and write the resulting clusters to a local output directory."""
+    # Parse the ligand sequences from all chain sequences, while clustering them based on their CCD codes
+    chain_cluster_mapping = {}
+    ccd_code_to_cluster_mapping = {}
+    for structure_chain_sequences in tqdm(
+        all_chain_sequences, desc="Clustering ligands by CCD code"
+    ):
+        for structure_id, chain_sequences in structure_chain_sequences.items():
+            for chain_id, sequence in chain_sequences.items():
+                chain_id_, molecule_type_ = chain_id.split(":")
+                molecule_type_and_name = molecule_type_.split("-")
+                if molecule_type_and_name[0] == "ligand":
+                    molecule_index_postfix = (
+                        f"-{molecule_type_and_name[1]}" if len(molecule_type_and_name) == 2 else ""
+                    )
+                    if sequence in ccd_code_to_cluster_mapping:
+                        cluster_id = ccd_code_to_cluster_mapping[sequence]
+                    else:
+                        cluster_id = len(ccd_code_to_cluster_mapping)
+                        ccd_code_to_cluster_mapping[sequence] = cluster_id
+                    chain_cluster_mapping[
+                        f"{structure_id}{chain_id_}:{molecule_type_and_name[0]}{molecule_index_postfix}"
+                    ] = cluster_id
 
-    input_filepath = input_filepath.replace(".fasta", "_ligand.fasta")
-    distmat_filepath = distmat_filepath.replace(".txt", "_ligand.txt")
+    # Cache chain cluster mappings to local (CSV) storage
+    local_chain_cluster_mapping = pd.DataFrame(
+        [
+            (k[:4].split(":")[0], k[4:].split(":")[0], k.split(":")[1], v)
+            for (k, v) in chain_cluster_mapping.items()
+        ],
+        columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
+    )
+    local_chain_cluster_mapping.to_csv(
+        os.path.join(output_dir, "ligand_chain_cluster_mapping.csv"), index=False
+    )
 
-    # Parse the ligand FASTA input file into a dictionary
-    ligands = {}
-    with open(input_filepath, "r") as f:
-        structure_id = None
-        for line in f:
-            if line.startswith(">"):
-                structure_id = line[1:].strip()
-                ligands[structure_id] = ""
-            else:
-                ligands[structure_id] += line.strip()
-
-    # Convert ligands to a list of tuples for easier indexing
-    ligand_structure_ids = list(ligands.keys())
-    ligand_sequences = list(ligands.values())
-    n = len(ligand_structure_ids)
-
-    # Initialize the distance matrix efficiently
-    distance_matrix = np.zeros((n, n))
-
-    # Fill the distance matrix using only the upper triangle (symmetric)
-    for i in range(n):
-        for j in range(i, n):
-            if ligand_sequences[i] == ligand_sequences[j]:
-                distance_matrix[i, j] = 100.0
-                distance_matrix[j, i] = 100.0
-
-    # Write the ligand distance matrix to a NumPy-compatible text file
-    with open(distmat_filepath, "w") as f:
-        f.write(f"{n}\n")
-        for i in range(n):
-            row = [ligand_structure_ids[i]] + list(map(str, distance_matrix[i]))
-            f.write(" ".join(row) + "\n")
+    return chain_cluster_mapping
 
 
 @typecheck
@@ -461,12 +502,13 @@ def cluster_interfaces(
     peptide_chain_cluster_mapping: Dict[str, IntType],
     ligand_chain_cluster_mapping: Dict[str, IntType],
     interface_chain_ids: CHAIN_INTERFACES,
+    output_dir: str,
 ) -> INTERFACE_CLUSTERS:
     """Cluster interfaces based on the cluster IDs of the chains involved."""
     interface_chains_cluster_mapping = {}
     interface_clusters = {}
 
-    for pdb_id in interface_chain_ids:
+    for pdb_id in tqdm(interface_chain_ids, desc="Clustering interfaces"):
         for chain_id_pair in interface_chain_ids[pdb_id]:
             chain_ids = chain_id_pair.split("+")
             chain_clusters = []
@@ -476,6 +518,15 @@ def cluster_interfaces(
                 if "protein" in pdb_chain_id and pdb_chain_id in protein_chain_cluster_mapping:
                     chain_clusters.append(
                         f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id]}"
+                    )
+                elif (
+                    "protein" in pdb_chain_id
+                    and pdb_chain_id.replace("protein", "peptide") in peptide_chain_cluster_mapping
+                ):
+                    # Based on (majority) chain molecule types, handle instances where
+                    # a X-protein (or protein-X) interaction is actually a peptide interaction, e.g., PDB `148l`
+                    chain_clusters.append(
+                        f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('protein', 'peptide')]}"
                     )
                 elif (
                     "nucleic_acid" in pdb_chain_id
@@ -523,6 +574,33 @@ def cluster_interfaces(
                 f"{pdb_id}~{chain_id_pair}"
             ] = f"{chain_cluster_0},{chain_cluster_1}:{interface_cluster_mapping}"
 
+    # Cache interface cluster mappings to local (CSV) storage
+    pd.DataFrame(
+        (
+            (
+                k.split("~")[0],
+                k.split("+")[0].split("~")[-1].split(":")[0],
+                k.split("+")[1].split("~")[-1].split(":")[0],
+                k.split("+")[0].split("~")[-1].split(":")[1],
+                k.split("+")[1].split("~")[-1].split(":")[1],
+                int(v.split(":")[0].split(",")[0]),
+                int(v.split(":")[0].split(",")[1]),
+                int(v.split(":")[1]),
+            )
+            for k, v in interface_cluster_mapping.items()
+        ),
+        columns=[
+            "pdb_id",
+            "interface_chain_id_1",
+            "interface_chain_id_2",
+            "interface_molecule_id_1",
+            "interface_molecule_id_2",
+            "interface_chain_cluster_id_1",
+            "interface_chain_cluster_id_2",
+            "interface_cluster_id",
+        ],
+    ).to_csv(os.path.join(output_dir, "interface_cluster_mapping.csv"), index=False)
+
     return interface_clusters
 
 
@@ -563,9 +641,6 @@ if __name__ == "__main__":
     # Determine paths for intermediate files
 
     fasta_filepath = os.path.join(args.output_dir, "sequences.fasta")
-    aligned_fasta_filepath = os.path.join(args.output_dir, "aligned_sequences.fasta")
-    distmat_filepath = os.path.join(args.output_dir, "distmat.txt")
-
     # Attempt to load existing chain sequences and interfaces from local storage
 
     if os.path.exists(
@@ -648,199 +723,81 @@ if __name__ == "__main__":
             .to_dict()
         )
 
-    # Align sequences separately for each molecule type and compute each respective distance matrix
+    # Cluster sequences separately for each molecule type
 
-    if not all(
+    if not protein_chain_cluster_mapping:
+        protein_molecule_ids = write_sequences_to_fasta(
+            all_chain_sequences, fasta_filepath, molecule_type="protein"
+        )
+        protein_chain_cluster_mapping = cluster_sequences_using_mmseqs2(
+            # Cluster proteins at 40% sequence homology
+            fasta_filepath,
+            args.output_dir,
+            molecule_type="protein",
+            min_seq_id=0.4,
+            coverage=0.8,
+            coverage_mode=0,
+        )
+
+    if not nucleic_acid_chain_cluster_mapping:
+        nucleic_acid_molecule_ids = write_sequences_to_fasta(
+            all_chain_sequences, fasta_filepath, molecule_type="nucleic_acid"
+        )
+        nucleic_acid_chain_cluster_mapping = cluster_sequences_using_mmseqs2(
+            # Cluster nucleic acids at 100% sequence homology
+            fasta_filepath,
+            args.output_dir,
+            molecule_type="nucleic_acid",
+            min_seq_id=1.0,
+            coverage=0.8,
+            coverage_mode=0,
+            # NOTE: The following arguments were taken from: https://github.com/soedinglab/MMseqs2/issues/373#issuecomment-728166556
+            k_mer_length=6,
+            spaced_k_mer_pattern="11011101",
+        )
+
+    if not peptide_chain_cluster_mapping:
+        peptide_molecule_ids = write_sequences_to_fasta(
+            all_chain_sequences, fasta_filepath, molecule_type="peptide"
+        )
+        peptide_chain_cluster_mapping = cluster_sequences_using_mmseqs2(
+            # Cluster peptides at 100% sequence homology
+            fasta_filepath,
+            args.output_dir,
+            molecule_type="peptide",
+            min_seq_id=1.0,
+            coverage=0.8,
+            coverage_mode=0,
+            # NOTE: The following arguments were taken from: https://github.com/soedinglab/MMseqs2/issues/373#issuecomment-728166556
+            k_mer_length=6,
+            spaced_k_mer_pattern="11011101",
+        )
+
+    if not ligand_chain_cluster_mapping:
+        ligand_chain_cluster_mapping = cluster_ligands_by_ccd_code(
+            # Cluster ligands based on their CCD codes (i.e., identical ligands share a cluster)
+            all_chain_sequences,
+            args.output_dir,
+        )
+
+    # Cluster interfaces based on the cluster IDs of the chains involved, and save the interface cluster mapping to local (CSV) storage
+
+    assert all(
         (
             protein_chain_cluster_mapping,
             nucleic_acid_chain_cluster_mapping,
             peptide_chain_cluster_mapping,
             ligand_chain_cluster_mapping,
         )
-    ):
-        protein_molecule_ids = write_sequences_to_fasta(
-            all_chain_sequences, fasta_filepath, molecule_type="protein"
-        )
-        nucleic_acid_molecule_ids = write_sequences_to_fasta(
-            all_chain_sequences, fasta_filepath, molecule_type="nucleic_acid"
-        )
-        peptide_molecule_ids = write_sequences_to_fasta(
-            all_chain_sequences, fasta_filepath, molecule_type="peptide"
-        )
-        ligand_molecule_ids = write_sequences_to_fasta(
-            all_chain_sequences, fasta_filepath, molecule_type="ligand"
-        )
+    ), "All molecule type-specific chain cluster mappings must be available to cluster interfaces."
 
-        run_clustalo(
-            fasta_filepath,
-            aligned_fasta_filepath,
-            distmat_filepath,
-            molecule_type="protein",
-        )
-        run_clustalo(
-            fasta_filepath,
-            aligned_fasta_filepath,
-            distmat_filepath,
-            molecule_type="nucleic_acid",
-        )
-        run_clustalo(
-            fasta_filepath,
-            aligned_fasta_filepath,
-            distmat_filepath,
-            molecule_type="peptide",
-        )
-        cluster_ligands_by_ccd_code(
-            fasta_filepath,
-            distmat_filepath,
-        )
-
-        protein_dist_matrix = read_distance_matrix(distmat_filepath, molecule_type="protein")
-        nucleic_acid_dist_matrix = read_distance_matrix(
-            distmat_filepath, molecule_type="nucleic_acid"
-        )
-        peptide_dist_matrix = read_distance_matrix(distmat_filepath, molecule_type="peptide")
-        ligand_dist_matrix = read_distance_matrix(distmat_filepath, molecule_type="ligand")
-
-        # Cluster residues at sequence homology levels corresponding to each molecule type
-
-        protein_cluster_labels = (
-            # Cluster proteins at 40% sequence homology
-            AgglomerativeClustering(
-                n_clusters=None,
-                distance_threshold=60.0 + 1e-6,
-                metric="precomputed",
-                linkage="complete",
-            ).fit_predict(protein_dist_matrix)
-            if exists(protein_dist_matrix)
-            else None
-        )
-
-        nucleic_acid_cluster_labels = (
-            # Cluster nucleic acids at 100% sequence homology
-            AgglomerativeClustering(
-                n_clusters=None, distance_threshold=1e-6, metric="precomputed", linkage="complete"
-            ).fit_predict(nucleic_acid_dist_matrix)
-            if exists(nucleic_acid_dist_matrix)
-            else None
-        )
-
-        peptide_cluster_labels = (
-            # Cluster peptides at 100% sequence homology
-            AgglomerativeClustering(
-                n_clusters=None, distance_threshold=1e-6, metric="precomputed", linkage="complete"
-            ).fit_predict(peptide_dist_matrix)
-            if exists(peptide_dist_matrix)
-            else None
-        )
-
-        ligand_cluster_labels = (
-            # Cluster ligands based on their CCD codes (i.e., identical ligands share a cluster)
-            AgglomerativeClustering(
-                n_clusters=None, distance_threshold=1e-6, metric="precomputed", linkage="complete"
-            ).fit_predict(ligand_dist_matrix)
-            if exists(ligand_dist_matrix)
-            else None
-        )
-
-        # Map PDB IDs and their constituent chain and molecule IDs to (molecule type-specific) cluster IDs, and save the mappings to local (CSV) storage
-
-        protein_chain_cluster_mapping = (
-            dict(zip(protein_molecule_ids, protein_cluster_labels))
-            if exists(protein_cluster_labels)
-            else {}
-        )
-        nucleic_acid_chain_cluster_mapping = (
-            dict(zip(nucleic_acid_molecule_ids, nucleic_acid_cluster_labels))
-            if exists(nucleic_acid_cluster_labels)
-            else {}
-        )
-        peptide_chain_cluster_mapping = (
-            dict(zip(peptide_molecule_ids, peptide_cluster_labels))
-            if exists(peptide_cluster_labels)
-            else {}
-        )
-        ligand_chain_cluster_mapping = (
-            dict(zip(ligand_molecule_ids, ligand_cluster_labels))
-            if exists(ligand_cluster_labels)
-            else {}
-        )
-
-        if protein_chain_cluster_mapping:
-            pd.DataFrame(
-                (
-                    (k.split(":")[0][:4], k.split(":")[0][4:], k.split(":")[1], v)
-                    for k, v in protein_chain_cluster_mapping.items()
-                ),
-                columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
-            ).to_csv(
-                os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv"), index=False
-            )
-        if nucleic_acid_chain_cluster_mapping:
-            pd.DataFrame(
-                (
-                    (k.split(":")[0][:4], k.split(":")[0][4:], k.split(":")[1], v)
-                    for k, v in nucleic_acid_chain_cluster_mapping.items()
-                ),
-                columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
-            ).to_csv(
-                os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv"),
-                index=False,
-            )
-        if peptide_chain_cluster_mapping:
-            pd.DataFrame(
-                (
-                    (k.split(":")[0][:4], k.split(":")[0][4:], k.split(":")[1], v)
-                    for k, v in peptide_chain_cluster_mapping.items()
-                ),
-                columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
-            ).to_csv(
-                os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv"), index=False
-            )
-        if ligand_chain_cluster_mapping:
-            pd.DataFrame(
-                (
-                    (k.split(":")[0][:4], k.split(":")[0][4:], k.split(":")[1], v)
-                    for k, v in ligand_chain_cluster_mapping.items()
-                ),
-                columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
-            ).to_csv(
-                os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv"), index=False
-            )
-
-    # Cluster interfaces based on the cluster IDs of the chains involved, and save the interface cluster mapping to local (CSV) storage
-
-    interface_cluster_mapping = cluster_interfaces(
+    cluster_interfaces(
         protein_chain_cluster_mapping,
         nucleic_acid_chain_cluster_mapping,
         peptide_chain_cluster_mapping,
         ligand_chain_cluster_mapping,
         interface_chain_ids,
+        args.output_dir,
     )
-
-    pd.DataFrame(
-        (
-            (
-                k.split("~")[0],
-                k.split("+")[0].split("~")[-1].split(":")[0],
-                k.split("+")[1].split("~")[-1].split(":")[0],
-                k.split("+")[0].split("~")[-1].split(":")[1],
-                k.split("+")[1].split("~")[-1].split(":")[1],
-                int(v.split(":")[0].split(",")[0]),
-                int(v.split(":")[0].split(",")[1]),
-                int(v.split(":")[1]),
-            )
-            for k, v in interface_cluster_mapping.items()
-        ),
-        columns=[
-            "pdb_id",
-            "interface_chain_id_1",
-            "interface_chain_id_2",
-            "interface_molecule_id_1",
-            "interface_molecule_id_2",
-            "interface_chain_cluster_id_1",
-            "interface_chain_cluster_id_2",
-            "interface_cluster_id",
-        ],
-    ).to_csv(os.path.join(args.output_dir, "interface_cluster_mapping.csv"), index=False)
 
 # %%
