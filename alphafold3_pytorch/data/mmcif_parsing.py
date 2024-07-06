@@ -5,6 +5,7 @@ import functools
 import io
 import logging
 from collections import defaultdict
+from operator import itemgetter
 from typing import Any, Mapping, Optional, Sequence, Set, Tuple
 
 from Bio import PDB
@@ -645,3 +646,71 @@ def _get_complex_chains(
 def _is_set(data: str) -> bool:
     """Returns False if data is a special mmCIF character indicating 'unset'."""
     return data not in (".", "?")
+
+
+def parse_mmcif_object(
+    filepath: str, file_id: str, auth_chains: bool = True, auth_residues: bool = True
+) -> MmcifObject:
+    """Parse an mmCIF file into an `MmcifObject` containing a BioPython `Structure` object as well as associated metadata."""
+    with open(filepath, "r") as f:
+        mmcif_string = f.read()
+
+    parsing_result = parse(
+        file_id=file_id,
+        mmcif_string=mmcif_string,
+        auth_chains=auth_chains,
+        auth_residues=auth_residues,
+    )
+
+    # Crash if an error is encountered. Any parsing errors should have
+    # been dealt with beforehand (e.g., at the alignment stage).
+    if parsing_result.mmcif_object is None:
+        raise list(parsing_result.errors.values())[0]
+
+    return parsing_result.mmcif_object
+
+
+def filter_mmcif(mmcif_object: MmcifObject) -> MmcifObject:
+    """Filter an `MmcifObject` based on collected (atom/residue/chain) removal sets."""
+    model = mmcif_object.structure
+
+    # Filter out specified chains
+    chains_to_remove = set()
+
+    for chain in model:
+        # Filter out specified residues
+        residues_to_remove = set()
+        assert len(chain) == len(mmcif_object.chem_comp_details[chain.id]), (
+            f"Number of residues in chain {chain.id} does not match "
+            f"number of chemical component details for this chain: {len(chain)} vs. "
+            f"{len(mmcif_object.chem_comp_details[chain.id])}."
+        )
+        for res_index, residue in enumerate(chain):
+            # Filter out specified atoms
+            atoms_to_remove = set()
+            for atom in residue:
+                if atom.get_full_id() in mmcif_object.atoms_to_remove:
+                    atoms_to_remove.add(atom)
+            if len(atoms_to_remove) == len(residue):
+                residues_to_remove.add((res_index, residue))
+            for atom in atoms_to_remove:
+                residue.detach_child(atom.id)
+            if residue.get_full_id() in mmcif_object.residues_to_remove:
+                residues_to_remove.add((res_index, residue))
+        if len(residues_to_remove) == len(chain):
+            chains_to_remove.add(chain)
+        for res_index, residue in sorted(residues_to_remove, key=itemgetter(0), reverse=True):
+            del mmcif_object.chem_comp_details[chain.id][res_index]
+            chain.detach_child(residue.id)
+        if chain.get_full_id() in mmcif_object.chains_to_remove:
+            chains_to_remove.add(chain)
+
+    for chain in chains_to_remove:
+        model.detach_child(chain.id)
+        mmcif_object.chem_comp_details.pop(chain.id)
+
+    mmcif_object.atoms_to_remove.clear()
+    mmcif_object.residues_to_remove.clear()
+    mmcif_object.chains_to_remove.clear()
+
+    return mmcif_object

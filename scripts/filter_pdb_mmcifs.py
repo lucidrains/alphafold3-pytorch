@@ -47,11 +47,6 @@ from pdbeccdutils.core import ccd_reader
 from pdbeccdutils.core.ccd_reader import CCDReaderResult
 from tqdm.contrib.concurrent import process_map
 
-from alphafold3_pytorch.common.biomolecule import (
-    _from_mmcif_object,
-    get_residue_constants,
-    to_mmcif,
-)
 from alphafold3_pytorch.common.paper_constants import (
     CRYSTALLOGRAPHY_METHODS,
     LIGAND_EXCLUSION_SET,
@@ -59,6 +54,7 @@ from alphafold3_pytorch.common.paper_constants import (
     PROTEIN_RESIDUE_CENTER_ATOMS,
 )
 from alphafold3_pytorch.data import mmcif_parsing
+from alphafold3_pytorch.data import mmcif_writing
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject
 from alphafold3_pytorch.utils.data_utils import (
     get_biopython_chain_residue_by_composite_id,
@@ -75,29 +71,6 @@ FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT = (
 )
 
 # Helper functions
-
-
-@typecheck
-def parse_mmcif_object(
-    filepath: str, file_id: str, auth_chains: bool = True, auth_residues: bool = True
-) -> MmcifObject:
-    """Parse an mmCIF file into an `MmcifObject` containing a BioPython `Structure` object as well as associated metadata."""
-    with open(filepath, "r") as f:
-        mmcif_string = f.read()
-
-    parsing_result = mmcif_parsing.parse(
-        file_id=file_id,
-        mmcif_string=mmcif_string,
-        auth_chains=auth_chains,
-        auth_residues=auth_residues,
-    )
-
-    # Crash if an error is encountered. Any parsing errors should have
-    # been dealt with beforehand (e.g., at the alignment stage).
-    if parsing_result.mmcif_object is None:
-        raise list(parsing_result.errors.values())[0]
-
-    return parsing_result.mmcif_object
 
 
 @typecheck
@@ -602,98 +575,6 @@ def remove_crystallization_aids(
 
 
 @typecheck
-def filter_mmcif(mmcif_object: MmcifObject) -> MmcifObject:
-    """Filter an `MmcifObject` based on collected (atom/residue/chain) removal sets."""
-    model = mmcif_object.structure
-
-    # Filter out specified chains
-    chains_to_remove = set()
-
-    for chain in model:
-        # Filter out specified residues
-        residues_to_remove = set()
-        assert len(chain) == len(mmcif_object.chem_comp_details[chain.id]), (
-            f"Number of residues in chain {chain.id} does not match "
-            f"number of chemical component details for this chain: {len(chain)} vs. "
-            f"{len(mmcif_object.chem_comp_details[chain.id])}."
-        )
-        for res_index, residue in enumerate(chain):
-            # Filter out specified atoms
-            atoms_to_remove = set()
-            for atom in residue:
-                if atom.get_full_id() in mmcif_object.atoms_to_remove:
-                    atoms_to_remove.add(atom)
-            if len(atoms_to_remove) == len(residue):
-                residues_to_remove.add((res_index, residue))
-            for atom in atoms_to_remove:
-                residue.detach_child(atom.id)
-            if residue.get_full_id() in mmcif_object.residues_to_remove:
-                residues_to_remove.add((res_index, residue))
-        if len(residues_to_remove) == len(chain):
-            chains_to_remove.add(chain)
-        for res_index, residue in sorted(residues_to_remove, key=itemgetter(0), reverse=True):
-            del mmcif_object.chem_comp_details[chain.id][res_index]
-            chain.detach_child(residue.id)
-        if chain.get_full_id() in mmcif_object.chains_to_remove:
-            chains_to_remove.add(chain)
-
-    for chain in chains_to_remove:
-        model.detach_child(chain.id)
-        mmcif_object.chem_comp_details.pop(chain.id)
-
-    mmcif_object.atoms_to_remove.clear()
-    mmcif_object.residues_to_remove.clear()
-    mmcif_object.chains_to_remove.clear()
-
-    return mmcif_object
-
-
-@typecheck
-def get_unique_res_atom_names(mmcif_object: MmcifObject) -> List[List[List[str]]]:
-    """Get atom names for each (e.g. ligand) "pseudoresidue" of each residue in each chain."""
-    unique_res_atom_names = []
-    for chain in mmcif_object.structure:
-        chain_chem_comp = mmcif_object.chem_comp_details[chain.id]
-        for res, res_chem_comp in zip(chain, chain_chem_comp):
-            is_polymer_residue = is_polymer(res_chem_comp.type)
-            residue_constants = get_residue_constants(res_chem_type=res_chem_comp.type)
-            if is_polymer_residue:
-                # For polymer residues, append the atom types directly.
-                atoms_to_append = [residue_constants.atom_types]
-            else:
-                # For non-polymer residues, create a nested list of atom names.
-                atoms_to_append = [
-                    [atom.name for _ in range(residue_constants.atom_type_num)] for atom in res
-                ]
-            unique_res_atom_names.append(atoms_to_append)
-    return unique_res_atom_names
-
-
-@typecheck
-def write_mmcif(
-    mmcif_object: MmcifObject,
-    output_filepath: str,
-    gapless_poly_seq: bool = True,
-    insert_orig_atom_names: bool = True,
-    insert_alphafold_mmcif_metadata: bool = True,
-):
-    """Write a BioPython `Structure` object to an mmCIF file using an intermediate `Biomolecule` object."""
-    biomol = _from_mmcif_object(mmcif_object)
-    unique_res_atom_names = (
-        get_unique_res_atom_names(mmcif_object) if insert_orig_atom_names else None
-    )
-    mmcif_string = to_mmcif(
-        biomol,
-        mmcif_object.file_id,
-        gapless_poly_seq=gapless_poly_seq,
-        insert_alphafold_mmcif_metadata=insert_alphafold_mmcif_metadata,
-        unique_res_atom_names=unique_res_atom_names,
-    )
-    with open(output_filepath, "w") as f:
-        f.write(mmcif_string)
-
-
-@typecheck
 @timeout_decorator.timeout(FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT, use_signals=False)
 def filter_structure_with_timeout(filepath: str, output_dir: str):
     """
@@ -708,7 +589,7 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
     os.makedirs(output_file_dir, exist_ok=True)
 
     # Filtering of targets
-    mmcif_object = parse_mmcif_object(filepath, file_id)
+    mmcif_object = mmcif_parsing.parse_mmcif_object(filepath, file_id)
     mmcif_object = prefilter_target(mmcif_object)
     if not exists(mmcif_object):
         logger.info(f"Skipping target due to prefiltering: {file_id}")
@@ -734,8 +615,8 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
     mmcif_object = remove_crystallization_aids(mmcif_object, CRYSTALLOGRAPHY_METHODS)
     if len(mmcif_object.chains_to_remove) < len(mmcif_object.structure):
         # Save a filtered structure as an mmCIF file along with its latest metadata
-        mmcif_object = filter_mmcif(mmcif_object)
-        write_mmcif(
+        mmcif_object = mmcif_parsing.filter_mmcif(mmcif_object)
+        mmcif_writing.write_mmcif(
             mmcif_object,
             output_filepath,
             gapless_poly_seq=True,

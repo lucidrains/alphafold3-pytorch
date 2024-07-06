@@ -35,9 +35,9 @@ from loguru import logger
 from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 
+from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
 from alphafold3_pytorch.utils.utils import exists, np_mode
-from scripts.filter_pdb_mmcifs import parse_mmcif_object
 
 # Constants
 
@@ -170,7 +170,7 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
     """
     assert filepath.endswith(".cif"), "The input file must be an mmCIF file."
     file_id = os.path.splitext(os.path.basename(filepath))[0]
-    mmcif_object = parse_mmcif_object(filepath, file_id)
+    mmcif_object = mmcif_parsing.parse_mmcif_object(filepath, file_id)
     model = mmcif_object.structure
 
     # NOTE: After dataset filtering, only heavy (non-hydrogen) atoms remain in the structure
@@ -707,7 +707,7 @@ if __name__ == "__main__":
             # Cluster proteins at 40% sequence homology
             AgglomerativeClustering(
                 n_clusters=None,
-                distance_threshold=40.0 + 1e-6,
+                distance_threshold=60.0 + 1e-6,
                 metric="precomputed",
                 linkage="complete",
             ).fit_predict(protein_dist_matrix)
