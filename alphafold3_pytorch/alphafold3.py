@@ -3071,9 +3071,7 @@ class Alphafold3(Module):
         # residue or nucleotide modifications
 
         num_molecule_mods = default(num_molecule_mods, 0)
-
         has_molecule_mod_embeds = num_molecule_mods > 0
-        self.num_molecule_mods = num_molecule_mods
 
         if has_molecule_mod_embeds:
             self.molecule_mod_embeds = nn.Embedding(num_molecule_mods, dim_single)
@@ -3233,6 +3231,11 @@ class Alphafold3(Module):
 
         self.register_buffer('zero', torch.tensor(0.), persistent = False)
 
+        # some shorthand for jaxtyping
+
+        self.dapi = self.dim_atompair_inputs
+        self.dai = self.dim_atom_inputs
+
     @property
     def device(self):
         return self.zero.device
@@ -3309,8 +3312,8 @@ class Alphafold3(Module):
     def forward(
         self,
         *,
-        atom_inputs: Float['b m dai'],
-        atompair_inputs: Float['b m m dapi'] | Float['b nw w1 w2 dapi'],
+        atom_inputs: Float['b m {self.dai}'],
+        atompair_inputs: Float['b m m {self.dapi}'] | Float['b nw w1 w2 {self.dapi}'],
         additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         molecule_atom_lens: Int['b n'],
@@ -3318,7 +3321,7 @@ class Alphafold3(Module):
         additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
-        is_molecule_mod: Bool['b n {self.num_molecule_mods}'] | None = None,
+        is_molecule_mod: Bool['b n num_mods'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,

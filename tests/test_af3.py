@@ -473,6 +473,7 @@ def test_alphafold3(
         atoms_per_window = atoms_per_window,
         dim_template_feats = 44,
         num_dist_bins = 38,
+        num_molecule_mods = num_molecule_mods,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
         ),
