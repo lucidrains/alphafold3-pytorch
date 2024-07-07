@@ -3233,6 +3233,7 @@ class Alphafold3(Module):
 
         # some shorthand for jaxtyping
 
+        self.w = atoms_per_window
         self.dapi = self.dim_atompair_inputs
         self.dai = self.dim_atom_inputs
 
@@ -3313,14 +3314,14 @@ class Alphafold3(Module):
         self,
         *,
         atom_inputs: Float['b m {self.dai}'],
-        atompair_inputs: Float['b m m {self.dapi}'] | Float['b nw w1 w2 {self.dapi}'],
+        atompair_inputs: Float['b m m {self.dapi}'] | Float['b nw {self.w} {self.w*2} {self.dapi}'],
         additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}'],
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n'],
         additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
         atom_ids: Int['b m'] | None = None,
-        atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
+        atompair_ids: Int['b m m'] | Int['b nw {self.w} {self.w*2}'] | None = None,
         is_molecule_mod: Bool['b n num_mods'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
