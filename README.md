@@ -123,6 +123,75 @@ sampled_atom_pos = alphafold3(
 sampled_atom_pos.shape # (2, <atom_seqlen>, 3)
 ```
 
+An example with molecule level input handling
+
+```python
+import torch
+
+from alphafold3_pytorch import (
+    Alphafold3,
+    Alphafold3Input,
+    alphafold3_inputs_to_batched_atom_input
+)
+
+contrived_protein = 'AG'
+
+mock_atompos = [
+    torch.randn(6, 3),   # alanine has 6 non-hydrogen atoms
+    torch.randn(5, 3)    # glycine has 5 non-hydrogen atoms
+]
+
+train_alphafold3_input = Alphafold3Input(
+    proteins = [contrived_protein],
+    atom_pos = mock_atompos
+)
+
+eval_alphafold3_input = Alphafold3Input(
+    proteins = [contrived_protein]
+)
+
+batched_atom_input = alphafold3_inputs_to_batched_atom_input(train_alphafold3_input, atoms_per_window = 27)
+
+# training
+
+alphafold3 = Alphafold3(
+    dim_atom_inputs = 3,
+    dim_atompair_inputs = 1,
+    atoms_per_window = 27,
+    dim_template_feats = 44,
+    num_dist_bins = 38,
+    confidence_head_kwargs = dict(
+        pairformer_depth = 1
+    ),
+    template_embedder_kwargs = dict(
+        pairformer_stack_depth = 1
+    ),
+    msa_module_kwargs = dict(
+        depth = 1
+    ),
+    pairformer_stack = dict(
+        depth = 2
+    ),
+    diffusion_module_kwargs = dict(
+        atom_encoder_depth = 1,
+        token_transformer_depth = 1,
+        atom_decoder_depth = 1,
+    )
+)
+
+loss = alphafold3(**batched_atom_input.dict())
+loss.backward()
+
+# sampling
+
+batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
+
+alphafold3.eval()
+sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
+
+assert sampled_atom_pos.shape == (1, (6 + 5), 3)
+```
+
 ## Data preparation
 
 ### PDB dataset curation
