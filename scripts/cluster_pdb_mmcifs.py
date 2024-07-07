@@ -477,25 +477,6 @@ def cluster_ligands_by_ccd_code(
 
 
 @typecheck
-def read_distance_matrix(
-    distmat_filepath: str,
-    molecule_type: CLUSTERING_MOLECULE_TYPE,
-) -> Optional[np.ndarray]:
-    """Read a distance matrix from a file and return it as a NumPy array."""
-    assert distmat_filepath.endswith(".txt"), "The distance matrix file must be a text file."
-    distmat_filepath = distmat_filepath.replace(".txt", f"_{molecule_type}.txt")
-    if not os.path.isfile(distmat_filepath):
-        logger.warning(f"Distance matrix file '{distmat_filepath}' does not exist.")
-        return None
-
-    # Convert sequence matching percentages to distances through complementation
-    df = pd.read_csv(distmat_filepath, sep="\s+", header=None, skiprows=1)
-    matrix = 100.0 - df.values[:, 1:].astype(float) if len(df) > 0 else None
-
-    return matrix
-
-
-@typecheck
 def map_pdb_chain_id_to_chain_cluster_id(
     pdb_chain_id: str,
     molecule_id: str,
