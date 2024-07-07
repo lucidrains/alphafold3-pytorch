@@ -2967,6 +2967,7 @@ class Alphafold3(Module):
         num_molecule_types: int = 32,       # restype in additional residue information, apparently 32 (must be human amino acids + nucleotides + something else)
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
+        num_molecule_mods: int | None = None,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
@@ -3063,6 +3064,16 @@ class Alphafold3(Module):
 
         self.has_atom_embeds = has_atom_embeds
         self.has_atompair_embeds = has_atompair_embeds
+
+        # residue or nucleotide modifications
+
+        has_molecule_mod_embeds = num_molecule_mods > 0
+        self.num_molecule_mods = num_molecule_mods
+
+        if has_molecule_mod_embeds:
+            self.molecule_mod_embeds = nn.Embedding(num_molecule_mods, dim_single)
+
+        self.has_molecule_mod_embeds = has_molecule_mod_embeds
 
         # atoms per window
 
@@ -3302,6 +3313,7 @@ class Alphafold3(Module):
         additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw w1 w2'] | None = None,
+        is_molecule_mod: Bool['b n {self.num_molecule_mods}'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,
@@ -3400,6 +3412,26 @@ class Alphafold3(Module):
                 atompair_embeds = full_pairwise_repr_to_windowed(atompair_embeds, window_size = self.atoms_per_window)
 
             atompair_feats = atompair_feats + atompair_embeds
+
+        # handle maybe molecule modifications
+
+        assert not (exists(is_molecule_mod) ^ self.has_molecule_mod_embeds), 'you either set `num_molecule_mods` and did not pass in `is_molecule_mod` or vice versa'
+
+        if self.has_molecule_mod_embeds:
+            single_init, seq_packed_shape = pack_one(single_init, '* ds')
+
+            is_molecule_mod, _ = pack_one(is_molecule_mod, '* mods')
+
+            if not is_molecule_mod.is_sparse:
+                is_molecule_mod = is_molecule_mod.to_sparse()
+
+            seq_indices, mod_id = is_molecule_mod.indices()
+            scatter_values = self.molecule_mod_embeds(mod_id)
+
+            seq_indices = repeat(seq_indices, 'n -> n ds', ds = single_init.shape[-1])
+            single_init = single_init.scatter_add(0, seq_indices, scatter_values)
+
+            single_init = unpack_one(single_init, seq_packed_shape, '* ds')
 
         # relative positional encoding
 

@@ -418,10 +418,12 @@ def test_distogram_head():
 @pytest.mark.parametrize('window_atompair_inputs', (True, False))
 @pytest.mark.parametrize('stochastic_frame_average', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
+@pytest.mark.parametrize('num_molecule_mods', (0, 5))
 def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool,
-    atom_transformer_intramolecular_attn: bool
+    atom_transformer_intramolecular_attn: bool,
+    num_molecule_mods: int
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -442,6 +444,10 @@ def test_alphafold3(
     additional_token_feats = torch.randn(2, 16, 2)
     is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    is_molecule_mod = None
+    if num_molecule_mods > 0:
+        is_molecule_mod = torch.zeros(2, seq_len, num_molecule_mods).uniform_(0, 1) < 0.1
 
     atom_parent_ids = None
 
@@ -495,6 +501,7 @@ def test_alphafold3(
         atom_parent_ids = atom_parent_ids,
         atompair_inputs = atompair_inputs,
         is_molecule_types = is_molecule_types,
+        is_molecule_mod = is_molecule_mod,
         additional_molecule_feats = additional_molecule_feats,
         additional_token_feats = additional_token_feats,
         token_bonds = token_bonds,
@@ -519,6 +526,7 @@ def test_alphafold3(
         atom_inputs = atom_inputs,
         molecule_ids = molecule_ids,
         molecule_atom_lens = molecule_atom_lens,
+        is_molecule_mod = is_molecule_mod,
         atompair_inputs = atompair_inputs,
         is_molecule_types = is_molecule_types,
         additional_molecule_feats = additional_molecule_feats,
