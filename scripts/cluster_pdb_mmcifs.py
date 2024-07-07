@@ -366,7 +366,7 @@ def cluster_sequences_using_mmseqs2(
     min_seq_id: float = 0.5,
     coverage: float = 0.8,
     coverage_mode: Literal[0, 1, 2, 3] = 1,
-    k_mer_length: int = 14,
+    k_mer_length: Optional[int] = None,
     spaced_k_mer_pattern: Optional[str] = None,
 ) -> Dict[str, int]:
     """Run MMseqs2 on the input FASTA file and write the resulting clusters to a local output directory."""
@@ -395,9 +395,9 @@ def cluster_sequences_using_mmseqs2(
         str(coverage),
         "--cov-mode",
         str(coverage_mode),
-        "-k",
-        str(k_mer_length),
     ]
+    if k_mer_length:
+        mmseqs_command.extend(["-k", str(k_mer_length)])
     if spaced_k_mer_pattern:
         mmseqs_command.extend(["--spaced-kmer-pattern", spaced_k_mer_pattern])
     subprocess.run(mmseqs_command)
@@ -496,6 +496,58 @@ def read_distance_matrix(
 
 
 @typecheck
+def map_pdb_chain_id_to_chain_cluster_id(
+    pdb_chain_id: str,
+    molecule_id: str,
+    protein_chain_cluster_mapping: Dict[str, IntType],
+    nucleic_acid_chain_cluster_mapping: Dict[str, IntType],
+    peptide_chain_cluster_mapping: Dict[str, IntType],
+    ligand_chain_cluster_mapping: Dict[str, IntType],
+) -> str:
+    """Map a PDB chain ID and molecule ID to a chain cluster ID based on the chain's (majority) molecule type."""
+    if "protein" in pdb_chain_id and pdb_chain_id in protein_chain_cluster_mapping:
+        chain_cluster = f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id]}"
+    elif (
+        "protein" in pdb_chain_id
+        and pdb_chain_id.replace("protein", "peptide") in peptide_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-protein (or protein-X) interaction is actually a peptide interaction, e.g., PDB `148l`
+        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('protein', 'peptide')]}"
+    elif (
+        "protein" in pdb_chain_id
+        and pdb_chain_id.replace("protein", "nucleic_acid") in nucleic_acid_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-protein (or protein-X) interaction is actually a nucleic acid interaction, e.g., PDB `1b23`
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('protein', 'nucleic_acid')]}"
+    elif "nucleic_acid" in pdb_chain_id and pdb_chain_id in nucleic_acid_chain_cluster_mapping:
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id]}"
+    elif (
+        "nucleic_acid" in pdb_chain_id
+        and pdb_chain_id.replace("nucleic_acid", "protein") in protein_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-nucleic acid (or nucleic acid-X) interaction is actually a protein interaction, e.g., PDB `3a1s`
+        chain_cluster = f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id.replace('nucleic_acid', 'protein')]}"
+    elif (
+        "nucleic_acid" in pdb_chain_id
+        and pdb_chain_id.replace("nucleic_acid", "peptide") in peptide_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-nucleic acid (or nucleic acid-X) interaction is actually a peptide interaction, e.g., PDB `2aiz`
+        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('nucleic_acid', 'peptide')]}"
+    elif "peptide" in pdb_chain_id and pdb_chain_id in peptide_chain_cluster_mapping:
+        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id]}"
+    elif "ligand" in pdb_chain_id and pdb_chain_id in ligand_chain_cluster_mapping:
+        chain_cluster = f"{molecule_id}-cluster-{ligand_chain_cluster_mapping[pdb_chain_id]}"
+    else:
+        raise ValueError(f"Chain {pdb_chain_id} not found in any chain cluster mapping.")
+
+    return chain_cluster
+
+
+@typecheck
 def cluster_interfaces(
     protein_chain_cluster_mapping: Dict[str, IntType],
     nucleic_acid_chain_cluster_mapping: Dict[str, IntType],
@@ -515,38 +567,16 @@ def cluster_interfaces(
             for chain_id in chain_ids:
                 pdb_chain_id = f"{pdb_id}{chain_id}"
                 molecule_id = chain_id.split(":")[-1]
-                if "protein" in pdb_chain_id and pdb_chain_id in protein_chain_cluster_mapping:
-                    chain_clusters.append(
-                        f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id]}"
+                chain_clusters.append(
+                    map_pdb_chain_id_to_chain_cluster_id(
+                        pdb_chain_id,
+                        molecule_id,
+                        protein_chain_cluster_mapping,
+                        nucleic_acid_chain_cluster_mapping,
+                        peptide_chain_cluster_mapping,
+                        ligand_chain_cluster_mapping,
                     )
-                elif (
-                    "protein" in pdb_chain_id
-                    and pdb_chain_id.replace("protein", "peptide") in peptide_chain_cluster_mapping
-                ):
-                    # Based on (majority) chain molecule types, handle instances where
-                    # a X-protein (or protein-X) interaction is actually a peptide interaction, e.g., PDB `148l`
-                    chain_clusters.append(
-                        f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('protein', 'peptide')]}"
-                    )
-                elif (
-                    "nucleic_acid" in pdb_chain_id
-                    and pdb_chain_id in nucleic_acid_chain_cluster_mapping
-                ):
-                    chain_clusters.append(
-                        f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id]}"
-                    )
-                elif "peptide" in pdb_chain_id and pdb_chain_id in peptide_chain_cluster_mapping:
-                    chain_clusters.append(
-                        f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id]}"
-                    )
-                elif "ligand" in pdb_chain_id and pdb_chain_id in ligand_chain_cluster_mapping:
-                    chain_clusters.append(
-                        f"{molecule_id}-cluster-{ligand_chain_cluster_mapping[pdb_chain_id]}"
-                    )
-                else:
-                    raise ValueError(
-                        f"Chain {pdb_chain_id} not found in any cluster mapping for PDB ID {pdb_id}."
-                    )
+                )
             # Ensure that each interface cluster is unique
             if (
                 len(chain_clusters) == 2
@@ -587,7 +617,7 @@ def cluster_interfaces(
                 int(v.split(":")[0].split(",")[1]),
                 int(v.split(":")[1]),
             )
-            for k, v in interface_cluster_mapping.items()
+            for k, v in interface_clusters.items()
         ),
         columns=[
             "pdb_id",
