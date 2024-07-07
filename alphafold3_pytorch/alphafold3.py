@@ -3053,8 +3053,11 @@ class Alphafold3(Module):
 
         # optional atom and atom bond embeddings
 
-        has_atom_embeds = exists(num_atom_embeds)
-        has_atompair_embeds = exists(num_atompair_embeds)
+        num_atom_embeds = default(num_atom_embeds, 0)
+        num_atompair_embeds = default(num_atompair_embeds, 0)
+
+        has_atom_embeds = num_atom_embeds > 0
+        has_atompair_embeds = num_atompair_embeds > 0
 
         if has_atom_embeds:
             self.atom_embeds = nn.Embedding(num_atom_embeds, dim_atom)
@@ -3066,6 +3069,8 @@ class Alphafold3(Module):
         self.has_atompair_embeds = has_atompair_embeds
 
         # residue or nucleotide modifications
+
+        num_molecule_mods = default(num_molecule_mods, 0)
 
         has_molecule_mod_embeds = num_molecule_mods > 0
         self.num_molecule_mods = num_molecule_mods
