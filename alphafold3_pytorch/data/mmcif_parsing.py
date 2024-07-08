@@ -291,9 +291,9 @@ def parse(
                 min([monomer.num for monomer in seq]),
             )
 
-        # Loop over the atoms for which we have coordinates. Populate a mapping:
+        # Loop over the atoms for which we have coordinates. Populate two mappings:
         # -mmcif_seq_to_structure_mappings (maps mmCIF idx into sequence to author ResidueAtPosition).
-        # -author_entity_to_chain_mappings (maps author chain ids to entity ids).
+        # -mmcif_entity_to_author_chain_mappings (maps entity number to author chain IDs).
         mmcif_seq_to_structure_mappings = {}
         mmcif_entity_to_author_chain_mappings = defaultdict(dict)
         for atom in atom_site_list:

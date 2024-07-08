@@ -53,8 +53,7 @@ from alphafold3_pytorch.common.paper_constants import (
     NUCLEIC_ACID_RESIDUE_CENTER_ATOMS,
     PROTEIN_RESIDUE_CENTER_ATOMS,
 )
-from alphafold3_pytorch.data import mmcif_parsing
-from alphafold3_pytorch.data import mmcif_writing
+from alphafold3_pytorch.data import mmcif_parsing, mmcif_writing
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject
 from alphafold3_pytorch.utils.data_utils import (
     get_biopython_chain_residue_by_composite_id,
@@ -75,13 +74,17 @@ FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT = (
 
 @typecheck
 def filter_pdb_release_date(
-    mmcif_object: MmcifObject, cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30")
+    mmcif_object: MmcifObject,
+    min_cutoff_date: pd.Timestamp = pd.to_datetime("1970-01-01"),
+    max_cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30"),
 ) -> bool:
     """Filter based on PDB release date."""
     return (
         "release_date" in mmcif_object.header
         and exists(mmcif_object.header["release_date"])
-        and pd.to_datetime(mmcif_object.header["release_date"]) <= cutoff_date
+        and min_cutoff_date
+        <= pd.to_datetime(mmcif_object.header["release_date"])
+        <= max_cutoff_date
     )
 
 
@@ -137,10 +140,16 @@ def filter_resolved_chains(
 
 
 @typecheck
-def prefilter_target(mmcif_object) -> MmcifObject | None:
+def prefilter_target(
+    mmcif_object: MmcifObject,
+    min_cutoff_date: pd.Timestamp = pd.to_datetime("1970-01-01"),
+    max_cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30"),
+) -> MmcifObject | None:
     """Pre-filter a target based on various criteria."""
     target_passes_prefilters = (
-        filter_pdb_release_date(mmcif_object)
+        filter_pdb_release_date(
+            mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
+        )
         and filter_resolution(mmcif_object)
         and filter_polymer_chains(mmcif_object)
     )
@@ -576,7 +585,13 @@ def remove_crystallization_aids(
 
 @typecheck
 @timeout_decorator.timeout(FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT, use_signals=False)
-def filter_structure_with_timeout(filepath: str, output_dir: str):
+def filter_structure_with_timeout(
+    filepath: str,
+    output_dir: str,
+    min_cutoff_date: pd.Timestamp = pd.to_datetime("1970-01-01"),
+    max_cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30"),
+    is_evaluation_set: bool = False,
+):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
     using AlphaFold 3's PDB dataset filtering criteria under a
@@ -590,7 +605,9 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
 
     # Filtering of targets
     mmcif_object = mmcif_parsing.parse_mmcif_object(filepath, file_id)
-    mmcif_object = prefilter_target(mmcif_object)
+    mmcif_object = prefilter_target(
+        mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
+    )
     if not exists(mmcif_object):
         logger.info(f"Skipping target due to prefiltering: {file_id}")
         return
@@ -599,9 +616,9 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
     mmcif_object = remove_hydrogens(mmcif_object, remove_waters=True)
     mmcif_object = remove_polymer_chains_with_all_unknown_residues(mmcif_object)
     mmcif_object = remove_clashing_chains(mmcif_object)
-    # NOTE: We skip this step to stay in line with the AlphaFold 3 supplement,
-    # as it seems ligands are only excluded from the benchmark datasets
-    # mmcif_object = remove_excluded_ligands(mmcif_object, LIGAND_EXCLUSION_SET)
+    if is_evaluation_set:
+        # NOTE: The AlphaFold 3 supplement suggests the training dataset retains these (excluded) ligands
+        mmcif_object = remove_excluded_ligands(mmcif_object, LIGAND_EXCLUSION_SET)
     mmcif_object = remove_non_ccd_atoms(mmcif_object, CCD_READER_RESULTS)
     mmcif_object = remove_leaving_atoms(mmcif_object, CCD_READER_RESULTS)
     mmcif_object = filter_large_ca_distances(mmcif_object)
@@ -627,18 +644,24 @@ def filter_structure_with_timeout(filepath: str, output_dir: str):
 
 
 @typecheck
-def filter_structure(args: Tuple[str, str]):
+def filter_structure(args: Tuple[str, str, pd.Timestamp, pd.Timestamp, bool]):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
     using AlphaFold 3's PDB dataset filtering criteria.
     """
-    filepath, output_dir = args
+    filepath, output_dir, min_cutoff_date, max_cutoff_date, is_evaluation_set = args
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     output_file_dir = os.path.join(output_dir, file_id[1:3])
     output_filepath = os.path.join(output_file_dir, f"{file_id}.cif")
 
     try:
-        filter_structure_with_timeout(filepath, output_dir)
+        filter_structure_with_timeout(
+            filepath,
+            output_dir,
+            min_cutoff_date=min_cutoff_date,
+            max_cutoff_date=max_cutoff_date,
+            is_evaluation_set=is_evaluation_set,
+        )
     except Exception as e:
         logger.info(f"Skipping structure filtering of {filepath} due to: {e}")
         if os.path.exists(output_filepath):
@@ -678,23 +701,43 @@ if __name__ == "__main__":
         help="Path to the output directory in which to store filtered mmCIF dataset files.",
     )
     parser.add_argument(
+        "-f",
+        "--min_cutoff_date",
+        type=pd.Timestamp,
+        default=pd.to_datetime("1970-01-01"),
+        help="Minimum cutoff date for filtering PDB release dates.",
+    )
+    parser.add_argument(
+        "-l",
+        "--max_cutoff_date",
+        type=pd.Timestamp,
+        default=pd.to_datetime("2021-09-30"),
+        help="Maximum cutoff date for filtering PDB release dates.",
+    )
+    parser.add_argument(
         "-s",
         "--skip_existing",
         action="store_true",
         help="Skip filtering of existing output files.",
     )
     parser.add_argument(
+        "-e",
+        "--is_evaluation_set",
+        action="store_true",
+        help="Whether the dataset being filtered is an evaluation (e.g., validation or testing) set.",
+    )
+    parser.add_argument(
         "-n",
         "--no_workers",
         type=int,
-        default=2,
+        default=16,
         help="Number of workers to use for filtering.",
     )
     parser.add_argument(
         "-w",
         "--chunksize",
         type=int,
-        default=10,
+        default=1,
         help="How many files should be distributed to each worker at a time.",
     )
     args = parser.parse_args()
@@ -722,14 +765,21 @@ if __name__ == "__main__":
     # Filter structures across all worker processes
 
     args_tuples = [
-        (filepath, args.output_dir)
+        (
+            filepath,
+            args.output_dir,
+            args.min_cutoff_date,
+            args.max_cutoff_date,
+            args.is_evaluation_set,
+        )
         for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
         if not (
-            args.skip_existing and os.path.exists(
+            args.skip_existing
+            and os.path.exists(
                 os.path.join(
                     args.output_dir,
                     os.path.splitext(os.path.basename(filepath))[0][1:3],
-                    f"{os.path.splitext(os.path.basename(filepath))[0]}.cif"
+                    f"{os.path.splitext(os.path.basename(filepath))[0]}.cif",
                 )
             )
         )
