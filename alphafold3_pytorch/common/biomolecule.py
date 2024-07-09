@@ -20,7 +20,7 @@ from alphafold3_pytorch.common import (
 )
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
-from alphafold3_pytorch.utils.data_utils import is_polymer
+from alphafold3_pytorch.utils.data_utils import deep_merge_dicts, is_polymer
 from alphafold3_pytorch.utils.utils import exists, np_mode
 
 MMCIF_PREFIXES_TO_DROP_POST_PARSING = [
@@ -67,9 +67,13 @@ class Biomolecule:
     # Residue index as used in PDB. It is not necessarily continuous or 0-indexed.
     residue_index: np.ndarray  # [num_res]
 
-    # 0-indexed number corresponding to the chain in the biomolecule that this
-    # residue belongs to.
+    # 0-indexed number corresponding to the chain in the biomolecule to which this
+    # residue belongs.
     chain_index: np.ndarray  # [num_res]
+
+    # A string representation of the chain in the biomolecule to which this
+    # residue belongs.
+    chain_id: np.ndarray  # [num_res]
 
     # B-factors, or temperature factors, of the atoms of each residue
     # (in sq. angstroms units), representing the displacement of the
@@ -85,6 +89,12 @@ class Biomolecule:
     # as an integer between 0 and 3. This is used to determine whether a residue is
     # a protein (0), RNA (1), DNA (2), or ligand (3) residue.
     chemtype: np.ndarray  # [num_res]
+
+    # Atom name-chain ID-residue ID tuples for each (e.g. ligand) "pseudoresidue" of each residue in each chain.
+    # This is used to group "pseudoresidues" (e.g., ligand atoms) by parent residue.
+    unique_res_atom_names: Optional[
+        List[Tuple[List[List[str]], str, int]]
+    ]  # [num_res, num_pseudoresidues, num_atoms]
 
     # Chemical component details of each residue as a unique `ChemComp` object.
     # This is used to determine the biomolecule's unique chemical IDs, names, types, etc.
@@ -102,6 +112,95 @@ class Biomolecule:
     # N.b., this is primarily used to retain mmCIF assembly metadata
     # (e.g., when exporting an mmCIF file from a Biomolecule object).
     mmcif_metadata: Dict[str, Any]  # [1]
+
+    def __add__(self, other: "Biomolecule") -> "Biomolecule":
+        """Merges two `Biomolecule` instances."""
+        return Biomolecule(
+            atom_positions=np.concatenate([self.atom_positions, other.atom_positions], axis=0),
+            restype=np.concatenate([self.restype, other.restype], axis=0),
+            atom_mask=np.concatenate([self.atom_mask, other.atom_mask], axis=0),
+            residue_index=np.concatenate([self.residue_index, other.residue_index], axis=0),
+            chain_index=np.concatenate([self.chain_index, other.chain_index], axis=0),
+            chain_id=np.concatenate([self.chain_id, other.chain_id], axis=0),
+            b_factors=np.concatenate([self.b_factors, other.b_factors], axis=0),
+            chemid=np.concatenate([self.chemid, other.chemid], axis=0),
+            chemtype=np.concatenate([self.chemtype, other.chemtype], axis=0),
+            unique_res_atom_names=self.unique_res_atom_names + other.unique_res_atom_names,
+            chem_comp_table=self.chem_comp_table.union(other.chem_comp_table),
+            entity_to_chain=deep_merge_dicts(
+                self.entity_to_chain, other.entity_to_chain, value_op="union"
+            ),
+            mmcif_to_author_chain=deep_merge_dicts(
+                self.mmcif_to_author_chain, other.mmcif_to_author_chain, value_op="union"
+            ),
+            mmcif_metadata={**self.mmcif_metadata, **other.mmcif_metadata},
+        )
+
+    def subset_chains(self, subset_chain_ids: List[str]) -> "Biomolecule":
+        """Filters a `Biomolecule` instance to only include a subset's chain IDs."""
+        chain_id_mapping = {chain_id: n for n, chain_id in enumerate(np.unique(self.chain_id))}
+        assert all(
+            chain_id in chain_id_mapping for chain_id in subset_chain_ids
+        ), "All subset chain IDs must be present in the Biomolecule object."
+        subset_chain_index_mapping = {
+            chain_id_mapping[chain_id]: chain_id for chain_id in subset_chain_ids
+        }
+        entity_to_chain = {
+            entity_id: [
+                chain_id for chain_id in chain_ids if chain_id in subset_chain_index_mapping
+            ]
+            for entity_id, chain_ids in self.entity_to_chain.items()
+            if any(chain_id in subset_chain_index_mapping for chain_id in chain_ids)
+        }
+        mmcif_to_author_chain = {
+            mmcif_chain: author_chain_id
+            for mmcif_chain, author_chain_id in self.mmcif_to_author_chain.items()
+            if author_chain_id in subset_chain_index_mapping
+        }
+        chain_mask = np.isin(self.chain_index, list(subset_chain_index_mapping.keys()))
+        return Biomolecule(
+            atom_positions=self.atom_positions[chain_mask],
+            restype=self.restype[chain_mask],
+            atom_mask=self.atom_mask[chain_mask],
+            residue_index=self.residue_index[chain_mask],
+            chain_index=self.chain_index[chain_mask],
+            chain_id=self.chain_id[chain_mask],
+            b_factors=self.b_factors[chain_mask],
+            chemid=self.chemid[chain_mask],
+            chemtype=self.chemtype[chain_mask],
+            unique_res_atom_names=[
+                unique_res_atom_names
+                for unique_res_atom_names in self.unique_res_atom_names
+                if unique_res_atom_names[1] in subset_chain_ids
+            ],
+            chem_comp_table=self.chem_comp_table,
+            entity_to_chain=entity_to_chain,
+            mmcif_to_author_chain=mmcif_to_author_chain,
+            mmcif_metadata=self.mmcif_metadata,
+        )
+
+    def repeat(self, coord: np.ndarray) -> "Biomolecule":
+        """Repeat a Biomolecule according to a (repeated) coordinate array."""
+        return Biomolecule(
+            atom_positions=coord.reshape(-1, 47, 3),
+            restype=np.tile(self.restype, (coord.shape[0], 1)).reshape(-1),
+            atom_mask=np.tile(self.atom_mask, (coord.shape[0], 1, 1)).reshape(-1, 47),
+            residue_index=np.tile(self.residue_index, (coord.shape[0], 1)).reshape(-1),
+            chain_index=np.tile(self.chain_index, (coord.shape[0], 1)).reshape(-1),
+            chain_id=np.tile(self.chain_id, (coord.shape[0], 1)).reshape(-1),
+            b_factors=np.tile(self.b_factors, (coord.shape[0], 1, 1)).reshape(-1, 47),
+            chemid=np.tile(self.chemid, (coord.shape[0], 1)).reshape(-1),
+            chemtype=np.tile(self.chemtype, (coord.shape[0], 1)).reshape(-1),
+            unique_res_atom_names=[
+                unique_res_atom_names
+                for _ in range(coord.shape[0])
+                for unique_res_atom_names in self.unique_res_atom_names
+            ],
+            chem_comp_table=self.chem_comp_table,
+            entity_to_chain=self.entity_to_chain,
+            mmcif_to_author_chain=self.mmcif_to_author_chain,
+            mmcif_metadata=self.mmcif_metadata,
+        )
 
 
 @typecheck
@@ -146,6 +245,29 @@ def get_ligand_atom_name(atom_name: str, atom_types_set: Set[str]) -> str:
         )
     else:
         return atom_name
+
+
+@typecheck
+def get_unique_res_atom_names(
+    mmcif_object: mmcif_parsing.MmcifObject,
+) -> List[Tuple[List[List[str]], str, int]]:
+    """Get atom name-chain ID tuples for each (e.g. ligand) "pseudoresidue" of each residue in each chain."""
+    unique_res_atom_names = []
+    for chain in mmcif_object.structure:
+        chain_chem_comp = mmcif_object.chem_comp_details[chain.id]
+        for res, res_chem_comp in zip(chain, chain_chem_comp):
+            is_polymer_residue = is_polymer(res_chem_comp.type)
+            residue_constants = get_residue_constants(res_chem_type=res_chem_comp.type)
+            if is_polymer_residue:
+                # For polymer residues, append the atom types directly.
+                atoms_to_append = [residue_constants.atom_types]
+            else:
+                # For non-polymer residues, create a nested list of atom names.
+                atoms_to_append = [
+                    [atom.name for _ in range(residue_constants.atom_type_num)] for atom in res
+                ]
+            unique_res_atom_names.append((atoms_to_append, chain.id, res.id[1]))
+    return unique_res_atom_names
 
 
 @typecheck
@@ -309,15 +431,20 @@ def _from_mmcif_object(
         if author_chain in chain_id_mapping
     }
 
+    # For mmCIF I/O, retain a list of unique atom names for each "pseudoresidue" of each residue.
+    unique_res_atom_names = get_unique_res_atom_names(mmcif_object)
+
     return Biomolecule(
         atom_positions=np.array(atom_positions),
         restype=np.array(restype),
         atom_mask=np.array(atom_mask),
         residue_index=np.array(residue_index),
         chain_index=chain_index,
+        chain_id=np.array(chain_ids),
         b_factors=np.array(b_factors),
         chemid=np.array(chemid),
         chemtype=np.array(chemtype),
+        unique_res_atom_names=unique_res_atom_names,
         chem_comp_table=residue_chem_comp_details,
         entity_to_chain=entity_to_chain,
         mmcif_to_author_chain=mmcif_to_author_chain,
@@ -395,7 +522,7 @@ def to_mmcif(
     file_id: str,
     gapless_poly_seq: bool = True,
     insert_alphafold_mmcif_metadata: bool = True,
-    unique_res_atom_names: Optional[List[List[List[str]]]] = None,
+    unique_res_atom_names: Optional[List[Tuple[List[List[str]], str, int]]] = None,
 ) -> str:
     """Converts a `Biomolecule` instance to an mmCIF string.
 
@@ -430,10 +557,10 @@ def to_mmcif(
     :param gapless_poly_seq: If True, the polymer output will contain gapless residue indices.
     :param insert_alphafold_mmcif_metadata: If True, insert metadata fields
         referencing AlphaFold in the output mmCIF file.
-    :param unique_res_atom_names: A list of lists of lists of atom names for each "pseudoresidue"
-        of each unique residue. If None, the atom names are assumed to be the same for all
-        residues of the same chemical type (e.g., RNA). This is used to group "pseudoresidues"
-        (e.g., ligand atoms) by parent residue.
+    :param unique_res_atom_names: A dictionary mapping each author chain ID to a list of lists
+        of lists of atom names for each "pseudoresidue" of each unique residue. If None, the
+        atom names are assumed to be the same for all residues of the same chemical type (e.g., RNA).
+        This is used to group "pseudoresidues" (e.g., ligand atoms) by parent residue.
 
     :return: A valid mmCIF string.
 
@@ -676,6 +803,7 @@ def to_mmcif(
 
     # Add all atom sites.
     if exists(unique_res_atom_names):
+        unique_res_atom_names = [item[0] for item in unique_res_atom_names]
         assert len(unique_res_atom_names) == len(
             unique_restype
         ), f"Unique residue atom names array must have the same length ({len(unique_res_atom_names)}) as the unique residue types array ({len(unique_restype)})."
