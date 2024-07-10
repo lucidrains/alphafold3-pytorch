@@ -210,6 +210,10 @@ rsync.rcsb.org::ftp_data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_as
 
 > WARNING: Downloading PDB can take up to 1TB of space.
 
+> NOTE: PDB also hosts snapshots on AWS: https://pdbsnapshots.s3.us-west-2.amazonaws.com/index.html.
+
+> TODO: Use a specific snapshot to make training reproducible.
+
 After downloading, you should have two directories formatted like this:
 https://files.rcsb.org/pub/pdb/data/assemblies/mmCIF/divided/ & https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
 ```bash
