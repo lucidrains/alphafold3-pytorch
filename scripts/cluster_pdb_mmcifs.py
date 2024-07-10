@@ -25,7 +25,7 @@ import json
 import os
 import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, List, Literal, Optional, Set, Tuple
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -140,16 +140,20 @@ def convert_modified_residue_three_to_one(
 
     if residue_mol_type == "protein":
         return (
-            PROTEIN_LETTERS_3TO1[mapped_residue]
-            if mapped_residue in PROTEIN_LETTERS_3TO1
-            else "X",
+            (
+                PROTEIN_LETTERS_3TO1[mapped_residue]
+                if mapped_residue in PROTEIN_LETTERS_3TO1
+                else "X"
+            ),
             "protein",
         )
     elif residue_mol_type in {"rna", "dna"}:
         return (
-            NUCLEIC_LETTERS_3TO1[mapped_residue]
-            if mapped_residue in NUCLEIC_LETTERS_3TO1
-            else "X",
+            (
+                NUCLEIC_LETTERS_3TO1[mapped_residue]
+                if mapped_residue in NUCLEIC_LETTERS_3TO1
+                else "X"
+            ),
             "nucleic_acid",
         )
     else:
@@ -366,8 +370,7 @@ def cluster_sequences_using_mmseqs2(
     min_seq_id: float = 0.5,
     coverage: float = 0.8,
     coverage_mode: Literal[0, 1, 2, 3] = 1,
-    k_mer_length: Optional[int] = None,
-    spaced_k_mer_pattern: Optional[str] = None,
+    extra_parameters: Optional[Dict[str, Union[int, float, str]]] = None,
 ) -> Dict[str, int]:
     """Run MMseqs2 on the input FASTA file and write the resulting clusters to a local output directory."""
     assert input_filepath.endswith(".fasta"), "The input file must be a FASTA file."
@@ -396,10 +399,10 @@ def cluster_sequences_using_mmseqs2(
         "--cov-mode",
         str(coverage_mode),
     ]
-    if k_mer_length:
-        mmseqs_command.extend(["-k", str(k_mer_length)])
-    if spaced_k_mer_pattern:
-        mmseqs_command.extend(["--spaced-kmer-pattern", spaced_k_mer_pattern])
+    if extra_parameters:
+        for key, value in extra_parameters.items():
+            mmseqs_command.extend([key, str(value)])
+
     subprocess.run(mmseqs_command)
     assert os.path.isfile(
         output_cluster_filepath
@@ -748,6 +751,11 @@ if __name__ == "__main__":
             min_seq_id=0.4,
             coverage=0.8,
             coverage_mode=0,
+            extra_parameters={
+                # cluster reassign improves clusters by reassigning sequences to the best cluster
+                # and fixes transitivity issues of the cascade clustering
+                "--cluster-reassign": 1,
+            },
         )
 
     if not nucleic_acid_chain_cluster_mapping:
@@ -762,9 +770,14 @@ if __name__ == "__main__":
             min_seq_id=1.0,
             coverage=0.8,
             coverage_mode=0,
-            # NOTE: The following arguments were taken from: https://github.com/soedinglab/MMseqs2/issues/373#issuecomment-728166556
-            k_mer_length=6,
-            spaced_k_mer_pattern="11011101",
+            extra_parameters={
+                # 7 or 8 should work best, something to test
+                "-k": 8,
+                # there is currently an issue in mmseqs2 with nucleotide search and spaced k-mers
+                "--spaced-kmer-mode": 0,
+                # see above
+                "--cluster-reassign": 1,
+            },
         )
 
     if not peptide_chain_cluster_mapping:
@@ -779,9 +792,30 @@ if __name__ == "__main__":
             min_seq_id=1.0,
             coverage=0.8,
             coverage_mode=0,
-            # NOTE: The following arguments were taken from: https://github.com/soedinglab/MMseqs2/issues/373#issuecomment-728166556
-            k_mer_length=6,
-            spaced_k_mer_pattern="11011101",
+            # some of these parameters are from the spacepharer optimized parameters
+            # these were for short CRISPR spacer recognition, so they should work well for arbitrary peptides
+            # this is a adhoc solution, with some recent new introduction like the ungapped prefilter
+            extra_parameters={
+                # spacepharer optimized parameters
+                "--gap-open": 16,
+                "--gap-extend": 2,
+                "--sub-mat": "VTML40.out",
+                # we would like to try using ungapped prefilter mode to avoid
+                # minimum consecutive k-mer match restrictions, but the cluster workflow doesn't expose this yet
+                # let's use a real small k-mer size instead
+                # "--prefilter-mode": 1,
+                "-k": 5,
+                "--spaced-kmer-mode": 0,
+                # Don't try suppresing FP hits since the peptides are too short
+                "--mask": 0,
+                "--comp-bias-corr": 0,
+                # let more things through the prefilter
+                "--min-ungapped-score": 5,
+                # Try disabling completely with "inf"?
+                "-e": 1,
+                # see above
+                "--cluster-reassign": 1,
+            },
         )
 
     if not ligand_chain_cluster_mapping:
