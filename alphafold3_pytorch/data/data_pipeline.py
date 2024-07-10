@@ -140,7 +140,7 @@ def make_mmcif_features(
 
 
 if __name__ == "__main__":
-    filepath = "data/pdb_data/dev_mmcifs/ak/7akd-assembly1.cif"
+    filepath = "data/pdb_data/mmcifs/ak/7akd-assembly1.cif"
     file_id = os.path.splitext(os.path.basename(filepath))[0]
 
     mmcif_object = mmcif_parsing.parse_mmcif_object(
