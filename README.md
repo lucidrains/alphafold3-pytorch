@@ -28,6 +28,8 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 - <a href="https://github.com/amorehead">Alex</a> for the PDB dataset preparation script!
 
+- <a href="https://github.com/milot-mirdita">Milot</a> for optimizing the PDB dataset clustering script!
+
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
 
 ## Install
@@ -198,18 +200,26 @@ assert sampled_atom_pos.shape == (1, (6 + 5), 3)
 
 ### PDB dataset curation
 
-To acquire the AlphaFold 3 PDB dataset, first download all complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The Python script below (i.e., `filter_pdb_mmcifs.py`) assumes you have downloaded the PDB in the **mmCIF file format**, placing it at `data/pdb_data/unfiltered_mmcifs/`. On the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
+To acquire the AlphaFold 3 PDB dataset, first download all first-assembly (and asymmetric unit) complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The Python script below (i.e., `filter_pdb_mmcifs.py`) assumes you have downloaded the PDB in the **mmCIF file format**, placing it at `data/pdb_data/unfiltered_assembly_mmcifs/` (and `data/pdb_data/unfiltered_asym_mmcifs/`, respectively). On the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
 
-For example, one can use the following command to download the PDB as a collection of mmCIF files:
+For example, one can use the following commands to download the PDB as a collection of mmCIF files:
 ```bash
+# For `assembly1` complexes
 rsync -rlpt -v -z --delete --port=33444 \
-rsync.rcsb.org::ftp_data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_mmcifs/
+rsync.rcsb.org::ftp_data/assemblies/mmCIF/divided/ ./data/pdb_data/unfiltered_assembly_mmcifs/
+# For asymmetric unit complexes
+rsync -rlpt -v -z --delete --port=33444 \
+rsync.rcsb.org::ftp_data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_asym_mmcifs/
 ```
 
 > WARNING: Downloading PDB can take up to 1TB of space.
 
-After downloading, you should have a directory formatted like this:
-https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
+> NOTE: PDB also hosts snapshots on AWS: https://pdbsnapshots.s3.us-west-2.amazonaws.com/index.html.
+
+> TODO: Use a specific snapshot to make training reproducible.
+
+After downloading, you should have two directories formatted like this:
+https://files.rcsb.org/pub/pdb/data/assemblies/mmCIF/divided/ & https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
 ```bash
 00/
 01/
@@ -218,9 +228,10 @@ https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
 zz/
 ```
 
-In this directory, unzip all the files:
+For these directories, unzip all the files:
 ```bash
-find . -type f -name "*.gz" -exec gzip -d {} \;
+find ./data/pdb_data/unfiltered_assembly_mmcifs/ -type f -name "*.gz" -exec gzip -d {} \;
+find ./data/pdb_data/unfiltered_asym_mmcifs/ -type f -name "*.gz" -exec gzip -d {} \;
 ```
 
 Next run the commands
@@ -235,12 +246,12 @@ find data/ccd_data/ -type f -name "*.gz" -exec gzip -d {} \;
 
 ### PDB dataset filtering
 
-Then run the following with `pdb_dir`, `ccd_dir`, and `mmcif_output_dir` replaced with the locations of your local copies of the PDB, CCD, and your desired dataset output directory (i.e., `./data/pdb_data/unfiltered_mmcifs/`, `./data/ccd_data/`, and `./data/pdb_data/mmcifs/`).
+Then run the following with `pdb_assembly_dir`, `pdb_asym_dir`, `ccd_dir`, and `mmcif_output_dir` replaced with the locations of your local copies of the first-assembly PDB, asymmetric unit PDB, CCD, and your desired dataset output directory (i.e., `./data/pdb_data/unfiltered_assembly_mmcifs/`, `./data/pdb_data/unfiltered_asym_mmcifs/`, `./data/ccd_data/`, and `./data/pdb_data/mmcifs/`).
 ```bash
-python scripts/filter_pdb_mmcifs.py --mmcif_dir <pdb_dir> --ccd_dir <ccd_dir> --output_dir <mmcif_output_dir>
+python scripts/filter_pdb_mmcifs.py --mmcif_assembly_dir <pdb_assembly_dir> --mmcif_asym_dir <pdb_asym_dir> --ccd_dir <ccd_dir> --output_dir <mmcif_output_dir>
 ```
 
-See the script for more options. Each mmCIF that successfully passes
+See the script for more options. Each first-assembly mmCIF that successfully passes
 all processing steps will be written to `mmcif_output_dir` within a subdirectory
 named according to the mmCIF's second and third PDB ID characters (e.g. `5c`).
 

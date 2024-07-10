@@ -721,10 +721,6 @@ def to_mmcif(
         mmcif_dict["_pdbx_struct_assembly.oligomeric_count"].append(
             str(pdbx_struct_assembly_oligomeric_count[assembly_id])
         )
-    assert mmcif_dict[
-        "_pdbx_struct_assembly_gen.assembly_id"
-    ], "No _pdbx_struct_assembly_gen.assembly_id entries found."
-    assert mmcif_dict["_pdbx_struct_assembly.id"], "No _pdbx_struct_assembly.id entries found."
 
     # Populate the _chem_comp table.
     for chem_comp in biomol.chem_comp_table:

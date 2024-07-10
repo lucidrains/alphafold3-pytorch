@@ -36,7 +36,7 @@ import glob
 import os
 import random
 from operator import itemgetter
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Literal, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -66,10 +66,67 @@ from alphafold3_pytorch.utils.utils import exists
 # Constants
 
 FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT = (
-    120  # Maximum time allocated to filter a single structure (in seconds)
+    600  # Maximum time allocated to filter a single structure (in seconds)
 )
 
+EVALUATION_SPLITS = {"eval", "test"}
+
 # Helper functions
+
+
+@typecheck
+def impute_missing_assembly_metadata(
+    mmcif_object: MmcifObject, asym_mmcif_object: MmcifObject
+) -> MmcifObject:
+    """Impute missing assembly metadata from the asymmetric unit mmCIF."""
+    mmcif_object.header.update(asym_mmcif_object.header)
+    mmcif_object.covalent_bonds.extend(asym_mmcif_object.covalent_bonds)
+
+    # Impute structure method
+    if (
+        "_exptl.method" not in mmcif_object.raw_string
+        and "_exptl.method" in asym_mmcif_object.raw_string
+    ):
+        mmcif_object.raw_string["_exptl.method"] = asym_mmcif_object.raw_string["_exptl.method"]
+
+    # Impute release date
+    if (
+        "_pdbx_audit_revision_history.revision_date" not in mmcif_object.raw_string
+        and "_pdbx_audit_revision_history.revision_date" in asym_mmcif_object.raw_string
+    ):
+        mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"] = (
+            asym_mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
+        )
+
+    # Impute resolution
+    if (
+        "_refine.ls_d_res_high" not in mmcif_object.raw_string
+        and "_refine.ls_d_res_high" in asym_mmcif_object.raw_string
+    ):
+        mmcif_object.raw_string["_refine.ls_d_res_high"] = asym_mmcif_object.raw_string[
+            "_refine.ls_d_res_high"
+        ]
+    if (
+        "_em_3d_reconstruction.resolution" not in mmcif_object.raw_string
+        and "_em_3d_reconstruction.resolution" in asym_mmcif_object.raw_string
+    ):
+        mmcif_object.raw_string["_em_3d_reconstruction.resolution"] = asym_mmcif_object.raw_string[
+            "_em_3d_reconstruction.resolution"
+        ]
+    if (
+        "_reflns.d_resolution_high" not in mmcif_object.raw_string
+        and "_reflns.d_resolution_high" in asym_mmcif_object.raw_string
+    ):
+        mmcif_object.raw_string["_reflns.d_resolution_high"] = asym_mmcif_object.raw_string[
+            "_reflns.d_resolution_high"
+        ]
+
+    # Impute structure connectivity
+    for key in asym_mmcif_object.raw_string:
+        if key.startswith("_struct_conn.") and key not in mmcif_object.raw_string:
+            mmcif_object.raw_string[key] = asym_mmcif_object.raw_string[key]
+
+    return mmcif_object
 
 
 @typecheck
@@ -118,11 +175,15 @@ def filter_polymer_chains(
 def filter_resolved_chains(
     mmcif_object: MmcifObject, minimum_polymer_residues: int = 4
 ) -> MmcifObject | None:
-    """Filter based on number of resolved residues."""
+    """Filter polymer chains based on number of resolved residues."""
     chains_to_remove = {
         mmcif_object.structure[chain.id].get_full_id()
         for chain in mmcif_object.structure.get_chains()
-        if len(
+        if any(
+            is_polymer(mmcif_object.all_chem_comp_details[chain.id][res_index].type)
+            for res_index in range(len(mmcif_object.chain_to_seqres[chain.id]))
+        )
+        and len(
             [
                 res_index
                 for res_index in range(len(mmcif_object.chain_to_seqres[chain.id]))
@@ -191,9 +252,12 @@ def remove_polymer_chains_with_all_unknown_residues(mmcif_object: MmcifObject) -
     chains_to_remove = {
         chain.get_full_id()
         for chain in mmcif_object.structure.get_chains()
-        if not any(
+        if any(
             is_polymer(mmcif_object.all_chem_comp_details[chain.id][res_index].type)
-            and mmcif_object.chain_to_seqres[chain.id][res_index] != "X"
+            for res_index in range(len(mmcif_object.chain_to_seqres[chain.id]))
+        )
+        and not any(
+            mmcif_object.chain_to_seqres[chain.id][res_index] != "X"
             for res_index in range(len(mmcif_object.chain_to_seqres[chain.id]))
         )
     }
@@ -351,7 +415,11 @@ def remove_leaving_atoms(
     atoms_to_remove = set()
 
     for covalent_bond in mmcif_object.covalent_bonds:
-        if covalent_bond.leaving_atom_flag in {"one", "both"}:
+        bond_chain_ids_in_structure = (
+            covalent_bond.ptnr1_auth_asym_id in mmcif_object.structure
+            and covalent_bond.ptnr2_auth_asym_id in mmcif_object.structure
+        )
+        if covalent_bond.leaving_atom_flag in {"one", "both"} and bond_chain_ids_in_structure:
             # Identify the chemical types of the residues of the "partner 1" and "partner 2" bond atoms in the structure
             ptnr1_chain = mmcif_object.structure[covalent_bond.ptnr1_auth_asym_id]
             ptnr2_chain = mmcif_object.structure[covalent_bond.ptnr2_auth_asym_id]
@@ -401,10 +469,12 @@ def remove_leaving_atoms(
 
 @typecheck
 def filter_large_ca_distances(
-    mmcif_object: MmcifObject, max_distance: float = 10.0
+    mmcif_object: MmcifObject,
+    max_distance: float = 10.0,
+    min_num_residues_for_protein_classification: int = 10,
 ) -> MmcifObject:
     """
-    Identify chains with large sequential Ca-Ca atom distances to be removed.
+    Identify chains (to be removed) with any large sequential Ca-Ca atom distances.
 
     NOTE: This function currently does not account for residues
     with alternative Ca atom locations.
@@ -412,17 +482,29 @@ def filter_large_ca_distances(
     chains_to_remove = set()
 
     for chain in mmcif_object.structure.get_chains():
+        num_peptide_residues = sum(
+            1
+            for res_index in range(len(chain))
+            if "peptide" in mmcif_object.chem_comp_details[chain.id][res_index].type.lower()
+        )
+        if num_peptide_residues < min_num_residues_for_protein_classification:
+            # Only filter protein chains
+            continue
         ca_atoms = [
             res["CA"]
             for (res_index, res) in enumerate(chain)
             if "peptide" in mmcif_object.chem_comp_details[chain.id][res_index].type.lower()
             and "CA" in res
         ]
+        ca_ca_distance_in_range = True
         for i, ca1 in enumerate(ca_atoms[:-1]):
             ca2 = ca_atoms[i + 1]
             if (ca1 - ca2) > max_distance:
-                chains_to_remove.add(chain.get_full_id())
+                ca_ca_distance_in_range = False
                 break
+
+        if len(ca_atoms) > 1 and not ca_ca_distance_in_range:
+            chains_to_remove.add(chain.get_full_id())
 
     mmcif_object.chains_to_remove.update(chains_to_remove)
 
@@ -489,6 +571,16 @@ def select_closest_chains(
         return token_center_atoms
 
     @typecheck
+    def get_token_chain_id(token: TokenType) -> str:
+        """Get chain ID of a token."""
+        if isinstance(token, AtomType):
+            # For an Atom, navigate up twice to get to the Chain level
+            return token.get_parent().get_parent().id
+        elif isinstance(token, ResidueType):
+            # For a Residue, navigate up once to get to the Chain level
+            return token.get_parent().id
+
+    @typecheck
     def get_interface_tokens(
         tokens: List[TokenType],
         protein_residue_center_atoms: Dict[str, str],
@@ -496,16 +588,30 @@ def select_closest_chains(
         center_atom_interaction_distance: float = 15.0,
     ) -> List[TokenType]:
         """Get interface tokens."""
-        interface_tokens = set()
         token_center_atoms = get_token_center_atoms(
             tokens, protein_residue_center_atoms, nucleic_acid_residue_center_atoms
         )
-        token_center_atoms_array = np.array([atom.coord for atom in token_center_atoms])
+        token_center_atoms_coords_array = np.array([atom.coord for atom in token_center_atoms])
+        token_chains_array = np.array([get_token_chain_id(token) for token in tokens])
+
+        # Compute all pairwise distances
+        differences = (
+            token_center_atoms_coords_array[:, None, :]
+            - token_center_atoms_coords_array[None, :, :]
+        )
+        distances = np.linalg.norm(differences, axis=2)
+
+        # Create masks
+        token_self_mask = distances != 0
+        token_interface_mask = token_chains_array[:, None] != token_chains_array[None, :]
+        token_interaction_mask = distances < center_atom_interaction_distance
+        interface_distance_mask = token_self_mask & token_interface_mask & token_interaction_mask
+
+        interface_tokens = set()
         for token_index, token in enumerate(tokens):
-            token_center_atom = token_center_atoms_array[None, token_index]
-            distances = np.linalg.norm(token_center_atoms_array - token_center_atom, axis=1)
-            if np.any(distances < center_atom_interaction_distance).item():
+            if np.any(interface_distance_mask[token_index, :]):
                 interface_tokens.add(token)
+
         return list(interface_tokens)
 
     chains_to_remove = set()
@@ -590,7 +696,7 @@ def filter_structure_with_timeout(
     output_dir: str,
     min_cutoff_date: pd.Timestamp = pd.to_datetime("1970-01-01"),
     max_cutoff_date: pd.Timestamp = pd.to_datetime("2021-09-30"),
-    is_evaluation_set: bool = False,
+    split: Literal["train", "eval", "test"] = "train",
 ):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
@@ -598,6 +704,10 @@ def filter_structure_with_timeout(
     timeout constraint.
     """
     # Section 2.5.4 of the AlphaFold 3 supplement
+    asym_filepath = os.path.join(
+        os.path.dirname(filepath).replace("unfiltered_assembly", "unfiltered_asym"),
+        os.path.basename(filepath).replace("-assembly1", ""),
+    )
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     output_file_dir = os.path.join(output_dir, file_id[1:3])
     output_filepath = os.path.join(output_file_dir, f"{file_id}.cif")
@@ -605,6 +715,11 @@ def filter_structure_with_timeout(
 
     # Filtering of targets
     mmcif_object = mmcif_parsing.parse_mmcif_object(filepath, file_id)
+    asym_mmcif_object = mmcif_parsing.parse_mmcif_object(asym_filepath, file_id)
+    # NOTE: The assembly mmCIF does not contain the full header or the
+    # structure connectivity (i.e., bond) information, so we impute
+    # these from the asymmetric unit mmCIF
+    mmcif_object = impute_missing_assembly_metadata(mmcif_object, asym_mmcif_object)
     mmcif_object = prefilter_target(
         mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
     )
@@ -616,7 +731,7 @@ def filter_structure_with_timeout(
     mmcif_object = remove_hydrogens(mmcif_object, remove_waters=True)
     mmcif_object = remove_polymer_chains_with_all_unknown_residues(mmcif_object)
     mmcif_object = remove_clashing_chains(mmcif_object)
-    if is_evaluation_set:
+    if split in EVALUATION_SPLITS:
         # NOTE: The AlphaFold 3 supplement suggests the training dataset retains these (excluded) ligands
         mmcif_object = remove_excluded_ligands(mmcif_object, LIGAND_EXCLUSION_SET)
     mmcif_object = remove_non_ccd_atoms(mmcif_object, CCD_READER_RESULTS)
@@ -644,12 +759,12 @@ def filter_structure_with_timeout(
 
 
 @typecheck
-def filter_structure(args: Tuple[str, str, pd.Timestamp, pd.Timestamp, bool]):
+def filter_structure(args: Tuple[str, str, pd.Timestamp, pd.Timestamp, str]):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
     using AlphaFold 3's PDB dataset filtering criteria.
     """
-    filepath, output_dir, min_cutoff_date, max_cutoff_date, is_evaluation_set = args
+    filepath, output_dir, min_cutoff_date, max_cutoff_date, split = args
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     output_file_dir = os.path.join(output_dir, file_id[1:3])
     output_filepath = os.path.join(output_file_dir, f"{file_id}.cif")
@@ -660,7 +775,7 @@ def filter_structure(args: Tuple[str, str, pd.Timestamp, pd.Timestamp, bool]):
             output_dir,
             min_cutoff_date=min_cutoff_date,
             max_cutoff_date=max_cutoff_date,
-            is_evaluation_set=is_evaluation_set,
+            split=split,
         )
     except Exception as e:
         logger.info(f"Skipping structure filtering of {filepath} due to: {e}")
@@ -681,10 +796,17 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-i",
-        "--mmcif_dir",
+        "--mmcif_assembly_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "unfiltered_mmcifs"),
-        help="Path to the input directory containing mmCIF files to filter.",
+        default=os.path.join("data", "pdb_data", "unfiltered_assembly_mmcifs"),
+        help="Path to the input directory containing `assembly1` mmCIF files to filter.",
+    )
+    parser.add_argument(
+        "-a",
+        "--mmcif_asym_dir",
+        type=str,
+        default=os.path.join("data", "pdb_data", "unfiltered_asym_mmcifs"),
+        help="Path to the input directory containing asymmetric unit mmCIF files with which to filter the `assembly1` mmCIF files.",
     )
     parser.add_argument(
         "-c",
@@ -722,9 +844,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-e",
-        "--is_evaluation_set",
-        action="store_true",
-        help="Whether the dataset being filtered is an evaluation (e.g., validation or testing) set.",
+        "--split",
+        type=str,
+        choices=["train", "eval", "test"],
+        default="train",
+        help="To which split the filtered dataset should be assigned (i.e., `train`, `eval`, or `test`).",
     )
     parser.add_argument(
         "-n",
@@ -742,7 +866,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    assert os.path.exists(args.mmcif_dir), f"Input directory {args.mmcif_dir} does not exist."
+    assert os.path.exists(
+        args.mmcif_assembly_dir
+    ), f"Input assembly directory {args.mmcif_assembly_dir} does not exist."
+    assert os.path.exists(
+        args.mmcif_asym_dir
+    ), f"Input asymmetric unit directory {args.mmcif_asym_dir} does not exist."
     assert os.path.exists(args.ccd_dir), f"CCD directory {args.ccd_dir} does not exist."
     assert os.path.exists(
         os.path.join(args.ccd_dir, "chem_comp_model.cif")
@@ -770,10 +899,17 @@ if __name__ == "__main__":
             args.output_dir,
             args.min_cutoff_date,
             args.max_cutoff_date,
-            args.is_evaluation_set,
+            args.split,
         )
-        for filepath in glob.glob(os.path.join(args.mmcif_dir, "*", "*.cif"))
-        if not (
+        for filepath in glob.glob(os.path.join(args.mmcif_assembly_dir, "*", "*.cif"))
+        if "assembly1" in os.path.basename(filepath)
+        and os.path.exists(
+            os.path.join(
+                os.path.dirname(filepath).replace("unfiltered_assembly", "unfiltered_asym"),
+                os.path.basename(filepath).replace("-assembly1", ""),
+            )
+        )
+        and not (
             args.skip_existing
             and os.path.exists(
                 os.path.join(

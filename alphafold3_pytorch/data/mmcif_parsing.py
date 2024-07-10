@@ -594,7 +594,7 @@ def _get_header(parsed_info: MmCIFDict) -> PdbHeader:
     if "_pdbx_audit_revision_history.revision_date" in parsed_info:
         header["release_date"] = get_release_date(parsed_info)
     else:
-        logging.warning("Could not determine release_date: %s", parsed_info["_entry.id"])
+        logging.warning("Could not determine release_date for entry: %s", parsed_info["_entry.id"])
 
     header["resolution"] = 0.00
     for res_key in (
