@@ -169,27 +169,31 @@ DNA_NUCLEOTIDES = dict(
         first_atom_idx = 20,
         last_atom_idx = 1,
         hydroxyl_idx = 21,
+        distogram_atom_idx = 4
     ),
     C = dict(
         smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)O)O',
         complement = 'G',
         first_atom_idx = 17,
         last_atom_idx = 1,
-        hydroxyl_idx = 19
+        hydroxyl_idx = 19,
+        distogram_atom_idx = 4
     ),
     G = dict(
         smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)COP(=O)(O)O)O',
         complement = 'C',
         first_atom_idx = 21,
         last_atom_idx = 1,
-        hydroxyl_idx = 22
+        hydroxyl_idx = 22,
+        distogram_atom_idx = 4
     ),
     T = dict(
         smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)COP(=O)(O)O)O',
         complement = 'A',
         first_atom_idx = 19,
         last_atom_idx = 11,
-        hydroxyl_idx = 20
+        hydroxyl_idx = 20,
+        distogram_atom_idx = 9
     )
 )
 
@@ -199,28 +203,32 @@ RNA_NUCLEOTIDES = dict(
         complement = 'U',
         first_atom_idx = 19,
         last_atom_idx = 11,
-        hydroxyl_idx = 20
+        hydroxyl_idx = 20,
+        distogram_atom_idx = 9
     ),
     C = dict(
         smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
         complement = 'G',
         first_atom_idx = 17,
         last_atom_idx = 10,
-        hydroxyl_idx = 19
+        hydroxyl_idx = 19,
+        distogram_atom_idx = 8
     ),
     G = dict(
         smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
         complement = 'C',
         first_atom_idx = 14,
         last_atom_idx = 7,
-        hydroxyl_idx = 16
+        hydroxyl_idx = 16,
+        distogram_atom_idx = 5
     ),
     U = dict(
         smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
         complement = 'A',
         first_atom_idx = 18,
         last_atom_idx = 10,
-        hydroxyl_idx = 19
+        hydroxyl_idx = 19,
+        distogram_atom_idx = 8
     )
 )
 
