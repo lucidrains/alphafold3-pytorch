@@ -200,23 +200,28 @@ assert sampled_atom_pos.shape == (1, (6 + 5), 3)
 
 ### PDB dataset curation
 
-To acquire the AlphaFold 3 PDB dataset, first download all first-assembly (and asymmetric unit) complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The Python script below (i.e., `filter_pdb_mmcifs.py`) assumes you have downloaded the PDB in the **mmCIF file format**, placing it at `data/pdb_data/unfiltered_assembly_mmcifs/` (and `data/pdb_data/unfiltered_asym_mmcifs/`, respectively). On the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
+To acquire the AlphaFold 3 PDB dataset, first download all first-assembly (and asymmetric unit) complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The two Python scripts below (i.e., `filter_pdb_mmcifs.py` and `cluster_pdb_mmcifs.py`) assume you have downloaded the PDB in the **mmCIF file format**, placing its first-assembly and asymmetric unit mmCIF files at `data/pdb_data/unfiltered_assembly_mmcifs/` and `data/pdb_data/unfiltered_asym_mmcifs/`, respectively.
 
-For example, one can use the following commands to download the PDB as a collection of mmCIF files:
+For reproducibility, we recommend downloading the PDB using AWS snapshots (e.g., `20240101`). To do so, refer to [AWS's documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html) to set up the AWS CLI locally. Alternatively, on the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
+
+For example, one can use the following commands to download the PDB as two collections of mmCIF files:
 ```bash
-# For `assembly1` complexes
+# For `assembly1` complexes, use the PDB's `20240101` AWS snapshot:
+aws s3 sync s3://pdbsnapshots/20240101/pub/pdb/data/assemblies/mmCIF/divided/ ./data/pdb_data/unfiltered_assembly_mmcifs
+# Or as a fallback, use rsync:
 rsync -rlpt -v -z --delete --port=33444 \
 rsync.rcsb.org::ftp_data/assemblies/mmCIF/divided/ ./data/pdb_data/unfiltered_assembly_mmcifs/
-# For asymmetric unit complexes
+
+# For asymmetric unit complexes, also use the PDB's `20240101` AWS snapshot:
+aws s3 sync s3://pdbsnapshots/20240101/pub/pdb/data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_asym_mmcifs
+# Or as a fallback, use rsync:
 rsync -rlpt -v -z --delete --port=33444 \
 rsync.rcsb.org::ftp_data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_asym_mmcifs/
 ```
 
-> WARNING: Downloading PDB can take up to 1TB of space.
+> WARNING: Downloading the PDB can take up to 700GB of space.
 
-> NOTE: PDB also hosts snapshots on AWS: https://pdbsnapshots.s3.us-west-2.amazonaws.com/index.html.
-
-> TODO: Use a specific snapshot to make training reproducible.
+> NOTE: The PDB hosts all available AWS snapshots here: https://pdbsnapshots.s3.us-west-2.amazonaws.com/index.html.
 
 After downloading, you should have two directories formatted like this:
 https://files.rcsb.org/pub/pdb/data/assemblies/mmCIF/divided/ & https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
