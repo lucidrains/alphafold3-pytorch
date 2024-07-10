@@ -298,6 +298,9 @@ def _from_mmcif_object(
       ValueError: If insertion code is detected at a residue.
     """
     structure = mmcif_object.structure
+    # Resolve alternative locations for atoms/residues by taking the one with the largest occupancy.
+    # NOTE: For `DisorderedAtom` objects, selecting the highest-occupancy atom is already the default behavior in Biopython.
+    # Reference: https://biopython-tutorial.readthedocs.io/en/latest/notebooks/11%20-%20Going%203D%20-%20The%20PDB%20module.html#Disordered-atoms[disordered-atoms]
     if isinstance(structure, Model):
         model = structure
     else:
@@ -333,6 +336,7 @@ def _from_mmcif_object(
                 f" {res_chem_comp_details.id} in the mmCIF chemical component dictionary for {mmcif_object.file_id}."
             )
             is_polymer_residue = is_polymer(res_chem_comp_details.type)
+            is_peptide_residue = "peptide" in res_chem_comp_details.type.lower()
             residue_constants = get_residue_constants(res_chem_type=res_chem_comp_details.type)
             res_shortname = residue_constants.restype_3to1.get(res.resname, "X")
             restype_idx = residue_constants.restype_order.get(
@@ -345,12 +349,36 @@ def _from_mmcif_object(
                 for atom in res:
                     if is_polymer_residue and atom.name not in residue_constants.atom_types_set:
                         continue
-                    pos[residue_constants.atom_order[atom.name]] = atom.coord
-                    mask[residue_constants.atom_order[atom.name]] = 1.0
-                    res_b_factors[residue_constants.atom_order[atom.name]] = atom.bfactor
+                    elif is_peptide_residue and atom.name.upper() == "SE" and res.get_resname() == "MSE":
+                        # Put the coords of the selenium atom in the sulphur column.
+                        pos[residue_constants.atom_order["SD"]] = atom.coord
+                        mask[residue_constants.atom_order["SD"]] = 1.0
+                        res_b_factors[residue_constants.atom_order["SD"]] = atom.bfactor
+                    else:
+                        pos[residue_constants.atom_order[atom.name]] = atom.coord
+                        mask[residue_constants.atom_order[atom.name]] = 1.0
+                        res_b_factors[residue_constants.atom_order[atom.name]] = atom.bfactor
                 if np.sum(mask) < 0.5:
                     # If no known atom positions are reported for a polymer residue then skip it.
                     continue
+                if is_peptide_residue:
+                    # Fix naming errors in arginine residues where NH2 is incorrectly
+                    # assigned to be closer to CD than NH1
+                    cd = residue_constants.atom_order["CD"]
+                    nh1 = residue_constants.atom_order["NH1"]
+                    nh2 = residue_constants.atom_order["NH2"]
+                    if (
+                        res.get_resname() == "ARG"
+                        and all(mask[atom_index] for atom_index in (cd, nh1, nh2))
+                        and (np.linalg.norm(pos[nh1] - pos[cd]) > np.linalg.norm(pos[nh2] - pos[cd]))
+                    ):
+                        pos[nh1], pos[nh2] = pos[nh2].copy(), pos[nh1].copy()
+                        mask[nh1], mask[nh2] = mask[nh2].copy(), mask[nh1].copy()
+                        res_b_factors[nh1], res_b_factors[nh2] = (
+                            res_b_factors[nh2].copy(),
+                            res_b_factors[nh1].copy(),
+                        )
+                # Collect the residue's features.
                 restype.append(restype_idx)
                 chemid.append(res_chem_comp_details.id)
                 chemtype.append(residue_constants.chemtype_num)
@@ -379,6 +407,7 @@ def _from_mmcif_object(
                 # into a single ligand residue using indexing operations
                 # working jointly on chain_index and residue_index.
                 for atom in res:
+                    # NOTE: This code assumes water residues have previously been filtered out.
                     pos = np.zeros((residue_constants.atom_type_num, 3))
                     mask = np.zeros((residue_constants.atom_type_num,))
                     res_b_factors = np.zeros((residue_constants.atom_type_num,))
