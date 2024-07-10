@@ -1,5 +1,7 @@
 """General-purpose data pipeline."""
 
+import os
+
 from loguru import logger
 from typing import MutableMapping, Optional, Tuple
 
@@ -111,10 +113,10 @@ def make_mmcif_features(
         )
     )
 
-    # Expand the first bioassembly/model sequence and structure, to obtain a biologically relevant complex (AF3 Supplement, Section 2.1).
+    # As necessary, expand the first bioassembly/model sequence and structure, to obtain a biologically relevant complex (AF3 Supplement, Section 2.1).
     # Reference: https://github.com/biotite-dev/biotite/blob/1045f43f80c77a0dc00865e924442385ce8f83ab/src/biotite/structure/io/pdbx/convert.py#L1441
 
-    assembly = get_assembly(_from_mmcif_object(mmcif_object))
+    assembly = _from_mmcif_object(mmcif_object) if "assembly" in description else get_assembly(_from_mmcif_object(mmcif_object))
 
     mmcif_feats["all_atom_positions"] = assembly.atom_positions
     mmcif_feats["all_atom_mask"] = assembly.atom_mask
@@ -138,20 +140,22 @@ def make_mmcif_features(
 
 
 if __name__ == "__main__":
+    filepath = "data/pdb_data/mmcifs/ak/7akd-assembly1.cif"
+    file_id = os.path.splitext(os.path.basename(filepath))[0]
+
     mmcif_object = mmcif_parsing.parse_mmcif_object(
-        # Load an example mmCIF file that includes
-        # protein, nucleic acid, and ligand residues.
-        filepath="data/pdb_data/mmcifs/f7/4f7u.cif",
-        file_id="4f7u",
+        filepath=filepath,
+        file_id=file_id,
     )
     mmcif_feats, assembly = make_mmcif_features(mmcif_object)
     mmcif_string = to_mmcif(
         assembly,
-        file_id="4f7u",
+        file_id=file_id,
         gapless_poly_seq=True,
         insert_alphafold_mmcif_metadata=False,
         unique_res_atom_names=assembly.unique_res_atom_names,
     )
-    with open("4f7u_reconstructed.cif", "w") as f:
+    with open(os.path.basename(filepath).replace(".cif", "_reconstructed.cif"), "w") as f:
         f.write(mmcif_string)
-    print("Successfully reconstructed the mmCIF file after assembly expansion.")
+
+    print(f"Successfully reconstructed {filepath} after mmCIF featurization.")
