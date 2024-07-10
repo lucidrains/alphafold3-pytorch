@@ -3,15 +3,17 @@
 import dataclasses
 import functools
 import io
+import itertools
 import logging
 from collections import defaultdict
 from operator import itemgetter
 from typing import Any, Mapping, Optional, Sequence, Set, Tuple
 
+import numpy as np
 from Bio import PDB
 from Bio.Data import PDBData
 
-from alphafold3_pytorch.utils.data_utils import is_polymer, is_water
+from alphafold3_pytorch.utils.data_utils import is_polymer, is_water, matrix_rotate
 
 # Type aliases:
 ChainId = str
@@ -213,6 +215,111 @@ def mmcif_loop_to_dict(
     """
     entries = mmcif_loop_to_list(prefix, parsed_info)
     return {entry[index]: entry for entry in entries}
+
+
+def apply_transformations(
+    biomol: Any,
+    transformation_dict: Mapping[str, Tuple[np.ndarray, np.ndarray]],
+    operations: Sequence[Tuple[str, str]],
+) -> Any:
+    """
+    Gets subassembly by applying the given operations to the input
+    Biomolecule containing affected asym IDs.
+
+    Adapted from: https://github.com/biotite-dev/biotite
+
+    :param biomol: The Biomolecule to which to apply assembly transformations.
+    :param transformation_dict: A dictionary, where the keys are operation IDs
+        and the values are tuples of rotation matrix and translation vector.
+    :param operations: A list of tuples, where each tuple contains operation IDs
+        of a single step.
+    :return: The subassembly Biomolecule.
+    """
+    # Additional first dimension for 'repeat_biomol()'
+    assembly_coord = np.zeros((len(operations),) + biomol.atom_positions.shape)
+
+    # Apply corresponding transformation for each copy in the assembly
+    for i, operation in enumerate(operations):
+        coord = biomol.atom_positions.copy()
+        # Execute for each transformation step
+        # in the operation expression
+        for op_step in operation:
+            rotation_matrix, translation_vector = transformation_dict[op_step]
+            # Rotate
+            coord = matrix_rotate(coord, rotation_matrix)
+            # Translate
+            coord += translation_vector
+        assembly_coord[i] = coord
+
+    return biomol.repeat(assembly_coord)
+
+
+def get_transformations(
+    struct_oper: Mapping[str, str]
+) -> Mapping[str, Tuple[np.ndarray, np.ndarray]]:
+    """
+    Gets transformation operations in terms of rotation matrix and
+    translation for each operation ID in `pdbx_struct_oper_list`.
+
+    Adapted from: https://github.com/biotite-dev/biotite
+
+    :param struct_oper: A dictionary representing each row in the
+        `_pdbx_struct_oper_list` category of an mmCIF file.
+    :return: A dictionary, where the keys are operation IDs and the values
+        are tuples of rotation matrix and translation vector.
+    """
+    transformation_dict = {}
+    for id in struct_oper:
+        rotation_matrix = np.array(
+            [
+                [struct_oper[id][f"_pdbx_struct_oper_list.matrix[{i}][{j}]"] for j in (1, 2, 3)]
+                for i in (1, 2, 3)
+            ],
+            dtype=np.float64,
+        )
+        translation_vector = np.array(
+            [struct_oper[id][f"_pdbx_struct_oper_list.vector[{i}]"] for i in (1, 2, 3)],
+            dtype=np.float64,
+        )
+        transformation_dict[id] = (rotation_matrix, translation_vector)
+    return transformation_dict
+
+
+def parse_operation_expression(expression: str) -> Sequence[Tuple[str, str]]:
+    """
+    Gets successive operation steps (IDs) for the given
+    ``oper_expression``. Forms the cartesian product, if necessary.
+
+    Adapted from: https://github.com/biotite-dev/biotite
+
+    :param expression: The operation expression string.
+    :return: A list of tuples, where each tuple contains operation IDs
+        of a single step.
+    """
+    # Split groups by parentheses:
+    # use the opening parenthesis as delimiter
+    # and just remove the closing parenthesis
+    # example: '(X0)(1-10,21-25)' from PDB `1a34`
+    expressions_per_step = expression.replace(")", "").split("(")
+    expressions_per_step = [e for e in expressions_per_step if len(e) > 0]
+    # Important: Operations are applied from right to left
+    expressions_per_step.reverse()
+
+    operations = []
+    for one_step_expr in expressions_per_step:
+        one_step_op_ids = []
+        for expr in one_step_expr.split(","):
+            if "-" in expr:
+                # Range of operation IDs, they must be integers
+                first, last = expr.split("-")
+                one_step_op_ids.extend([str(id) for id in range(int(first), int(last) + 1)])
+            else:
+                # Single operation ID
+                one_step_op_ids.append(expr)
+        operations.append(one_step_op_ids)
+
+    # Cartesian product of operations
+    return list(itertools.product(*operations))
 
 
 @functools.lru_cache(16, typed=False)
