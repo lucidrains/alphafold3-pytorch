@@ -8,6 +8,8 @@ You can chat with other researchers about this work <a href="https://discord.gg/
 
 <a href="https://www.youtube.com/watch?v=qjFgthkKxcA">Review of the paper</a> by <a href="https://x.com/sokrypton">Sergey</a>
 
+<a href="https://elanapearl.github.io/blog/2024/the-illustrated-alphafold/">Illustrated guide</a> by <a href="https://elanapearl.github.io/">Elana P. Simon</a>
+
 A fork with full Lightning + Hydra support is being maintained by <a href="https://github.com/amorehead">Alex</a> at <a href="https://github.com/amorehead/alphafold3-pytorch-lightning-hydra">this repository</a>
 
 ## Appreciation
