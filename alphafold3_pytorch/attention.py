@@ -178,7 +178,8 @@ class Attention(Module):
         window_size = None,
         num_memory_kv: int = 0,
         enable_attn_softclamp = False,
-        attn_softclamp_value = 50.
+        attn_softclamp_value = 50.,
+        init_gate_bias = -2.
     ):
         super().__init__()
         """
@@ -224,7 +225,7 @@ class Attention(Module):
         if gate_output:
             gate_linear = nn.Linear(dim, dim_inner)
             nn.init.zeros_(gate_linear.weight)
-            nn.init.constant_(gate_linear.bias, 1.)
+            nn.init.constant_(gate_linear.bias, init_gate_bias)
 
             self.to_gates = gate_linear
 
