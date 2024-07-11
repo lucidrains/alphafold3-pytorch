@@ -42,7 +42,6 @@ import numpy as np
 import pandas as pd
 import timeout_decorator
 from Bio.PDB.NeighborSearch import NeighborSearch
-from loguru import logger
 from pdbeccdutils.core import ccd_reader
 from pdbeccdutils.core.ccd_reader import CCDReaderResult
 from tqdm.contrib.concurrent import process_map
@@ -55,12 +54,12 @@ from alphafold3_pytorch.common.paper_constants import (
 )
 from alphafold3_pytorch.data import mmcif_parsing, mmcif_writing
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject
+from alphafold3_pytorch.tensor_typing import AtomType, ResidueType, TokenType, typecheck
 from alphafold3_pytorch.utils.data_utils import (
     get_biopython_chain_residue_by_composite_id,
     is_polymer,
     is_water,
 )
-from alphafold3_pytorch.tensor_typing import AtomType, ResidueType, TokenType, typecheck
 from alphafold3_pytorch.utils.utils import exists
 
 # Constants
@@ -80,7 +79,7 @@ def impute_missing_assembly_metadata(
 ) -> MmcifObject:
     """Impute missing assembly metadata from the asymmetric unit mmCIF."""
     mmcif_object.header.update(asym_mmcif_object.header)
-    mmcif_object.covalent_bonds.extend(asym_mmcif_object.covalent_bonds)
+    mmcif_object.bonds.extend(asym_mmcif_object.bonds)
 
     # Impute structure method
     if (
@@ -94,9 +93,9 @@ def impute_missing_assembly_metadata(
         "_pdbx_audit_revision_history.revision_date" not in mmcif_object.raw_string
         and "_pdbx_audit_revision_history.revision_date" in asym_mmcif_object.raw_string
     ):
-        mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"] = (
-            asym_mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
-        )
+        mmcif_object.raw_string[
+            "_pdbx_audit_revision_history.revision_date"
+        ] = asym_mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
 
     # Impute resolution
     if (
@@ -403,9 +402,10 @@ def remove_leaving_atoms(
     """
     Identify leaving atoms to remove from covalent ligands.
 
-    NOTE: We rely on the CCD's `struct_conn` and `pdbx_leaving_atom_flag`
-    metadata to discern leaving atoms within each covalent ligand
-    once a covalent ligand has been structurally identified.
+    NOTE: We rely on the PDB's `struct_conn` and the CCD's
+    `pdbx_leaving_atom_flag` metadata to discern leaving
+    atoms within each covalent ligand once a covalent
+    ligand has been structurally identified.
 
     NOTE: This implementation assumes that if a ligand atom is covalently
     bonded to any other atom, then any leaving atom within the residue
@@ -414,20 +414,22 @@ def remove_leaving_atoms(
     """
     atoms_to_remove = set()
 
-    for covalent_bond in mmcif_object.covalent_bonds:
+    for bond in mmcif_object.bonds:
+        if bond.conn_type_id.lower() != "covale":
+            continue
         bond_chain_ids_in_structure = (
-            covalent_bond.ptnr1_auth_asym_id in mmcif_object.structure
-            and covalent_bond.ptnr2_auth_asym_id in mmcif_object.structure
+            bond.ptnr1_auth_asym_id in mmcif_object.structure
+            and bond.ptnr2_auth_asym_id in mmcif_object.structure
         )
-        if covalent_bond.leaving_atom_flag in {"one", "both"} and bond_chain_ids_in_structure:
+        if bond.pdbx_leaving_atom_flag in {"one", "both"} and bond_chain_ids_in_structure:
             # Identify the chemical types of the residues of the "partner 1" and "partner 2" bond atoms in the structure
-            ptnr1_chain = mmcif_object.structure[covalent_bond.ptnr1_auth_asym_id]
-            ptnr2_chain = mmcif_object.structure[covalent_bond.ptnr2_auth_asym_id]
+            ptnr1_chain = mmcif_object.structure[bond.ptnr1_auth_asym_id]
+            ptnr2_chain = mmcif_object.structure[bond.ptnr2_auth_asym_id]
             ptnr1_res = get_biopython_chain_residue_by_composite_id(
-                ptnr1_chain, covalent_bond.ptnr1_auth_comp_id, int(covalent_bond.ptnr1_auth_seq_id)
+                ptnr1_chain, bond.ptnr1_auth_comp_id, int(bond.ptnr1_auth_seq_id)
             )
             ptnr2_res = get_biopython_chain_residue_by_composite_id(
-                ptnr2_chain, covalent_bond.ptnr2_auth_comp_id, int(covalent_bond.ptnr2_auth_seq_id)
+                ptnr2_chain, bond.ptnr2_auth_comp_id, int(bond.ptnr2_auth_seq_id)
             )
             # NOTE: This is the main bottleneck of the function, since (for each chain)
             # we need a zero-based index into the residue's chemical component details
@@ -441,9 +443,9 @@ def remove_leaving_atoms(
             )
 
             # Remove all leaving atoms in the "partner 1" covalent ligand residue
-            if ptnr1_res_is_ligand and covalent_bond.ptnr1_auth_comp_id in ccd_reader_results:
+            if ptnr1_res_is_ligand and bond.ptnr1_auth_comp_id in ccd_reader_results:
                 ptnr1_atom_id_leaving_atom_table = ccd_reader_results[
-                    covalent_bond.ptnr1_auth_comp_id
+                    bond.ptnr1_auth_comp_id
                 ].component.ccd_cif_block.find(
                     "_chem_comp_atom.", ["atom_id", "pdbx_leaving_atom_flag"]
                 )
@@ -452,9 +454,9 @@ def remove_leaving_atoms(
                         atoms_to_remove.add(ptnr1_res[row["atom_id"]].get_full_id())
 
             # Remove all leaving atoms in the "partner 2" covalent ligand residue
-            if ptnr2_res_is_ligand and covalent_bond.ptnr2_auth_comp_id in ccd_reader_results:
+            if ptnr2_res_is_ligand and bond.ptnr2_auth_comp_id in ccd_reader_results:
                 ptnr2_atom_id_leaving_atom_table = ccd_reader_results[
-                    covalent_bond.ptnr2_auth_comp_id
+                    bond.ptnr2_auth_comp_id
                 ].component.ccd_cif_block.find(
                     "_chem_comp_atom.", ["atom_id", "pdbx_leaving_atom_flag"]
                 )
@@ -724,7 +726,7 @@ def filter_structure_with_timeout(
         mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
     )
     if not exists(mmcif_object):
-        logger.info(f"Skipping target due to prefiltering: {file_id}")
+        print(f"Skipping target due to prefiltering: {file_id}")
         return
     # Filtering of bioassemblies
     # NOTE: Here, we remove waters even though the AlphaFold 3 supplement doesn't mention removing them during filtering
@@ -755,7 +757,7 @@ def filter_structure_with_timeout(
             insert_orig_atom_names=True,
             insert_alphafold_mmcif_metadata=False,
         )
-        logger.info(f"Finished filtering structure: {mmcif_object.file_id}")
+        print(f"Finished filtering structure: {mmcif_object.file_id}")
 
 
 @typecheck
@@ -778,12 +780,12 @@ def filter_structure(args: Tuple[str, str, pd.Timestamp, pd.Timestamp, str]):
             split=split,
         )
     except Exception as e:
-        logger.info(f"Skipping structure filtering of {filepath} due to: {e}")
+        print(f"Skipping structure filtering of {filepath} due to: {e}")
         if os.path.exists(output_filepath):
             try:
                 os.remove(output_filepath)
             except Exception as e:
-                logger.warning(
+                print(
                     f"Failed to remove partially filtered file {output_filepath} due to: {e}. Skipping its removal..."
                 )
 
@@ -883,13 +885,13 @@ if __name__ == "__main__":
 
     # Load the Chemical Component Dictionary (CCD) into memory
 
-    logger.info("Loading the Chemical Component Dictionary (CCD) into memory...")
+    print("Loading the Chemical Component Dictionary (CCD) into memory...")
     CCD_READER_RESULTS = ccd_reader.read_pdb_components_file(
         # Load globally to share amongst all worker processes
         os.path.join(args.ccd_dir, "components.cif"),
         sanitize=False,  # Reduce loading time
     )
-    logger.info("Finished loading the Chemical Component Dictionary (CCD) into memory.")
+    print("Finished loading the Chemical Component Dictionary (CCD) into memory.")
 
     # Filter structures across all worker processes
 

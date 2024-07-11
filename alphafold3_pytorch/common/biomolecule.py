@@ -36,6 +36,7 @@ MMCIF_PREFIXES_TO_DROP_POST_PARSING = [
     "_pdbx_struct_assembly.",
     "_pdbx_struct_assembly_gen.",
     "_struct_asym.",
+    "_struct_conn.",
 ]
 MMCIF_PREFIXES_TO_DROP_POST_AF3 = MMCIF_PREFIXES_TO_DROP_POST_PARSING + [
     "_citation.",
@@ -90,11 +91,17 @@ class Biomolecule:
     # a protein (0), RNA (1), DNA (2), or ligand (3) residue.
     chemtype: np.ndarray  # [num_res]
 
+    # Bonds between atoms in the biomolecule.
+    bonds: Optional[List[mmcif_parsing.Bond]]  # [num_bonds]
+
     # Atom name-chain ID-residue ID tuples for each (e.g. ligand) "pseudoresidue" of each residue in each chain.
     # This is used to group "pseudoresidues" (e.g., ligand atoms) by parent residue.
     unique_res_atom_names: Optional[
         List[Tuple[List[List[str]], str, int]]
     ]  # [num_res, num_pseudoresidues, num_atoms]
+
+    # Mapping from (original) author chain ID-residue name-residue ID (CRI) tuples to (new) author CRI tuples.
+    author_cri_to_new_cri: Dict[Tuple[str, str, int], Tuple[str, str, int]]  # [num_res]
 
     # Chemical component details of each residue as a unique `ChemComp` object.
     # This is used to determine the biomolecule's unique chemical IDs, names, types, etc.
@@ -125,7 +132,9 @@ class Biomolecule:
             b_factors=np.concatenate([self.b_factors, other.b_factors], axis=0),
             chemid=np.concatenate([self.chemid, other.chemid], axis=0),
             chemtype=np.concatenate([self.chemtype, other.chemtype], axis=0),
+            bonds=list(dict.fromkeys(self.bonds + other.bonds)),
             unique_res_atom_names=self.unique_res_atom_names + other.unique_res_atom_names,
+            author_cri_to_new_cri={**self.author_cri_to_new_cri, **other.author_cri_to_new_cri},
             chem_comp_table=self.chem_comp_table.union(other.chem_comp_table),
             entity_to_chain=deep_merge_dicts(
                 self.entity_to_chain, other.entity_to_chain, value_op="union"
@@ -168,11 +177,22 @@ class Biomolecule:
             b_factors=self.b_factors[chain_mask],
             chemid=self.chemid[chain_mask],
             chemtype=self.chemtype[chain_mask],
+            bonds=[
+                bond
+                for bond in self.bonds
+                if bond.ptnr1_auth_asym_id in subset_chain_ids
+                and bond.ptnr2_auth_asym_id in subset_chain_ids
+            ],
             unique_res_atom_names=[
                 unique_res_atom_names
                 for unique_res_atom_names in self.unique_res_atom_names
                 if unique_res_atom_names[1] in subset_chain_ids
             ],
+            author_cri_to_new_cri={
+                author_cri: new_cri
+                for author_cri, new_cri in self.author_cri_to_new_cri.items()
+                if new_cri[0] in subset_chain_index_mapping
+            },
             chem_comp_table=self.chem_comp_table,
             entity_to_chain=entity_to_chain,
             mmcif_to_author_chain=mmcif_to_author_chain,
@@ -191,11 +211,13 @@ class Biomolecule:
             b_factors=np.tile(self.b_factors, (coord.shape[0], 1, 1)).reshape(-1, 47),
             chemid=np.tile(self.chemid, (coord.shape[0], 1)).reshape(-1),
             chemtype=np.tile(self.chemtype, (coord.shape[0], 1)).reshape(-1),
+            bonds=self.bonds,
             unique_res_atom_names=[
                 unique_res_atom_names
                 for _ in range(coord.shape[0])
                 for unique_res_atom_names in self.unique_res_atom_names
             ],
+            author_cri_to_new_cri=self.author_cri_to_new_cri,
             chem_comp_table=self.chem_comp_table,
             entity_to_chain=self.entity_to_chain,
             mmcif_to_author_chain=self.mmcif_to_author_chain,
@@ -320,6 +342,7 @@ def _from_mmcif_object(
     residue_index = []
     chain_ids = []
     b_factors = []
+    author_cri_to_new_cri = {}
 
     for chain in model:
         if exists(chain_id) and chain.id != chain_id:
@@ -349,7 +372,11 @@ def _from_mmcif_object(
                 for atom in res:
                     if is_polymer_residue and atom.name not in residue_constants.atom_types_set:
                         continue
-                    elif is_peptide_residue and atom.name.upper() == "SE" and res.get_resname() == "MSE":
+                    elif (
+                        is_peptide_residue
+                        and atom.name.upper() == "SE"
+                        and res.get_resname() == "MSE"
+                    ):
                         # Put the coords of the selenium atom in the sulphur column.
                         pos[residue_constants.atom_order["SD"]] = atom.coord
                         mask[residue_constants.atom_order["SD"]] = 1.0
@@ -370,7 +397,9 @@ def _from_mmcif_object(
                     if (
                         res.get_resname() == "ARG"
                         and all(mask[atom_index] for atom_index in (cd, nh1, nh2))
-                        and (np.linalg.norm(pos[nh1] - pos[cd]) > np.linalg.norm(pos[nh2] - pos[cd]))
+                        and (
+                            np.linalg.norm(pos[nh1] - pos[cd]) > np.linalg.norm(pos[nh2] - pos[cd])
+                        )
                     ):
                         pos[nh1], pos[nh2] = pos[nh2].copy(), pos[nh1].copy()
                         mask[nh1], mask[nh2] = mask[nh2].copy(), mask[nh1].copy()
@@ -387,6 +416,11 @@ def _from_mmcif_object(
                 residue_index.append(res_index + 1)
                 chain_ids.append(chain.id)
                 b_factors.append(res_b_factors)
+                author_cri_to_new_cri[(chain.id, res.resname, res.id[1])] = (
+                    chain.id,
+                    res.resname,
+                    res_index + 1,
+                )
                 if res.resname == residue_constants.unk_restype:
                     # If the polymer residue is unknown, then it is of the corresponding unknown polymer residue type.
                     residue_chem_comp_details.add(
@@ -425,6 +459,12 @@ def _from_mmcif_object(
                     residue_index.append(res_index + 1)
                     chain_ids.append(chain.id)
                     b_factors.append(res_b_factors)
+
+                author_cri_to_new_cri[(chain.id, res.resname, res.id[1])] = (
+                    chain.id,
+                    res.resname,
+                    res_index + 1,
+                )
 
                 if res.resname == residue_constants.unk_restype:
                     # If the ligand residue is unknown, then it is of the unknown ligand residue type.
@@ -473,7 +513,9 @@ def _from_mmcif_object(
         b_factors=np.array(b_factors),
         chemid=np.array(chemid),
         chemtype=np.array(chemtype),
+        bonds=mmcif_object.bonds,
         unique_res_atom_names=unique_res_atom_names,
+        author_cri_to_new_cri=author_cri_to_new_cri,
         chem_comp_table=residue_chem_comp_details,
         entity_to_chain=entity_to_chain,
         mmcif_to_author_chain=mmcif_to_author_chain,
@@ -605,6 +647,8 @@ def to_mmcif(
     b_factors = biomol.b_factors
     chemid = biomol.chemid
     chemtype = biomol.chemtype
+    bonds = biomol.bonds
+    author_cri_to_new_cri = biomol.author_cri_to_new_cri
     entity_id_to_chain_ids = biomol.entity_to_chain
     mmcif_to_author_chain_ids = biomol.mmcif_to_author_chain
     orig_mmcif_metadata = biomol.mmcif_metadata
@@ -750,6 +794,45 @@ def to_mmcif(
         mmcif_dict["_pdbx_struct_assembly.oligomeric_count"].append(
             str(pdbx_struct_assembly_oligomeric_count[assembly_id])
         )
+
+    # Populate the _struct_conn table.
+    for bond in bonds:
+        # Skip bonds between residues that have previously been filtered out.
+        ptnr1_key = (
+            bond.ptnr1_auth_asym_id,
+            bond.ptnr1_auth_comp_id,
+            int(bond.ptnr1_auth_seq_id),
+        )
+        ptnr2_key = (
+            bond.ptnr2_auth_asym_id,
+            bond.ptnr2_auth_comp_id,
+            int(bond.ptnr2_auth_seq_id),
+        )
+        if ptnr1_key not in author_cri_to_new_cri or ptnr2_key not in author_cri_to_new_cri:
+            continue
+        # Partner 1
+        ptnr1_mapping = author_cri_to_new_cri[ptnr1_key]
+        mmcif_dict["_struct_conn.ptnr1_auth_seq_id"].append(
+            str(ptnr1_mapping[2])
+        )  # Reindex ptnr1 residue ID.
+        mmcif_dict["_struct_conn.ptnr1_auth_comp_id"].append(bond.ptnr1_auth_comp_id)
+        mmcif_dict["_struct_conn.ptnr1_auth_asym_id"].append(bond.ptnr1_auth_asym_id)
+        mmcif_dict["_struct_conn.ptnr1_label_atom_id"].append(bond.ptnr1_label_atom_id)
+        mmcif_dict["_struct_conn.pdbx_ptnr1_label_alt_id"].append(bond.pdbx_ptnr1_label_alt_id)
+        # Partner 2
+        ptnr2_mapping = author_cri_to_new_cri[ptnr2_key]
+        mmcif_dict["_struct_conn.ptnr2_auth_seq_id"].append(
+            str(ptnr2_mapping[2])
+        )  # Reindex ptnr2 residue ID.
+        mmcif_dict["_struct_conn.ptnr2_auth_comp_id"].append(bond.ptnr2_auth_comp_id)
+        mmcif_dict["_struct_conn.ptnr2_auth_asym_id"].append(bond.ptnr2_auth_asym_id)
+        mmcif_dict["_struct_conn.ptnr2_label_atom_id"].append(bond.ptnr2_label_atom_id)
+        mmcif_dict["_struct_conn.pdbx_ptnr2_label_alt_id"].append(bond.pdbx_ptnr2_label_alt_id)
+        # Connection metadata
+        mmcif_dict["_struct_conn.pdbx_leaving_atom_flag"].append(bond.pdbx_leaving_atom_flag)
+        mmcif_dict["_struct_conn.pdbx_dist_value"].append(bond.pdbx_dist_value)
+        mmcif_dict["_struct_conn.pdbx_role"].append(bond.pdbx_role)
+        mmcif_dict["_struct_conn.conn_type_id"].append(bond.conn_type_id)
 
     # Populate the _chem_comp table.
     for chem_comp in biomol.chem_comp_table:

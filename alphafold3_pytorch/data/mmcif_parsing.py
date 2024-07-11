@@ -65,8 +65,8 @@ class AtomSite:
 
 
 @dataclasses.dataclass(frozen=True)
-class CovalentBond:
-    """Represents a covalent bond between two atoms."""
+class Bond:
+    """Represents a structural connection between two atoms."""
 
     ptnr1_auth_seq_id: str
     ptnr1_auth_comp_id: str
@@ -80,7 +80,9 @@ class CovalentBond:
     ptnr2_label_atom_id: str
     pdbx_ptnr2_label_alt_id: str
 
-    leaving_atom_flag: str
+    pdbx_leaving_atom_flag: str
+    pdbx_dist_value: str
+    pdbx_role: str
     conn_type_id: str
 
 
@@ -127,7 +129,7 @@ class MmcifObject:
             {1: ['A', 'B']}
         mmcif_to_author_chain: Dict mapping internal mmCIF chain ids to author chain ids. E.g.
             {'A': 'B', 'B', 'B'}
-        covalent_bonds: List of CovalentBond.
+        bonds: List of Bond objects.
         raw_string: The raw string used to construct the MmcifObject.
         atoms_to_remove: Optional set of atoms to remove.
         residues_to_remove: Optional set of residues to remove.
@@ -143,7 +145,7 @@ class MmcifObject:
     seqres_to_structure: Mapping[ChainId, Mapping[int, ResidueAtPosition]]
     entity_to_chain: Mapping[int, Sequence[str]]
     mmcif_to_author_chain: Mapping[str, str]
-    covalent_bonds: Sequence[CovalentBond]
+    bonds: Sequence[Bond]
     raw_string: Any
     atoms_to_remove: Set[AtomFullId]
     residues_to_remove: Set[ResidueFullId]
@@ -541,8 +543,8 @@ def parse(
             for entity_id, chains in mmcif_entity_to_author_chain_mappings.items()
         }
 
-        # Identify all covalent bonds.
-        covalent_bonds = _get_covalent_bond_list(parsed_info)
+        # Identify all bonds.
+        bonds = _get_bond_list(parsed_info)
 
         mmcif_object = MmcifObject(
             file_id=file_id,
@@ -554,7 +556,7 @@ def parse(
             seqres_to_structure=seq_to_structure_mappings,
             entity_to_chain=entity_to_chain,
             mmcif_to_author_chain=mmcif_to_author_chain_id,
-            covalent_bonds=covalent_bonds,
+            bonds=bonds,
             raw_string=parsed_info,
             atoms_to_remove=set(),
             residues_to_remove=set(),
@@ -631,12 +633,12 @@ def _get_atom_site_list(parsed_info: MmCIFDict) -> Sequence[AtomSite]:
     ]
 
 
-def _get_covalent_bond_list(parsed_info: MmCIFDict) -> Sequence[CovalentBond]:
-    """Returns list of covalent bonds present in the structure."""
+def _get_bond_list(parsed_info: MmCIFDict) -> Sequence[Bond]:
+    """Returns list of bonds present in the structure."""
     return [
-        # Collect unique (partner) atom metadata required for each covalent bond
+        # Collect unique (partner) atom metadata required for each bond
         # per https://mmcif.wwpdb.org/docs/sw-examples/python/html/connections3.html.
-        CovalentBond(*conn)
+        Bond(*conn)
         for conn in zip(  # pylint:disable=g-complex-comprehension
             # Partner 1
             parsed_info.get("_struct_conn.ptnr1_auth_seq_id", []),
@@ -652,9 +654,11 @@ def _get_covalent_bond_list(parsed_info: MmCIFDict) -> Sequence[CovalentBond]:
             parsed_info.get("_struct_conn.pdbx_ptnr2_label_alt_id", []),
             # Connection metadata
             parsed_info.get("_struct_conn.pdbx_leaving_atom_flag", []),
+            parsed_info.get("_struct_conn.pdbx_dist_value", []),
+            parsed_info.get("_struct_conn.pdbx_role", []),
             parsed_info.get("_struct_conn.conn_type_id", []),
         )
-        if len(conn[-1]) and conn[-1].lower() == "covale"
+        if len(conn[-1]) > 0
     ]
 
 
