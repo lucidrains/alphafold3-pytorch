@@ -1,3 +1,4 @@
+import os
 import pytest
 import torch
 
@@ -5,10 +6,14 @@ from alphafold3_pytorch import (
     Alphafold3,
     Alphafold3Input,
     AtomInput,
+    PDBInput,
     maybe_transform_to_atom_input,
     collate_inputs_to_batched_atom_input,
-    alphafold3_inputs_to_batched_atom_input
+    alphafold3_inputs_to_batched_atom_input,
+    pdb_inputs_to_batched_atom_input
 )
+
+from alphafold3_pytorch.data import mmcif_parsing, mmcif_writing
 
 from alphafold3_pytorch.life import (
     reverse_complement,
@@ -134,3 +139,70 @@ def test_atompos_input():
     sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
 
     assert sampled_atom_pos.shape == (1, (6 + 5), 3)
+
+def test_pdbinput_input():
+    pytest.skip("This unit test is currently disabled while the PDB featurization pipeline is under development.")
+
+    filepath = os.path.join("data", "test", "7a4d-assembly1.cif")
+    file_id = os.path.splitext(os.path.basename(filepath))[0]
+    assert os.path.exists(filepath)
+
+    if os.path.exists(filepath.replace(".cif", "-sampled.cif")):
+        os.remove(filepath.replace(".cif", "-sampled.cif"))
+
+    train_pdb_input = PDBInput(filepath)
+
+    eval_pdb_input = PDBInput(filepath)
+
+    batched_atom_input = pdb_inputs_to_batched_atom_input(
+        train_pdb_input, atoms_per_window=27
+    )
+
+    # training
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs=3,
+        dim_atompair_inputs=1,
+        atoms_per_window=27,
+        dim_template_feats=44,
+        num_dist_bins=38,
+        confidence_head_kwargs=dict(pairformer_depth=1),
+        template_embedder_kwargs=dict(pairformer_stack_depth=1),
+        msa_module_kwargs=dict(depth=1),
+        pairformer_stack=dict(depth=2),
+        diffusion_module_kwargs=dict(
+            atom_encoder_depth=1,
+            token_transformer_depth=1,
+            atom_decoder_depth=1,
+        ),
+    )
+
+    loss = alphafold3(**batched_atom_input.dict())
+    loss.backward()
+
+    # sampling
+
+    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(
+        eval_pdb_input, atoms_per_window=27
+    )
+
+    alphafold3.eval()
+    sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
+
+    assert sampled_atom_pos.shape == (1, 4155, 3)
+
+    # visualizing
+
+    mmcif_object = mmcif_parsing.parse_mmcif_object(
+        filepath=filepath,
+        file_id=file_id,
+    )
+    mmcif_writing.write_mmcif(
+        mmcif_object=mmcif_object,
+        output_filepath=filepath.replace(".cif", "-sampled.cif"),
+        gapless_poly_seq=True,
+        insert_orig_atom_names=True,
+        insert_alphafold_mmcif_metadata=True,
+        sampled_atom_positions=sampled_atom_pos.cpu().numpy(),
+    )
+    assert os.path.exists(filepath.replace(".cif", "-sampled.cif"))
