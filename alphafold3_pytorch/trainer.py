@@ -23,6 +23,7 @@ from alphafold3_pytorch.inputs import (
     AtomInput,
     BatchedAtomInput,
     Alphafold3Input,
+    PDBInput,
     maybe_transform_to_atom_inputs,
     alphafold3_input_to_molecule_input
 )
@@ -195,6 +196,18 @@ def alphafold3_inputs_to_batched_atom_input(
 ) -> BatchedAtomInput:
 
     if isinstance(inp, Alphafold3Input):
+        inp = [inp]
+
+    atom_inputs = maybe_transform_to_atom_inputs(inp)
+    return collate_inputs_to_batched_atom_input(atom_inputs, **collate_kwargs)
+
+@typecheck
+def pdb_inputs_to_batched_atom_input(
+    inp: PDBInput | List[PDBInput],
+    **collate_kwargs
+) -> BatchedAtomInput:
+
+    if isinstance(inp, PDBInput):
         inp = [inp]
 
     atom_inputs = maybe_transform_to_atom_inputs(inp)
