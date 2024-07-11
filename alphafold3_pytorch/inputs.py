@@ -58,15 +58,13 @@ CCD_COMPONENTS_SMILES_FILEPATH = os.path.join("data", "ccd_data", "components_sm
 
 # load all SMILES strings in the PDB Chemical Component Dictionary (CCD)
 
+CCD_COMPONENTS_SMILES = None
+
 if os.path.exists(CCD_COMPONENTS_SMILES_FILEPATH):
     logger.info(f"Loading CCD component SMILES strings from {CCD_COMPONENTS_SMILES_FILEPATH}.")
     with open(CCD_COMPONENTS_SMILES_FILEPATH) as f:
         CCD_COMPONENTS_SMILES = json.load(f)
-else:
-    assert os.path.exists(CCD_COMPONENTS_FILEPATH), (
-        f"The PDB Chemical Component Dictionary (CCD) components file {CCD_COMPONENTS_FILEPATH} does not exist. "
-        "Please follow the instructions in `README.md` to first download the file."
-    )
+elif os.path.exists(CCD_COMPONENTS_FILEPATH):
     logger.info(
         f"Loading CCD components from {CCD_COMPONENTS_FILEPATH} to extract all available SMILES strings (~3 minutes, one-time only)."
     )
@@ -908,6 +906,12 @@ class PDBInput:
 def extract_chain_sequences_from_chemical_components(
     chem_comps: List[mmcif_parsing.ChemComp],
 ) -> Tuple[List[str], List[str], List[str], List[Mol | str]]:
+    assert exists(CCD_COMPONENTS_SMILES), (
+        f"The PDB Chemical Component Dictionary (CCD) components SMILES file {CCD_COMPONENTS_SMILES_FILEPATH} does not exist. "
+        f"Please re-run this script after ensuring the preliminary CCD file {CCD_COMPONENTS_FILEPATH} has been downloaded according to this project's `README.md` file."
+        f"After doing so, the SMILES file {CCD_COMPONENTS_SMILES_FILEPATH} will be cached locally and used for subsequent runs."
+    )
+
     current_chain_seq = []
     proteins, ss_dna, ss_rna, ligands = [], [], [], []
 
