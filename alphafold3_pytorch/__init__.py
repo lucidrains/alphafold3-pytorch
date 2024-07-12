@@ -39,6 +39,7 @@ from alphafold3_pytorch.inputs import (
     BatchedAtomInput,
     MoleculeInput,
     Alphafold3Input,
+    PDBInput,
     maybe_transform_to_atom_input,
     maybe_transform_to_atom_inputs
 )
@@ -47,7 +48,8 @@ from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,
     collate_inputs_to_batched_atom_input,
-    alphafold3_inputs_to_batched_atom_input
+    alphafold3_inputs_to_batched_atom_input,
+    pdb_inputs_to_batched_atom_input,
 )
 
 from alphafold3_pytorch.configs import (
@@ -90,10 +92,12 @@ __all__ = [
     Alphafold3WithHubMixin,
     Alphafold3Config,
     AtomInput,
+    PDBInput,
     Trainer,
     TrainerConfig,
     ConductorConfig,
     create_alphafold3_from_yaml,
     create_trainer_from_yaml,
-    create_trainer_from_conductor_yaml
+    create_trainer_from_conductor_yaml,
+    pdb_inputs_to_batched_atom_input,
 ]
