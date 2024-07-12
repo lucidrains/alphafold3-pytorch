@@ -248,9 +248,9 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
                     if f"{neighbor_interface_key}+{atom_interface_key}" not in interface_chain_ids:
                         interface_chain_ids.add(f"{atom_interface_key}+{neighbor_interface_key}")
 
-        assert (
-            len(one_letter_seq_tokens) > 0
-        ), f"No residues found in chain {chain.id} within the mmCIF file {filepath}."
+        if not one_letter_seq_tokens:
+            # NOTE: This indicates that the current chain consists of only ligand residues
+            continue
 
         unique_token_molecule_types = set(token_molecule_types)
         if len(unique_token_molecule_types) > 1:
