@@ -36,6 +36,7 @@ from tqdm import tqdm
 
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
+from alphafold3_pytorch.utils.data_utils import RESIDUE_MOLECULE_TYPE, get_residue_molecule_type
 from alphafold3_pytorch.utils.utils import np_mode
 
 # Constants
@@ -43,7 +44,6 @@ from alphafold3_pytorch.utils.utils import np_mode
 CHAIN_SEQUENCES = List[Dict[str, Dict[str, str]]]
 CHAIN_INTERFACES = Dict[str, List[str]]
 INTERFACE_CLUSTERS = Dict[str, str]
-RESIDUE_MOLECULE_TYPE = Literal["protein", "rna", "dna", "ligand"]
 CLUSTERING_MOLECULE_TYPE = Literal["protein", "nucleic_acid", "peptide", "ligand", "unknown"]
 
 PROTEIN_LETTERS_3TO1 = {k.strip(): v.strip() for k, v in PDBData.protein_letters_3to1.items()}
@@ -74,20 +74,6 @@ DNA_LETTERS_1TO3 = {
 
 
 # Helper functions
-
-
-@typecheck
-def get_residue_molecule_type(res_chem_type: str) -> RESIDUE_MOLECULE_TYPE:
-    """Get the molecule type of a residue."""
-    if "peptide" in res_chem_type.lower():
-        return "protein"
-    elif "rna" in res_chem_type.lower():
-        return "rna"
-    elif "dna" in res_chem_type.lower():
-        return "dna"
-    else:
-        return "ligand"
-
 
 @typecheck
 def convert_modified_residue_three_to_one(
