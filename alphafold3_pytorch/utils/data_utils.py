@@ -4,6 +4,10 @@ import numpy as np
 
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
 
+# constants
+
+RESIDUE_MOLECULE_TYPE = Literal["protein", "rna", "dna", "ligand"]
+
 
 @typecheck
 def is_polymer(
@@ -29,6 +33,19 @@ def is_water(res_name: str, water_res_names: Set[str] = {"HOH", "WAT"}) -> bool:
     :return: Whether the residue is a water residue.
     """
     return any(water_res_name in res_name.upper() for water_res_name in water_res_names)
+
+
+@typecheck
+def get_residue_molecule_type(res_chem_type: str) -> RESIDUE_MOLECULE_TYPE:
+    """Get the molecule type of a residue."""
+    if "peptide" in res_chem_type.lower():
+        return "protein"
+    elif "rna" in res_chem_type.lower():
+        return "rna"
+    elif "dna" in res_chem_type.lower():
+        return "dna"
+    else:
+        return "ligand"
 
 
 @typecheck
