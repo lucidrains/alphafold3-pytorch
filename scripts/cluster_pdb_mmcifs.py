@@ -343,7 +343,8 @@ def write_sequences_to_fasta(
                         )
                         molecule_id = f"{structure_id}{chain_id_}:{molecule_type_and_name[0]}{molecule_index_postfix}"
 
-                        f.write(f">{molecule_id}\n{sequence}\n")
+                        mapped_sequence = sequence.replace("X", "N") if molecule_type == "nucleic_acid" else sequence
+                        f.write(f">{molecule_id}\n{mapped_sequence}\n")
                         molecule_ids.append(molecule_id)
     return molecule_ids
 
