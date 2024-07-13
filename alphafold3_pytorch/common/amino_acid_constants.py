@@ -4,8 +4,8 @@ from typing import Final
 
 # This mapping is used when we need to store atom data in a format that requires
 # fixed atom data size for every residue (e.g. a numpy array).
+# From: https://github.com/google-deepmind/alphafold/blob/f251de6613cb478207c732bf9627b1e853c99c2f/alphafold/common/residue_constants.py#L492C1-L497C2
 atom_types = [
-    # NOTE: Taken from: https://github.com/google-deepmind/alphafold/blob/f251de6613cb478207c732bf9627b1e853c99c2f/alphafold/common/residue_constants.py#L492C1-L497C2
     "N",
     "CA",
     "C",
@@ -133,6 +133,8 @@ resnames = [restype_1to3[r] for r in restypes] + [unk_restype]
 chemtype_num = 0
 
 # A compact atom encoding with 14 columns for amino acid residues.
+# From: https://github.com/google-deepmind/alphafold/blob/f251de6613cb478207c732bf9627b1e853c99c2f/alphafold/common/residue_constants.py#L505
+# Also matches: https://files.rcsb.org/ligands/view/ALA.cif - https://files.rcsb.org/ligands/view/VAL.cif
 # pylint: disable=line-too-long
 # pylint: disable=bad-whitespace
 restype_name_to_compact_atom_names = {
