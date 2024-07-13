@@ -82,3 +82,10 @@ unk_chemname = "UNKNOWN LIGAND RESIDUE"
 
 # This represents the residue chemical type (i.e., `chemtype`) index of ligand residues.
 chemtype_num = dna_constants.chemtype_num + 1  # := 3.
+
+# A compact atom encoding with 47 columns for ligand residues.
+# pylint: disable=line-too-long
+# pylint: disable=bad-whitespace
+restype_name_to_compact_atom_names = {
+    "UNL": atom_types,
+}
