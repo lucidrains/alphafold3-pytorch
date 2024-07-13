@@ -350,6 +350,15 @@ def write_sequences_to_fasta(
 
 
 @typecheck
+def extract_pdb_chain_and_molecule_ids_from_clustering_string(x: str) -> Tuple[str, str, str]:
+    """Extract PDB, chain, and molecule IDs from a clustering output string."""
+    pdb_id = x.split(":")[0].split("-assembly1")[0] + "-assembly1" if "-assembly1" in x else x.split(":")[0][:4]
+    chain_id = x.split(":")[0].split("-assembly1")[1] if "assembly1" in x else x.split(":")[0][4:]
+    molecule_id = x.split(":")[1]
+    return pdb_id, chain_id, molecule_id
+
+
+@typecheck
 def cluster_sequences_using_mmseqs2(
     input_filepath: str,
     output_dir: str,
@@ -411,7 +420,7 @@ def cluster_sequences_using_mmseqs2(
     # Cache chain cluster mappings to local (CSV) storage
     local_chain_cluster_mapping = pd.DataFrame(
         chain_cluster_mapping["cluster_member"]
-        .apply(lambda x: pd.Series((x[:4].split(":")[0], x[4:].split(":")[0], x.split(":")[1])))
+        .apply(lambda x: pd.Series(extract_pdb_chain_and_molecule_ids_from_clustering_string(x)))
         .values,
         columns=["pdb_id", "chain_id", "molecule_id"],
     )
@@ -454,7 +463,7 @@ def cluster_ligands_by_ccd_code(
     # Cache chain cluster mappings to local (CSV) storage
     local_chain_cluster_mapping = pd.DataFrame(
         [
-            (k[:4].split(":")[0], k[4:].split(":")[0], k.split(":")[1], v)
+            (*extract_pdb_chain_and_molecule_ids_from_clustering_string(k), v)
             for (k, v) in chain_cluster_mapping.items()
         ],
         columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
@@ -571,9 +580,9 @@ def cluster_interfaces(
                 if (chain_clusters[1], chain_clusters[0]) in interface_chains_cluster_mapping
                 else interface_chains_cluster_mapping[(chain_clusters[0], chain_clusters[1])]
             )
-            interface_clusters[
-                f"{pdb_id}~{chain_id_pair}"
-            ] = f"{chain_cluster_0},{chain_cluster_1}:{interface_cluster_mapping}"
+            interface_clusters[f"{pdb_id}~{chain_id_pair}"] = (
+                f"{chain_cluster_0},{chain_cluster_1}:{interface_cluster_mapping}"
+            )
 
     # Cache interface cluster mappings to local (CSV) storage
     pd.DataFrame(
