@@ -1,0 +1,125 @@
+data_PRO
+# 
+_chem_comp.id                                    PRO 
+_chem_comp.name                                  PROLINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C5 H9 N O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        115.130 
+_chem_comp.one_letter_code                       P 
+_chem_comp.three_letter_code                     PRO 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  RCSB 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+PRO N   N   N 0 1 N N N Y Y N 39.165 37.768 82.966 -0.816 1.108  0.254  N   PRO 1  
+PRO CA  CA  C 0 1 N N S Y N N 38.579 38.700 82.008 0.001  -0.107 0.509  CA  PRO 2  
+PRO C   C   C 0 1 N N N Y N Y 37.217 39.126 82.515 1.408  0.091  0.005  C   PRO 3  
+PRO O   O   O 0 1 N N N Y N Y 36.256 38.332 82.370 1.650  0.980  -0.777 O   PRO 4  
+PRO CB  CB  C 0 1 N N N N N N 38.491 37.874 80.720 -0.703 -1.227 -0.286 CB  PRO 5  
+PRO CG  CG  C 0 1 N N N N N N 38.311 36.445 81.200 -2.163 -0.753 -0.439 CG  PRO 6  
+PRO CD  CD  C 0 1 N N N N N N 38.958 36.358 82.579 -2.218 0.614  0.276  CD  PRO 7  
+PRO OXT OXT O 0 1 N Y N Y N Y 37.131 40.263 83.047 2.391  -0.721 0.424  OXT PRO 8  
+PRO H   HT1 H 0 1 N Y N Y Y N 40.152 37.928 82.959 -0.707 1.708  1.057  H   PRO 9  
+PRO HA  HA  H 0 1 N N N Y N N 39.160 39.638 81.850 0.009  -0.343 1.573  HA  PRO 10 
+PRO HB2 1HB H 0 1 N N N N N N 37.703 38.219 80.010 -0.240 -1.345 -1.266 HB2 PRO 11 
+PRO HB3 2HB H 0 1 N N N N N N 39.352 38.017 80.027 -0.666 -2.165 0.267  HB3 PRO 12 
+PRO HG2 1HG H 0 1 N N N N N N 37.247 36.109 81.191 -2.416 -0.638 -1.493 HG2 PRO 13 
+PRO HG3 2HG H 0 1 N N N N N N 38.703 35.687 80.482 -2.843 -1.458 0.040  HG3 PRO 14 
+PRO HD2 1HD H 0 1 N N N N N N 38.378 35.759 83.320 -2.872 1.300  -0.263 HD2 PRO 15 
+PRO HD3 2HD H 0 1 N N N N N N 39.880 35.732 82.614 -2.559 0.492  1.304  HD3 PRO 16 
+PRO HXT HXT H 0 1 N Y N Y N Y 36.276 40.530 83.365 3.293  -0.594 0.101  HXT PRO 17 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+PRO N   CA  SING N N 1  
+PRO N   CD  SING N N 2  
+PRO N   H   SING N N 3  
+PRO CA  C   SING N N 4  
+PRO CA  CB  SING N N 5  
+PRO CA  HA  SING N N 6  
+PRO C   O   DOUB N N 7  
+PRO C   OXT SING N N 8  
+PRO CB  CG  SING N N 9  
+PRO CB  HB2 SING N N 10 
+PRO CB  HB3 SING N N 11 
+PRO CG  CD  SING N N 12 
+PRO CG  HG2 SING N N 13 
+PRO CG  HG3 SING N N 14 
+PRO CD  HD2 SING N N 15 
+PRO CD  HD3 SING N N 16 
+PRO OXT HXT SING N N 17 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+PRO SMILES           ACDLabs              10.04 "O=C(O)C1NCCC1"                                                     
+PRO SMILES_CANONICAL CACTVS               3.341 "OC(=O)[C@@H]1CCCN1"                                                
+PRO SMILES           CACTVS               3.341 "OC(=O)[CH]1CCCN1"                                                  
+PRO SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "C1C[C@H](NC1)C(=O)O"                                               
+PRO SMILES           "OpenEye OEToolkits" 1.5.0 "C1CC(NC1)C(=O)O"                                                   
+PRO InChI            InChI                1.03  "InChI=1S/C5H9NO2/c7-5(8)4-2-1-3-6-4/h4,6H,1-3H2,(H,7,8)/t4-/m0/s1" 
+PRO InChIKey         InChI                1.03  ONIBWKKTOPOVIA-BYPYZUCNSA-N                                         
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+PRO "SYSTEMATIC NAME" ACDLabs              10.04 L-proline                            
+PRO "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-pyrrolidine-2-carboxylic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+PRO "Create component"  1999-07-08 RCSB 
+PRO "Modify descriptor" 2011-06-04 RCSB 
+PRO "Modify backbone"   2023-11-03 PDBE 
+# 

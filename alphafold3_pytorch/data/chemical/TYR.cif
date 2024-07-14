@@ -1,0 +1,139 @@
+data_TYR
+# 
+_chem_comp.id                                    TYR 
+_chem_comp.name                                  TYROSINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C9 H11 N O3" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        181.189 
+_chem_comp.one_letter_code                       Y 
+_chem_comp.three_letter_code                     TYR 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+TYR N   N   N 0 1 N N N Y Y N 5.005 5.256 15.563 1.320  0.952  1.428  N   TYR 1  
+TYR CA  CA  C 0 1 N N S Y N N 5.326 6.328 16.507 -0.018 0.429  1.734  CA  TYR 2  
+TYR C   C   C 0 1 N N N Y N Y 4.742 7.680 16.116 -0.103 0.094  3.201  C   TYR 3  
+TYR O   O   O 0 1 N N N Y N Y 4.185 8.411 16.947 0.886  -0.254 3.799  O   TYR 4  
+TYR CB  CB  C 0 1 N N N N N N 6.836 6.389 16.756 -0.274 -0.831 0.907  CB  TYR 5  
+TYR CG  CG  C 0 1 Y N N N N N 7.377 5.438 17.795 -0.189 -0.496 -0.559 CG  TYR 6  
+TYR CD1 CD1 C 0 1 Y N N N N N 6.826 5.370 19.075 1.022  -0.589 -1.219 CD1 TYR 7  
+TYR CD2 CD2 C 0 1 Y N N N N N 8.493 4.624 17.565 -1.324 -0.102 -1.244 CD2 TYR 8  
+TYR CE1 CE1 C 0 1 Y N N N N N 7.308 4.536 20.061 1.103  -0.282 -2.563 CE1 TYR 9  
+TYR CE2 CE2 C 0 1 Y N N N N N 9.029 3.816 18.552 -1.247 0.210  -2.587 CE2 TYR 10 
+TYR CZ  CZ  C 0 1 Y N N N N N 8.439 3.756 19.805 -0.032 0.118  -3.252 CZ  TYR 11 
+TYR OH  OH  O 0 1 N N N N N N 8.954 2.936 20.781 0.044  0.420  -4.574 OH  TYR 12 
+TYR OXT OXT O 0 1 N Y N Y N Y 4.840 8.051 14.829 -1.279 0.184  3.842  OXT TYR 13 
+TYR H   H   H 0 1 N N N Y Y N 5.621 4.925 15.064 1.977  0.225  1.669  H   TYR 14 
+TYR H2  HN2 H 0 1 N Y N Y Y N 5.288 5.511 14.617 1.365  1.063  0.426  H2  TYR 15 
+TYR HA  HA  H 0 1 N N N Y N N 4.913 6.081 17.361 -0.767 1.183  1.489  HA  TYR 16 
+TYR HB2 1HB H 0 1 N N N N N N 7.289 6.213 15.916 0.473  -1.585 1.152  HB2 TYR 17 
+TYR HB3 2HB H 0 1 N N N N N N 7.063 7.294 17.023 -1.268 -1.219 1.134  HB3 TYR 18 
+TYR HD1 HD1 H 0 1 N N N N N N 6.097 5.913 19.272 1.905  -0.902 -0.683 HD1 TYR 19 
+TYR HD2 HD2 H 0 1 N N N N N N 8.887 4.627 16.723 -2.269 -0.031 -0.727 HD2 TYR 20 
+TYR HE1 HE1 H 0 1 N N N N N N 6.886 4.493 20.888 2.049  -0.354 -3.078 HE1 TYR 21 
+TYR HE2 HE2 H 0 1 N N N N N N 9.788 3.310 18.373 -2.132 0.523  -3.121 HE2 TYR 22 
+TYR HH  HH  H 0 1 N N N N N N 8.500 3.001 21.460 -0.123 -0.399 -5.059 HH  TYR 23 
+TYR HXT HXT H 0 1 N Y N Y N Y 4.475 8.893 14.585 -1.333 -0.030 4.784  HXT TYR 24 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+TYR N   CA  SING N N 1  
+TYR N   H   SING N N 2  
+TYR N   H2  SING N N 3  
+TYR CA  C   SING N N 4  
+TYR CA  CB  SING N N 5  
+TYR CA  HA  SING N N 6  
+TYR C   O   DOUB N N 7  
+TYR C   OXT SING N N 8  
+TYR CB  CG  SING N N 9  
+TYR CB  HB2 SING N N 10 
+TYR CB  HB3 SING N N 11 
+TYR CG  CD1 DOUB Y N 12 
+TYR CG  CD2 SING Y N 13 
+TYR CD1 CE1 SING Y N 14 
+TYR CD1 HD1 SING N N 15 
+TYR CD2 CE2 DOUB Y N 16 
+TYR CD2 HD2 SING N N 17 
+TYR CE1 CZ  DOUB Y N 18 
+TYR CE1 HE1 SING N N 19 
+TYR CE2 CZ  SING Y N 20 
+TYR CE2 HE2 SING N N 21 
+TYR CZ  OH  SING N N 22 
+TYR OH  HH  SING N N 23 
+TYR OXT HXT SING N N 24 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+TYR SMILES           ACDLabs              10.04 "O=C(O)C(N)Cc1ccc(O)cc1"                                                                   
+TYR SMILES_CANONICAL CACTVS               3.341 "N[C@@H](Cc1ccc(O)cc1)C(O)=O"                                                              
+TYR SMILES           CACTVS               3.341 "N[CH](Cc1ccc(O)cc1)C(O)=O"                                                                
+TYR SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "c1cc(ccc1C[C@@H](C(=O)O)N)O"                                                              
+TYR SMILES           "OpenEye OEToolkits" 1.5.0 "c1cc(ccc1CC(C(=O)O)N)O"                                                                   
+TYR InChI            InChI                1.03  "InChI=1S/C9H11NO3/c10-8(9(12)13)5-6-1-3-7(11)4-2-6/h1-4,8,11H,5,10H2,(H,12,13)/t8-/m0/s1" 
+TYR InChIKey         InChI                1.03  OUYCCCASQSFEME-QMMMGPOBSA-N                                                                
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+TYR "SYSTEMATIC NAME" ACDLabs              10.04 L-tyrosine                                       
+TYR "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-2-amino-3-(4-hydroxyphenyl)propanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+TYR "Create component"  1999-07-08 EBI  
+TYR "Modify descriptor" 2011-06-04 RCSB 
+TYR "Modify backbone"   2023-11-03 PDBE 
+# 

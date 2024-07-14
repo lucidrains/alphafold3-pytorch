@@ -1,0 +1,134 @@
+data_ILE
+# 
+_chem_comp.id                                    ILE 
+_chem_comp.name                                  ISOLEUCINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C6 H13 N O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        131.173 
+_chem_comp.one_letter_code                       I 
+_chem_comp.three_letter_code                     ILE 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  RCSB 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+ILE N    N    N 0 1 N N N Y Y N 52.625 76.235 68.049 -1.944 0.335  -0.343 N    ILE 1  
+ILE CA   CA   C 0 1 N N S Y N N 52.964 77.620 67.705 -0.487 0.519  -0.369 CA   ILE 2  
+ILE C    C    C 0 1 N N N Y N Y 51.910 78.234 66.791 0.066  -0.032 -1.657 C    ILE 3  
+ILE O    O    O 0 1 N N N Y N Y 51.409 77.508 65.911 -0.484 -0.958 -2.203 O    ILE 4  
+ILE CB   CB   C 0 1 N N S N N N 54.346 77.727 66.970 0.140  -0.219 0.814  CB   ILE 5  
+ILE CG1  CG1  C 0 1 N N N N N N 54.852 79.179 66.992 -0.421 0.341  2.122  CG1  ILE 6  
+ILE CG2  CG2  C 0 1 N N N N N N 54.218 77.237 65.524 1.658  -0.027 0.788  CG2  ILE 7  
+ILE CD1  CD1  C 0 1 N N N N N N 56.126 79.382 66.170 0.206  -0.397 3.305  CD1  ILE 8  
+ILE OXT  OXT  O 0 1 N Y N Y N Y 51.631 79.444 66.958 1.171  0.504  -2.197 OXT  ILE 9  
+ILE H    H    H 0 1 N N N Y Y N 53.330 75.824 68.660 -2.112 -0.656 -0.410 H    ILE 10 
+ILE H2   HN2  H 0 1 N Y N Y Y N 52.475 75.667 67.215 -2.256 0.622  0.572  H2   ILE 11 
+ILE HA   HA   H 0 1 N N N Y N N 53.012 78.169 68.673 -0.253 1.582  -0.299 HA   ILE 12 
+ILE HB   HB   H 0 1 N N N N N N 55.082 77.082 67.504 -0.092 -1.281 0.744  HB   ILE 13 
+ILE HG12 1HG1 H 0 0 N N N N N N 54.051 79.883 66.666 -1.502 0.204  2.141  HG12 ILE 14 
+ILE HG13 2HG1 H 0 0 N N N N N N 54.993 79.535 68.039 -0.188 1.403  2.192  HG13 ILE 15 
+ILE HG21 1HG2 H 0 0 N N N N N N 55.200 77.313 65.001 1.891  1.034  0.857  HG21 ILE 16 
+ILE HG22 2HG2 H 0 0 N N N N N N 53.796 76.206 65.469 2.105  -0.554 1.631  HG22 ILE 17 
+ILE HG23 3HG2 H 0 0 N N N N N N 53.411 77.773 64.972 2.059  -0.427 -0.143 HG23 ILE 18 
+ILE HD11 1HD1 H 0 0 N N N N N N 56.492 80.434 66.185 -0.193 0.001  4.237  HD11 ILE 19 
+ILE HD12 2HD1 H 0 0 N N N N N N 56.926 78.677 66.496 -0.026 -1.460 3.235  HD12 ILE 20 
+ILE HD13 3HD1 H 0 0 N N N N N N 55.984 79.026 65.122 1.287  -0.261 3.286  HD13 ILE 21 
+ILE HXT  HXT  H 0 1 N Y N Y N Y 50.974 79.826 66.388 1.527  0.150  -3.024 HXT  ILE 22 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+ILE N   CA   SING N N 1  
+ILE N   H    SING N N 2  
+ILE N   H2   SING N N 3  
+ILE CA  C    SING N N 4  
+ILE CA  CB   SING N N 5  
+ILE CA  HA   SING N N 6  
+ILE C   O    DOUB N N 7  
+ILE C   OXT  SING N N 8  
+ILE CB  CG1  SING N N 9  
+ILE CB  CG2  SING N N 10 
+ILE CB  HB   SING N N 11 
+ILE CG1 CD1  SING N N 12 
+ILE CG1 HG12 SING N N 13 
+ILE CG1 HG13 SING N N 14 
+ILE CG2 HG21 SING N N 15 
+ILE CG2 HG22 SING N N 16 
+ILE CG2 HG23 SING N N 17 
+ILE CD1 HD11 SING N N 18 
+ILE CD1 HD12 SING N N 19 
+ILE CD1 HD13 SING N N 20 
+ILE OXT HXT  SING N N 21 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+ILE SMILES           ACDLabs              10.04 "O=C(O)C(N)C(C)CC"                                                            
+ILE SMILES_CANONICAL CACTVS               3.341 "CC[C@H](C)[C@H](N)C(O)=O"                                                    
+ILE SMILES           CACTVS               3.341 "CC[CH](C)[CH](N)C(O)=O"                                                      
+ILE SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "CC[C@H](C)[C@@H](C(=O)O)N"                                                   
+ILE SMILES           "OpenEye OEToolkits" 1.5.0 "CCC(C)C(C(=O)O)N"                                                            
+ILE InChI            InChI                1.03  "InChI=1S/C6H13NO2/c1-3-4(2)5(7)6(8)9/h4-5H,3,7H2,1-2H3,(H,8,9)/t4-,5-/m0/s1" 
+ILE InChIKey         InChI                1.03  AGPKZVBTJJNPAG-WHFBIAKZSA-N                                                   
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+ILE "SYSTEMATIC NAME" ACDLabs              10.04 L-isoleucine                              
+ILE "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S,3S)-2-amino-3-methyl-pentanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+ILE "Create component"  1999-07-08 RCSB 
+ILE "Modify descriptor" 2011-06-04 RCSB 
+ILE "Modify backbone"   2023-11-03 PDBE 
+# 

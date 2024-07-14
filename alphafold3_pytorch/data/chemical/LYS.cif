@@ -1,0 +1,140 @@
+data_LYS
+# 
+_chem_comp.id                                    LYS 
+_chem_comp.name                                  LYSINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C6 H15 N2 O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    1 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        147.195 
+_chem_comp.one_letter_code                       K 
+_chem_comp.three_letter_code                     LYS 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  RCSB 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+LYS N   N   N 0 1 N N N Y Y N 37.577 40.385 -3.968 1.422  1.796  0.198  N   LYS 1  
+LYS CA  CA  C 0 1 N N S Y N N 38.631 39.459 -4.356 1.394  0.355  0.484  CA  LYS 2  
+LYS C   C   C 0 1 N N N Y N Y 38.094 38.304 -5.212 2.657  -0.284 -0.032 C   LYS 3  
+LYS O   O   O 0 1 N N N Y N Y 36.873 38.235 -5.490 3.316  0.275  -0.876 O   LYS 4  
+LYS CB  CB  C 0 1 N N N N N N 39.374 38.919 -3.139 0.184  -0.278 -0.206 CB  LYS 5  
+LYS CG  CG  C 0 1 N N N N N N 38.523 38.111 -2.181 -1.102 0.282  0.407  CG  LYS 6  
+LYS CD  CD  C 0 1 N N N N N N 39.164 36.749 -1.903 -2.313 -0.351 -0.283 CD  LYS 7  
+LYS CE  CE  C 0 1 N N N N N N 38.106 35.761 -1.382 -3.598 0.208  0.329  CE  LYS 8  
+LYS NZ  NZ  N 1 1 N N N N N N 37.176 36.546 -0.539 -4.761 -0.400 -0.332 NZ  LYS 9  
+LYS OXT OXT O 0 1 N Y N Y N Y 38.961 37.678 -5.886 3.050  -1.476 0.446  OXT LYS 10 
+LYS H   H   H 0 1 N N N Y Y N 37.933 41.152 -3.399 1.489  1.891  -0.804 H   LYS 11 
+LYS H2  HN2 H 0 1 N Y N Y Y N 36.812 39.900 -3.498 0.521  2.162  0.464  H2  LYS 12 
+LYS HA  HA  H 0 1 N N N Y N N 39.352 40.037 -4.979 1.322  0.200  1.560  HA  LYS 13 
+LYS HB2 1HB H 0 1 N N N N N N 40.262 38.326 -3.460 0.210  -0.047 -1.270 HB2 LYS 14 
+LYS HB3 2HB H 0 1 N N N N N N 39.882 39.750 -2.596 0.211  -1.359 -0.068 HB3 LYS 15 
+LYS HG2 1HG H 0 1 N N N N N N 38.317 38.670 -1.238 -1.128 0.050  1.471  HG2 LYS 16 
+LYS HG3 2HG H 0 1 N N N N N N 37.474 38.007 -2.546 -1.130 1.363  0.269  HG3 LYS 17 
+LYS HD2 1HD H 0 1 N N N N N N 39.701 36.351 -2.795 -2.287 -0.120 -1.348 HD2 LYS 18 
+LYS HD3 2HD H 0 1 N N N N N N 40.034 36.831 -1.210 -2.285 -1.432 -0.145 HD3 LYS 19 
+LYS HE2 1HE H 0 1 N N N N N N 37.593 35.194 -2.194 -3.625 -0.023 1.394  HE2 LYS 20 
+LYS HE3 2HE H 0 1 N N N N N N 38.544 34.882 -0.854 -3.626 1.289  0.192  HE3 LYS 21 
+LYS HZ1 1HZ H 0 1 N N N N N N 36.474 35.891 -0.193 -4.736 -0.185 -1.318 HZ1 LYS 22 
+LYS HZ2 2HZ H 0 1 N N N N N N 37.644 37.064 0.203  -4.735 -1.400 -0.205 HZ2 LYS 23 
+LYS HZ3 3HZ H 0 1 N N N N N N 36.774 37.350 -1.021 -5.609 -0.031 0.071  HZ3 LYS 24 
+LYS HXT HXT H 0 1 N Y N Y N Y 38.628 36.963 -6.415 3.861  -1.886 0.115  HXT LYS 25 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+LYS N   CA  SING N N 1  
+LYS N   H   SING N N 2  
+LYS N   H2  SING N N 3  
+LYS CA  C   SING N N 4  
+LYS CA  CB  SING N N 5  
+LYS CA  HA  SING N N 6  
+LYS C   O   DOUB N N 7  
+LYS C   OXT SING N N 8  
+LYS CB  CG  SING N N 9  
+LYS CB  HB2 SING N N 10 
+LYS CB  HB3 SING N N 11 
+LYS CG  CD  SING N N 12 
+LYS CG  HG2 SING N N 13 
+LYS CG  HG3 SING N N 14 
+LYS CD  CE  SING N N 15 
+LYS CD  HD2 SING N N 16 
+LYS CD  HD3 SING N N 17 
+LYS CE  NZ  SING N N 18 
+LYS CE  HE2 SING N N 19 
+LYS CE  HE3 SING N N 20 
+LYS NZ  HZ1 SING N N 21 
+LYS NZ  HZ2 SING N N 22 
+LYS NZ  HZ3 SING N N 23 
+LYS OXT HXT SING N N 24 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+LYS SMILES           ACDLabs              10.04 "O=C(O)C(N)CCCC[NH3+]"                                                          
+LYS SMILES_CANONICAL CACTVS               3.341 "N[C@@H](CCCC[NH3+])C(O)=O"                                                     
+LYS SMILES           CACTVS               3.341 "N[CH](CCCC[NH3+])C(O)=O"                                                       
+LYS SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "C(CC[NH3+])C[C@@H](C(=O)O)N"                                                   
+LYS SMILES           "OpenEye OEToolkits" 1.5.0 "C(CC[NH3+])CC(C(=O)O)N"                                                        
+LYS InChI            InChI                1.03  "InChI=1S/C6H14N2O2/c7-4-2-1-3-5(8)6(9)10/h5H,1-4,7-8H2,(H,9,10)/p+1/t5-/m0/s1" 
+LYS InChIKey         InChI                1.03  KDXKERNSBIXSRK-YFKPBYRVSA-O                                                     
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+LYS "SYSTEMATIC NAME" ACDLabs              10.04 6-ammonio-L-norleucine                        
+LYS "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "[(5S)-5-amino-6-hydroxy-6-oxo-hexyl]azanium" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+LYS "Create component"  1999-07-08 RCSB 
+LYS "Modify descriptor" 2011-06-04 RCSB 
+LYS "Modify backbone"   2023-11-03 PDBE 
+# 

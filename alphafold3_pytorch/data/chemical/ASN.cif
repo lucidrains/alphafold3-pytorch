@@ -1,0 +1,127 @@
+data_ASN
+# 
+_chem_comp.id                                    ASN 
+_chem_comp.name                                  ASPARAGINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C4 H8 N2 O3" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        132.118 
+_chem_comp.one_letter_code                       N 
+_chem_comp.three_letter_code                     ASN 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        Corina 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+ASN N    N    N 0 1 N N N Y Y N 15.295 16.641 19.776 -0.293 1.686  0.094  N    ASN 1  
+ASN CA   CA   C 0 1 N N S Y N N 15.702 17.913 20.397 -0.448 0.292  -0.340 CA   ASN 2  
+ASN C    C    C 0 1 N N N Y N Y 14.630 18.500 21.234 -1.846 -0.179 -0.031 C    ASN 3  
+ASN O    O    O 0 1 N N N Y N Y 14.949 19.152 22.234 -2.510 0.402  0.794  O    ASN 4  
+ASN CB   CB   C 0 1 N N N N N N 16.088 18.882 19.297 0.562  -0.588 0.401  CB   ASN 5  
+ASN CG   CG   C 0 1 N N N N N N 17.262 18.512 18.462 1.960  -0.197 -0.002 CG   ASN 6  
+ASN OD1  OD1  O 0 1 N N N N N N 18.123 17.705 18.780 2.132  0.697  -0.804 OD1  ASN 7  
+ASN ND2  ND2  N 0 1 N N N N N N 17.281 19.172 17.284 3.019  -0.841 0.527  ND2  ASN 8  
+ASN OXT  OXT  O 0 1 N Y N Y N Y 13.386 18.353 20.865 -2.353 -1.243 -0.673 OXT  ASN 9  
+ASN H    H    H 0 1 N N N Y Y N 16.048 16.284 19.223 -0.904 2.297  -0.427 H    ASN 10 
+ASN H2   HN2  H 0 1 N Y N Y Y N 15.064 15.980 20.490 -0.453 1.776  1.086  H2   ASN 11 
+ASN HA   HA   H 0 1 N N N Y N N 16.555 17.716 21.063 -0.270 0.223  -1.413 HA   ASN 12 
+ASN HB2  1HB  H 0 1 N N N N N N 15.224 18.966 18.622 0.442  -0.451 1.476  HB2  ASN 13 
+ASN HB3  2HB  H 0 1 N N N N N N 16.323 19.842 19.779 0.389  -1.633 0.146  HB3  ASN 14 
+ASN HD21 1HD2 H 0 0 N N N N N N 18.021 19.008 16.631 2.881  -1.556 1.168  HD21 ASN 15 
+ASN HD22 2HD2 H 0 0 N N N N N N 16.555 19.824 17.065 3.919  -0.590 0.268  HD22 ASN 16 
+ASN HXT  HXT  H 0 1 N Y N Y N Y 12.819 18.813 21.473 -3.254 -1.508 -0.441 HXT  ASN 17 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+ASN N   CA   SING N N 1  
+ASN N   H    SING N N 2  
+ASN N   H2   SING N N 3  
+ASN CA  C    SING N N 4  
+ASN CA  CB   SING N N 5  
+ASN CA  HA   SING N N 6  
+ASN C   O    DOUB N N 7  
+ASN C   OXT  SING N N 8  
+ASN CB  CG   SING N N 9  
+ASN CB  HB2  SING N N 10 
+ASN CB  HB3  SING N N 11 
+ASN CG  OD1  DOUB N N 12 
+ASN CG  ND2  SING N N 13 
+ASN ND2 HD21 SING N N 14 
+ASN ND2 HD22 SING N N 15 
+ASN OXT HXT  SING N N 16 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+ASN SMILES           ACDLabs              12.01 "O=C(N)CC(N)C(=O)O"                                                        
+ASN InChI            InChI                1.03  "InChI=1S/C4H8N2O3/c5-2(4(8)9)1-3(6)7/h2H,1,5H2,(H2,6,7)(H,8,9)/t2-/m0/s1" 
+ASN InChIKey         InChI                1.03  DCXYFEDJOCDNAF-REOHCLBHSA-N                                                
+ASN SMILES_CANONICAL CACTVS               3.370 "N[C@@H](CC(N)=O)C(O)=O"                                                   
+ASN SMILES           CACTVS               3.370 "N[CH](CC(N)=O)C(O)=O"                                                     
+ASN SMILES_CANONICAL "OpenEye OEToolkits" 1.7.2 "C([C@@H](C(=O)O)N)C(=O)N"                                                 
+ASN SMILES           "OpenEye OEToolkits" 1.7.2 "C(C(C(=O)O)N)C(=O)N"                                                      
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+ASN "SYSTEMATIC NAME" ACDLabs              12.01 L-asparagine                                         
+ASN "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.7.2 "(2S)-2,4-bis(azanyl)-4-oxidanylidene-butanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+ASN "Create component"         1999-07-08 EBI  
+ASN "Modify leaving atom flag" 2010-12-17 RCSB 
+ASN "Modify descriptor"        2011-06-04 RCSB 
+ASN "Modify leaving atom flag" 2011-08-05 RCSB 
+ASN "Other modification"       2014-11-11 RCSB 
+ASN "Modify backbone"          2023-11-03 PDBE 
+# 

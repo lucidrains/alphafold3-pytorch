@@ -1,0 +1,128 @@
+data_VAL
+# 
+_chem_comp.id                                    VAL 
+_chem_comp.name                                  VALINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C5 H11 N O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        117.146 
+_chem_comp.one_letter_code                       V 
+_chem_comp.three_letter_code                     VAL 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  RCSB 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+VAL N    N    N 0 1 N N N Y Y N 11.009 2.661 48.464 1.564  -0.642 0.454  N    VAL 1  
+VAL CA   CA   C 0 1 N N S Y N N 10.415 3.985 48.550 0.145  -0.698 0.079  CA   VAL 2  
+VAL C    C    C 0 1 N N N Y N Y 10.002 4.429 49.975 -0.037 -0.093 -1.288 C    VAL 3  
+VAL O    O    O 0 1 N N N Y N Y 9.312  3.707 50.680 0.703  0.784  -1.664 O    VAL 4  
+VAL CB   CB   C 0 1 N N N N N N 9.230  4.107 47.566 -0.682 0.086  1.098  CB   VAL 5  
+VAL CG1  CG1  C 0 1 N N N N N N 8.585  5.457 47.708 -0.497 -0.528 2.487  CG1  VAL 6  
+VAL CG2  CG2  C 0 1 N N N N N N 9.689  3.877 46.132 -0.218 1.543  1.119  CG2  VAL 7  
+VAL OXT  OXT  O 0 1 N Y N Y N Y 10.377 5.639 50.362 -1.022 -0.529 -2.089 OXT  VAL 8  
+VAL H    H    H 0 1 N N N Y Y N 11.281 2.368 47.525 1.825  0.332  0.455  H    VAL 9  
+VAL H2   HN2  H 0 1 N Y N Y Y N 10.386 1.968 48.881 1.624  -0.959 1.410  H2   VAL 10 
+VAL HA   HA   H 0 1 N N N Y N N 11.226 4.692 48.259 -0.186 -1.736 0.064  HA   VAL 11 
+VAL HB   HB   H 0 1 N N N N N N 8.478  3.321 47.813 -1.736 0.044  0.820  HB   VAL 12 
+VAL HG11 1HG1 H 0 0 N N N N N N 7.729  5.545 46.997 -1.087 0.031  3.214  HG11 VAL 13 
+VAL HG12 2HG1 H 0 0 N N N N N N 8.279  5.666 48.759 -0.828 -1.566 2.472  HG12 VAL 14 
+VAL HG13 3HG1 H 0 0 N N N N N N 9.319  6.287 47.584 0.555  -0.486 2.765  HG13 VAL 15 
+VAL HG21 1HG2 H 0 0 N N N N N N 8.833  3.965 45.421 0.835  1.585  1.397  HG21 VAL 16 
+VAL HG22 2HG2 H 0 0 N N N N N N 10.527 4.557 45.853 -0.350 1.981  0.130  HG22 VAL 17 
+VAL HG23 3HG2 H 0 0 N N N N N N 10.218 2.902 46.020 -0.808 2.103  1.845  HG23 VAL 18 
+VAL HXT  HXT  H 0 1 N Y N Y N Y 10.123 5.911 51.236 -1.139 -0.140 -2.967 HXT  VAL 19 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+VAL N   CA   SING N N 1  
+VAL N   H    SING N N 2  
+VAL N   H2   SING N N 3  
+VAL CA  C    SING N N 4  
+VAL CA  CB   SING N N 5  
+VAL CA  HA   SING N N 6  
+VAL C   O    DOUB N N 7  
+VAL C   OXT  SING N N 8  
+VAL CB  CG1  SING N N 9  
+VAL CB  CG2  SING N N 10 
+VAL CB  HB   SING N N 11 
+VAL CG1 HG11 SING N N 12 
+VAL CG1 HG12 SING N N 13 
+VAL CG1 HG13 SING N N 14 
+VAL CG2 HG21 SING N N 15 
+VAL CG2 HG22 SING N N 16 
+VAL CG2 HG23 SING N N 17 
+VAL OXT HXT  SING N N 18 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+VAL SMILES           ACDLabs              10.04 "O=C(O)C(N)C(C)C"                                                      
+VAL SMILES_CANONICAL CACTVS               3.341 "CC(C)[C@H](N)C(O)=O"                                                  
+VAL SMILES           CACTVS               3.341 "CC(C)[CH](N)C(O)=O"                                                   
+VAL SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "CC(C)[C@@H](C(=O)O)N"                                                 
+VAL SMILES           "OpenEye OEToolkits" 1.5.0 "CC(C)C(C(=O)O)N"                                                      
+VAL InChI            InChI                1.03  "InChI=1S/C5H11NO2/c1-3(2)4(6)5(7)8/h3-4H,6H2,1-2H3,(H,7,8)/t4-/m0/s1" 
+VAL InChIKey         InChI                1.03  KZSNJWFQEVHDMF-BYPYZUCNSA-N                                            
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+VAL "SYSTEMATIC NAME" ACDLabs              10.04 L-valine                              
+VAL "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-2-amino-3-methyl-butanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+VAL "Create component"  1999-07-08 RCSB 
+VAL "Modify descriptor" 2011-06-04 RCSB 
+VAL "Modify backbone"   2023-11-03 PDBE 
+# 

@@ -1,0 +1,124 @@
+data_THR
+# 
+_chem_comp.id                                    THR 
+_chem_comp.name                                  THREONINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C4 H9 N O3" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        119.119 
+_chem_comp.one_letter_code                       T 
+_chem_comp.three_letter_code                     THR 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+THR N    N    N 0 1 N N N Y Y N 36.241 32.034 31.861 1.543  -0.702 0.430  N    THR 1  
+THR CA   CA   C 0 1 N N S Y N N 35.010 31.223 31.876 0.122  -0.706 0.056  CA   THR 2  
+THR C    C    C 0 1 N N N Y N Y 35.213 30.209 30.769 -0.038 -0.090 -1.309 C    THR 3  
+THR O    O    O 0 1 N N N Y N Y 35.564 30.621 29.635 0.732  0.761  -1.683 O    THR 4  
+THR CB   CB   C 0 1 N N R N N N 33.755 32.073 31.570 -0.675 0.104  1.079  CB   THR 5  
+THR OG1  OG1  O 0 1 N N N N N N 33.730 33.235 32.412 -0.193 1.448  1.103  OG1  THR 6  
+THR CG2  CG2  C 0 1 N N N N N N 32.482 31.262 31.863 -0.511 -0.521 2.466  CG2  THR 7  
+THR OXT  OXT  O 0 1 N Y N Y N Y 35.042 29.014 31.057 -1.039 -0.488 -2.110 OXT  THR 8  
+THR H    H    H 0 1 N N N Y Y N 36.104 32.716 32.606 1.839  0.261  0.434  H    THR 9  
+THR H2   HN2  H 0 1 N Y N Y Y N 36.457 32.445 30.953 1.593  -1.025 1.385  H2   THR 10 
+THR HA   HA   H 0 1 N N N Y N N 34.842 30.763 32.878 -0.245 -1.732 0.038  HA   THR 11 
+THR HB   HB   H 0 1 N N N N N N 33.792 32.367 30.495 -1.729 0.101  0.802  HB   THR 12 
+THR HG1  HG1  H 0 1 N N N N N N 32.959 33.757 32.224 0.740  1.406  1.352  HG1  THR 13 
+THR HG21 1HG2 H 0 0 N N N N N N 31.577 31.874 31.642 -1.080 0.056  3.194  HG21 THR 14 
+THR HG22 2HG2 H 0 0 N N N N N N 32.471 30.290 31.315 -0.879 -1.547 2.448  HG22 THR 15 
+THR HG23 3HG2 H 0 0 N N N N N N 32.471 30.863 32.904 0.542  -0.518 2.743  HG23 THR 16 
+THR HXT  HXT  H 0 1 N Y N Y N Y 35.169 28.378 30.362 -1.143 -0.092 -2.986 HXT  THR 17 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+THR N   CA   SING N N 1  
+THR N   H    SING N N 2  
+THR N   H2   SING N N 3  
+THR CA  C    SING N N 4  
+THR CA  CB   SING N N 5  
+THR CA  HA   SING N N 6  
+THR C   O    DOUB N N 7  
+THR C   OXT  SING N N 8  
+THR CB  OG1  SING N N 9  
+THR CB  CG2  SING N N 10 
+THR CB  HB   SING N N 11 
+THR OG1 HG1  SING N N 12 
+THR CG2 HG21 SING N N 13 
+THR CG2 HG22 SING N N 14 
+THR CG2 HG23 SING N N 15 
+THR OXT HXT  SING N N 16 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+THR SMILES           ACDLabs              10.04 "O=C(O)C(N)C(O)C"                                                        
+THR SMILES_CANONICAL CACTVS               3.341 "C[C@@H](O)[C@H](N)C(O)=O"                                               
+THR SMILES           CACTVS               3.341 "C[CH](O)[CH](N)C(O)=O"                                                  
+THR SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "C[C@H]([C@@H](C(=O)O)N)O"                                               
+THR SMILES           "OpenEye OEToolkits" 1.5.0 "CC(C(C(=O)O)N)O"                                                        
+THR InChI            InChI                1.03  "InChI=1S/C4H9NO3/c1-2(6)3(5)4(7)8/h2-3,6H,5H2,1H3,(H,7,8)/t2-,3+/m1/s1" 
+THR InChIKey         InChI                1.03  AYFVYJQAPQTCCC-GBXIJSLDSA-N                                              
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+THR "SYSTEMATIC NAME" ACDLabs              10.04 L-threonine                               
+THR "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S,3R)-2-amino-3-hydroxy-butanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+THR "Create component"  1999-07-08 EBI  
+THR "Modify descriptor" 2011-06-04 RCSB 
+THR "Modify backbone"   2023-11-03 PDBE 
+# 

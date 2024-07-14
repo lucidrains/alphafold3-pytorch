@@ -1,0 +1,123 @@
+data_ASP
+# 
+_chem_comp.id                                    ASP 
+_chem_comp.name                                  "ASPARTIC ACID" 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C4 H7 N O4" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        133.103 
+_chem_comp.one_letter_code                       D 
+_chem_comp.three_letter_code                     ASP 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        Corina 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+ASP N   N   N 0 1 N N N Y Y N 33.487 17.736 39.094 -0.317 1.688  0.066  N   ASP 1  
+ASP CA  CA  C 0 1 N N S Y N N 34.909 17.506 38.709 -0.470 0.286  -0.344 CA  ASP 2  
+ASP C   C   C 0 1 N N N Y N Y 34.993 16.527 37.537 -1.868 -0.180 -0.029 C   ASP 3  
+ASP O   O   O 0 1 N N N Y N Y 36.106 16.031 37.261 -2.534 0.415  0.786  O   ASP 4  
+ASP CB  CB  C 0 1 N N N N N N 35.682 16.954 39.915 0.539  -0.580 0.413  CB  ASP 5  
+ASP CG  CG  C 0 1 N N N N N N 35.231 15.544 40.306 1.938  -0.195 0.004  CG  ASP 6  
+ASP OD1 OD1 O 0 1 N N N N N N 35.793 14.986 41.279 2.109  0.681  -0.810 OD1 ASP 7  
+ASP OD2 OD2 O 0 1 N N N N N N 34.327 14.999 39.631 2.992  -0.826 0.543  OD2 ASP 8  
+ASP OXT OXT O 0 1 N Y N Y N Y 33.935 16.265 36.913 -2.374 -1.256 -0.652 OXT ASP 9  
+ASP H   H   H 0 1 N N N Y Y N 33.448 18.377 39.860 -0.928 2.289  -0.467 H   ASP 10 
+ASP H2  HN2 H 0 1 N Y N Y Y N 32.988 18.117 38.315 -0.478 1.795  1.056  H2  ASP 11 
+ASP HA  HA  H 0 1 N N N Y N N 35.356 18.461 38.395 -0.292 0.199  -1.416 HA  ASP 12 
+ASP HB2 HB1 H 0 1 N N N N N N 36.751 16.919 39.657 0.419  -0.425 1.485  HB2 ASP 13 
+ASP HB3 HB2 H 0 1 N N N N N N 35.515 17.623 40.772 0.367  -1.630 0.176  HB3 ASP 14 
+ASP HD2 HD2 H 0 1 N N N N N N 34.155 14.130 39.974 3.869  -0.545 0.250  HD2 ASP 15 
+ASP HXT HXT H 0 1 N Y N Y N Y 34.122 15.645 36.218 -3.275 -1.517 -0.416 HXT ASP 16 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+ASP N   CA  SING N N 1  
+ASP N   H   SING N N 2  
+ASP N   H2  SING N N 3  
+ASP CA  C   SING N N 4  
+ASP CA  CB  SING N N 5  
+ASP CA  HA  SING N N 6  
+ASP C   O   DOUB N N 7  
+ASP C   OXT SING N N 8  
+ASP CB  CG  SING N N 9  
+ASP CB  HB2 SING N N 10 
+ASP CB  HB3 SING N N 11 
+ASP CG  OD1 DOUB N N 12 
+ASP CG  OD2 SING N N 13 
+ASP OD2 HD2 SING N N 14 
+ASP OXT HXT SING N N 15 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+ASP SMILES           ACDLabs              12.01 "O=C(O)CC(N)C(=O)O"                                                      
+ASP SMILES_CANONICAL CACTVS               3.370 "N[C@@H](CC(O)=O)C(O)=O"                                                 
+ASP SMILES           CACTVS               3.370 "N[CH](CC(O)=O)C(O)=O"                                                   
+ASP SMILES_CANONICAL "OpenEye OEToolkits" 1.7.0 "C([C@@H](C(=O)O)N)C(=O)O"                                               
+ASP SMILES           "OpenEye OEToolkits" 1.7.0 "C(C(C(=O)O)N)C(=O)O"                                                    
+ASP InChI            InChI                1.03  "InChI=1S/C4H7NO4/c5-2(4(8)9)1-3(6)7/h2H,1,5H2,(H,6,7)(H,8,9)/t2-/m0/s1" 
+ASP InChIKey         InChI                1.03  CKLJMWTZIZZHCS-REOHCLBHSA-N                                              
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+ASP "SYSTEMATIC NAME" ACDLabs              12.01 "L-aspartic acid"               
+ASP "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.7.0 "(2S)-2-azanylbutanedioic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+ASP "Create component"         1999-07-08 EBI  
+ASP "Modify leaving atom flag" 2011-01-28 RCSB 
+ASP "Modify descriptor"        2011-06-04 RCSB 
+ASP "Modify backbone"          2023-11-03 PDBE 
+# 
