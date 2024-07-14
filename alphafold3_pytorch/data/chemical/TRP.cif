@@ -1,0 +1,146 @@
+data_TRP
+# 
+_chem_comp.id                                    TRP 
+_chem_comp.name                                  TRYPTOPHAN 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C11 H12 N2 O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         LTR 
+_chem_comp.formula_weight                        204.225 
+_chem_comp.one_letter_code                       W 
+_chem_comp.three_letter_code                     TRP 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+TRP N   N   N 0 1 N N N Y Y N 74.708 60.512 32.843 1.278  1.121  2.059  N   TRP 1  
+TRP CA  CA  C 0 1 N N S Y N N 74.400 61.735 32.114 -0.008 0.417  1.970  CA  TRP 2  
+TRP C   C   C 0 1 N N N Y N Y 73.588 61.411 30.840 -0.490 0.076  3.357  C   TRP 3  
+TRP O   O   O 0 1 N N N Y N Y 72.939 62.292 30.277 0.308  -0.130 4.240  O   TRP 4  
+TRP CB  CB  C 0 1 N N N N N N 75.684 62.473 31.706 0.168  -0.868 1.161  CB  TRP 5  
+TRP CG  CG  C 0 1 Y N N N N N 76.675 62.727 32.832 0.650  -0.526 -0.225 CG  TRP 6  
+TRP CD1 CD1 C 0 1 Y N N N N N 77.753 61.964 33.157 1.928  -0.418 -0.622 CD1 TRP 7  
+TRP CD2 CD2 C 0 1 Y N N N N N 76.646 63.805 33.777 -0.186 -0.256 -1.396 CD2 TRP 8  
+TRP NE1 NE1 N 0 1 Y N N N N N 78.403 62.494 34.247 1.978  -0.095 -1.951 NE1 TRP 9  
+TRP CE2 CE2 C 0 1 Y N N N N N 77.741 63.625 34.650 0.701  0.014  -2.454 CE2 TRP 10 
+TRP CE3 CE3 C 0 1 Y N N N N N 75.796 64.902 33.974 -1.564 -0.210 -1.615 CE3 TRP 11 
+TRP CZ2 CZ2 C 0 1 Y N N N N N 78.014 64.499 35.709 0.190  0.314  -3.712 CZ2 TRP 12 
+TRP CZ3 CZ3 C 0 1 Y N N N N N 76.065 65.776 35.031 -2.044 0.086  -2.859 CZ3 TRP 13 
+TRP CH2 CH2 C 0 1 Y N N N N N 77.168 65.565 35.884 -1.173 0.348  -3.907 CH2 TRP 14 
+TRP OXT OXT O 0 1 N Y N Y N Y 73.495 60.470 30.438 -1.806 0.001  3.610  OXT TRP 15 
+TRP H   H   H 0 1 N N N Y Y N 75.244 60.725 33.684 1.921  0.493  2.518  H   TRP 16 
+TRP H2  HN2 H 0 1 N Y N Y Y N 75.182 59.827 32.253 1.611  1.237  1.113  H2  TRP 17 
+TRP HA  HA  H 0 1 N N N Y N N 73.801 62.387 32.790 -0.740 1.058  1.479  HA  TRP 18 
+TRP HB2 1HB H 0 1 N N N N N N 76.185 61.933 30.869 0.900  -1.509 1.652  HB2 TRP 19 
+TRP HB3 2HB H 0 1 N N N N N N 75.429 63.431 31.197 -0.786 -1.390 1.095  HB3 TRP 20 
+TRP HD1 HD1 H 0 1 N N N N N N 78.055 61.051 32.616 2.789  -0.564 0.012  HD1 TRP 21 
+TRP HE1 HE1 H 0 1 N N N N N N 79.240 62.110 34.685 2.791  0.036  -2.462 HE1 TRP 22 
+TRP HE3 HE3 H 0 1 N N N N N N 74.932 65.074 33.310 -2.248 -0.413 -0.804 HE3 TRP 23 
+TRP HZ2 HZ2 H 0 1 N N N N N N 78.871 64.351 36.386 0.860  0.521  -4.534 HZ2 TRP 24 
+TRP HZ3 HZ3 H 0 1 N N N N N N 75.400 66.641 35.193 -3.110 0.116  -3.029 HZ3 TRP 25 
+TRP HH2 HH2 H 0 1 N N N N N N 77.376 66.257 36.716 -1.567 0.582  -4.885 HH2 TRP 26 
+TRP HXT HXT H 0 1 N Y N Y N Y 72.995 60.270 29.654 -2.115 -0.217 4.500  HXT TRP 27 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+TRP N   CA  SING N N 1  
+TRP N   H   SING N N 2  
+TRP N   H2  SING N N 3  
+TRP CA  C   SING N N 4  
+TRP CA  CB  SING N N 5  
+TRP CA  HA  SING N N 6  
+TRP C   O   DOUB N N 7  
+TRP C   OXT SING N N 8  
+TRP CB  CG  SING N N 9  
+TRP CB  HB2 SING N N 10 
+TRP CB  HB3 SING N N 11 
+TRP CG  CD1 DOUB Y N 12 
+TRP CG  CD2 SING Y N 13 
+TRP CD1 NE1 SING Y N 14 
+TRP CD1 HD1 SING N N 15 
+TRP CD2 CE2 DOUB Y N 16 
+TRP CD2 CE3 SING Y N 17 
+TRP NE1 CE2 SING Y N 18 
+TRP NE1 HE1 SING N N 19 
+TRP CE2 CZ2 SING Y N 20 
+TRP CE3 CZ3 DOUB Y N 21 
+TRP CE3 HE3 SING N N 22 
+TRP CZ2 CH2 DOUB Y N 23 
+TRP CZ2 HZ2 SING N N 24 
+TRP CZ3 CH2 SING Y N 25 
+TRP CZ3 HZ3 SING N N 26 
+TRP CH2 HH2 SING N N 27 
+TRP OXT HXT SING N N 28 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+TRP SMILES           ACDLabs              10.04 "O=C(O)C(N)Cc2c1ccccc1nc2"                                                                              
+TRP SMILES_CANONICAL CACTVS               3.341 "N[C@@H](Cc1c[nH]c2ccccc12)C(O)=O"                                                                      
+TRP SMILES           CACTVS               3.341 "N[CH](Cc1c[nH]c2ccccc12)C(O)=O"                                                                        
+TRP SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "c1ccc2c(c1)c(c[nH]2)C[C@@H](C(=O)O)N"                                                                  
+TRP SMILES           "OpenEye OEToolkits" 1.5.0 "c1ccc2c(c1)c(c[nH]2)CC(C(=O)O)N"                                                                       
+TRP InChI            InChI                1.03  "InChI=1S/C11H12N2O2/c12-9(11(14)15)5-7-6-13-10-4-2-1-3-8(7)10/h1-4,6,9,13H,5,12H2,(H,14,15)/t9-/m0/s1" 
+TRP InChIKey         InChI                1.03  QIVBCDIJIAJPQS-VIFPVBQESA-N                                                                             
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+TRP "SYSTEMATIC NAME" ACDLabs              10.04 L-tryptophan                                   
+TRP "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-2-amino-3-(1H-indol-3-yl)propanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+TRP "Create component"  1999-07-08 EBI  
+TRP "Modify descriptor" 2011-06-04 RCSB 
+TRP "Modify backbone"   2023-11-03 PDBE 
+# 

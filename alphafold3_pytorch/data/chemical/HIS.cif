@@ -1,0 +1,133 @@
+data_HIS
+# 
+_chem_comp.id                                    HIS 
+_chem_comp.name                                  HISTIDINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C6 H10 N3 O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    1 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        156.162 
+_chem_comp.one_letter_code                       H 
+_chem_comp.three_letter_code                     HIS 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        "OpenEye/OEToolkits V1.4.2" 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+HIS N   N   N 0 1 N N N Y Y N 33.472 42.685 -4.610 -0.040 -1.210 0.053  N   HIS 1  
+HIS CA  CA  C 0 1 N N S Y N N 33.414 41.686 -5.673 1.172  -1.709 0.652  CA  HIS 2  
+HIS C   C   C 0 1 N N N Y N Y 33.773 42.279 -7.040 1.083  -3.207 0.905  C   HIS 3  
+HIS O   O   O 0 1 N N N Y N Y 33.497 43.444 -7.337 0.040  -3.770 1.222  O   HIS 4  
+HIS CB  CB  C 0 1 N N N N N N 32.005 41.080 -5.734 1.484  -0.975 1.962  CB  HIS 5  
+HIS CG  CG  C 0 1 Y N N N N N 31.888 39.902 -6.651 2.940  -1.060 2.353  CG  HIS 6  
+HIS ND1 ND1 N 1 1 Y N N N N N 32.539 38.710 -6.414 3.380  -2.075 3.129  ND1 HIS 7  
+HIS CD2 CD2 C 0 1 Y N N N N N 31.199 39.734 -7.804 3.960  -0.251 2.046  CD2 HIS 8  
+HIS CE1 CE1 C 0 1 Y N N N N N 32.251 37.857 -7.382 4.693  -1.908 3.317  CE1 HIS 9  
+HIS NE2 NE2 N 0 1 Y N N N N N 31.439 38.453 -8.237 5.058  -0.801 2.662  NE2 HIS 10 
+HIS OXT OXT O 0 1 N Y N Y N Y 34.382 41.455 -7.879 2.247  -3.882 0.744  OXT HIS 11 
+HIS H   H   H 0 1 N N N Y Y N 33.485 42.227 -3.721 -0.102 -1.155 -0.950 H   HIS 12 
+HIS H2  HN2 H 0 1 N Y N Y Y N 34.301 43.234 -4.714 -0.715 -0.741 0.634  H2  HIS 13 
+HIS HA  HA  H 0 1 N N N Y N N 34.155 40.908 -5.439 1.965  -1.558 -0.089 HA  HIS 14 
+HIS HB2 1HB H 0 1 N N N N N N 31.733 40.750 -4.721 1.215  0.087  1.879  HB2 HIS 15 
+HIS HB3 2HB H 0 1 N N N N N N 31.337 41.860 -6.127 0.859  -1.368 2.775  HB3 HIS 16 
+HIS HD1 HD1 H 0 1 N N N N N N 33.135 38.521 -5.633 2.828  -2.838 3.511  HD1 HIS 17 
+HIS HD2 HD2 H 0 1 N N N N N N 30.577 40.470 -8.292 4.108  0.647  1.479  HD2 HIS 18 
+HIS HE1 HE1 H 0 1 N N N N N N 32.618 36.844 -7.461 5.340  -2.550 3.892  HE1 HIS 19 
+HIS HE2 HE2 H 0 1 N N N N N N 31.061 38.039 -9.065 6.002  -0.428 2.627  HE2 HIS 20 
+HIS HXT HXT H 0 1 N Y N Y N Y 34.553 41.905 -8.698 2.188  -4.848 0.901  HXT HIS 21 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+HIS N   CA  SING N N 1  
+HIS N   H   SING N N 2  
+HIS N   H2  SING N N 3  
+HIS CA  C   SING N N 4  
+HIS CA  CB  SING N N 5  
+HIS CA  HA  SING N N 6  
+HIS C   O   DOUB N N 7  
+HIS C   OXT SING N N 8  
+HIS CB  CG  SING N N 9  
+HIS CB  HB2 SING N N 10 
+HIS CB  HB3 SING N N 11 
+HIS CG  ND1 SING Y N 12 
+HIS CG  CD2 DOUB Y N 13 
+HIS ND1 CE1 DOUB Y N 14 
+HIS ND1 HD1 SING N N 15 
+HIS CD2 NE2 SING Y N 16 
+HIS CD2 HD2 SING N N 17 
+HIS CE1 NE2 SING Y N 18 
+HIS CE1 HE1 SING N N 19 
+HIS NE2 HE2 SING N N 20 
+HIS OXT HXT SING N N 21 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+HIS SMILES           ACDLabs              10.04 "O=C(O)C(N)Cc1cnc[nH+]1"                                                                    
+HIS SMILES_CANONICAL CACTVS               3.341 "N[C@@H](Cc1c[nH]c[nH+]1)C(O)=O"                                                            
+HIS SMILES           CACTVS               3.341 "N[CH](Cc1c[nH]c[nH+]1)C(O)=O"                                                              
+HIS SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "c1c([nH+]c[nH]1)C[C@@H](C(=O)O)N"                                                          
+HIS SMILES           "OpenEye OEToolkits" 1.5.0 "c1c([nH+]c[nH]1)CC(C(=O)O)N"                                                               
+HIS InChI            InChI                1.03  "InChI=1S/C6H9N3O2/c7-5(6(10)11)1-4-2-8-3-9-4/h2-3,5H,1,7H2,(H,8,9)(H,10,11)/p+1/t5-/m0/s1" 
+HIS InChIKey         InChI                1.03  HNDVDQJCIGZPNO-YFKPBYRVSA-O                                                                 
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+HIS "SYSTEMATIC NAME" ACDLabs              10.04 "3-(1H-imidazol-3-ium-4-yl)-L-alanine"                  
+HIS "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-2-amino-3-(1H-imidazol-3-ium-4-yl)propanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+HIS "Create component"  1999-07-08 EBI  
+HIS "Modify descriptor" 2011-06-04 RCSB 
+HIS "Modify backbone"   2023-11-03 PDBE 
+# 

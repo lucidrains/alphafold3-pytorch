@@ -1,0 +1,137 @@
+data_PHE
+# 
+_chem_comp.id                                    PHE 
+_chem_comp.name                                  PHENYLALANINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C9 H11 N O2" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2023-11-03 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        165.189 
+_chem_comp.one_letter_code                       F 
+_chem_comp.three_letter_code                     PHE 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+PHE N   N   N 0 1 N N N Y Y N 3.260 22.302 6.000 1.317  0.962  1.014  N   PHE 1  
+PHE CA  CA  C 0 1 N N S Y N N 4.252 21.272 5.710 -0.020 0.426  1.300  CA  PHE 2  
+PHE C   C   C 0 1 N N N Y N Y 5.559 21.899 5.229 -0.109 0.047  2.756  C   PHE 3  
+PHE O   O   O 0 1 N N N Y N Y 5.836 21.838 4.012 0.879  -0.317 3.346  O   PHE 4  
+PHE CB  CB  C 0 1 N N N N N N 3.708 20.298 4.656 -0.270 -0.809 0.434  CB  PHE 5  
+PHE CG  CG  C 0 1 Y N N N N N 4.596 19.106 4.406 -0.181 -0.430 -1.020 CG  PHE 6  
+PHE CD1 CD1 C 0 1 Y N N N N N 5.077 18.339 5.467 1.031  -0.498 -1.680 CD1 PHE 7  
+PHE CD2 CD2 C 0 1 Y N N N N N 4.927 18.732 3.109 -1.314 -0.018 -1.698 CD2 PHE 8  
+PHE CE1 CE1 C 0 1 Y N N N N N 5.874 17.219 5.237 1.112  -0.150 -3.015 CE1 PHE 9  
+PHE CE2 CE2 C 0 1 Y N N N N N 5.718 17.618 2.867 -1.231 0.333  -3.032 CE2 PHE 10 
+PHE CZ  CZ  C 0 1 Y N N N N N 6.193 16.860 3.932 -0.018 0.265  -3.691 CZ  PHE 11 
+PHE OXT OXT O 0 1 N Y N Y N Y 6.283 22.460 6.079 -1.286 0.113  3.396  OXT PHE 12 
+PHE H   H   H 0 1 N N N Y Y N 2.387 21.883 6.321 1.975  0.230  1.235  H   PHE 13 
+PHE H2  HN2 H 0 1 N Y N Y Y N 3.111 22.918 5.201 1.365  1.104  0.017  H2  PHE 14 
+PHE HA  HA  H 0 1 N N N Y N N 4.460 20.708 6.649 -0.770 1.184  1.076  HA  PHE 15 
+PHE HB2 1HB H 0 1 N N N N N N 2.676 19.968 4.922 0.480  -1.568 0.659  HB2 PHE 16 
+PHE HB3 2HB H 0 1 N N N N N N 3.493 20.833 3.701 -1.262 -1.207 0.646  HB3 PHE 17 
+PHE HD1 HD1 H 0 1 N N N N N N 4.823 18.622 6.502 1.915  -0.824 -1.152 HD1 PHE 18 
+PHE HD2 HD2 H 0 1 N N N N N N 4.556 19.328 2.258 -2.262 0.034  -1.183 HD2 PHE 19 
+PHE HE1 HE1 H 0 1 N N N N N N 6.250 16.619 6.083 2.060  -0.203 -3.530 HE1 PHE 20 
+PHE HE2 HE2 H 0 1 N N N N N N 5.968 17.335 1.830 -2.116 0.659  -3.560 HE2 PHE 21 
+PHE HZ  HZ  H 0 1 N N N N N N 6.822 15.974 3.741 0.045  0.538  -4.734 HZ  PHE 22 
+PHE HXT HXT H 0 1 N Y N Y N Y 7.096 22.850 5.779 -1.343 -0.130 4.330  HXT PHE 23 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+PHE N   CA  SING N N 1  
+PHE N   H   SING N N 2  
+PHE N   H2  SING N N 3  
+PHE CA  C   SING N N 4  
+PHE CA  CB  SING N N 5  
+PHE CA  HA  SING N N 6  
+PHE C   O   DOUB N N 7  
+PHE C   OXT SING N N 8  
+PHE CB  CG  SING N N 9  
+PHE CB  HB2 SING N N 10 
+PHE CB  HB3 SING N N 11 
+PHE CG  CD1 DOUB Y N 12 
+PHE CG  CD2 SING Y N 13 
+PHE CD1 CE1 SING Y N 14 
+PHE CD1 HD1 SING N N 15 
+PHE CD2 CE2 DOUB Y N 16 
+PHE CD2 HD2 SING N N 17 
+PHE CE1 CZ  DOUB Y N 18 
+PHE CE1 HE1 SING N N 19 
+PHE CE2 CZ  SING Y N 20 
+PHE CE2 HE2 SING N N 21 
+PHE CZ  HZ  SING N N 22 
+PHE OXT HXT SING N N 23 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+PHE SMILES           ACDLabs              10.04 "O=C(O)C(N)Cc1ccccc1"                                                                
+PHE SMILES_CANONICAL CACTVS               3.341 "N[C@@H](Cc1ccccc1)C(O)=O"                                                           
+PHE SMILES           CACTVS               3.341 "N[CH](Cc1ccccc1)C(O)=O"                                                             
+PHE SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "c1ccc(cc1)C[C@@H](C(=O)O)N"                                                         
+PHE SMILES           "OpenEye OEToolkits" 1.5.0 "c1ccc(cc1)CC(C(=O)O)N"                                                              
+PHE InChI            InChI                1.03  "InChI=1S/C9H11NO2/c10-8(9(11)12)6-7-4-2-1-3-5-7/h1-5,8H,6,10H2,(H,11,12)/t8-/m0/s1" 
+PHE InChIKey         InChI                1.03  COLNVLDHVKWLRT-QMMMGPOBSA-N                                                          
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+PHE "SYSTEMATIC NAME" ACDLabs              10.04 L-phenylalanine                        
+PHE "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S)-2-amino-3-phenyl-propanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+PHE "Create component"  1999-07-08 EBI  
+PHE "Modify descriptor" 2011-06-04 RCSB 
+PHE "Modify backbone"   2023-11-03 PDBE 
+# 

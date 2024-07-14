@@ -1,0 +1,158 @@
+data_U
+# 
+_chem_comp.id                                    U 
+_chem_comp.name                                  "URIDINE-5'-MONOPHOSPHATE" 
+_chem_comp.type                                  "RNA LINKING" 
+_chem_comp.pdbx_type                             ATOMN 
+_chem_comp.formula                               "C9 H13 N2 O9 P" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2011-06-04 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        324.181 
+_chem_comp.one_letter_code                       U 
+_chem_comp.three_letter_code                     U 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  PDBJ 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+U OP3    O3P  O 0 1 N Y N 29.106 2.045  0.152  -2.122 1.033  -4.690 OP3    U 1  
+U P      P    P 0 1 N N N 28.940 2.442  -1.379 -1.030 0.047  -4.037 P      U 2  
+U OP1    O1P  O 0 1 N N N 28.520 1.217  -2.078 -1.679 -1.228 -3.660 OP1    U 3  
+U OP2    O2P  O 0 1 N N N 30.133 3.129  -1.866 0.138  -0.241 -5.107 OP2    U 4  
+U "O5'"  O5*  O 0 1 N N N 27.784 3.522  -1.387 -0.399 0.736  -2.726 "O5'"  U 5  
+U "C5'"  C5*  C 0 1 N N N 26.432 3.117  -1.047 0.557  -0.182 -2.196 "C5'"  U 6  
+U "C4'"  C4*  C 0 1 N N R 25.647 4.373  -0.834 1.197  0.415  -0.942 "C4'"  U 7  
+U "O4'"  O4*  O 0 1 N N N 26.122 5.093  0.327  0.194  0.645  0.074  "O4'"  U 8  
+U "C3'"  C3*  C 0 1 N N S 25.763 5.465  -1.895 2.181  -0.588 -0.301 "C3'"  U 9  
+U "O3'"  O3*  O 0 1 N N N 25.041 5.077  -3.062 3.524  -0.288 -0.686 "O3'"  U 10 
+U "C2'"  C2*  C 0 1 N N R 25.213 6.663  -1.148 1.995  -0.383 1.218  "C2'"  U 11 
+U "O2'"  O2*  O 0 1 N N N 23.829 6.500  -1.012 3.219  0.046  1.819  "O2'"  U 12 
+U "C1'"  C1*  C 0 1 N N R 25.917 6.524  0.133  0.922  0.723  1.319  "C1'"  U 13 
+U N1     N1   N 0 1 N N N 27.224 7.194  0.137  0.028  0.464  2.451  N1     U 14 
+U C2     C2   C 0 1 N N N 27.201 8.578  0.406  -0.690 -0.671 2.486  C2     U 15 
+U O2     O2   O 0 1 N N N 26.156 9.121  0.619  -0.587 -1.474 1.580  O2     U 16 
+U N3     N3   N 0 1 N N N 28.408 9.189  0.403  -1.515 -0.936 3.517  N3     U 17 
+U C4     C4   C 0 1 N N N 29.660 8.606  0.152  -1.641 -0.055 4.530  C4     U 18 
+U O4     O4   O 0 1 N N N 30.676 9.330  0.195  -2.391 -0.292 5.460  O4     U 19 
+U C5     C5   C 0 1 N N N 29.604 7.215  -0.113 -0.894 1.146  4.502  C5     U 20 
+U C6     C6   C 0 1 N N N 28.447 6.605  -0.111 -0.070 1.384  3.459  C6     U 21 
+U HOP3   3HOP H 0 0 N N N 29.377 2.835  0.603  -2.475 0.583  -5.470 HOP3   U 22 
+U HOP2   2HOP H 0 0 N N N 30.404 3.919  -1.414 0.534  0.613  -5.325 HOP2   U 23 
+U "H5'"  1H5* H 0 1 N N N 25.974 2.434  -1.800 1.329  -0.373 -2.942 "H5'"  U 24 
+U "H5''" 2H5* H 0 0 N N N 26.387 2.417  -0.179 0.060  -1.117 -1.940 "H5''" U 25 
+U "H4'"  H4*  H 0 1 N N N 24.613 3.957  -0.795 1.712  1.345  -1.185 "H4'"  U 26 
+U "H3'"  H3*  H 0 1 N N N 26.782 5.677  -2.293 1.923  -1.609 -0.583 "H3'"  U 27 
+U "HO3'" H3T  H 0 0 N Y N 25.113 5.756  -3.722 4.094  -0.926 -0.234 "HO3'" U 28 
+U "H2'"  H2*  H 0 1 N N N 25.358 7.661  -1.622 1.643  -1.301 1.688  "H2'"  U 29 
+U "HO2'" 2HO* H 0 0 N N N 23.484 7.251  -0.543 3.865  -0.657 1.671  "HO2'" U 30 
+U "H1'"  H1*  H 0 1 N N N 25.312 6.996  0.941  1.392  1.700  1.423  "H1'"  U 31 
+U H3     H3   H 0 1 N N N 28.370 10.187 0.610  -2.024 -1.762 3.528  H3     U 32 
+U H5     H5   H 0 1 N N N 30.486 6.589  -0.327 -0.982 1.863  5.305  H5     U 33 
+U H6     H6   H 0 1 N N N 28.506 5.526  -0.332 0.507  2.295  3.421  H6     U 34 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+U OP3   P      SING N N 1  
+U OP3   HOP3   SING N N 2  
+U P     OP1    DOUB N N 3  
+U P     OP2    SING N N 4  
+U P     "O5'"  SING N N 5  
+U OP2   HOP2   SING N N 6  
+U "O5'" "C5'"  SING N N 7  
+U "C5'" "C4'"  SING N N 8  
+U "C5'" "H5'"  SING N N 9  
+U "C5'" "H5''" SING N N 10 
+U "C4'" "O4'"  SING N N 11 
+U "C4'" "C3'"  SING N N 12 
+U "C4'" "H4'"  SING N N 13 
+U "O4'" "C1'"  SING N N 14 
+U "C3'" "O3'"  SING N N 15 
+U "C3'" "C2'"  SING N N 16 
+U "C3'" "H3'"  SING N N 17 
+U "O3'" "HO3'" SING N N 18 
+U "C2'" "O2'"  SING N N 19 
+U "C2'" "C1'"  SING N N 20 
+U "C2'" "H2'"  SING N N 21 
+U "O2'" "HO2'" SING N N 22 
+U "C1'" N1     SING N N 23 
+U "C1'" "H1'"  SING N N 24 
+U N1    C2     SING N N 25 
+U N1    C6     SING N N 26 
+U C2    O2     DOUB N N 27 
+U C2    N3     SING N N 28 
+U N3    C4     SING N N 29 
+U N3    H3     SING N N 30 
+U C4    O4     DOUB N N 31 
+U C4    C5     SING N N 32 
+U C5    C6     DOUB N N 33 
+U C5    H5     SING N N 34 
+U C6    H6     SING N N 35 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+U SMILES           ACDLabs              10.04 "O=C1NC(=O)N(C=C1)C2OC(C(O)C2O)COP(=O)(O)O"                                                                                                         
+U SMILES_CANONICAL CACTVS               3.341 "O[C@H]1[C@@H](O)[C@@H](O[C@@H]1CO[P](O)(O)=O)N2C=CC(=O)NC2=O"                                                                                      
+U SMILES           CACTVS               3.341 "O[CH]1[CH](O)[CH](O[CH]1CO[P](O)(O)=O)N2C=CC(=O)NC2=O"                                                                                             
+U SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "C1=CN(C(=O)NC1=O)[C@H]2[C@@H]([C@@H]([C@H](O2)COP(=O)(O)O)O)O"                                                                                     
+U SMILES           "OpenEye OEToolkits" 1.5.0 "C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O"                                                                                                       
+U InChI            InChI                1.03  "InChI=1S/C9H13N2O9P/c12-5-1-2-11(9(15)10-5)8-7(14)6(13)4(20-8)3-19-21(16,17)18/h1-2,4,6-8,13-14H,3H2,(H,10,12,15)(H2,16,17,18)/t4-,6-,7-,8-/m1/s1" 
+U InChIKey         InChI                1.03  DJJCXFVJDGTHFX-XVFCMESISA-N                                                                                                                         
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+U "SYSTEMATIC NAME" ACDLabs              10.04 
+;5'-uridylic acid
+;
+U "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "[(2R,3S,4R,5R)-5-(2,4-dioxopyrimidin-1-yl)-3,4-dihydroxy-oxolan-2-yl]methyl dihydrogen phosphate" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+U "Create component"  1999-07-08 PDBJ 
+U "Modify descriptor" 2011-06-04 RCSB 
+# 
