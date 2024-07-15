@@ -8,7 +8,6 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.rdchem import Mol
 from typing import Literal
 
-from alphafold3_pytorch.common import amino_acid_constants, dna_constants, rna_constants
 from alphafold3_pytorch.tensor_typing import Int, typecheck
 
 def is_unique(arr):
