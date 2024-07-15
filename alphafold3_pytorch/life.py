@@ -319,40 +319,24 @@ def reverse_complement_tensor(t: Int[' n']):
 # metal ions
 
 METALS = dict(
-    Mg = dict(
-        smile = '[Mg]'
-    ),
-    Mn = dict(
-        smile = '[Mn]'
-    ),
-    Fe = dict(
-        smile = '[Fe]'
-    ),
-    Co = dict(
-        smile = '[Co]'
-    ),
-    Ni = dict(
-        smile = '[Ni]'
-    ),
-    Cu = dict(
-        smile = '[Cu]'
-    ),
-    Zn = dict(
-        smile = '[Zn]'
-    ),
-    Na = dict(
-        smile = '[Na]'
-    ),
-    Cl = dict(
-        smile = '[Cl]'
-    )
+    Mg=dict(resname="Mg", smile="[Mg+2]"),
+    Mn=dict(resname="Mn", smile="[Mn+2]"),
+    Fe=dict(resname="Fe", smile="[Fe+3]"),
+    Co=dict(resname="Co", smile="[Co+2]"),
+    Ni=dict(resname="Ni", smile="[Ni+2]"),
+    Cu=dict(resname="Cu", smile="[Cu+2]"),
+    Zn=dict(resname="Zn", smile="[Zn+2]"),
+    Na=dict(resname="Na", smile="[Na+]"),
+    Cl=dict(resname="Cl", smile="[Cl-]"),
+    Ca=dict(resname="Ca", smile="[Ca+2]"),
+    K=dict(resname="K", smile="[K+]"),
 )
 
 # miscellaneous
 
 MISC = dict(
-    Phospholipid = dict(
-        smile = 'CCCCCCCCCCCCCCCC(=O)OCC(COP(=O)(O)OCC(CO)O)OC(=O)CCCCCCCC1CC1CCCCCC'
+    Phospholipid=dict(
+        resname="UNL", smile="CCCCCCCCCCCCCCCC(=O)OCC(COP(=O)(O)OCC(CO)O)OC(=O)CCCCCCCC1CC1CCCCCC"
     )
 )
 
