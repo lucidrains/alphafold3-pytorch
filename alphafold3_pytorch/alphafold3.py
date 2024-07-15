@@ -5,7 +5,6 @@ from pathlib import Path
 from functools import partial, wraps
 from collections import namedtuple
 
-import einops
 import torch
 from torch import nn
 from torch import Tensor

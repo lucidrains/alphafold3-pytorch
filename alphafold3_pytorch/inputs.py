@@ -362,8 +362,10 @@ def molecule_to_atom_input(
                 _, last_atom_index = prev_src_tgt_atom_indices
                 first_atom_index, _ = src_tgt_atom_indices
 
-                src_atom_offset = offset + first_atom_index
-                tgt_atom_offset = offset - last_atom_index
+                last_atom_index_from_end = prev_mol.GetNumAtoms() - last_atom_index
+
+                src_atom_offset = offset - last_atom_index_from_end
+                tgt_atom_offset = offset + first_atom_index
 
                 atompair_ids[src_atom_offset, tgt_atom_offset] = 1
                 atompair_ids[tgt_atom_offset, src_atom_offset] = 1
@@ -670,8 +672,6 @@ def alphafold3_input_to_molecule_input(
         *flatten(ligands_token_pool_lens),
         *metal_ions_pool_lens
     ]
-
-    total_atoms = sum(token_pool_lens)
 
     # construct the token bonds
 
