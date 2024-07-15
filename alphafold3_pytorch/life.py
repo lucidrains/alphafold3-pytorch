@@ -27,7 +27,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 1
+        distogram_atom_idx = 1,
+        token_center_atom_idx = 1,
     ),
     R = dict(
         smile = 'C(CC(C(=O)O)N)CN=C(N)N',
@@ -35,7 +36,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 6,
         last_atom_idx = 3,
         hydroxyl_idx = 5,
-        distogram_atom_idx = 2
+        distogram_atom_idx = 2,
+        token_center_atom_idx = 2,
     ),
     N = dict(
         smile = 'C(C(C(=O)O)N)C(=O)N',
@@ -43,7 +45,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 1
+        distogram_atom_idx = 1,
+        token_center_atom_idx = 1,
     ),
     D = dict(
         smile = 'C(C(C(=O)O)N)C(=O)O',
@@ -51,7 +54,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 1
+        distogram_atom_idx = 1,
+        token_center_atom_idx = 1,
     ),
     C = dict(
         smile = 'C(C(C(=O)O)N)S',
@@ -59,7 +63,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 1
+        distogram_atom_idx = 1,
+        token_center_atom_idx = 1,
     ),
     Q = dict(
         smile = 'C(CC(=O)N)C(C(=O)O)N',
@@ -67,7 +72,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 5
+        distogram_atom_idx = 5,
+        token_center_atom_idx = 5,
     ),
     E = dict(
         smile = 'C(CC(=O)O)C(C(=O)O)N',
@@ -75,7 +81,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 5
+        distogram_atom_idx = 5,
+        token_center_atom_idx = 5,
     ),
     G = dict(
         smile = 'C(C(=O)O)N',
@@ -83,7 +90,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 4,
         last_atom_idx = 1,
         hydroxyl_idx = 3,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 0,
+        token_center_atom_idx = 0,
     ),
     H = dict(
         smile = 'C1=C(NC=N1)CC(C(=O)O)N',
@@ -91,7 +99,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 10,
         last_atom_idx = 7,
         hydroxyl_idx = 9,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 0,
+        token_center_atom_idx = 0,
     ),
     I = dict(
         smile = 'CCC(C)C(C(=O)O)N',
@@ -99,7 +108,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 8,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 0
+        distogram_atom_idx = 0,
+        token_center_atom_idx = 0,
     ),
     L = dict(
         smile = 'CC(C)CC(C(=O)O)N',
@@ -107,7 +117,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 8,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 4
+        distogram_atom_idx = 4,
+        token_center_atom_idx = 4,
     ),
     K = dict(
         smile = 'C(CCN)CC(C(=O)O)N',
@@ -115,7 +126,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 9,
         last_atom_idx = 6,
         hydroxyl_idx = 8,
-        distogram_atom_idx = 5
+        distogram_atom_idx = 5,
+        token_center_atom_idx = 5,
     ),
     M = dict(
         smile = 'CSCCC(C(=O)O)N',
@@ -123,7 +135,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 8,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 4
+        distogram_atom_idx = 4,
+        token_center_atom_idx = 4,
     ),
     F = dict(
         smile = 'C1=CC=C(C=C1)CC(C(=O)O)N',
@@ -131,7 +144,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 11,
         last_atom_idx = 8,
         hydroxyl_idx = 10,
-        distogram_atom_idx = 7
+        distogram_atom_idx = 7,
+        token_center_atom_idx = 7,
     ),
     P = dict(
         smile = 'C1CC(NC1)C(=O)O',
@@ -139,7 +153,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 3,
         last_atom_idx = 5,
         hydroxyl_idx = 7,
-        distogram_atom_idx = 2
+        distogram_atom_idx = 2,
+        token_center_atom_idx = 2,
     ),
     S = dict(
         smile = 'C(C(C(=O)O)N)O',
@@ -147,7 +162,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 5,
         last_atom_idx = 2,
         hydroxyl_idx = 4,
-        distogram_atom_idx = 1
+        distogram_atom_idx = 1,
+        token_center_atom_idx = 1,
     ),
     T = dict(
         smile = 'CC(C(C(=O)O)N)O',
@@ -155,7 +171,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 6,
         last_atom_idx = 3,
         hydroxyl_idx = 5,
-        distogram_atom_idx = 2
+        distogram_atom_idx = 2,
+        token_center_atom_idx = 2,
     ),
     W = dict(
         smile = 'C1=CC=C2C(=C1)C(=CN2)CC(C(=O)O)N',
@@ -163,7 +180,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 14,
         last_atom_idx = 11,
         hydroxyl_idx = 13,
-        distogram_atom_idx = 10
+        distogram_atom_idx = 10,
+        token_center_atom_idx = 10,
     ),
     Y = dict(
         smile = 'C1=CC(=CC=C1CC(C(=O)O)N)O',
@@ -171,7 +189,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 11,
         last_atom_idx = 8,
         hydroxyl_idx = 10,
-        distogram_atom_idx = 7
+        distogram_atom_idx = 7,
+        token_center_atom_idx = 7,
     ),
     V = dict(
         smile = 'CC(C)C(C(=O)O)N',
@@ -179,7 +198,8 @@ HUMAN_AMINO_ACIDS = dict(
         first_atom_idx = 7,
         last_atom_idx = 4,
         hydroxyl_idx = 6,
-        distogram_atom_idx = 3
+        distogram_atom_idx = 3,
+        token_center_atom_idx = 3,
     )
 )
 
@@ -194,7 +214,8 @@ DNA_NUCLEOTIDES = dict(
         first_atom_idx = 20,
         last_atom_idx = 1,
         hydroxyl_idx = 21,
-        distogram_atom_idx = 4
+        distogram_atom_idx = 4,
+        token_center_atom_idx = 4,
     ),
     C = dict(
         smile = 'C1C(C(OC1N2C=CC(=NC2=O)N)COP(=O)(O)O)O',
@@ -203,7 +224,8 @@ DNA_NUCLEOTIDES = dict(
         first_atom_idx = 17,
         last_atom_idx = 1,
         hydroxyl_idx = 19,
-        distogram_atom_idx = 4
+        distogram_atom_idx = 4,
+        token_center_atom_idx = 4,
     ),
     G = dict(
         smile = 'C1C(C(OC1N2C=NC3=C2N=C(NC3=O)N)COP(=O)(O)O)O',
@@ -212,7 +234,8 @@ DNA_NUCLEOTIDES = dict(
         first_atom_idx = 21,
         last_atom_idx = 1,
         hydroxyl_idx = 22,
-        distogram_atom_idx = 4
+        distogram_atom_idx = 4,
+        token_center_atom_idx = 4,
     ),
     T = dict(
         smile = 'CC1=CN(C(=O)NC1=O)C2CC(C(O2)COP(=O)(O)O)O',
@@ -221,7 +244,8 @@ DNA_NUCLEOTIDES = dict(
         first_atom_idx = 19,
         last_atom_idx = 11,
         hydroxyl_idx = 20,
-        distogram_atom_idx = 9
+        distogram_atom_idx = 9,
+        token_center_atom_idx = 8,
     )
 )
 
@@ -233,7 +257,8 @@ RNA_NUCLEOTIDES = dict(
         first_atom_idx = 19,
         last_atom_idx = 11,
         hydroxyl_idx = 20,
-        distogram_atom_idx = 9
+        distogram_atom_idx = 9,
+        token_center_atom_idx = 9,
     ),
     C = dict(
         smile = 'C1=CN(C(=O)N=C1N)C2C(C(C(O2)COP(=O)([O-])[O-])O)O',
@@ -242,7 +267,8 @@ RNA_NUCLEOTIDES = dict(
         first_atom_idx = 17,
         last_atom_idx = 10,
         hydroxyl_idx = 19,
-        distogram_atom_idx = 8
+        distogram_atom_idx = 8,
+        token_center_atom_idx = 8,
     ),
     G = dict(
         smile = 'C1=NC2=C(N1C3C(C(C(O3)COP(=O)(O)O)O)O)N=C(NC2=O)N',
@@ -251,7 +277,8 @@ RNA_NUCLEOTIDES = dict(
         first_atom_idx = 14,
         last_atom_idx = 7,
         hydroxyl_idx = 16,
-        distogram_atom_idx = 5
+        distogram_atom_idx = 5,
+        token_center_atom_idx = 5,
     ),
     U = dict(
         smile = 'C1=CN(C(=O)NC1=O)C2C(C(C(O2)COP(=O)(O)O)O)O',
@@ -260,7 +287,8 @@ RNA_NUCLEOTIDES = dict(
         first_atom_idx = 18,
         last_atom_idx = 10,
         hydroxyl_idx = 19,
-        distogram_atom_idx = 8
+        distogram_atom_idx = 8,
+        token_center_atom_idx = 8,
     )
 )
 

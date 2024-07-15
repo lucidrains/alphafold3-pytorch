@@ -3347,7 +3347,8 @@ class Alphafold3(Module):
         num_recycling_steps: int = 1,
         diffusion_add_bond_loss: bool = False,
         diffusion_add_smooth_lddt_loss: bool = False,
-        molecule_atom_indices: Int['b n'] | None = None,
+        distogram_atom_indices: Int['b n'] | None = None,
+        molecule_atom_indices: Int['b n'] | None = None, # the 'token centre atoms' mentioned in the paper, unsure where it is used in the architecture
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
         output_atompos_indices: Int['b m'] | None = None,
@@ -3378,6 +3379,10 @@ class Alphafold3(Module):
         if exists(molecule_atom_indices):
             molecule_atom_indices = molecule_atom_indices.masked_fill(~valid_atom_len_mask, 0)
             assert (molecule_atom_indices < molecule_atom_lens)[valid_atom_len_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+
+        if exists(distogram_atom_indices):
+            distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_atom_len_mask, 0)
+            assert (distogram_atom_indices < molecule_atom_lens)[valid_atom_len_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
 
@@ -3640,9 +3645,8 @@ class Alphafold3(Module):
 
         # distogram head
 
-        if not exists(distance_labels) and atom_pos_given and exists(molecule_atom_indices):
-
-            molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, molecule_atom_indices)
+        if not exists(distance_labels) and atom_pos_given and exists(distogram_atom_indices):
+            molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
             molecule_dist = torch.cdist(molecule_pos, molecule_pos, p = 2)
             dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', molecule_dist, self.distance_bins).abs()
             distance_labels = dist_from_dist_bins.argmin(dim = -1)
@@ -3678,6 +3682,7 @@ class Alphafold3(Module):
                     relative_position_encoding,
                     additional_molecule_feats,
                     is_molecule_types,
+                    distogram_atom_indices,
                     molecule_atom_indices,
                     molecule_atom_lens,
                     pae_labels,
@@ -3701,6 +3706,7 @@ class Alphafold3(Module):
                         relative_position_encoding,
                         additional_molecule_feats,
                         is_molecule_types,
+                        distogram_atom_indices,
                         molecule_atom_indices,
                         molecule_atom_lens,
                         pae_labels,
@@ -3756,7 +3762,7 @@ class Alphafold3(Module):
         should_call_confidence_head = any([*map(exists, confidence_head_labels)])
         return_pae_logits = exists(pae_labels)
 
-        if calc_diffusion_loss and should_call_confidence_head:
+        if calc_diffusion_loss and should_call_confidence_head and exists(molecule_atom_indices):
 
             # rollout
 

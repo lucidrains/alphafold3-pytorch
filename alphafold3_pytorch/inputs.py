@@ -137,6 +137,7 @@ class AtomInput:
     atom_pos:                   Float['m 3'] | None = None
     output_atompos_indices:     Int[' m'] | None = None
     molecule_atom_indices:      Int[' n'] | None = None
+    distogram_atom_indices:     Int[' n'] | None = None
     distance_labels:            Int['n n'] | None = None
     pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int['n n'] | None = None
@@ -167,6 +168,7 @@ class BatchedAtomInput:
     atom_pos:                   Float['b m 3'] | None = None
     output_atompos_indices:     Int['b m'] | None = None
     molecule_atom_indices:      Int['b n'] | None = None
+    distogram_atom_indices:     Int['b n'] | None = None
     distance_labels:            Int['b n n'] | None = None
     pae_labels:                 Int['b n n'] | None = None
     pde_labels:                 Int['b n n'] | None = None
@@ -202,11 +204,12 @@ def default_extract_atompair_feats_fn(mol: Mol):
 class MoleculeInput:
     molecules:                  List[Mol]
     molecule_token_pool_lens:   List[int]
-    molecule_atom_indices:      List[int | None]
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     token_bonds:                Bool['n n']
+    molecule_atom_indices:      List[int | None] | None = None
+    distogram_atom_indices:     List[int | None] | None = None
     atom_parent_ids:            Int[' m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
@@ -398,6 +401,8 @@ def molecule_to_atom_input(
         atompair_inputs = atompair_inputs,
         molecule_atom_lens = tensor(atom_lens, dtype = torch.long),
         molecule_ids = i.molecule_ids,
+        molecule_atom_indices = i.molecule_atom_indices,
+        distogram_atom_indices = i.distogram_atom_indices,
         additional_token_feats = i.additional_token_feats,
         additional_molecule_feats = i.additional_molecule_feats,
         is_molecule_types = i.is_molecule_types,
@@ -542,12 +547,15 @@ def alphafold3_input_to_molecule_input(
     proteins = i.proteins
     mol_proteins = []
     protein_entries = []
+
+    distogram_atom_indices = []
     molecule_atom_indices = []
 
     for protein in proteins:
         mol_peptides, protein_entries = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, chain = True, return_entries = True)
         mol_proteins.append(mol_peptides)
 
+        distogram_atom_indices.extend([entry['token_center_atom_idx'] for entry in protein_entries])
         molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in protein_entries])
 
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
@@ -810,7 +818,10 @@ def alphafold3_input_to_molecule_input(
         sym_ids
     ), dim = -1)
 
-    # molecule atom indices
+    # distogram and token centre atom indices
+
+    distogram_atom_indices = tensor(distogram_atom_indices)
+    distogram_atom_indices = pad_to_len(distogram_atom_indices, num_tokens, value = -1)
 
     molecule_atom_indices = tensor(molecule_atom_indices)
     molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value = -1)
@@ -874,6 +885,7 @@ def alphafold3_input_to_molecule_input(
         molecules = molecules,
         molecule_token_pool_lens = token_pool_lens,
         molecule_atom_indices = molecule_atom_indices,
+        distogram_atom_indices = distogram_atom_indices,
         molecule_ids = molecule_ids,
         token_bonds = token_bonds,
         additional_molecule_feats = additional_molecule_feats,
