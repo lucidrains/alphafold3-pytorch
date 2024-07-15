@@ -37,7 +37,6 @@ from alphafold3_pytorch.life import (
     ATOM_BONDS,
     MISC,
     mol_from_smile,
-    remove_atom_from_mol,
     reverse_complement,
     reverse_complement_tensor
 )
@@ -135,7 +134,6 @@ class AtomInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     atom_pos:                   Float['m 3'] | None = None
-    output_atompos_indices:     Int[' m'] | None = None
     molecule_atom_indices:      Int[' n'] | None = None
     distance_labels:            Int['n n'] | None = None
     pae_labels:                 Int['n n'] | None = None
@@ -165,7 +163,6 @@ class BatchedAtomInput:
     template_mask:              Bool['b t'] | None = None
     msa_mask:                   Bool['b s'] | None = None
     atom_pos:                   Float['b m 3'] | None = None
-    output_atompos_indices:     Int['b m'] | None = None
     molecule_atom_indices:      Int['b n'] | None = None
     distance_labels:            Int['b n n'] | None = None
     pae_labels:                 Int['b n n'] | None = None
@@ -212,7 +209,6 @@ class MoleculeInput:
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
-    output_atompos_indices:     Int[' m'] | None = None
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
@@ -439,7 +435,6 @@ class Alphafold3Input:
     resolved_labels:            Int[' n'] | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
-    add_output_atompos_indices: bool = True
     directed_bonds:             bool = False
     extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
     extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
@@ -458,7 +453,7 @@ def map_int_or_string_indices_to_mol(
 
     entries_list = list(entries.values())
 
-    # first get all the peptide or nucleotide entries
+    # get all the peptide or nucleotide entries
 
     if torch.is_tensor(indices):
         indices = indices.tolist()
@@ -466,21 +461,7 @@ def map_int_or_string_indices_to_mol(
     else:
         entries = [entries[s] for s in indices]
 
-    # for all peptides or nucleotide except last, remove hydroxl
-
-    mols = []
-
-    for idx, entry in enumerate(entries):
-        is_last = idx == (len(entries) - 1)
-
-        mol = entry[mol_keyname]
-
-        if chain and not is_last:
-            # hydroxyl oxygen to be removed should be the last atom
-            hydroxyl_idx = mol.GetNumAtoms() - 1
-            mol = remove_atom_from_mol(mol, hydroxyl_idx)
-
-        mols.append(mol)
+    mols = [entry[mol_keyname] for entry in entries]
 
     if not return_entries:
         return mols
@@ -818,55 +799,12 @@ def alphafold3_input_to_molecule_input(
     # handle atom positions
 
     atom_pos = i.atom_pos
-    output_atompos_indices = None
 
     if exists(atom_pos):
         if isinstance(atom_pos, list):
             atom_pos = torch.cat(atom_pos, dim = -2)
 
         assert atom_pos.shape[-2] == total_atoms
-
-        # to automatically reorder the atom positions back to canonical
-
-        if i.add_output_atompos_indices:
-            offset = 0
-
-            reorder_atompos_indices = []
-            output_atompos_indices = []
-
-            for chain in chainable_biomol_entries:
-                for idx, entry in enumerate(chain):
-                    is_last = idx == (len(chain) - 1)
-
-                    mol = entry['rdchem_mol']
-                    num_atoms = mol.GetNumAtoms()
-                    atom_reorder_indices = entry['atom_reorder_indices']
-
-                    if not is_last:
-                        num_atoms -= 1
-                        atom_reorder_indices = atom_reorder_indices[:-1]
-
-                    reorder_back_indices = atom_reorder_indices.argsort()
-
-                    output_atompos_indices.append(reorder_back_indices + offset)
-                    reorder_atompos_indices.append(atom_reorder_indices + offset)
-
-                    offset += num_atoms
-
-            output_atompos_indices = torch.cat(output_atompos_indices, dim = -1)
-            output_atompos_indices = pad_to_length(output_atompos_indices, total_atoms, value = -1)
-
-        # if atom positions are passed in, need to be reordered for the bonds between residues / nucleotides to be contiguous
-        # todo - fix to have no reordering needed (bonds are built not contiguous, just hydroxyl removed)
-
-        if i.reorder_atom_pos:
-            orig_order = torch.arange(total_atoms)
-            reorder_atompos_indices = torch.cat(reorder_atompos_indices, dim = -1)
-            reorder_atompos_indices = pad_to_length(reorder_atompos_indices, total_atoms, value = -1)
-
-            reorder_indices = torch.where(reorder_atompos_indices != -1, reorder_atompos_indices, orig_order)
-
-            atom_pos = atom_pos[reorder_indices]
 
     # create molecule input
 
@@ -880,7 +818,6 @@ def alphafold3_input_to_molecule_input(
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
         atom_pos = atom_pos,
-        output_atompos_indices = output_atompos_indices,
         templates = i.templates,
         msa = i.msa,
         template_mask = i.template_mask,
