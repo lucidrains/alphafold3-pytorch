@@ -176,14 +176,6 @@ def collate_inputs_to_batched_atom_input(
 
     batched_atom_input_dict = dict(tuple(zip(keys, outputs)))
 
-    # just ensure output_atompos_indices has full atom_seq_len manually for now
-
-    output_atompos_indices = batched_atom_input_dict.get('output_atompos_indices', None)
-
-    if exists(output_atompos_indices):
-        atom_seq_len = batched_atom_input_dict['atom_inputs'].shape[-2]
-        batched_atom_input_dict.update(output_atompos_indices = pad_or_slice_to(output_atompos_indices, atom_seq_len, dim = -1, pad_value = -1))
-
     # reconstitute dictionary
 
     batched_atom_inputs = BatchedAtomInput(**batched_atom_input_dict)
