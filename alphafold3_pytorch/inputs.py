@@ -102,8 +102,10 @@ def flatten(arr):
 def exclusive_cumsum(t):
     return t.cumsum(dim = -1) - t
 
-def pad_to_len(t, length, value = 0):
-    return F.pad(t, (0, max(0, length - t.shape[-1])), value = value)
+def pad_to_len(t, length, value = 0, dim = -1):
+    assert dim < 0
+    zeros = (0, 0) * (-dim - 1)
+    return F.pad(t, (*zeros, 0, max(0, length - t.shape[-1])), value = value)
 
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
@@ -205,6 +207,7 @@ class MoleculeInput:
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
+    src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
@@ -308,7 +311,10 @@ def molecule_to_atom_input(
 
         # for every molecule, build the bonds id matrix and add to `atompair_ids`
 
-        for idx, (mol, is_first_mol_in_chain, is_chainable_biomolecule, offset) in enumerate(zip(molecules, is_first_mol_in_chains, is_chainable_biomolecules, offsets)):
+        prev_mol = None
+        prev_src_tgt_atom_indices = None
+
+        for idx, (mol, is_first_mol_in_chain, is_chainable_biomolecule, src_tgt_atom_indices, offset) in enumerate(zip(molecules, is_first_mol_in_chains, is_chainable_biomolecules, i.src_tgt_atom_indices, offsets)):
 
             coordinates = []
             updates = []
@@ -349,15 +355,21 @@ def molecule_to_atom_input(
             atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
 
             # if is chainable biomolecule
-            # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom  of the last biomolecule
+            # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom of the last biomolecule
 
             if is_chainable_biomolecule and not is_first_mol_in_chain:
 
+                _, last_atom_index = prev_src_tgt_atom_indices
+                first_atom_index, _ = src_tgt_atom_indices
 
-                atompair_ids[offset, offset - 1] = 1
-                atompair_ids[offset - 1, offset] = 1
+                src_atom_offset = offset + first_atom_index
+                tgt_atom_offset = offset - last_atom_index
 
-                last_mol = mol
+                atompair_ids[src_atom_offset, tgt_atom_offset] = 1
+                atompair_ids[tgt_atom_offset, src_atom_offset] = 1
+
+            prev_mol = mol
+            prev_src_tgt_atom_indices = src_tgt_atom_indices
 
     # atom_inputs
 
@@ -538,6 +550,7 @@ def alphafold3_input_to_molecule_input(
 
     distogram_atom_indices = []
     molecule_atom_indices = []
+    src_tgt_atom_indices = []
 
     for protein in proteins:
         mol_peptides, protein_entries = map_int_or_string_indices_to_mol(HUMAN_AMINO_ACIDS, protein, chain = True, return_entries = True)
@@ -545,6 +558,8 @@ def alphafold3_input_to_molecule_input(
 
         distogram_atom_indices.extend([entry['token_center_atom_idx'] for entry in protein_entries])
         molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in protein_entries])
+
+        src_tgt_atom_indices.extend([[entry['first_atom_idx'], entry['last_atom_idx']] for entry in protein_entries])
 
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
         molecule_ids.append(protein_ids)
@@ -560,6 +575,11 @@ def alphafold3_input_to_molecule_input(
         mol_seq, ss_rna_entries = map_int_or_string_indices_to_mol(RNA_NUCLEOTIDES, seq, chain = True, return_entries = True)
         mol_ss_rnas.append(mol_seq)
 
+        distogram_atom_indices.extend([entry['token_center_atom_idx'] for entry in ss_rna_entries])
+        molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in ss_rna_entries])
+
+        src_tgt_atom_indices.extend([[entry['first_atom_idx'], entry['last_atom_idx']] for entry in ss_rna_entries])
+
         rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
         molecule_ids.append(rna_ids)
 
@@ -568,6 +588,11 @@ def alphafold3_input_to_molecule_input(
     for seq in ss_dnas:
         mol_seq, ss_dna_entries = map_int_or_string_indices_to_mol(DNA_NUCLEOTIDES, seq, chain = True, return_entries = True)
         mol_ss_dnas.append(mol_seq)
+
+        distogram_atom_indices.extend([entry['token_center_atom_idx'] for entry in ss_dna_entries])
+        molecule_atom_indices.extend([entry['distogram_atom_idx'] for entry in ss_dna_entries])
+
+        src_tgt_atom_indices.extend([[entry['first_atom_idx'], entry['last_atom_idx']] for entry in ss_dna_entries])
 
         dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
         molecule_ids.append(dna_ids)
@@ -814,6 +839,9 @@ def alphafold3_input_to_molecule_input(
     molecule_atom_indices = tensor(molecule_atom_indices)
     molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value = -1)
 
+    src_tgt_atom_indices = tensor(src_tgt_atom_indices)
+    src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, value = -1, dim = -2)
+
     # todo - handle atom positions for variable lengthed atoms (eventual missing atoms from mmCIF)
 
     atom_pos = i.atom_pos
@@ -830,6 +858,7 @@ def alphafold3_input_to_molecule_input(
         additional_molecule_feats = additional_molecule_feats,
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
+        src_tgt_atom_indices = src_tgt_atom_indices,
         atom_pos = atom_pos,
         templates = i.templates,
         msa = i.msa,
