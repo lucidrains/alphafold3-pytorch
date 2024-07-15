@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.1.122"
+version = "0.1.123"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" }

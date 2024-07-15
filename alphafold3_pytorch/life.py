@@ -511,22 +511,10 @@ for entry in [*CHAINABLE_BIOMOLECULES, *METALS_AND_MISC]:
     mol = mol_from_smile(entry['smile'])
     entry['rdchem_mol'] = mol
 
-# reorder all the chainable biomolecules
-# to simplify chaining them up and specifying the peptide or phosphodiesterase bonds
-
 for entry in CHAINABLE_BIOMOLECULES:
-    mol = entry['rdchem_mol']
+    num_atoms = mol.GetNumAtoms()
 
-    atom_order = torch.arange(mol.GetNumAtoms())
-
-    atom_order[entry['first_atom_idx']] = -1
-    atom_order[entry['last_atom_idx']] = 1e4
-
-    atom_reorder = atom_order.argsort()
-
-    mol = Chem.RenumberAtoms(mol, atom_reorder.tolist())
-
-    entry.update(
-        atom_reorder_indices = atom_reorder,
-        rdchem_mol = mol
-    )
+    assert 0 <= entry['distogram_atom_idx'] < num_atoms
+    assert 0 <= entry['first_atom_idx'] < num_atoms
+    assert 0 <= entry['last_atom_idx'] < num_atoms
+    assert 0 <= entry['token_center_atom_idx'] < num_atoms
