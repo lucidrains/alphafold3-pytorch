@@ -471,21 +471,9 @@ def map_int_or_string_indices_to_mol(
     else:
         entries = [entries[s] for s in indices]
 
-    # for all peptides or nucleotide except last, remove hydroxl
+    # gather Chem.Mol(s)
 
-    mols = []
-
-    for idx, entry in enumerate(entries):
-        is_last = idx == (len(entries) - 1)
-
-        mol = entry[mol_keyname]
-
-        if chain and not is_last:
-            # hydroxyl oxygen to be removed should be the last atom
-            hydroxyl_idx = mol.GetNumAtoms() - 1
-            mol = remove_atom_from_mol(mol, hydroxyl_idx)
-
-        mols.append(mol)
+    mols = [entry[mol_keyname] for entry in entries]
 
     if not return_entries:
         return mols
