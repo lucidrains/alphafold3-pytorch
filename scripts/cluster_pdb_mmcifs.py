@@ -264,9 +264,10 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
     return sequences, interface_chain_ids
 
 
+@typecheck
 def parse_chain_sequences_and_interfaces_from_mmcif_file(
     cif_filepath: str, assume_one_based_residue_ids: bool = False
-) -> Tuple[str, Dict[str, Dict[str, str]], Set[str]]:
+) -> Tuple[str, Dict[str, str], Set[str]]:
     """Parse chain sequences and interfaces from an mmCIF file."""
     structure_id = os.path.splitext(os.path.basename(cif_filepath))[0]
     try:
