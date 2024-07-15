@@ -86,8 +86,8 @@ def test_atompos_input():
     contrived_protein = 'AG'
 
     mock_atompos = [
-        torch.randn(6, 3),   # alanine has 6 non-hydrogen atoms
-        torch.randn(5, 3)    # glycine has 5 non-hydrogen atoms
+        torch.randn(5, 3),   # alanine has 5 non-hydrogen atoms
+        torch.randn(4, 3)    # glycine has 4 non-hydrogen atoms
     ]
 
     train_alphafold3_input = Alphafold3Input(
@@ -138,7 +138,7 @@ def test_atompos_input():
     alphafold3.eval()
     sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
 
-    assert sampled_atom_pos.shape == (1, (6 + 5), 3)
+    assert sampled_atom_pos.shape == (1, (5 + 4), 3)
 
 def test_pdbinput_input():
     pytest.skip("This unit test is currently disabled while the PDB featurization pipeline is under development.")
