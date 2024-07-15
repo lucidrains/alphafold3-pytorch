@@ -1,5 +1,7 @@
 """Deoxyribonucleic acid (DNA) constants used in AlphaFold."""
 
+import numpy as np
+
 from typing import Final
 
 from alphafold3_pytorch.common import amino_acid_constants, rna_constants
@@ -209,29 +211,45 @@ restype_name_to_compact_atom_names = {
         "",
     ],
     "DN": [
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
+        "OP3",
+        "P",
+        "OP1",
+        "OP2",
+        "O5'",
+        "C5'",
+        "C4'",
+        "O4'",
+        "C3'",
+        "O3'",
+        "C2'",
+        "C1'",
+        "N9",
+        "C8",
+        "N7",
+        "C5",
+        "C6",
+        "N6",
+        "N1",
+        "C2",
+        "N3",
+        "C4",
         "",
         "",
     ],
 }
+
+restype_atom47_to_compact_atom = np.zeros([5, 47], dtype=int)
+
+
+def _make_constants():
+    """Fill the array(s) above."""
+    for restype, restype_letter in enumerate(restypes):
+        resname = restype_1to3[restype_letter]
+        for atomname in restype_name_to_compact_atom_names[resname]:
+            if not atomname:
+                continue
+            atomtype = atom_order[atomname]
+            compact_atom_idx = restype_name_to_compact_atom_names[resname].index(atomname)
+            restype_atom47_to_compact_atom[restype, atomtype] = compact_atom_idx
+
+_make_constants()
