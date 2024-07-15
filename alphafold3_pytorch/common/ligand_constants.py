@@ -1,5 +1,7 @@
 """Ligand constants used in AlphaFold."""
 
+import numpy as np
+
 from typing import Final
 
 from alphafold3_pytorch.common import amino_acid_constants, dna_constants
@@ -62,10 +64,13 @@ atom_type_num = len(atom_types)  # := 47.
 
 
 # All ligand residues are mapped to the unknown amino acid type index (:= 20).
-restypes = ["UNL"]
+restypes = ["X"]
 min_restype_num = len(amino_acid_constants.restypes)  # := 20.
 restype_order = {restype: min_restype_num + i for i, restype in enumerate(restypes)}
 restype_num = len(amino_acid_constants.restypes)  # := 20.
+
+
+restype_1to3 = {"X": "UNL"}
 
 BIOMOLECULE_CHAIN: Final[str] = "other"
 POLYMER_CHAIN: Final[str] = "non-polymer"
@@ -89,3 +94,19 @@ chemtype_num = dna_constants.chemtype_num + 1  # := 3.
 restype_name_to_compact_atom_names = {
     "UNL": atom_types,
 }
+
+restype_atom47_to_compact_atom = np.zeros([1, 47], dtype=int)
+
+
+def _make_constants():
+    """Fill the array(s) above."""
+    for restype, restype_letter in enumerate(restypes):
+        resname = restype_1to3[restype_letter]
+        for atomname in restype_name_to_compact_atom_names[resname]:
+            if not atomname:
+                continue
+            atomtype = atom_order[atomname]
+            compact_atom_idx = restype_name_to_compact_atom_names[resname].index(atomname)
+            restype_atom47_to_compact_atom[restype, atomtype] = compact_atom_idx
+
+_make_constants()

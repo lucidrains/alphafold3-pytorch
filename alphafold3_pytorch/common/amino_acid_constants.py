@@ -1,5 +1,7 @@
 """Amino acid constants used in AlphaFold."""
 
+import numpy as np
+
 from typing import Final
 
 # This mapping is used when we need to store atom data in a format that requires
@@ -173,5 +175,21 @@ restype_name_to_compact_atom_names = {
     ],
     "TYR": ["N", "CA", "C", "O", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "", ""],
     "VAL": ["N", "CA", "C", "O", "CB", "CG1", "CG2", "", "", "", "", "", "", ""],
-    "UNK": ["", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    "UNK": ["N", "CA", "C", "O", "CB", "", "", "", "", "", "", "", "", ""],
 }
+
+restype_atom47_to_compact_atom = np.zeros([21, 47], dtype=int)
+
+
+def _make_constants():
+    """Fill the array(s) above."""
+    for restype, restype_letter in enumerate(restypes):
+        resname = restype_1to3[restype_letter]
+        for compact_atomidx, atomname in enumerate(restype_name_to_compact_atom_names[resname]):
+            if not atomname:
+                continue
+            atomtype = atom_order[atomname]
+            restype_atom47_to_compact_atom[restype, atomtype] = compact_atomidx
+
+
+_make_constants()

@@ -4517,7 +4517,6 @@ loop_
 _pdbx_audit_revision_history.revision_date
 2021-05-05
 2021-08-11
-2024-05-01
 #
 _refine.ls_d_res_high   2.6940
 #
@@ -4645,28 +4644,28 @@ _chem_comp.formula_weight
 _chem_comp.mon_nstd_flag
 _chem_comp.name
 _chem_comp.type
-TRP 'C11 H12 N2 O2'  204.225 y  TRYPTOPHAN                   'L-peptide linking'
-PRO 'C5 H9 N O2'     115.130 y  PROLINE                      'L-peptide linking'
-GLY 'C2 H5 N O2'     75.067  y  GLYCINE                      'peptide linking'
-ALA 'C3 H7 N O2'     89.093  y  ALANINE                      'L-peptide linking'
-SER 'C3 H7 N O3'     105.093 y  SERINE                       'L-peptide linking'
-LEU 'C6 H13 N O2'    131.173 y  LEUCINE                      'L-peptide linking'
-CYS 'C3 H7 N O2 S'   121.158 y  CYSTEINE                     'L-peptide linking'
-ILE 'C6 H13 N O2'    131.173 y  ISOLEUCINE                   'L-peptide linking'
-HIS 'C6 H10 N3 O2 1' 156.162 y  HISTIDINE                    'L-peptide linking'
-ASP 'C4 H7 N O4'     133.103 y  'ASPARTIC ACID'              'L-peptide linking'
 ASN 'C4 H8 N2 O3'    132.118 y  ASPARAGINE                   'L-peptide linking'
+THR 'C4 H9 N O3'     119.119 y  THREONINE                    'L-peptide linking'
+GLU 'C5 H9 N O4'     147.129 y  'GLUTAMIC ACID'              'L-peptide linking'
+PHE 'C9 H11 N O2'    165.189 y  PHENYLALANINE                'L-peptide linking'
+ILE 'C6 H13 N O2'    131.173 y  ISOLEUCINE                   'L-peptide linking'
+NH2 'H2 N'           16.023  .  'AMINO GROUP'                non-polymer
+GLY 'C2 H5 N O2'     75.067  y  GLYCINE                      'peptide linking'
+SER 'C3 H7 N O3'     105.093 y  SERINE                       'L-peptide linking'
 VAL 'C5 H11 N O2'    117.146 y  VALINE                       'L-peptide linking'
 MET 'C5 H11 N O2 S'  149.211 y  METHIONINE                   'L-peptide linking'
-TYR 'C9 H11 N O3'    181.189 y  TYROSINE                     'L-peptide linking'
-LYS 'C6 H15 N2 O2 1' 147.195 y  LYSINE                       'L-peptide linking'
-NH2 'H2 N'           16.023  .  'AMINO GROUP'                non-polymer
-GLU 'C5 H9 N O4'     147.129 y  'GLUTAMIC ACID'              'L-peptide linking'
-ACE 'C2 H4 O'        44.053  .  'ACETYL GROUP'               non-polymer
+ALA 'C3 H7 N O2'     89.093  y  ALANINE                      'L-peptide linking'
 ARG 'C6 H15 N4 O2 1' 175.209 y  ARGININE                     'L-peptide linking'
+LYS 'C6 H15 N2 O2 1' 147.195 y  LYSINE                       'L-peptide linking'
+ACE 'C2 H4 O'        44.053  .  'ACETYL GROUP'               non-polymer
+LEU 'C6 H13 N O2'    131.173 y  LEUCINE                      'L-peptide linking'
+CYS 'C3 H7 N O2 S'   121.158 y  CYSTEINE                     'L-peptide linking'
+TYR 'C9 H11 N O3'    181.189 y  TYROSINE                     'L-peptide linking'
+PRO 'C5 H9 N O2'     115.130 y  PROLINE                      'L-peptide linking'
+TRP 'C11 H12 N2 O2'  204.225 y  TRYPTOPHAN                   'L-peptide linking'
 GLN 'C5 H10 N2 O3'   146.144 y  GLUTAMINE                    'L-peptide linking'
-PHE 'C9 H11 N O2'    165.189 y  PHENYLALANINE                'L-peptide linking'
-THR 'C4 H9 N O3'     119.119 y  THREONINE                    'L-peptide linking'
+HIS 'C6 H10 N3 O2 1' 156.162 y  HISTIDINE                    'L-peptide linking'
+ASP 'C4 H7 N O4'     133.103 y  'ASPARTIC ACID'              'L-peptide linking'
 UNK ?                0.0     no 'UNKNOWN AMINO ACID RESIDUE' 'peptide linking'
 #
 loop_
