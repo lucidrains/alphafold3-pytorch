@@ -3351,7 +3351,6 @@ class Alphafold3(Module):
         molecule_atom_indices: Int['b n'] | None = None, # the 'token centre atoms' mentioned in the paper, unsure where it is used in the architecture
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
-        output_atompos_indices: Int['b m'] | None = None,
         distance_labels: Int['b n n'] | None = None,
         pae_labels: Int['b n n'] | None = None,
         pde_labels: Int['b n n'] | None = None,
@@ -3602,26 +3601,6 @@ class Alphafold3(Module):
 
             if exists(atom_mask):
                 sampled_atom_pos = einx.where('b m, b m c, -> b m c', atom_mask, sampled_atom_pos, 0.)
-
-            if not exists(output_atompos_indices):
-                return sampled_atom_pos
-
-            # in the case the atoms are passed in not ordered canonically
-
-            order_mask = output_atompos_indices >= 0   # -1 is padding, which means do not order (metal ions, ligands, or entire row if None was passed in)
-
-            output_atompos_indices = einx.where(
-                'b m, b m, m -> b m',
-                order_mask,
-                output_atompos_indices,
-                torch.arange(atom_seq_len, device = self.device)
-            )
-
-            sampled_atom_pos = einx.get_at(
-                'b [m] 3, b rm -> b rm 3',
-                sampled_atom_pos,
-                output_atompos_indices
-            )
 
             return sampled_atom_pos
 

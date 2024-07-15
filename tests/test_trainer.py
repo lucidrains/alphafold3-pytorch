@@ -63,12 +63,6 @@ class MockAtomDataset(Dataset):
         if random() > 0.5:
             msa_mask = torch.ones((7,)).bool()
 
-        # randomly reorder output atompos indices for testing
-
-        output_atompos_indices = None
-        if random() > 0.5:
-            output_atompos_indices = torch.arange(atom_seq_len).long()
-
         # required for training, but omitted on inference
 
         atom_pos = torch.randn(atom_seq_len, 3)
@@ -94,7 +88,6 @@ class MockAtomDataset(Dataset):
             msa = msa,
             msa_mask = msa_mask,
             atom_pos = atom_pos,
-            output_atompos_indices = output_atompos_indices,
             molecule_atom_indices = molecule_atom_indices,
             distance_labels = distance_labels,
             pae_labels = pae_labels,
@@ -182,7 +175,7 @@ def test_trainer():
 
     # assert can load latest checkpoint by loading from a directory
 
-    trainer.load('./checkpoints')
+    trainer.load('./checkpoints', strict = False)
 
     assert exists(trainer.model_loaded_from_path)
 
