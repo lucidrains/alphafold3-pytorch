@@ -1741,6 +1741,8 @@ class DiffusionModule(Module):
 
         self.atom_pos_to_atom_feat = LinearNoBias(3, dim_atom)
 
+        self.missing_atom_feat = nn.Parameter(torch.zeros(dim_atom))
+
         self.single_repr_to_atom_feat_cond = nn.Sequential(
             nn.LayerNorm(dim_single),
             LinearNoBias(dim_single, dim_atom)
@@ -1839,7 +1841,8 @@ class DiffusionModule(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
-        atom_parent_ids: Int['b m'] | None = None
+        atom_parent_ids: Int['b m'] | None = None,
+        missing_atom_mask: Bool['b m']| None = None
     ):
         w = self.atoms_per_window
         device = noised_atom_pos.device
@@ -1864,7 +1867,16 @@ class DiffusionModule(Module):
 
         # the most surprising part of the paper; no geometric biases!
 
-        atom_feats = self.atom_pos_to_atom_feat(noised_atom_pos) + atom_feats
+        noised_atom_pos_feats = self.atom_pos_to_atom_feat(noised_atom_pos)
+
+        # for missing atoms, replace the noise atom pos features with a missing embedding
+
+        if exists(missing_atom_mask):
+            noised_atom_pos_feats = einx.where('b m, d, b m d -> b m d', missing_atom_mask, self.missing_atom_feat, noised_atom_pos_feats)
+
+        # sum the noised atom position features to the atom features
+
+        atom_feats = noised_atom_pos_feats + atom_feats
 
         # condition atom feats cond (cl) with single repr
 
@@ -2199,6 +2211,7 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
+        missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         return_denoised_pos = False,
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'] | None = None,
@@ -2227,6 +2240,7 @@ class ElucidatedAtomDiffusion(Module):
             network_condition_kwargs = dict(
                 atom_feats = atom_feats,
                 atom_mask = atom_mask,
+                missing_atom_mask = missing_atom_mask,
                 atompair_feats = atompair_feats,
                 atom_parent_ids = atom_parent_ids,
                 mask = mask,
@@ -2281,6 +2295,11 @@ class ElucidatedAtomDiffusion(Module):
         loss_weights = self.loss_weight(padded_sigmas)
 
         losses = losses * loss_weights
+
+        # if there are missing atoms, update the atom mask to not include them in the loss
+
+        if exists(missing_atom_mask):
+            atom_mask = atom_mask & ~ missing_atom_mask
 
         # account for atom mask
 
@@ -3337,6 +3356,7 @@ class Alphafold3(Module):
         atompair_ids: Int['b m m'] | Int['b nw {self.w} {self.w*2}'] | None = None,
         is_molecule_mod: Bool['b n num_mods'] | None = None,
         atom_mask: Bool['b m'] | None = None,
+        missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -3656,6 +3676,7 @@ class Alphafold3(Module):
                 (
                     atom_pos,
                     atom_mask,
+                    missing_atom_mask,
                     atom_feats,
                     atom_parent_ids,
                     atompair_feats,
@@ -3679,6 +3700,7 @@ class Alphafold3(Module):
                     for t in (
                         atom_pos,
                         atom_mask,
+                        missing_atom_mask,
                         atom_feats,
                         atom_parent_ids,
                         atompair_feats,
@@ -3730,6 +3752,7 @@ class Alphafold3(Module):
                 atom_feats = atom_feats,
                 atompair_feats = atompair_feats,
                 atom_parent_ids = atom_parent_ids,
+                missing_atom_mask = missing_atom_mask,
                 atom_mask = atom_mask,
                 mask = mask,
                 single_trunk_repr = single,
