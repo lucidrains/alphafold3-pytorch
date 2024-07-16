@@ -213,6 +213,7 @@ class MoleculeInput:
     token_bonds:                Bool['n n']
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
+    missing_atom_indices:       List[Int[' _'] | None] | None = None
     atom_parent_ids:            Int[' m'] | None = None
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
@@ -287,6 +288,24 @@ def molecule_to_atom_input(
 
     all_num_atoms = tensor([mol.GetNumAtoms() for mol in molecules])
     offsets = exclusive_cumsum(all_num_atoms)
+
+    # handle maybe missing atom indices
+
+    missing_atom_mask = None
+
+    if exists(i.missing_atom_indices) and len(i.missing_atom_indices) > 0:
+
+        missing_atom_mask = []
+
+        for num_atoms, mol_missing_atom_indices in zip(all_num_atoms, i.missing_atom_indices):
+            mol_miss_atom_mask = torch.zeros(num_atoms, dtype = torch.bool)
+
+            if exists(mol_missing_atom_indices) and mol_missing_atom_indices.numel() > 0:
+                mol_miss_atom_mask.scatter_(-1, mol_missing_atom_indices, True)
+
+            missing_atom_mask.append(mol_miss_atom_mask)
+
+        missing_atom_mask = torch.cat(missing_atom_mask)
 
     # handle maybe atompair embeds
 
@@ -420,6 +439,7 @@ def molecule_to_atom_input(
         molecule_ids = i.molecule_ids,
         molecule_atom_indices = i.molecule_atom_indices,
         distogram_atom_indices = i.distogram_atom_indices,
+        missing_atom_mask = missing_atom_mask,
         additional_token_feats = i.additional_token_feats,
         additional_molecule_feats = i.additional_molecule_feats,
         is_molecule_types = i.is_molecule_types,
@@ -448,6 +468,7 @@ class Alphafold3Input:
     ds_dna:                     List[Int[' _'] | str] = imm_list()
     ds_rna:                     List[Int[' _'] | str] = imm_list()
     atom_parent_ids:            Int[' m'] | None = None
+    missing_atom_indices:       List[List[int] | None] = imm_list()
     additional_token_feats:     Float[f'n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
@@ -844,9 +865,24 @@ def alphafold3_input_to_molecule_input(
     src_tgt_atom_indices = tensor(src_tgt_atom_indices)
     src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, value = -1, dim = -2)
 
-    # todo - handle atom positions for variable lengthed atoms (eventual missing atoms from mmCIF)
+    # atom positions
 
     atom_pos = i.atom_pos
+
+    # handle missing atom indices
+
+    missing_atom_indices = None
+
+    if exists(i.missing_atom_indices) and len(i.missing_atom_indices) > 0:
+        missing_atom_indices = []
+
+        for mol_miss_atom_indices in i.missing_atom_indices:
+            mol_miss_atom_indices = default(mol_miss_atom_indices, [])
+            mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype = torch.long)
+
+            missing_atom_indices.append(mol_miss_atom_indices)
+
+        assert len(molecules) == len(missing_atom_indices)
 
     # create molecule input
 
@@ -860,6 +896,7 @@ def alphafold3_input_to_molecule_input(
         additional_molecule_feats = additional_molecule_feats,
         additional_token_feats = default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types = is_molecule_types,
+        missing_atom_indices = missing_atom_indices,
         src_tgt_atom_indices = src_tgt_atom_indices,
         atom_pos = atom_pos,
         templates = i.templates,

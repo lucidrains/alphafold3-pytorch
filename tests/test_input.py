@@ -92,6 +92,7 @@ def test_atompos_input():
 
     train_alphafold3_input = Alphafold3Input(
         proteins = [contrived_protein],
+        missing_atom_indices = [[1, 2], None],
         atom_pos = mock_atompos
     )
 
