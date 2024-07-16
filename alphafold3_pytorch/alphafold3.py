@@ -3375,12 +3375,14 @@ class Alphafold3(Module):
         molecule_atom_lens = molecule_atom_lens.masked_fill(~valid_atom_len_mask, 0)
 
         if exists(molecule_atom_indices):
-            molecule_atom_indices = molecule_atom_indices.masked_fill(~valid_atom_len_mask, 0)
-            assert (molecule_atom_indices < molecule_atom_lens)[valid_atom_len_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+            valid_molecule_atom_mask = molecule_atom_indices >= 0 & valid_atom_len_mask
+            molecule_atom_indices = molecule_atom_indices.masked_fill(~valid_molecule_atom_mask, 0)
+            assert (molecule_atom_indices < molecule_atom_lens)[valid_molecule_atom_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
 
         if exists(distogram_atom_indices):
-            distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_atom_len_mask, 0)
-            assert (distogram_atom_indices < molecule_atom_lens)[valid_atom_len_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+            valid_distogram_mask = distogram_atom_indices >= 0 & valid_atom_len_mask
+            distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_distogram_mask, 0)
+            assert (distogram_atom_indices < molecule_atom_lens)[valid_distogram_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
 
@@ -3629,6 +3631,11 @@ class Alphafold3(Module):
             dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', molecule_dist, self.distance_bins).abs()
             distance_labels = dist_from_dist_bins.argmin(dim = -1)
 
+            # account for representative distogram atom missing from residue (-1 set on distogram_atom_indices field)
+
+            valid_distogram_mask = einx.logical_and('b i, b j -> b i j', valid_distogram_mask, valid_distogram_mask)
+            distance_labels.masked_fill_(~valid_distogram_mask, ignore)
+
         if exists(distance_labels):
             distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
             distogram_logits = self.distogram_head(pairwise)
@@ -3660,7 +3667,6 @@ class Alphafold3(Module):
                     relative_position_encoding,
                     additional_molecule_feats,
                     is_molecule_types,
-                    distogram_atom_indices,
                     molecule_atom_indices,
                     molecule_atom_lens,
                     pae_labels,
@@ -3684,7 +3690,6 @@ class Alphafold3(Module):
                         relative_position_encoding,
                         additional_molecule_feats,
                         is_molecule_types,
-                        distogram_atom_indices,
                         molecule_atom_indices,
                         molecule_atom_lens,
                         pae_labels,
