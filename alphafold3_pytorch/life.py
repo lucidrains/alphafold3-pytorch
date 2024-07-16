@@ -14,7 +14,6 @@ def is_unique(arr):
     return len(arr) == len({*arr})
 
 # human amino acids
-# reordered so [N][...][C][OH] - [OH] is removed for all peptides except last
 
 # NOTE: template SMILES were derived via `print([Chem.MolToSmiles(resname_to_mol[resname], canonical=False) for resname in resname_to_mol])`
 # to guarantee the order (and quantity) of atoms in the SMILES string perfectly matches the atoms in the residue template structure
@@ -191,7 +190,6 @@ HUMAN_AMINO_ACIDS = dict(
 )
 
 # nucleotides
-# reordered from 5' to 3', so [O][P][...][C(3')][OH] - hydroxyl group removed when chaining into a nucleic acid chain
 
 DNA_NUCLEOTIDES = dict(
     A=dict(
