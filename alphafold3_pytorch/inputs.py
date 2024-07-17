@@ -544,8 +544,10 @@ def map_int_or_string_indices_to_mol(
 def maybe_string_to_int(
     entries: dict,
     indices: Int[' _'] | List[str] | str,
-    other_index: int = 0
 ) -> Int[' _']:
+
+    unknown_index = len(entries) - 1
+
     if isinstance(indices, str):
         indices = list(indices)
 
@@ -554,7 +556,7 @@ def maybe_string_to_int(
 
     index = {symbol: i for i, symbol in enumerate(entries.keys())}
 
-    return tensor([index[c] for c in indices]).long()
+    return tensor([index.get(c, unknown_index) for c in indices]).long()
 
 @typecheck
 def alphafold3_input_to_molecule_input(
@@ -582,11 +584,13 @@ def alphafold3_input_to_molecule_input(
         ss_dnas.extend([seq, rc_seq])
 
     # keep track of molecule_ids - for now it is
-    # other(1) | proteins (20) | rna (4) | dna (4)
+    # proteins (21) | rna (5) | dna (5) | gap? (1) - unknown for each biomolecule is the very last, ligand is 20
 
-    protein_offset = 1
-    rna_offset = len(HUMAN_AMINO_ACIDS) + protein_offset
+    rna_offset = len(HUMAN_AMINO_ACIDS)
     dna_offset = len(RNA_NUCLEOTIDES) + rna_offset
+
+    ligand_id = len(HUMAN_AMINO_ACIDS) - 1
+    gap_id = len(DNA_NUCLEOTIDES) + dna_offset
 
     molecule_ids = []
 
@@ -609,7 +613,7 @@ def alphafold3_input_to_molecule_input(
 
         src_tgt_atom_indices.extend([[entry['first_atom_idx'], entry['last_atom_idx']] for entry in protein_entries])
 
-        protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein) + protein_offset
+        protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein)
         molecule_ids.append(protein_ids)
 
         chainable_biomol_entries.append(protein_entries)
@@ -652,10 +656,14 @@ def alphafold3_input_to_molecule_input(
     metal_ions = alphafold3_input.metal_ions
     mol_metal_ions = map_int_or_string_indices_to_mol(METALS, metal_ions)
 
+    molecule_ids.append(tensor([gap_id] * len(mol_metal_ions)))
+
     # convert ligands to rdchem.Mol
 
     ligands = list(alphafold3_input.ligands)
     mol_ligands = [(mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands]
+
+    molecule_ids.append(tensor([ligand_id] * len(mol_ligands)))
 
     # create the molecule input
 
@@ -766,7 +774,7 @@ def alphafold3_input_to_molecule_input(
 
     # handle molecule ids
 
-    molecule_ids = torch.cat(molecule_ids)
+    molecule_ids = torch.cat(molecule_ids).long()
     molecule_ids = pad_to_len(molecule_ids, num_tokens)
 
     # handle atom_parent_ids
