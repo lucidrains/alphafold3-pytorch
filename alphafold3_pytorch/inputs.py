@@ -299,6 +299,8 @@ def molecule_to_atom_input(
 
     if exists(i.missing_atom_indices) and len(i.missing_atom_indices) > 0:
 
+        assert len(molecules) == len(i.missing_atom_indices), f'{len(i.missing_atom_indices)} missing atom indices does not match the number of molecules given ({len(molecules)})'
+
         missing_atom_indices: List[Int[' _']] = [default(indices, torch.empty((0,), dtype = torch.long)) for indices in i.missing_atom_indices]
 
         missing_atom_mask: List[Bool[' _']] = []
