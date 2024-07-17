@@ -87,12 +87,14 @@ def test_atompos_input():
 
     mock_atompos = [
         torch.randn(5, 3),   # alanine has 5 non-hydrogen atoms
-        torch.randn(4, 3)    # glycine has 4 non-hydrogen atoms
+        torch.randn(4, 3),   # glycine has 4 non-hydrogen atoms
+        torch.randn(3, 3)    # ligand has 3 carbons
     ]
 
     train_alphafold3_input = Alphafold3Input(
         proteins = [contrived_protein],
-        missing_atom_indices = [[1, 2], None],
+        missing_atom_indices = [[1, 2], None, [0, 1]],
+        ligands = ['CCC'],
         atom_pos = mock_atompos
     )
 

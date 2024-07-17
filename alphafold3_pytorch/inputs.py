@@ -301,11 +301,11 @@ def molecule_to_atom_input(
 
         assert len(molecules) == len(i.missing_atom_indices), f'{len(i.missing_atom_indices)} missing atom indices does not match the number of molecules given ({len(molecules)})'
 
-        missing_atom_indices: List[Int[' _']] = [default(indices, torch.empty((0,), dtype = torch.long)) for indices in i.missing_atom_indices]
-
+        missing_atom_indices: List[Int[' _']] = []
         missing_atom_mask: List[Bool[' _']] = []
 
-        for num_atoms, mol_missing_atom_indices in zip(all_num_atoms, missing_atom_indices):
+        for num_atoms, mol_missing_atom_indices, is_ligand in zip(all_num_atoms, i.missing_atom_indices, i.is_molecule_types[:, -1]):
+            mol_missing_atom_indices = default(mol_missing_atom_indices, torch.empty((0,), dtype = torch.long))
 
             mol_miss_atom_mask = torch.zeros(num_atoms, dtype = torch.bool)
 
@@ -314,8 +314,14 @@ def molecule_to_atom_input(
 
             missing_atom_mask.append(mol_miss_atom_mask)
 
-        missing_atom_mask = torch.cat(missing_atom_mask)
+            if not is_ligand:
+                missing_atom_indices.append(mol_missing_atom_indices)
+            else:
+                for is_missing_atom_in_ligand in mol_miss_atom_mask:
+                    index = tensor([0] if is_missing_atom_in_ligand else [], dtype = torch.long)
+                    missing_atom_indices.append(index)
 
+        missing_atom_mask = torch.cat(missing_atom_mask)
         missing_atom_indices = pad_sequence(missing_atom_indices, batch_first = True, padding_value = -1)
 
     # handle maybe atompair embeds
