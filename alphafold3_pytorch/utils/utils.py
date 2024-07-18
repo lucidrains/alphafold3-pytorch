@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Any
+from typing import Any, Iterable
 
 
 def exists(val: Any) -> bool:
@@ -20,6 +20,16 @@ def default(v: Any, d: Any) -> Any:
     :return: The value `v` if it exists, otherwise the default value `d`.
     """
     return v if exists(v) else d
+
+
+def first(arr: Iterable[Any]) -> Any:
+    """
+    Return the first element of an iterable object such as a list.
+
+    :param arr: An iterable object.
+    :return: The first element of the iterable object.
+    """
+    return arr[0]
 
 
 def always(value):
