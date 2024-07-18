@@ -191,7 +191,7 @@ def test_pdbinput_input():
 
     alphafold3.eval()
 
-    sampled_atom_pos, = alphafold3(
+    sampled_atom_pos = alphafold3(
         **batched_eval_atom_input.dict(), return_loss=False, return_present_sampled_atoms=True
     )
 
