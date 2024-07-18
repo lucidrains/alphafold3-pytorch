@@ -151,7 +151,7 @@ def test_pdbinput_input():
     if os.path.exists(filepath.replace(".cif", "-sampled.cif")):
         os.remove(filepath.replace(".cif", "-sampled.cif"))
 
-    train_pdb_input = PDBInput(filepath)
+    train_pdb_input = PDBInput(filepath, training=True)
 
     eval_pdb_input = PDBInput(filepath)
 
