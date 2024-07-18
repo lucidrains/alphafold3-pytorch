@@ -476,6 +476,7 @@ def test_alphafold3(
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
+        dim_pairwise = 64,
         atoms_per_window = atoms_per_window,
         dim_template_feats = 44,
         num_dist_bins = 38,

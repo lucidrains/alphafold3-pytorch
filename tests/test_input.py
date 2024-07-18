@@ -160,6 +160,12 @@ def test_pdbinput_input():
     # training
 
     alphafold3 = Alphafold3(
+        dim_atom=8,
+        dim_atompair=8,
+        dim_input_embedder_token=8,
+        dim_single=8,
+        dim_pairwise=8,
+        dim_token=8,
         dim_atom_inputs=3,
         dim_atompair_inputs=1,
         atoms_per_window=27,
@@ -168,7 +174,7 @@ def test_pdbinput_input():
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1),
-        pairformer_stack=dict(depth=2),
+        pairformer_stack=dict(depth=1),
         diffusion_module_kwargs=dict(
             atom_encoder_depth=1,
             token_transformer_depth=1,

@@ -1735,6 +1735,7 @@ class DiffusionModule(Module):
         self.pairwise_conditioner = PairwiseConditioning(
             dim_pairwise_trunk = dim_pairwise_trunk,
             dim_pairwise_rel_pos_feats = dim_pairwise_rel_pos_feats,
+            dim_pairwise = dim_pairwise,
             **pairwise_cond_kwargs
         )
 
