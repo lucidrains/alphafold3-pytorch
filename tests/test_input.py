@@ -139,13 +139,11 @@ def test_atompos_input():
     batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
 
     alphafold3.eval()
-    sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
+    sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict(), return_loss=False)
 
     assert sampled_atom_pos.shape == (1, (5 + 4), 3)
 
 def test_pdbinput_input():
-    pytest.skip("This unit test is currently disabled while the PDB featurization pipeline is under development.")
-
     filepath = os.path.join("data", "test", "7a4d-assembly1.cif")
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     assert os.path.exists(filepath)
@@ -157,9 +155,7 @@ def test_pdbinput_input():
 
     eval_pdb_input = PDBInput(filepath)
 
-    batched_atom_input = pdb_inputs_to_batched_atom_input(
-        train_pdb_input, atoms_per_window=27
-    )
+    batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=27)
 
     # training
 
@@ -185,14 +181,14 @@ def test_pdbinput_input():
 
     # sampling
 
-    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(
-        eval_pdb_input, atoms_per_window=27
-    )
+    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=27)
 
     alphafold3.eval()
-    sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
+    sampled_atom_pos = alphafold3(
+        **batched_eval_atom_input.dict(), return_loss=False, return_present_sampled_atoms=True
+    )
 
-    assert sampled_atom_pos.shape == (1, 4155, 3)
+    assert sampled_atom_pos.shape == (4155, 3)
 
     # visualizing
 
