@@ -1,17 +1,19 @@
-import gemmi
 import os
-import torch
+from typing import Literal
 
+import gemmi
 import rdkit.Geometry.rdGeometry as rdGeometry
-
+import torch
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.rdchem import Mol
-from typing import Literal
 
 from alphafold3_pytorch.tensor_typing import Int, typecheck
 
+
 def is_unique(arr):
+    """Check if all elements in an array are unique."""
     return len(arr) == len({*arr})
+
 
 # human amino acids
 
@@ -289,30 +291,34 @@ RNA_NUCLEOTIDES = dict(
 
 # complements in tensor form, following the ordering ACG(T|U)N
 
-NUCLEIC_ACID_COMPLEMENT_TENSOR = torch.tensor([3, 2, 1, 0, 4], dtype = torch.long)
+NUCLEIC_ACID_COMPLEMENT_TENSOR = torch.tensor([3, 2, 1, 0, 4], dtype=torch.long)
 
 # some functions for nucleic acids
 
+
 @typecheck
-def reverse_complement(
-    seq: str,
-    nucleic_acid_type: Literal['dna', 'rna'] = 'dna'
-):
-    if nucleic_acid_type == 'dna':
+def reverse_complement(seq: str, nucleic_acid_type: Literal["dna", "rna"] = "dna"):
+    """Get the reverse complement of a nucleic acid sequence."""
+    if nucleic_acid_type == "dna":
         nucleic_acid_entries = DNA_NUCLEOTIDES
-    elif nucleic_acid_type == 'rna':
+    elif nucleic_acid_type == "rna":
         nucleic_acid_entries = RNA_NUCLEOTIDES
 
-    assert all([nuc in nucleic_acid_entries for nuc in seq]), 'unknown nucleotide for given nucleic acid type'
+    assert all(
+        [nuc in nucleic_acid_entries for nuc in seq]
+    ), "unknown nucleotide for given nucleic acid type"
 
-    complement = [nucleic_acid_entries[nuc]['complement'] for nuc in seq]
-    return ''.join(complement[::-1])
+    complement = [nucleic_acid_entries[nuc]["complement"] for nuc in seq]
+    return "".join(complement[::-1])
+
 
 @typecheck
-def reverse_complement_tensor(t: Int[' n']):
+def reverse_complement_tensor(t: Int[" n"]):  # type: ignore
+    """Get the reverse complement of a nucleic acid sequence tensor."""
     complement = NUCLEIC_ACID_COMPLEMENT_TENSOR[t]
-    reverse_complement = complement.flip(dims = (-1,))
+    reverse_complement = complement.flip(dims=(-1,))
     return reverse_complement
+
 
 # metal ions
 
@@ -340,14 +346,7 @@ MISC = dict(
 
 # atoms - for atom embeddings
 
-ATOMS = [
-    'C',
-    'O',
-    'N',
-    'S',
-    'P',
-    *METALS
-]
+ATOMS = ["C", "O", "N", "S", "P", *METALS]
 
 assert is_unique(ATOMS)
 
@@ -368,23 +367,22 @@ assert is_unique(ATOM_BONDS)
 
 # some rdkit helper function
 
+
 @typecheck
 def generate_conformation(mol: Mol) -> Mol:
+    """Generate a conformation for a molecule."""
     mol = Chem.AddHs(mol)
-    Chem.EmbedMultipleConfs(mol, numConfs = 1)
+    Chem.EmbedMultipleConfs(mol, numConfs=1)
     mol = Chem.RemoveHs(mol)
     return mol
 
+
 @typecheck
 def mol_from_smile(smile: str) -> Mol:
+    """Generate an rdkit.Chem molecule from a SMILES string."""
     mol = Chem.MolFromSmiles(smile)
     return generate_conformation(mol)
 
-@typecheck
-def remove_atom_from_mol(mol: Mol, atom_idx: int) -> Mol:
-    edit_mol = Chem.EditableMol(mol)
-    edit_mol.RemoveAtom(atom_idx)
-    return mol
 
 @typecheck
 def mol_from_template_mmcif_file(

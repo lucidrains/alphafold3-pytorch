@@ -1,8 +1,8 @@
 """Ribonucleic acid (RNA) constants used in AlphaFold."""
 
-import numpy as np
-
 from typing import Final
+
+import numpy as np
 
 from alphafold3_pytorch.common import amino_acid_constants
 
@@ -62,6 +62,7 @@ atom_types = [
 atom_types_set = set(atom_types)
 atom_order = {atom_type: i for i, atom_type in enumerate(atom_types)}
 atom_type_num = len(atom_types)  # := 28 + 19 null types := 47.
+res_rep_atom_index = 12  # The index of the atom used to represent the center of the residue.
 
 
 # This is the standard residue order when coding RNA type as a number.
@@ -72,7 +73,7 @@ restype_order = {restype: min_restype_num + i for i, restype in enumerate(restyp
 restype_num = min_restype_num + len(restypes)  # := 21 + 4 := 25.
 
 
-restype_1to3 = {"A": "A", "C": "C", "G": "G", "U": "U"}
+restype_1to3 = {"A": "A", "C": "C", "G": "G", "U": "U", "X": "N"}
 
 BIOMOLECULE_CHAIN: Final[str] = "polyribonucleotide"
 POLYMER_CHAIN: Final[str] = "polymer"
@@ -243,5 +244,6 @@ def _make_constants():
             atomtype = atom_order[atomname]
             compact_atom_idx = restype_name_to_compact_atom_names[resname].index(atomname)
             restype_atom47_to_compact_atom[restype, atomtype] = compact_atom_idx
+
 
 _make_constants()
