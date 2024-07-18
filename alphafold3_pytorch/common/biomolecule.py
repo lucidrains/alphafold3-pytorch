@@ -39,6 +39,7 @@ MMCIF_PREFIXES_TO_DROP_POST_PARSING = [
     "_struct_conn.",
 ]
 MMCIF_PREFIXES_TO_DROP_POST_AF3 = MMCIF_PREFIXES_TO_DROP_POST_PARSING + [
+    "_audit_author.",
     "_citation.",
     "_citation_author.",
 ]
@@ -52,6 +53,10 @@ class Biomolecule:
     # residue_constants.atom_types, e.g., the first three are N, CA, CB for
     # amino acid residues.
     atom_positions: np.ndarray  # [num_res, num_atom_type, 3]
+
+    # Name of each residue-representative atom as a string,
+    # which matches the number of (pseudo)residues (A.K.A. tokens).
+    atom_name: np.ndarray  # [num_res]
 
     # Amino-acid or nucleotide type for each residue represented as an integer
     # between 0 and 31, where:
@@ -124,6 +129,7 @@ class Biomolecule:
         """Merges two `Biomolecule` instances."""
         return Biomolecule(
             atom_positions=np.concatenate([self.atom_positions, other.atom_positions], axis=0),
+            atom_name=np.concatenate([self.atom_name, other.atom_name], axis=0),
             restype=np.concatenate([self.restype, other.restype], axis=0),
             atom_mask=np.concatenate([self.atom_mask, other.atom_mask], axis=0),
             residue_index=np.concatenate([self.residue_index, other.residue_index], axis=0),
@@ -169,6 +175,7 @@ class Biomolecule:
         chain_mask = np.isin(self.chain_index, list(subset_chain_index_mapping.keys()))
         return Biomolecule(
             atom_positions=self.atom_positions[chain_mask],
+            atom_name=self.atom_name[chain_mask],
             restype=self.restype[chain_mask],
             atom_mask=self.atom_mask[chain_mask],
             residue_index=self.residue_index[chain_mask],
@@ -203,6 +210,7 @@ class Biomolecule:
         """Repeat a Biomolecule according to a (repeated) coordinate array."""
         return Biomolecule(
             atom_positions=coord.reshape(-1, 47, 3),
+            atom_name=np.tile(self.atom_name, (coord.shape[0], 1)).reshape(-1),
             restype=np.tile(self.restype, (coord.shape[0], 1)).reshape(-1),
             atom_mask=np.tile(self.atom_mask, (coord.shape[0], 1, 1)).reshape(-1, 47),
             residue_index=np.tile(self.residue_index, (coord.shape[0], 1)).reshape(-1),
@@ -258,13 +266,18 @@ def get_ligand_atom_name(atom_name: str, atom_types_set: Set[str]) -> str:
     elif len(atom_name) == 2:
         return atom_name if atom_name in atom_types_set else atom_name[0]
     elif len(atom_name) == 3:
-        return (
-            atom_name
-            if atom_name in atom_types_set
-            else (
-                atom_name[:2] if atom_name[:2] in atom_types_set else atom_name[0] + atom_name[2]
-            )
-        )
+        if atom_name in atom_types_set:
+            return atom_name
+        elif atom_name[:2] in atom_types_set:
+            return atom_name[:2]
+        elif atom_name[1:] in atom_types_set:
+            return atom_name[1:]
+        elif atom_name[0] + atom_name[2] in atom_types_set:
+            return atom_name[0] + atom_name[2]
+        elif atom_name.split("H")[0] in atom_types_set:
+            return atom_name.split("H")[0]
+        else:
+            return atom_name
     else:
         return atom_name
 
@@ -334,6 +347,7 @@ def _from_mmcif_object(
         model = models[0]
 
     atom_positions = []
+    atom_names = []
     restype = []
     chemid = []
     chemtype = []
@@ -412,6 +426,9 @@ def _from_mmcif_object(
                 chemid.append(res_chem_comp_details.id)
                 chemtype.append(residue_constants.chemtype_num)
                 atom_positions.append(pos)
+                atom_names.append(
+                    residue_constants.atom_types[residue_constants.res_rep_atom_index]
+                )
                 atom_mask.append(mask)
                 residue_index.append(res_index + 1)
                 chain_ids.append(chain.id)
@@ -448,6 +465,7 @@ def _from_mmcif_object(
                     atom_name = get_ligand_atom_name(atom.name, residue_constants.atom_types_set)
                     if atom_name not in residue_constants.atom_types_set:
                         atom_name = "ATM"
+                    atom_names.append(atom_name)
                     pos[residue_constants.atom_order[atom_name]] = atom.coord
                     mask[residue_constants.atom_order[atom_name]] = 1.0
                     res_b_factors[residue_constants.atom_order[atom_name]] = atom.bfactor
@@ -505,6 +523,7 @@ def _from_mmcif_object(
 
     return Biomolecule(
         atom_positions=np.array(atom_positions),
+        atom_name=np.array(atom_names),
         restype=np.array(restype),
         atom_mask=np.array(atom_mask),
         residue_index=np.array(residue_index),
