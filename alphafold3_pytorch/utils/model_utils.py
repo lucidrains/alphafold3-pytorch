@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from einops import pack, rearrange, repeat, unpack
 from torch import Tensor
 
-from alphafold3_pytorch.utils.tensor_typing import Bool, Float, Int, typecheck
+from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.utils import exists
 
 # constants
