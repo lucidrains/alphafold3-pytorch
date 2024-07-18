@@ -37,6 +37,10 @@ from alphafold3_pytorch.alphafold3 import (
     atom_ref_pos_to_atompair_inputs
 )
 
+from alphafold3_pytorch.inputs import (
+    IS_MOLECULE_TYPES
+)
+
 def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
@@ -444,7 +448,7 @@ def test_alphafold3(
 
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, 16, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     is_molecule_mod = None
@@ -556,7 +560,7 @@ def test_alphafold3_without_msa_and_templates():
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, seq_len, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
@@ -621,7 +625,7 @@ def test_alphafold3_force_return_loss():
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, seq_len, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
@@ -716,7 +720,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, seq_len, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
