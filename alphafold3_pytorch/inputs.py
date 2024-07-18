@@ -93,18 +93,6 @@ elif os.path.exists(CCD_COMPONENTS_FILEPATH):
 
 # functions
 
-def exists(v):
-    return v is not None
-
-def default(v, d):
-    return v if exists(v) else d
-
-def first(arr):
-    return arr[0]
-
-def identity(t):
-    return t
-
 def flatten(arr):
     return [el for sub_arr in arr for el in sub_arr]
 
