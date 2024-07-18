@@ -2692,7 +2692,7 @@ class InputFeatureEmbedder(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_additional_token_feats = 2,
-        num_molecule_types = 32,
+        num_molecule_types = NUM_MOLECULE_IDS,
         atom_transformer_blocks = 3,
         atom_transformer_heads = 4,
         atom_transformer_kwargs: dict = dict(),
@@ -3141,6 +3141,7 @@ class Alphafold3(Module):
         # input feature embedder
 
         self.input_embedder = InputFeatureEmbedder(
+            num_molecule_types = num_molecule_types,
             dim_atom_inputs = dim_atom_inputs,
             dim_atompair_inputs = dim_atompair_inputs,
             atoms_per_window = atoms_per_window,
