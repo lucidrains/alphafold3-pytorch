@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any
 
 import einx
 import torch
@@ -17,7 +17,6 @@ Shape = Union[Tuple[int, ...], List[int]]
 # helper functions
 
 # default scheduler used in paper w/ warmup
-
 
 def default_lambda_lr_fn(steps: int) -> float:
     """Default lambda learning rate function.

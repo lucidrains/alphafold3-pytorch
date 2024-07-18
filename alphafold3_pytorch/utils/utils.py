@@ -1,6 +1,15 @@
 import numpy as np
 
-from typing import Any
+from typing import Any, List
+
+def first(arr: List) -> Any:
+    """
+    Returns first element of list
+
+    :param arr: the list
+    :return: the element
+    """
+    return arr[0]
 
 
 def exists(val: Any) -> bool:

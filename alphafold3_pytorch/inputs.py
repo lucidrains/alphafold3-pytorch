@@ -707,7 +707,8 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         (mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands
     ]
 
-    molecule_ids.append(tensor([ligand_id] * len(mol_ligands)))
+    for mol_ligand in mol_ligands:
+        molecule_ids.append(tensor([ligand_id] * mol_ligand.GetNumAtoms()))
 
     # create the molecule input
 
@@ -819,8 +820,6 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     # handle molecule ids
 
     molecule_ids = torch.cat(molecule_ids).long()
-    # TODO: do not pad this with zeros anymore, as it will mistakenly treat padded tokens as `ALA`
-    molecule_ids = pad_to_len(molecule_ids, num_tokens)
 
     # handle atom_parent_ids
     # this governs in the atom encoder / decoder, which atom attends to which
