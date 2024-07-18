@@ -1,8 +1,8 @@
 """Ligand constants used in AlphaFold."""
 
-import numpy as np
-
 from typing import Final
+
+import numpy as np
 
 from alphafold3_pytorch.common import amino_acid_constants, dna_constants
 
@@ -58,9 +58,62 @@ atom_types = [
     "ZN",
     "ATM",
 ]
+element_types = [
+    # NOTE: Taken from: https://github.com/baker-laboratory/RoseTTAFold-All-Atom/blob/c1fd92455be2a4133ad147242fc91cea35477282/rf2aa/chemical.py#L117C13-L126C18
+    "Al",
+    "As",
+    "Au",
+    "B",
+    "Be",
+    "Br",
+    "C",
+    "Ca",
+    "Cl",
+    "Co",
+    "Cr",
+    "Cu",
+    "F",
+    "Fe",
+    "Hg",
+    "I",
+    "Ir",
+    "K",
+    "Li",
+    "Mg",
+    "Mn",
+    "Mo",
+    "N",
+    "Ni",
+    "O",
+    "Os",
+    "P",
+    "Pb",
+    "Pd",
+    "Pr",
+    "Pt",
+    "Re",
+    "Rh",
+    "Ru",
+    "S",
+    "Sb",
+    "Se",
+    "Si",
+    "Sn",
+    "Tb",
+    "Te",
+    "U",
+    "W",
+    "V",
+    "Y",
+    "Zn",
+    "ATM",
+]
 atom_types_set = set(atom_types)
 atom_order = {atom_type: i for i, atom_type in enumerate(atom_types)}
 atom_type_num = len(atom_types)  # := 47.
+res_rep_atom_index = (
+    len(atom_types) - 1
+)  # := 46  # The index of the atom used to represent the center of a ligand pseudoresidue.
 
 
 # All ligand residues are mapped to the unknown amino acid type index (:= 20).
@@ -108,5 +161,6 @@ def _make_constants():
             atomtype = atom_order[atomname]
             compact_atom_idx = restype_name_to_compact_atom_names[resname].index(atomname)
             restype_atom47_to_compact_atom[restype, atomtype] = compact_atom_idx
+
 
 _make_constants()
