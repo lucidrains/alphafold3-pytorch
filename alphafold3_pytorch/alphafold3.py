@@ -40,6 +40,9 @@ from alphafold3_pytorch.attention import (
 
 from alphafold3_pytorch.inputs import (
     IS_MOLECULE_TYPES,
+    IS_PROTEIN_INDEX,
+    IS_LIGAND_INDEX,
+    IS_BIOMOLECULE_INDICES,
     ADDITIONAL_MOLECULE_FEATS
 )
 
@@ -104,12 +107,13 @@ additional_molecule_feats: [*, 5]:
 """
 
 """
-is_molecule_types: [*, 4]
+is_molecule_types: [*, 5]
 
 0: is_protein
 1: is_rna
 2: is_dna
 3: is_ligand
+4: is_metal_ions_or_misc
 """
 
 # constants
@@ -2269,7 +2273,7 @@ class ElucidatedAtomDiffusion(Module):
             is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
             is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
 
-            _, atom_is_dna, atom_is_rna, atom_is_ligand = is_nucleotide_or_ligand_fields
+            _, atom_is_dna, atom_is_rna, atom_is_ligand, _ = is_nucleotide_or_ligand_fields
 
             # section 3.7.1 equation 4
 
@@ -3493,7 +3497,7 @@ class Alphafold3(Module):
         # only apply relative positional encodings to biomolecules that are chained
         # not to ligands + metal ions
 
-        is_chained_biomol = is_molecule_types[..., :3].any(dim = -1) # first three types are chained biomolecules (protein, rna, dna)
+        is_chained_biomol = is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim = -1) # first three types are chained biomolecules (protein, rna, dna)
         paired_is_chained_biomol = einx.logical_and('b i, b j -> b i j', is_chained_biomol, is_chained_biomol)
 
         relative_position_encoding = einx.where(
@@ -3531,7 +3535,7 @@ class Alphafold3(Module):
         # prepare mask for msa module and template embedder
         # which is equivalent to the `is_protein` of the `is_molecular_types` input
 
-        is_protein_mask = is_molecule_types[..., 0]
+        is_protein_mask = is_molecule_types[..., IS_PROTEIN_INDEX]
 
         # init recycled single and pairwise
 

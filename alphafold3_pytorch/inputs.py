@@ -47,7 +47,12 @@ from alphafold3_pytorch.utils.utils import default, exists, first, identity
 
 # constants
 
-IS_MOLECULE_TYPES = 4
+IS_MOLECULE_TYPES = 5
+IS_PROTEIN_INDEX = 0
+IS_LIGAND_INDEX = -2
+IS_METAL_ION_INDEX = -1
+IS_BIOMOLECULE_INDICES = slice(0, 3)
+
 ADDITIONAL_MOLECULE_FEATS = 5
 
 CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
@@ -243,7 +248,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     if not exists(atom_lens):
         atom_lens = []
 
-        for mol, is_ligand in zip(molecules, i.is_molecule_types[:, -1]):
+        for mol, is_ligand in zip(molecules, i.is_molecule_types[:, IS_LIGAND_INDEX]):
             num_atoms = mol.GetNumAtoms()
 
             if is_ligand:
@@ -347,7 +352,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         asym_ids = F.pad(asym_ids, (1, 0), value=-1)
         is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
 
-        is_chainable_biomolecules = i.is_molecule_types[..., :3].any(dim=-1)
+        is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
 
         # for every molecule, build the bonds id matrix and add to `atompair_ids`
 
@@ -746,9 +751,10 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         len(all_rna_mols),
         len(all_dna_mols),
         total_ligand_tokens,
+        num_metal_ions
     ]
 
-    num_tokens = sum(molecule_type_token_lens) + num_metal_ions
+    num_tokens = sum(molecule_type_token_lens)
 
     assert num_tokens > 0, "you have an empty alphafold3 input"
 
@@ -757,7 +763,6 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     molecule_types_lens_cumsum = tensor([0, *molecule_type_token_lens]).cumsum(dim=-1)
     left, right = molecule_types_lens_cumsum[:-1], molecule_types_lens_cumsum[1:]
 
-    # TODO: fix bug that may leave molecules with no assigned type
     is_molecule_types = (arange >= left) & (arange < right)
 
     # all molecules, layout is
@@ -950,7 +955,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         for mol_index, (mol_miss_atom_indices, mol) in enumerate(
             zip(i.missing_atom_indices, molecules)
         ):
-            is_ligand_residue = is_molecule_types[mol_index, -1].item()
+            is_ligand_residue = is_molecule_types[mol_index, IS_LIGAND_INDEX].item()
             mol_miss_atom_indices = default(mol_miss_atom_indices, [])
             mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
@@ -1427,9 +1432,9 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
     molecule_ids = torch.from_numpy(biomol.restype)
 
     # retrieve is_molecule_types from the `Biomolecule` object, which is a boolean tensor of shape [*, 4]
-    # is_protein | is_rna | is_dna | is_ligand
+    # is_protein | is_rna | is_dna | is_ligand | is_metal_ion
     # this is needed for their special diffusion loss
-    n_one_hot = 4
+    n_one_hot = 5
     is_molecule_types = F.one_hot(torch.from_numpy(biomol.chemtype), num_classes=n_one_hot).bool()
 
     # manually derive remaining features using the `Biomolecule` object
@@ -1464,11 +1469,20 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
             molecule_atom_types.extend([mol_type] * num_atoms)
             # ensure modified polymer residues are one-hot encoded as ligands
             # TODO: double-check whether this handling of modified polymer residues makes sense
-            is_molecule_types[molecule_idx : molecule_idx + num_atoms, : n_one_hot - 1] = False
-            is_molecule_types[molecule_idx : molecule_idx + num_atoms, n_one_hot - 1] = True
+
+            molecule_type_row_idx = slice(molecule_idx, molecule_idx + num_atoms)
+
+            is_molecule_types[molecule_type_row_idx, IS_BIOMOLECULE_INDICES] = False
+
             if num_atoms == 1:
                 # NOTE: we manually set the molecule ID of ions to the `gap` ID
-                molecule_ids[molecule_idx] = gap_id
+                molecule_ids[molecule_type_row_idx] = gap_id
+                is_mol_type_index = IS_METAL_ION_INDEX
+            else:
+                is_mol_type_index = IS_LIGAND_INDEX
+
+            is_molecule_types[molecule_type_row_idx, is_mol_type_index] = True
+
             molecule_idx += num_atoms
         else:
             token_pool_lens.append(num_atoms)

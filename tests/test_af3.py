@@ -444,7 +444,7 @@ def test_alphafold3(
 
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, 16, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     is_molecule_mod = None
@@ -556,7 +556,7 @@ def test_alphafold3_without_msa_and_templates():
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, seq_len, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
@@ -716,7 +716,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
     additional_token_feats = torch.randn(2, seq_len, 2)
-    is_molecule_types = torch.randint(0, 2, (2, seq_len, 4)).bool()
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
