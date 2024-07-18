@@ -1465,10 +1465,11 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
 
             molecule_type_row_idx = slice(molecule_idx, molecule_idx + num_atoms)
 
-            is_molecule_types[molecule_type_row_idx, IS_BIOMOLECULE_INDICES] = False
+            # NOTE: we reset all type annotations e.g., since ions are initially considered ligands
+            is_molecule_types[molecule_type_row_idx] = False
 
             if num_atoms == 1:
-                # NOTE: we manually set the molecule ID of ions to the `gap` ID
+                # NOTE: we manually set the molecule ID of ions to a dedicated category
                 molecule_ids[molecule_idx] = MOLECULE_METAL_ION_ID
                 is_mol_type_index = IS_METAL_ION_INDEX
             else:
@@ -1568,7 +1569,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
             ligand_offset += chain_len
 
     # ensure mmCIF polymer-ligand (i.e., protein/RNA/DNA-ligand) and ligand-ligand bonds
-    # (and bonds less than 2.4 Å) are installed in `MoleculeInput` during training onlytraining
+    # (and bonds less than 2.4 Å) are installed in `MoleculeInput` during training only
     # per the AF3 supplement (Table 5, `token_bonds`)
     bond_atom_indices = defaultdict(int)
     for bond in biomol.bonds:
@@ -1619,6 +1620,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
                     f"Could not find a matching token index for token1 {ptnr1_atom_id} due to: {e}. "
                     "Skipping installing the current bond associated with this token."
                 )
+                continue
             try:
                 col_idx = get_token_index_from_composite_atom_id(
                     biomol,
@@ -1633,6 +1635,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
                     f"Could not find a matching token index for token2 {ptnr1_atom_id} due to: {e}. "
                     "Skipping installing the current bond associated with this token."
                 )
+                continue
             token_bonds[row_idx, col_idx] = True
             token_bonds[col_idx, row_idx] = True
             bond_atom_indices[ptnr1_atom_id] += 1
