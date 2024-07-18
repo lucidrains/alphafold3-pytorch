@@ -29,6 +29,7 @@ from alphafold3_pytorch.common.biomolecule import (
 )
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.data.data_pipeline import get_assembly
+
 from alphafold3_pytorch.life import (
     ATOM_BONDS,
     ATOMS,
@@ -40,6 +41,8 @@ from alphafold3_pytorch.life import (
     reverse_complement,
     reverse_complement_tensor,
 )
+
+
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.data_utils import RESIDUE_MOLECULE_TYPE, get_residue_molecule_type
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
@@ -52,6 +55,10 @@ IS_PROTEIN_INDEX = 0
 IS_LIGAND_INDEX = -2
 IS_METAL_ION_INDEX = -1
 IS_BIOMOLECULE_INDICES = slice(0, 3)
+
+MOLECULE_GAP_ID = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) - 1
+MOLECULE_METAL_ION_ID = MOLECULE_GAP_ID + 1
+NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) + 2
 
 ADDITIONAL_MOLECULE_FEATS = 5
 
@@ -621,9 +628,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     rna_offset = len(HUMAN_AMINO_ACIDS)
     dna_offset = len(RNA_NUCLEOTIDES) + rna_offset
-
     ligand_id = len(HUMAN_AMINO_ACIDS) - 1
-    gap_id = len(DNA_NUCLEOTIDES) + dna_offset
 
     molecule_ids = []
 
@@ -703,7 +708,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     metal_ions = alphafold3_input.metal_ions
     mol_metal_ions = map_int_or_string_indices_to_mol(METALS, metal_ions)
 
-    molecule_ids.append(tensor([gap_id] * len(mol_metal_ions)))
+    molecule_ids.append(tensor([MOLECULE_METAL_ION_ID] * len(mol_metal_ions)))
 
     # convert ligands to rdchem.Mol
 
@@ -1434,7 +1439,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
     # retrieve is_molecule_types from the `Biomolecule` object, which is a boolean tensor of shape [*, 4]
     # is_protein | is_rna | is_dna | is_ligand | is_metal_ion
     # this is needed for their special diffusion loss
-    n_one_hot = 5
+    n_one_hot = IS_MOLECULE_TYPES
     is_molecule_types = F.one_hot(torch.from_numpy(biomol.chemtype), num_classes=n_one_hot).bool()
 
     # manually derive remaining features using the `Biomolecule` object
@@ -1460,7 +1465,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
     molecule_idx = 0
     token_pool_lens = []
     molecule_atom_types = []
-    gap_id = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES)
+
     for mol, mol_type in zip(molecules, molecule_types):
         num_atoms = mol.GetNumAtoms()
         if mol_type == "ligand":
@@ -1476,7 +1481,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
 
             if num_atoms == 1:
                 # NOTE: we manually set the molecule ID of ions to the `gap` ID
-                molecule_ids[molecule_type_row_idx] = gap_id
+                molecule_ids[molecule_idx] = MOLECULE_METAL_ION_ID
                 is_mol_type_index = IS_METAL_ION_INDEX
             else:
                 is_mol_type_index = IS_LIGAND_INDEX

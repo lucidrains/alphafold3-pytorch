@@ -43,6 +43,7 @@ from alphafold3_pytorch.inputs import (
     IS_PROTEIN_INDEX,
     IS_LIGAND_INDEX,
     IS_BIOMOLECULE_INDICES,
+    NUM_MOLECULE_IDS,
     ADDITIONAL_MOLECULE_FEATS
 )
 
@@ -3001,8 +3002,8 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        dim_additional_token_feats = 2,     # in paper, they include two meta information per token (f_profile, f_deletion_mean)
-        num_molecule_types: int = 32,       # restype in additional residue information, apparently 32 (must be human amino acids + nucleotides + something else)
+        dim_additional_token_feats = 2,                 # in paper, they include two meta information per token (f_profile, f_deletion_mean)
+        num_molecule_types: int = NUM_MOLECULE_IDS,     # restype in additional residue information, apparently 32. will do 33 to account for metal ions
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
         num_molecule_mods: int | None = None,
