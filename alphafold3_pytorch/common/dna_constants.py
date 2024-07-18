@@ -1,8 +1,8 @@
 """Deoxyribonucleic acid (DNA) constants used in AlphaFold."""
 
-import numpy as np
-
 from typing import Final
+
+import numpy as np
 
 from alphafold3_pytorch.common import amino_acid_constants, rna_constants
 
@@ -62,6 +62,7 @@ atom_types = [
 atom_types_set = set(atom_types)
 atom_order = {atom_type: i for i, atom_type in enumerate(atom_types)}
 atom_type_num = len(atom_types)  # := 28 + 19 null types := 47.
+res_rep_atom_index = 11  # The index of the atom used to represent the center of the residue.
 
 
 # This is the standard residue order when coding DNA type as a number.
@@ -79,6 +80,7 @@ restype_1to3 = {
     "C": "DC",
     "G": "DG",
     "T": "DT",
+    "X": "DN",
 }
 
 BIOMOLECULE_CHAIN: Final[str] = "polydeoxyribonucleotide"
@@ -251,5 +253,6 @@ def _make_constants():
             atomtype = atom_order[atomname]
             compact_atom_idx = restype_name_to_compact_atom_names[resname].index(atomname)
             restype_atom47_to_compact_atom[restype, atomtype] = compact_atom_idx
+
 
 _make_constants()
