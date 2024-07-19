@@ -539,7 +539,6 @@ def map_int_or_string_indices_to_mol(
     entries: dict,
     indices: Int[' _'] | List[str] | str,
     mol_keyname = 'rdchem_mol',
-    chain = False,
     return_entries = False
 ) -> List[Mol] | Tuple[List[Mol], List[dict]]:
 
@@ -632,7 +631,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     for protein in proteins:
         mol_peptides, protein_entries = map_int_or_string_indices_to_mol(
-            HUMAN_AMINO_ACIDS, protein, chain=True, return_entries=True
+            HUMAN_AMINO_ACIDS, protein, return_entries=True
         )
         mol_proteins.append(mol_peptides)
 
@@ -657,7 +656,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     for seq in ss_rnas:
         mol_seq, ss_rna_entries = map_int_or_string_indices_to_mol(
-            RNA_NUCLEOTIDES, seq, chain=True, return_entries=True
+            RNA_NUCLEOTIDES, seq, return_entries=True
         )
         mol_ss_rnas.append(mol_seq)
 
@@ -675,7 +674,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     for seq in ss_dnas:
         mol_seq, ss_dna_entries = map_int_or_string_indices_to_mol(
-            DNA_NUCLEOTIDES, seq, chain=True, return_entries=True
+            DNA_NUCLEOTIDES, seq, return_entries=True
         )
         mol_ss_dnas.append(mol_seq)
 
@@ -1005,8 +1004,25 @@ class PDBInput:
     add_atom_ids: bool = False
     add_atompair_ids: bool = False
     directed_bonds: bool = False
+    training: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
+
+    def __post_init__(self):
+        """Run post-init checks."""
+        if not os.path.exists(self.mmcif_filepath):
+            raise FileNotFoundError(f"mmCIF file not found: {self.mmcif_filepath}.")
+        if not self.mmcif_filepath.endswith(".cif"):
+            raise ValueError(
+                f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` file extension."
+            )
+
+        if self.msa_dir is not None and not os.path.exists(self.msa_dir):
+            raise FileNotFoundError(f"Provided MSA directory not found: {self.msa_dir}.")
+        if self.templates_dir is not None and not os.path.exists(self.templates_dir):
+            raise FileNotFoundError(
+                f"Provided templates directory not found: {self.templates_dir}."
+            )
 
 
 @typecheck
@@ -1390,7 +1406,7 @@ def get_token_index_from_composite_atom_id(
 
 
 @typecheck
-def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> MoleculeInput:
+def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
     """Convert a PDBInput to a MoleculeInput."""
     i = pdb_input
 
@@ -1573,7 +1589,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput, training: bool = True) -> M
     # per the AF3 supplement (Table 5, `token_bonds`)
     bond_atom_indices = defaultdict(int)
     for bond in biomol.bonds:
-        if not training:
+        if not i.training:
             continue
 
         # determine bond type
