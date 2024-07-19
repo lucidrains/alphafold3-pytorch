@@ -6,6 +6,7 @@ import os
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from functools import partial
+from itertools import groupby
 from typing import Any, Callable, List, Set, Tuple, Type
 
 import einx
@@ -1406,6 +1407,57 @@ def get_token_index_from_composite_atom_id(
 
 
 @typecheck
+def find_mismatched_symmetry(asym_ids: np.ndarray, entity_ids: np.ndarray, sym_ids: np.ndarray, chemid: np.ndarray) -> bool:
+    """
+    Find mismatched symmetry in a biomolecule's asymmetry, entity, symmetry, and token chemical IDs.
+    
+    This function compares the chemical IDs of (related) regions with the same entity ID
+    but different symmetry IDs. If the chemical IDs of these regions' matching asymmetric
+    chain ID regions are not equal, then their symmetry is "mismatched".
+
+    :param asym_ids: An array of asymmetric unit (i.e., chain) IDs for each token in the biomolecule.
+    :param entity_ids: An array of entity IDs for each token in the biomolecule.
+    :param sym_ids: An array of symmetry IDs for each token in the biomolecule.
+    :param chemid: An array of chemical IDs for each token in the biomolecule.
+    :return: A boolean indicating whether the symmetry IDs are mismatched.
+    """
+    assert len(asym_ids) == len(entity_ids) == len(sym_ids) == len(chemid), (
+        f"The number of asymmetric unit IDs ({len(asym_ids)}), entity IDs ({len(entity_ids)}), symmetry IDs ({len(sym_ids)}), and chemical IDs ({len(chemid)}) do not match. "
+        "Please ensure that these input features are correctly paired."
+    )
+
+    # Create a combined array of tuples (asym_id, entity_id, sym_id, index)
+    combined = np.array(list(zip(asym_ids, entity_ids, sym_ids, range(len(entity_ids)))))
+    
+    # Group by entity_id
+    grouped_by_entity = defaultdict(list)
+    for entity, group in groupby(combined, key=lambda x: x[1]):
+        grouped_by_entity[entity].extend(list(group))
+    
+    # Compare regions with the same entity_id but different sym_id
+    for entity, group in grouped_by_entity.items():
+        # Group by sym_id within each entity_id group
+        grouped_by_sym = defaultdict(list)
+        for _, _, sym, idx in group:
+            grouped_by_sym[sym].append(idx)
+        
+        # Compare chemid sequences for the asym_id regions of different sym_id groups within the same entity_id group
+        sym_ids_keys = list(grouped_by_sym.keys())
+        for i in range(len(sym_ids_keys)):
+            for j in range(i + 1, len(sym_ids_keys)):
+                indices1 = grouped_by_sym[sym_ids_keys[i]]
+                indices2 = grouped_by_sym[sym_ids_keys[j]]
+                indices1_asym_ids = np.unique(asym_ids[indices1])
+                indices2_asym_ids = np.unique(asym_ids[indices2])
+                chemid_seq1 = chemid[np.isin(asym_ids, indices1_asym_ids)]
+                chemid_seq2 = chemid[np.isin(asym_ids, indices2_asym_ids)]
+                if len(chemid_seq1) != len(chemid_seq2) or not np.array_equal(chemid_seq1, chemid_seq2):
+                    return True
+
+    return False
+
+
+@typecheck
 def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
     """Convert a PDBInput to a MoleculeInput."""
     i = pdb_input
@@ -1532,6 +1584,64 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
     molecule_atom_indices = tensor(molecule_atom_indices)
     distogram_atom_indices = tensor(distogram_atom_indices)
 
+    # constructing the additional_molecule_feats
+    # which is in turn used to derive relative positions
+
+    # residue_index - an arange that restarts at 1 for each chain - reuse biomol.residue_index here
+    # token_index   - just an arange
+    # asym_id       - unique id for each chain of a biomolecule - reuse chain_index here
+    # entity_id     - unique id for each biomolecule sequence
+    # sym_id        - unique id for each chain of the same biomolecule sequence
+
+    # entity ids
+
+    unrepeated_entity_sequences = defaultdict(int)
+    for entity_sequence in chain_seqs:
+        if entity_sequence in unrepeated_entity_sequences:
+            continue
+        unrepeated_entity_sequences[entity_sequence] = len(unrepeated_entity_sequences)
+
+    entity_idx = 0
+    entity_id_counts = []
+    unrepeated_entity_ids = []
+    for entity_sequence, chain_chem_type in zip(chain_seqs, chain_chem_types):
+        entity_mol = molecules[entity_idx]
+        entity_len = (
+            entity_mol.GetNumAtoms() if chain_chem_type == "ligand" else len(entity_sequence)
+        )
+        entity_idx += 1 if chain_chem_type == "ligand" else len(entity_sequence)
+
+        entity_id_counts.append(entity_len)
+        unrepeated_entity_ids.append(unrepeated_entity_sequences[entity_sequence])
+
+    entity_ids = torch.repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
+
+    # sym ids
+
+    unrepeated_sym_ids = []
+    unrepeated_sym_sequences = defaultdict(int)
+    for entity_sequence in chain_seqs:
+        unrepeated_sym_ids.append(unrepeated_sym_sequences[entity_sequence])
+        if entity_sequence in unrepeated_sym_sequences:
+            unrepeated_sym_sequences[entity_sequence] += 1
+    unrepeated_sym_ids = tensor(unrepeated_sym_ids)
+
+    sym_ids = torch.repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
+
+    # concat for all of additional_molecule_feats
+
+    additional_molecule_feats = torch.stack(
+        (
+            # NOTE: `Biomolecule.residue_index` is 1-based originally
+            torch.from_numpy(biomol.residue_index) - 1,
+            torch.arange(num_tokens),
+            torch.from_numpy(biomol.chain_index),
+            entity_ids,
+            sym_ids,
+        ),
+        dim=-1,
+    )
+
     # construct token bonds, which will be linearly connected for proteins
     # and nucleic acids, but for ligands will have their atomic bond matrix
     # (as ligands are atom resolution)
@@ -1584,12 +1694,21 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
             polymer_offset += chain_len
             ligand_offset += chain_len
 
+    # ascertain whether homomeric (e.g., bonded ligand) symmetry is preserved,
+    # which determines whether or not we use the mmCIF bond inputs (AF3 Section 5.1)
+    lacking_homomeric_symmetry = find_mismatched_symmetry(
+        biomol.chain_index,
+        entity_ids.numpy(),
+        sym_ids.numpy(),
+        biomol.chemid,
+    )
+
     # ensure mmCIF polymer-ligand (i.e., protein/RNA/DNA-ligand) and ligand-ligand bonds
     # (and bonds less than 2.4 Å) are installed in `MoleculeInput` during training only
     # per the AF3 supplement (Table 5, `token_bonds`)
     bond_atom_indices = defaultdict(int)
     for bond in biomol.bonds:
-        if not i.training:
+        if not i.training or lacking_homomeric_symmetry:
             continue
 
         # determine bond type
@@ -1656,64 +1775,6 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
             token_bonds[col_idx, row_idx] = True
             bond_atom_indices[ptnr1_atom_id] += 1
             bond_atom_indices[ptnr2_atom_id] += 1
-
-    # constructing the additional_molecule_feats
-    # which is in turn used to derive relative positions
-
-    # residue_index - an arange that restarts at 1 for each chain - reuse biomol.residue_index here
-    # token_index   - just an arange
-    # asym_id       - unique id for each chain of a biomolecule - reuse chain_index here
-    # entity_id     - unique id for each biomolecule sequence
-    # sym_id        - unique id for each chain of the same biomolecule sequence
-
-    # entity ids
-
-    unrepeated_entity_sequences = defaultdict(int)
-    for entity_sequence in chain_seqs:
-        if entity_sequence in unrepeated_entity_sequences:
-            continue
-        unrepeated_entity_sequences[entity_sequence] = len(unrepeated_entity_sequences)
-
-    entity_idx = 0
-    entity_id_counts = []
-    unrepeated_entity_ids = []
-    for entity_sequence, chain_chem_type in zip(chain_seqs, chain_chem_types):
-        entity_mol = molecules[entity_idx]
-        entity_len = (
-            entity_mol.GetNumAtoms() if chain_chem_type == "ligand" else len(entity_sequence)
-        )
-        entity_idx += 1 if chain_chem_type == "ligand" else len(entity_sequence)
-
-        entity_id_counts.append(entity_len)
-        unrepeated_entity_ids.append(unrepeated_entity_sequences[entity_sequence])
-
-    entity_ids = torch.repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
-
-    # sym ids
-
-    unrepeated_sym_ids = []
-    unrepeated_sym_sequences = defaultdict(int)
-    for entity_sequence in chain_seqs:
-        unrepeated_sym_ids.append(unrepeated_sym_sequences[entity_sequence])
-        if entity_sequence in unrepeated_sym_sequences:
-            unrepeated_sym_sequences[entity_sequence] += 1
-    unrepeated_sym_ids = tensor(unrepeated_sym_ids)
-
-    sym_ids = torch.repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
-
-    # concat for all of additional_molecule_feats
-
-    additional_molecule_feats = torch.stack(
-        (
-            # NOTE: `Biomolecule.residue_index` is 1-based originally
-            torch.from_numpy(biomol.residue_index) - 1,
-            torch.arange(num_tokens),
-            torch.from_numpy(biomol.chain_index),
-            entity_ids,
-            sym_ids,
-        ),
-        dim=-1,
-    )
 
     # handle missing atom indices
     missing_atom_indices = None
