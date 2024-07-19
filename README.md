@@ -32,6 +32,8 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 - <a href="https://github.com/amorehead">Alex</a> for basically writing the entire gargantuan flow from parsing the PDB all the way to the molecule and atomic inputs for training
 
+- <a href="https://github.com/vandrw">Andrei</a> for working on the weighted PDB dataset sampling!
+
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
 
 ## Install
