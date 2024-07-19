@@ -307,7 +307,7 @@ def get_unique_res_atom_names(
 
 @typecheck
 def _from_mmcif_object(
-    mmcif_object: mmcif_parsing.MmcifObject, chain_id: Optional[str] = None
+    mmcif_object: mmcif_parsing.MmcifObject, chain_ids: Optional[Set[str]] = None,
 ) -> Biomolecule:
     """Takes a Biopython structure/model mmCIF object and creates a `Biomolecule` instance.
 
@@ -323,7 +323,7 @@ def _from_mmcif_object(
       can cause numerous downstream parsing errors.
 
     :param mmcif_object: The parsed Biopython structure/model mmCIF object.
-    :param chain_id: If chain_id is specified (e.g. A), then only that chain is parsed.
+    :param chain_ids: If chain_ids are specified (e.g. A), then only these chains are parsed.
         Otherwise all chains are parsed.
 
     :return: A new `Biomolecule` created from the structure/model mmCIF object contents.
@@ -354,12 +354,12 @@ def _from_mmcif_object(
     residue_chem_comp_details = set()
     atom_mask = []
     residue_index = []
-    chain_ids = []
+    chain_idx = []
     b_factors = []
     author_cri_to_new_cri = {}
 
     for chain in model:
-        if exists(chain_id) and chain.id != chain_id:
+        if exists(chain_ids) and chain.id not in chain_ids:
             continue
         for res_index, res in enumerate(chain):
             if res.id[2] != " ":
@@ -431,7 +431,7 @@ def _from_mmcif_object(
                 )
                 atom_mask.append(mask)
                 residue_index.append(res_index + 1)
-                chain_ids.append(chain.id)
+                chain_idx.append(chain.id)
                 b_factors.append(res_b_factors)
                 author_cri_to_new_cri[(chain.id, res.resname, res.id[1])] = (
                     chain.id,
@@ -475,7 +475,7 @@ def _from_mmcif_object(
                     atom_positions.append(pos)
                     atom_mask.append(mask)
                     residue_index.append(res_index + 1)
-                    chain_ids.append(chain.id)
+                    chain_idx.append(chain.id)
                     b_factors.append(res_b_factors)
 
                 author_cri_to_new_cri[(chain.id, res.resname, res.id[1])] = (
@@ -500,9 +500,9 @@ def _from_mmcif_object(
                     residue_chem_comp_details.add(res_chem_comp_details)
 
     # Chain IDs are usually characters so map these to ints.
-    unique_chain_ids = np.unique(chain_ids)
+    unique_chain_ids = np.unique(chain_idx)
     chain_id_mapping = {cid: n for n, cid in enumerate(unique_chain_ids)}
-    chain_index = np.array([chain_id_mapping[cid] for cid in chain_ids])
+    chain_index = np.array([chain_id_mapping[cid] for cid in chain_idx])
 
     # Construct a mapping from an integer entity ID to integer chain IDs.
     entity_to_chain = {
@@ -528,7 +528,7 @@ def _from_mmcif_object(
         atom_mask=np.array(atom_mask),
         residue_index=np.array(residue_index),
         chain_index=chain_index,
-        chain_id=np.array(chain_ids),
+        chain_id=np.array(chain_idx),
         b_factors=np.array(b_factors),
         chemid=np.array(chemid),
         chemtype=np.array(chemtype),
@@ -543,7 +543,7 @@ def _from_mmcif_object(
 
 
 @typecheck
-def from_mmcif_string(mmcif_str: str, file_id: str, chain_id: Optional[str] = None) -> Biomolecule:
+def from_mmcif_string(mmcif_str: str, file_id: str, chain_ids: Optional[Set[str]] = None) -> Biomolecule:
     """Takes a mmCIF string and constructs a `Biomolecule` object.
 
     WARNING: All non-standard residue types will be converted into UNK. All
@@ -551,7 +551,7 @@ def from_mmcif_string(mmcif_str: str, file_id: str, chain_id: Optional[str] = No
 
     :param mmcif_str: The contents of the mmCIF file.
     :param file_id: The file ID (usually the PDB ID) to be used in the mmCIF.
-    :param chain_id: If chain_id is specified (e.g. A), then only that chain is parsed.
+    :param chain_ids: If chain_ids are specified (e.g. A), then only these chains are parsed.
         Otherwise all chains are parsed.
 
     :return: A new `Biomolecule` parsed from the mmCIF contents.
@@ -566,7 +566,7 @@ def from_mmcif_string(mmcif_str: str, file_id: str, chain_id: Optional[str] = No
     if parsing_result.mmcif_object is None:
         raise list(parsing_result.errors.values())[0]
 
-    return _from_mmcif_object(parsing_result.mmcif_object, chain_id=chain_id)
+    return _from_mmcif_object(parsing_result.mmcif_object, chain_ids=chain_ids)
 
 
 @typecheck
