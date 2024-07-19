@@ -28,7 +28,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from Bio.Data import PDBData
 from Bio.PDB.NeighborSearch import NeighborSearch
 from loguru import logger
@@ -413,29 +413,42 @@ def cluster_sequences_using_mmseqs2(
         output_cluster_filepath
     ), f"Output cluster file '{output_cluster_filepath}' does not exist."
 
-    chain_cluster_mapping = pd.read_csv(
+    chain_cluster_mapping = pl.read_csv(
         output_cluster_filepath,
-        sep="\t",
-        header=None,
-        names=["cluster_rep", "cluster_member"],
+        separator="\t",
+        has_header=False,
+        new_columns=["cluster_rep", "cluster_member"],
     )
-    chain_cluster_mapping["cluster_id"] = pd.factorize(chain_cluster_mapping["cluster_rep"])[0]
-    chain_cluster_mappings = (
-        chain_cluster_mapping[["cluster_member", "cluster_id"]]
-        .set_index("cluster_member")["cluster_id"]
-        .to_dict()
+    chain_cluster_mapping.insert_column(
+        len(chain_cluster_mapping.columns),
+        chain_cluster_mapping.get_column("cluster_rep")
+        .cast(pl.Categorical)
+        .to_physical()
+        .rename("cluster_id"),
+    )
+    chain_cluster_mappings = dict(
+        zip(
+            chain_cluster_mapping.get_column("cluster_member"),
+            chain_cluster_mapping.get_column("cluster_id"),
+        )
     )
 
     # Cache chain cluster mappings to local (CSV) storage
-    local_chain_cluster_mapping = pd.DataFrame(
-        chain_cluster_mapping["cluster_member"]
-        .apply(lambda x: pd.Series(extract_pdb_chain_and_molecule_ids_from_clustering_string(x)))
-        .values,
-        columns=["pdb_id", "chain_id", "molecule_id"],
+    local_chain_cluster_mapping = pl.DataFrame(
+        chain_cluster_mapping.get_column("cluster_member")
+        .map_elements(
+            extract_pdb_chain_and_molecule_ids_from_clustering_string, 
+            return_dtype=pl.List
+        ).to_list(),
+        schema=["pdb_id", "chain_id", "molecule_id"],
+        orient="row",
     )
-    local_chain_cluster_mapping["cluster_id"] = chain_cluster_mapping["cluster_id"]
-    local_chain_cluster_mapping.to_csv(
-        os.path.join(output_dir, f"{molecule_type}_chain_cluster_mapping.csv"), index=False
+    local_chain_cluster_mapping.insert_column(
+        len(local_chain_cluster_mapping.columns),
+        chain_cluster_mapping.get_column("cluster_id"),
+    )
+    local_chain_cluster_mapping.write_csv(
+        os.path.join(output_dir, f"{molecule_type}_chain_cluster_mapping.csv")
     )
 
     return chain_cluster_mappings
@@ -470,15 +483,16 @@ def cluster_ligands_by_ccd_code(
                     ] = cluster_id
 
     # Cache chain cluster mappings to local (CSV) storage
-    local_chain_cluster_mapping = pd.DataFrame(
+    local_chain_cluster_mapping = pl.DataFrame(
         [
             (*extract_pdb_chain_and_molecule_ids_from_clustering_string(k), v)
             for (k, v) in chain_cluster_mapping.items()
         ],
-        columns=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
+        schema=["pdb_id", "chain_id", "molecule_id", "cluster_id"],
+        orient="row",
     )
-    local_chain_cluster_mapping.to_csv(
-        os.path.join(output_dir, "ligand_chain_cluster_mapping.csv"), index=False
+    local_chain_cluster_mapping.write_csv(
+        os.path.join(output_dir, "ligand_chain_cluster_mapping.csv"),
     )
 
     return chain_cluster_mapping
@@ -594,7 +608,7 @@ def cluster_interfaces(
             ] = f"{chain_cluster_0},{chain_cluster_1}:{interface_cluster_mapping}"
 
     # Cache interface cluster mappings to local (CSV) storage
-    pd.DataFrame(
+    pl.DataFrame(
         (
             (
                 k.split("~")[0],
@@ -608,7 +622,7 @@ def cluster_interfaces(
             )
             for k, v in interface_clusters.items()
         ),
-        columns=[
+        schema=[
             "pdb_id",
             "interface_chain_id_1",
             "interface_chain_id_2",
@@ -618,7 +632,7 @@ def cluster_interfaces(
             "interface_chain_cluster_id_2",
             "interface_cluster_id",
         ],
-    ).to_csv(os.path.join(output_dir, "interface_cluster_mapping.csv"), index=False)
+    ).write_csv(os.path.join(output_dir, "interface_cluster_mapping.csv"))
 
     return interface_clusters
 
@@ -700,47 +714,55 @@ if __name__ == "__main__":
 
     if os.path.exists(os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")):
         protein_chain_cluster_mapping = (
-            pd.read_csv(os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv"))
-            .assign(
-                combined_key=lambda df: df.apply(
-                    lambda row: f"{row['pdb_id']}{row['chain_id']}:{row['molecule_id']}", axis=1
-                )
+            pl.read_csv(os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv"))
+            .with_columns(
+                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
             )
-            .set_index("combined_key")["cluster_id"]
-            .to_dict()
+        )
+        protein_chain_cluster_mapping = dict(
+            zip(
+                protein_chain_cluster_mapping.get_column("combined_key"),
+                protein_chain_cluster_mapping.get_column("cluster_id"),
+            )
         )
     if os.path.exists(os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv")):
         nucleic_acid_chain_cluster_mapping = (
-            pd.read_csv(os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv"))
-            .assign(
-                combined_key=lambda df: df.apply(
-                    lambda row: f"{row['pdb_id']}{row['chain_id']}:{row['molecule_id']}", axis=1
-                )
+            pl.read_csv(os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv"))
+            .with_columns(
+                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
             )
-            .set_index("combined_key")["cluster_id"]
-            .to_dict()
+        )
+        nucleic_acid_chain_cluster_mapping = dict(
+            zip(
+                nucleic_acid_chain_cluster_mapping.get_column("combined_key"),
+                nucleic_acid_chain_cluster_mapping.get_column("cluster_id"),
+            )
         )
     if os.path.exists(os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv")):
         peptide_chain_cluster_mapping = (
-            pd.read_csv(os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv"))
-            .assign(
-                combined_key=lambda df: df.apply(
-                    lambda row: f"{row['pdb_id']}{row['chain_id']}:{row['molecule_id']}", axis=1
-                )
+            pl.read_csv(os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv"))
+            .with_columns(
+                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
             )
-            .set_index("combined_key")["cluster_id"]
-            .to_dict()
+        )
+        peptide_chain_cluster_mapping = dict(
+            zip(
+                peptide_chain_cluster_mapping.get_column("combined_key"),
+                peptide_chain_cluster_mapping.get_column("cluster_id"),
+            )
         )
     if os.path.exists(os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")):
         ligand_chain_cluster_mapping = (
-            pd.read_csv(os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv"))
-            .assign(
-                combined_key=lambda df: df.apply(
-                    lambda row: f"{row['pdb_id']}{row['chain_id']}:{row['molecule_id']}", axis=1
-                )
+            pl.read_csv(os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv"))
+            .with_columns(
+                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
             )
-            .set_index("combined_key")["cluster_id"]
-            .to_dict()
+        )
+        ligand_chain_cluster_mapping = dict(
+            zip(
+                ligand_chain_cluster_mapping.get_column("combined_key"),
+                ligand_chain_cluster_mapping.get_column("cluster_id"),
+            )
         )
 
     # Cluster sequences separately for each molecule type
