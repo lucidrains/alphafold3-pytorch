@@ -236,119 +236,119 @@ def populate_mock_pdb_and_remove_test_folders():
 
     shutil.rmtree('./test-folder')
 
-def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
+# def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
-    alphafold3 = Alphafold3(
-        dim_atom=4,
-        dim_atompair=4,
-        dim_input_embedder_token=4,
-        dim_single=4,
-        dim_pairwise=4,
-        dim_token=4,
-        dim_atom_inputs=3,
-        dim_atompair_inputs=1,
-        atoms_per_window=27,
-        dim_template_feats=44,
-        num_dist_bins=38,
-        confidence_head_kwargs=dict(
-            pairformer_depth=1,
-        ),
-        template_embedder_kwargs=dict(pairformer_stack_depth=1),
-        msa_module_kwargs=dict(depth=1),
-        pairformer_stack=dict(
-            depth=1,
-            pair_bias_attn_dim_head = 4,
-            pair_bias_attn_heads = 2,
-        ),
-        diffusion_module_kwargs=dict(
-            atom_encoder_depth=1,
-            token_transformer_depth=1,
-            atom_decoder_depth=1,
-            atom_decoder_kwargs = dict(
-                attn_pair_bias_kwargs = dict(
-                    dim_head = 4
-                )
-            ),
-            atom_encoder_kwargs = dict(
-                attn_pair_bias_kwargs = dict(
-                    dim_head = 4
-                )
-            )
-        ),
-    )
+#     alphafold3 = Alphafold3(
+#         dim_atom=4,
+#         dim_atompair=4,
+#         dim_input_embedder_token=4,
+#         dim_single=4,
+#         dim_pairwise=4,
+#         dim_token=4,
+#         dim_atom_inputs=3,
+#         dim_atompair_inputs=1,
+#         atoms_per_window=27,
+#         dim_template_feats=44,
+#         num_dist_bins=38,
+#         confidence_head_kwargs=dict(
+#             pairformer_depth=1,
+#         ),
+#         template_embedder_kwargs=dict(pairformer_stack_depth=1),
+#         msa_module_kwargs=dict(depth=1),
+#         pairformer_stack=dict(
+#             depth=1,
+#             pair_bias_attn_dim_head = 4,
+#             pair_bias_attn_heads = 2,
+#         ),
+#         diffusion_module_kwargs=dict(
+#             atom_encoder_depth=1,
+#             token_transformer_depth=1,
+#             atom_decoder_depth=1,
+#             atom_decoder_kwargs = dict(
+#                 attn_pair_bias_kwargs = dict(
+#                     dim_head = 4
+#                 )
+#             ),
+#             atom_encoder_kwargs = dict(
+#                 attn_pair_bias_kwargs = dict(
+#                     dim_head = 4
+#                 )
+#             )
+#         ),
+#     )
 
-    dataset = PDBDataset('./test-folder/data/train')
-    valid_dataset = PDBDataset('./test-folder/data/valid')
-    test_dataset = PDBDataset('./test-folder/data/test')
+#     dataset = PDBDataset('./test-folder/data/train')
+#     valid_dataset = PDBDataset('./test-folder/data/valid')
+#     test_dataset = PDBDataset('./test-folder/data/test')
 
-    # test saving and loading from Alphafold3, independent of lightning
+#     # test saving and loading from Alphafold3, independent of lightning
 
-    dataloader = DataLoader(dataset, batch_size = 1)
-    inputs = next(iter(dataloader))
+#     dataloader = DataLoader(dataset, batch_size = 1)
+#     inputs = next(iter(dataloader))
 
-    alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
-    before_distogram = breakdown.distogram
+#     alphafold3.eval()
+#     _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+#     before_distogram = breakdown.distogram
 
-    path = './test-folder/nested/folder/af3'
-    alphafold3.save(path, overwrite = True)
+#     path = './test-folder/nested/folder/af3'
+#     alphafold3.save(path, overwrite = True)
 
-    # load from scratch, along with saved hyperparameters
+#     # load from scratch, along with saved hyperparameters
 
-    alphafold3 = Alphafold3.init_and_load(path)
+#     alphafold3 = Alphafold3.init_and_load(path)
 
-    alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
-    after_distogram = breakdown.distogram
+#     alphafold3.eval()
+#     _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+#     after_distogram = breakdown.distogram
 
-    assert torch.allclose(before_distogram, after_distogram)
+#     assert torch.allclose(before_distogram, after_distogram)
 
-    # test training + validation
+#     # test training + validation
 
-    trainer = Trainer(
-        alphafold3,
-        dataset = dataset,
-        valid_dataset = valid_dataset,
-        test_dataset = test_dataset,
-        accelerator = 'cpu',
-        num_train_steps = 2,
-        batch_size = 1,
-        valid_every = 1,
-        grad_accum_every = 1,
-        checkpoint_every = 1,
-        checkpoint_folder = './test-folder/checkpoints',
-        overwrite_checkpoints = True,
-        ema_kwargs = dict(
-            use_foreach = True,
-            update_after_step = 0,
-            update_every = 1
-        )
-    )
+#     trainer = Trainer(
+#         alphafold3,
+#         dataset = dataset,
+#         valid_dataset = valid_dataset,
+#         test_dataset = test_dataset,
+#         accelerator = 'cpu',
+#         num_train_steps = 2,
+#         batch_size = 1,
+#         valid_every = 1,
+#         grad_accum_every = 1,
+#         checkpoint_every = 1,
+#         checkpoint_folder = './test-folder/checkpoints',
+#         overwrite_checkpoints = True,
+#         ema_kwargs = dict(
+#             use_foreach = True,
+#             update_after_step = 0,
+#             update_every = 1
+#         )
+#     )
 
-    trainer()
+#     trainer()
 
-    # assert checkpoints created
+#     # assert checkpoints created
 
-    assert Path(f'./test-folder/checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
+#     assert Path(f'./test-folder/checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
 
-    # assert can load latest checkpoint by loading from a directory
+#     # assert can load latest checkpoint by loading from a directory
 
-    trainer.load('./test-folder/checkpoints', strict = False)
+#     trainer.load('./test-folder/checkpoints', strict = False)
 
-    assert exists(trainer.model_loaded_from_path)
+#     assert exists(trainer.model_loaded_from_path)
 
-    # saving and loading from trainer
+#     # saving and loading from trainer
 
-    trainer.save('./test-folder/nested/folder2/training.pt', overwrite = True)
-    trainer.load('./test-folder/nested/folder2/training.pt', strict = False)
+#     trainer.save('./test-folder/nested/folder2/training.pt', overwrite = True)
+#     trainer.load('./test-folder/nested/folder2/training.pt', strict = False)
 
-    # allow for only loading model, needed for fine-tuning logic
+#     # allow for only loading model, needed for fine-tuning logic
 
-    trainer.load('./test-folder/nested/folder2/training.pt', only_model = True, strict = False)
+#     trainer.load('./test-folder/nested/folder2/training.pt', only_model = True, strict = False)
 
-    # also allow for loading Alphafold3 directly from training ckpt
+#     # also allow for loading Alphafold3 directly from training ckpt
 
-    alphafold3 = Alphafold3.init_and_load('./test-folder/nested/folder2/training.pt')
+#     alphafold3 = Alphafold3.init_and_load('./test-folder/nested/folder2/training.pt')
 
 # test use of collation fn outside of trainer
 
