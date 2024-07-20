@@ -4,6 +4,7 @@ import collections
 import dataclasses
 import functools
 import io
+import random
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -232,6 +233,69 @@ class Biomolecule:
             mmcif_metadata=self.mmcif_metadata,
         )
 
+    def crop_chains_with_masks(
+        self, chain_ids_and_lengths: List[Tuple[str, int]], crop_masks: List[np.ndarray]
+    ):
+        """
+        Crop the chains and metadata within a Biomolecule
+        to only include the specified chain residues.
+        """
+        assert len(chain_ids_and_lengths) == len(
+            crop_masks
+        ), "The number of chains and crop masks must be equal."
+        raise NotImplementedError("Chain cropping is not yet implemented.")
+
+    def contiguous_crop(self, n_res: int) -> "Biomolecule":
+        """
+        Crop a Biomolecule to only include contiguous
+        polymer residues and/or ligand atoms for each chain.
+        """
+        chain_ids_and_lengths = list(collections.Counter(self.chain_id).items())
+        random.shuffle(chain_ids_and_lengths)
+        crop_masks = create_contiguous_crop_masks(chain_ids_and_lengths, n_res)
+        self.crop_chains_with_masks(chain_ids_and_lengths, crop_masks)
+
+    def spatial_crop(self) -> "Biomolecule":
+        """
+        Crop a Biomolecule to only include polymer residues and ligand atoms
+        near a (random) reference atom within a sampled chain/interface.
+        """
+        raise NotImplementedError("Spatial cropping is not yet implemented.")
+
+    def spatial_interface_crop(self) -> "Biomolecule":
+        """
+        Crop a Biomolecule to only include contiguous polymer residues
+        and/or ligand atoms for each chain.
+        """
+        raise NotImplementedError("Spatial interface cropping is not yet implemented.")
+
+
+@typecheck
+def create_contiguous_crop_masks(
+    chain_ids_and_lengths: List[Tuple[str, int]], n_res: int
+) -> List[np.ndarray]:
+    """
+    Create contiguous crop masks for each given chain.
+    Implements Algorithm 1 from the AlphaFold-Multimer paper.
+    """
+    m_ks = []
+    n_added = 0
+    n_remaining = n_res
+    for chain_id_and_length in chain_ids_and_lengths:
+        n_k = chain_id_and_length[1]
+        n_remaining -= n_k
+        crop_size_max = min(n_res - n_added, n_k)
+        # NOTE: `max(0, n_remaining)` was analytically added to prevent invalid crop sizes.
+        crop_size_min = min(n_k, max(0, n_res - (n_added + max(0, n_remaining))))
+        crop_size = random.randrange(crop_size_min, crop_size_max + 1)
+        n_added += crop_size
+        crop_start = random.randrange(0, n_k - crop_size + 1)
+        m_k = np.zeros(n_k, dtype=bool)
+        keep = np.arange(crop_start, crop_start + crop_size)
+        m_k[keep] = True
+        m_ks.append(m_k)
+    return m_ks
+
 
 @typecheck
 def get_residue_constants(
@@ -307,7 +371,8 @@ def get_unique_res_atom_names(
 
 @typecheck
 def _from_mmcif_object(
-    mmcif_object: mmcif_parsing.MmcifObject, chain_ids: Optional[Set[str]] = None,
+    mmcif_object: mmcif_parsing.MmcifObject,
+    chain_ids: Optional[Set[str]] = None,
 ) -> Biomolecule:
     """Takes a Biopython structure/model mmCIF object and creates a `Biomolecule` instance.
 
@@ -543,7 +608,9 @@ def _from_mmcif_object(
 
 
 @typecheck
-def from_mmcif_string(mmcif_str: str, file_id: str, chain_ids: Optional[Set[str]] = None) -> Biomolecule:
+def from_mmcif_string(
+    mmcif_str: str, file_id: str, chain_ids: Optional[Set[str]] = None
+) -> Biomolecule:
     """Takes a mmCIF string and constructs a `Biomolecule` object.
 
     WARNING: All non-standard residue types will be converted into UNK. All
