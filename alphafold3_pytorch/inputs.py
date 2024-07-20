@@ -1883,7 +1883,7 @@ class PDBDataset(Dataset):
 
         assert folder.exists() and folder.is_dir()
 
-        self.files = [*folder.glob('*.cif')]
+        self.files = [*folder.glob('**/*.cif')]
         self.pdb_input_kwargs = pdb_input_kwargs
         self.training = training
 
