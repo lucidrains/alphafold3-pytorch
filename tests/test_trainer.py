@@ -355,7 +355,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
     alphafold3 = Alphafold3.init_and_load('./test-folder/nested/folder2/training.pt')
 
-# # test use of collation fn outside of trainer
+# test use of collation fn outside of trainer
 
 def test_collate_fn():
     alphafold3 = Alphafold3(
