@@ -138,6 +138,9 @@ def log(t, eps = 1e-20):
 def divisible_by(num, den):
     return (num % den) == 0
 
+def compact(*args):
+    return tuple(filter(exists, args))
+
 # tensor helpers
 
 def max_neg_value(t: Tensor):
@@ -3904,6 +3907,9 @@ class Alphafold3(Module):
             label_pairwise_mask = einx.logical_and('... i, ... j -> ... i j', label_mask, label_mask)
 
             # cross entropy losses
+
+            assert all([t.shape[-1] for t in compact(pde_labels, plddt_labels, resolved_labels)])
+            assert pde_labels.shape[-1] == ch_logits.pde.shape[-1]
 
             if exists(pae_labels):
                 pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
