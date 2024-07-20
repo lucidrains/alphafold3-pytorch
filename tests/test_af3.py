@@ -388,6 +388,41 @@ def test_confidence_head():
         mask = mask
     )
 
+def test_atom_resolution_confidence_head():
+    single_inputs_repr = torch.randn(2, 16, 77)
+    single_repr = torch.randn(2, 16, 384)
+    pairwise_repr = torch.randn(2, 16, 16, 128)
+    mask = torch.ones((2, 16)).bool()
+
+    atom_seq_len = 32
+    atom_feats = torch.randn(2, atom_seq_len, 64)
+    pred_atom_pos = torch.randn(2, atom_seq_len, 3)
+
+    molecule_atom_indices = torch.randint(0, atom_seq_len, (2, 16)).long()
+    molecule_atom_lens = torch.full((2, 16), 2).long()
+
+    confidence_head = ConfidenceHead(
+        dim_single_inputs = 77,
+        atom_resolution = True,
+        dim_atom = 64,
+        atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
+        dim_single = 384,
+        dim_pairwise = 128,
+    )
+
+    logits = confidence_head(
+        single_inputs_repr = single_inputs_repr,
+        single_repr = single_repr,
+        atom_feats = atom_feats,
+        molecule_atom_indices = molecule_atom_indices,
+        molecule_atom_lens = molecule_atom_lens,
+        pairwise_repr = pairwise_repr,
+        pred_atom_pos = pred_atom_pos,
+        mask = mask
+    )
+
+    assert logits.pde.shape[-1] == atom_seq_len
+
 def test_input_embedder():
 
     molecule_atom_lens = torch.randint(0, 3, (2, 16))
