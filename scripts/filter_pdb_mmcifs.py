@@ -38,7 +38,6 @@ import random
 from operator import itemgetter
 from typing import Dict, List, Literal, Set, Tuple
 from datetime import datetime
-from dateutil import parser as date_parser
 
 import numpy as np
 import timeout_decorator
@@ -140,7 +139,7 @@ def filter_pdb_release_date(
         "release_date" in mmcif_object.header
         and exists(mmcif_object.header["release_date"])
         and min_cutoff_date
-        <= date_parser.parse(mmcif_object.header["release_date"])
+        <= datetime.strptime(mmcif_object.header["release_date"], "%Y-%m-%d")
         <= max_cutoff_date
     )
 
