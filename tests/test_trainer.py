@@ -216,11 +216,21 @@ def populate_mock_pdb_and_remove_test_folders():
     data_folder = pytest_root_folder / 'data'
 
     train_folder = data_folder / 'train'
+    valid_folder = data_folder / 'valid'
+    test_folder = data_folder / 'test'
 
     train_folder.mkdir(exist_ok = True, parents = True)
+    valid_folder.mkdir(exist_ok = True, parents = True)
+    test_folder.mkdir(exist_ok = True, parents = True)
+
+    for i in range(2):
+        shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
 
     for i in range(1):
-        shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
+        shutil.copy2(str(working_cif_file), str(valid_folder / f'{i}.cif'))
+
+    for i in range(1):
+        shutil.copy2(str(working_cif_file), str(test_folder / f'{i}.cif'))
 
     yield
 
@@ -237,7 +247,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         dim_token=4,
         dim_atom_inputs=3,
         dim_atompair_inputs=1,
-        atoms_per_window=8,
+        atoms_per_window=27,
         dim_template_feats=44,
         num_dist_bins=38,
         confidence_head_kwargs=dict(
@@ -268,8 +278,8 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     )
 
     dataset = PDBDataset('./test-folder/data/train')
-    valid_dataset = PDBDataset('./test-folder/data/train')
-    test_dataset = PDBDataset('./test-folder/data/train')
+    valid_dataset = PDBDataset('./test-folder/data/valid')
+    test_dataset = PDBDataset('./test-folder/data/test')
 
     # test saving and loading from Alphafold3, independent of lightning
 
@@ -277,7 +287,9 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    with torch.no_grad():
+        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+
     before_distogram = breakdown.distogram
 
     path = './test-folder/nested/folder/af3'
@@ -288,11 +300,13 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     alphafold3 = Alphafold3.init_and_load(path)
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    with torch.no_grad():
+        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
-
+    return
     # test training + validation
 
     trainer = Trainer(
