@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+from pathlib import Path
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from functools import partial
@@ -10,17 +11,21 @@ from itertools import groupby
 from typing import Any, Callable, List, Set, Tuple, Type
 
 import einx
+
 import numpy as np
 import torch
+from torch import tensor
+from torch.utils.data import Dataset
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
+
 from loguru import logger
 from pdbeccdutils.core import ccd_reader
+
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdDetermineBonds
 from rdkit.Chem.rdchem import Atom, Mol
 from rdkit.Geometry import Point3D
-from torch import tensor
-from torch.nn.utils.rnn import pad_sequence
 
 from alphafold3_pytorch.common import amino_acid_constants, dna_constants, rna_constants
 from alphafold3_pytorch.common.biomolecule import (
@@ -1863,6 +1868,41 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
 
     return molecule_input
 
+
+# PDB Dataset
+
+class PDBDataset(Dataset):
+    def __init__(
+        self,
+        folder: str | Path,
+        training: bool | None = None, # extra training flag placed by Alex on PDBInput
+        **pdb_input_kwargs
+    ):
+        if isinstance(folder, str):
+            folder = Path(folder)
+
+        assert folder.exists() and folder.is_dir()
+
+        self.files = [*folder.glob('*.cif')]
+        self.pdb_input_kwargs = pdb_input_kwargs
+        self.training = training
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+
+        kwargs = self.pdb_input_kwargs
+
+        if exists(self.training):
+            kwargs = {**kwargs, 'training': self.training}
+
+        pdb_input = PDBInput(
+            str(self.files[idx]),
+            **kwargs
+        )
+
+        return pdb_input
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation

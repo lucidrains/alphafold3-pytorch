@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 
 from alphafold3_pytorch import (
     Alphafold3,
+    PDBDataset,
     AtomInput,
     DataLoader,
     Trainer,
@@ -106,7 +107,7 @@ def remove_test_folders():
     yield
     shutil.rmtree('./test-folder')
 
-def test_trainer(remove_test_folders):
+def test_trainer_with_mock_atom_input(remove_test_folders):
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -134,6 +135,135 @@ def test_trainer(remove_test_folders):
     dataset = MockAtomDataset(100)
     valid_dataset = MockAtomDataset(4)
     test_dataset = MockAtomDataset(2)
+
+    # test saving and loading from Alphafold3, independent of lightning
+
+    dataloader = DataLoader(dataset, batch_size = 2)
+    inputs = next(iter(dataloader))
+
+    alphafold3.eval()
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    before_distogram = breakdown.distogram
+
+    path = './test-folder/nested/folder/af3'
+    alphafold3.save(path, overwrite = True)
+
+    # load from scratch, along with saved hyperparameters
+
+    alphafold3 = Alphafold3.init_and_load(path)
+
+    alphafold3.eval()
+    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    after_distogram = breakdown.distogram
+
+    assert torch.allclose(before_distogram, after_distogram)
+
+    # test training + validation
+
+    trainer = Trainer(
+        alphafold3,
+        dataset = dataset,
+        valid_dataset = valid_dataset,
+        test_dataset = test_dataset,
+        accelerator = 'cpu',
+        num_train_steps = 2,
+        batch_size = 1,
+        valid_every = 1,
+        grad_accum_every = 2,
+        checkpoint_every = 1,
+        checkpoint_folder = './test-folder/checkpoints',
+        overwrite_checkpoints = True,
+        ema_kwargs = dict(
+            use_foreach = True,
+            update_after_step = 0,
+            update_every = 1
+        )
+    )
+
+    trainer()
+
+    # assert checkpoints created
+
+    assert Path(f'./test-folder/checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
+
+    # assert can load latest checkpoint by loading from a directory
+
+    trainer.load('./test-folder/checkpoints', strict = False)
+
+    assert exists(trainer.model_loaded_from_path)
+
+    # saving and loading from trainer
+
+    trainer.save('./test-folder/nested/folder2/training.pt', overwrite = True)
+    trainer.load('./test-folder/nested/folder2/training.pt', strict = False)
+
+    # allow for only loading model, needed for fine-tuning logic
+
+    trainer.load('./test-folder/nested/folder2/training.pt', only_model = True, strict = False)
+
+    # also allow for loading Alphafold3 directly from training ckpt
+
+    alphafold3 = Alphafold3.init_and_load('./test-folder/nested/folder2/training.pt')
+
+# testing trainer with pdb inputs
+
+@pytest.fixture()
+def populate_mock_pdb_and_remove_test_folders():
+    proj_root = Path('.')
+    working_cif_file = proj_root / 'data' / 'test' / '7a4d-assembly1.cif'
+
+    pytest_root_folder = Path('./test-folder')
+    data_folder = pytest_root_folder / 'data'
+
+    train_folder = data_folder / 'train'
+    valid_folder = data_folder / 'valid'
+    test_folder = data_folder / 'test'
+
+    train_folder.mkdir(exist_ok = True, parents = True)
+    valid_folder.mkdir(exist_ok = True, parents = True)
+    test_folder.mkdir(exist_ok = True, parents = True)
+
+    for i in range(100):
+        shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
+
+    for i in range(4):
+        shutil.copy2(str(working_cif_file), str(valid_folder / f'{i}.cif'))
+
+    for i in range(2):
+        shutil.copy2(str(working_cif_file), str(test_folder / f'{i}.cif'))
+
+    yield
+
+    shutil.rmtree('./test-folder')
+
+def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
+
+    alphafold3 = Alphafold3(
+        dim_atom=8,
+        dim_atompair=8,
+        dim_input_embedder_token=8,
+        dim_single=8,
+        dim_pairwise=8,
+        dim_token=8,
+        dim_atom_inputs=3,
+        dim_atompair_inputs=1,
+        atoms_per_window=27,
+        dim_template_feats=44,
+        num_dist_bins=38,
+        confidence_head_kwargs=dict(pairformer_depth=1),
+        template_embedder_kwargs=dict(pairformer_stack_depth=1),
+        msa_module_kwargs=dict(depth=1),
+        pairformer_stack=dict(depth=1),
+        diffusion_module_kwargs=dict(
+            atom_encoder_depth=1,
+            token_transformer_depth=1,
+            atom_decoder_depth=1,
+        ),
+    )
+
+    dataset = PDBDataset('./test-folder/data/train')
+    valid_dataset = PDBDataset('./test-folder/data/valid')
+    test_dataset = PDBDataset('./test-folder/data/test')
 
     # test saving and loading from Alphafold3, independent of lightning
 
