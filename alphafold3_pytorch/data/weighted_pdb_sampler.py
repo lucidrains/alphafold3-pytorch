@@ -9,7 +9,6 @@ from alphafold3_pytorch.tensor_typing import typecheck
 from scripts.cluster_pdb_mmcifs import CLUSTERING_MOLECULE_TYPE
 
 
-@typecheck
 def get_chain_count(molecule_type: CLUSTERING_MOLECULE_TYPE) -> Tuple[int, int, int]:
     """
     Returns the number of protein, nucleic acid, and ligand chains in a
@@ -31,7 +30,6 @@ def get_chain_count(molecule_type: CLUSTERING_MOLECULE_TYPE) -> Tuple[int, int, 
             raise ValueError(f"Unknown molecule type: {molecule_type}")
 
 
-@typecheck
 def calculate_weight(
     alphas: Dict[str, float],
     beta: float,
@@ -84,7 +82,7 @@ def get_interface_weight(
 def get_cluster_sizes(
     mapping: pl.DataFrame,
     cluster_id_col: str,
-) -> Dict[str, int]:
+) -> Dict[int, int]:
     """
     Returns a dictionary where keys are cluster IDs and values are the number
     of chains/interfaces in the cluster.
@@ -186,26 +184,18 @@ class WeightedPDBSampler(Sampler[List[str]]):
         if not isinstance(chain_mapping_paths, list):
             chain_mapping_paths = [chain_mapping_paths]
 
-        chain_mapping = []
-        for path in chain_mapping_paths:
-            mapping = pl.read_csv(path)
-            mapping = mapping.with_columns(
-                (pl.col("molecule_id") + "-" + pl.col("cluster_id").cast(pl.String)).alias(
-                    "cluster_id"
-                )
+        chain_mapping = [pl.read_csv(path) for path in chain_mapping_paths]
+        # Increment chain cluster IDs to avoid overlap
+        chain_cluster_nums = [
+            mapping.get_column("cluster_id").max() for mapping in chain_mapping
+        ]
+        for i in range(1, len(chain_mapping)):
+            chain_mapping[i] = chain_mapping[i].with_columns(
+                (pl.col("cluster_id") + sum(chain_cluster_nums[:i])).alias("cluster_id")
             )
-            chain_mapping.append(mapping)
+
         chain_mapping = pl.concat(chain_mapping)
         interface_mapping = pl.read_csv(interface_mapping_path)
-        interface_mapping = interface_mapping.with_columns(
-            (
-                pl.col("interface_molecule_id_1")
-                + "-"
-                + pl.col("interface_molecule_id_2")
-                + "-"
-                + pl.col("interface_cluster_id").cast(pl.String)
-            ).alias("interface_cluster_id")
-        )
 
         # Filter out unwanted PDB IDs
         if len(pdb_ids_to_skip) > 0:
@@ -226,6 +216,20 @@ class WeightedPDBSampler(Sampler[List[str]]):
         interface_mapping.insert_column(
             len(interface_mapping.columns),
             compute_interface_weights(interface_mapping, self.alphas, self.betas["interface"]),
+        )
+
+        # Add additional information to the cluster IDs
+        chain_mapping = chain_mapping.with_columns(
+            (pl.col("molecule_id") + "-" + pl.col("cluster_id").cast(pl.String)).alias("cluster_id")
+        )
+        interface_mapping = interface_mapping.with_columns(
+            (
+                pl.col("interface_molecule_id_1")
+                + "-"
+                + pl.col("interface_molecule_id_2")
+                + "-"
+                + pl.col("interface_cluster_id").cast(pl.String)
+            ).alias("interface_cluster_id")
         )
 
         # Concatenate chain and interface mappings
