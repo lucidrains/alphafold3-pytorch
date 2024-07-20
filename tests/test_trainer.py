@@ -1,6 +1,7 @@
 import os
 os.environ['TYPECHECK'] = 'True'
 
+import shutil
 from pathlib import Path
 from random import randrange, random
 from dataclasses import asdict
@@ -100,7 +101,13 @@ class MockAtomDataset(Dataset):
             resolved_labels = resolved_labels
         )
 
-def test_trainer():
+@pytest.fixture()
+def remove_test_folders():
+    yield
+    shutil.rmtree('./test-folder')
+
+def test_trainer(remove_test_folders):
+
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
         dim_template_feats = 44,
@@ -137,7 +144,7 @@ def test_trainer():
     _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
     before_distogram = breakdown.distogram
 
-    path = './some/nested/folder/af3'
+    path = './test-folder/nested/folder/af3'
     alphafold3.save(path, overwrite = True)
 
     # load from scratch, along with saved hyperparameters
@@ -163,6 +170,7 @@ def test_trainer():
         valid_every = 1,
         grad_accum_every = 2,
         checkpoint_every = 1,
+        checkpoint_folder = './test-folder/checkpoints',
         overwrite_checkpoints = True,
         ema_kwargs = dict(
             use_foreach = True,
@@ -175,26 +183,26 @@ def test_trainer():
 
     # assert checkpoints created
 
-    assert Path(f'./checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
+    assert Path(f'./test-folder/checkpoints/({trainer.train_id})_af3.ckpt.1.pt').exists()
 
     # assert can load latest checkpoint by loading from a directory
 
-    trainer.load('./checkpoints', strict = False)
+    trainer.load('./test-folder/checkpoints', strict = False)
 
     assert exists(trainer.model_loaded_from_path)
 
     # saving and loading from trainer
 
-    trainer.save('./some/nested/folder2/training.pt', overwrite = True)
-    trainer.load('./some/nested/folder2/training.pt', strict = False)
+    trainer.save('./test-folder/nested/folder2/training.pt', overwrite = True)
+    trainer.load('./test-folder/nested/folder2/training.pt', strict = False)
 
     # allow for only loading model, needed for fine-tuning logic
 
-    trainer.load('./some/nested/folder2/training.pt', only_model = True, strict = False)
+    trainer.load('./test-folder/nested/folder2/training.pt', only_model = True, strict = False)
 
     # also allow for loading Alphafold3 directly from training ckpt
 
-    alphafold3 = Alphafold3.init_and_load('./some/nested/folder2/training.pt')
+    alphafold3 = Alphafold3.init_and_load('./test-folder/nested/folder2/training.pt')
 
 # test use of collation fn outside of trainer
 
