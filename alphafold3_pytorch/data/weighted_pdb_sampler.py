@@ -186,9 +186,7 @@ class WeightedPDBSampler(Sampler[List[str]]):
 
         chain_mapping = [pl.read_csv(path) for path in chain_mapping_paths]
         # Increment chain cluster IDs to avoid overlap
-        chain_cluster_nums = [
-            mapping.get_column("cluster_id").max() for mapping in chain_mapping
-        ]
+        chain_cluster_nums = [mapping.get_column("cluster_id").max() for mapping in chain_mapping]
         for i in range(1, len(chain_mapping)):
             chain_mapping[i] = chain_mapping[i].with_columns(
                 (pl.col("cluster_id") + sum(chain_cluster_nums[:i])).alias("cluster_id")
@@ -218,20 +216,6 @@ class WeightedPDBSampler(Sampler[List[str]]):
             compute_interface_weights(interface_mapping, self.alphas, self.betas["interface"]),
         )
 
-        # Add additional information to the cluster IDs
-        chain_mapping = chain_mapping.with_columns(
-            (pl.col("molecule_id") + "-" + pl.col("cluster_id").cast(pl.String)).alias("cluster_id")
-        )
-        interface_mapping = interface_mapping.with_columns(
-            (
-                pl.col("interface_molecule_id_1")
-                + "-"
-                + pl.col("interface_molecule_id_2")
-                + "-"
-                + pl.col("interface_cluster_id").cast(pl.String)
-            ).alias("interface_cluster_id")
-        )
-
         # Concatenate chain and interface mappings
         chain_mapping = chain_mapping.with_columns(
             [
@@ -247,7 +231,9 @@ class WeightedPDBSampler(Sampler[List[str]]):
             [
                 pl.col("interface_chain_id_1").alias("chain_id_1"),
                 pl.col("interface_chain_id_2").alias("chain_id_2"),
-                pl.col("interface_cluster_id").alias("cluster_id"),
+                (
+                    pl.col("interface_cluster_id") + chain_mapping.get_column("cluster_id").max()
+                ).alias("cluster_id"),
             ]
         )
         interface_mapping = interface_mapping.select(
