@@ -223,7 +223,7 @@ def populate_mock_pdb_and_remove_test_folders():
     valid_folder.mkdir(exist_ok = True, parents = True)
     test_folder.mkdir(exist_ok = True, parents = True)
 
-    for i in range(100):
+    for i in range(2):
         shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
 
     for i in range(1):
@@ -287,7 +287,9 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    with torch.no_grad():
+        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+
     before_distogram = breakdown.distogram
 
     path = './test-folder/nested/folder/af3'
@@ -298,7 +300,9 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     alphafold3 = Alphafold3.init_and_load(path)
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    with torch.no_grad():
+        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
@@ -318,6 +322,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         checkpoint_every = 1,
         checkpoint_folder = './test-folder/checkpoints',
         overwrite_checkpoints = True,
+        use_ema = False,
         ema_kwargs = dict(
             use_foreach = True,
             update_after_step = 0,

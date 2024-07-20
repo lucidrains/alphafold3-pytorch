@@ -174,11 +174,25 @@ def test_pdbinput_input():
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1),
-        pairformer_stack=dict(depth=1),
+        pairformer_stack=dict(
+            depth=1,
+            pair_bias_attn_dim_head = 4,
+            pair_bias_attn_heads = 2,
+        ),
         diffusion_module_kwargs=dict(
             atom_encoder_depth=1,
             token_transformer_depth=1,
             atom_decoder_depth=1,
+            atom_decoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            ),
+            atom_encoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            )
         ),
     )
 
