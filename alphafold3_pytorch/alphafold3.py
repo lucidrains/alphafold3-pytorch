@@ -147,10 +147,13 @@ def max_neg_value(t: Tensor):
     return -torch.finfo(t.dtype).max
 
 def pack_one(t, pattern):
-    return pack([t], pattern)
+    packed, ps = pack([t], pattern)
 
-def unpack_one(t, ps, pattern):
-    return unpack(t, ps, pattern)[0]
+    def unpack_one(to_unpack, unpack_pattern = None):
+        unpacked, = unpack(to_unpack, ps, default(unpack_pattern, pattern))
+        return unpacked
+
+    return packed, unpack_one
 
 def exclusive_cumsum(t, dim = -1):
     return t.cumsum(dim = dim) - t
@@ -194,7 +197,7 @@ def atom_ref_pos_to_atompair_inputs(
     # Algorithm 5 - lines 2-6
     # allow for either batched or single
 
-    atom_ref_pos, batch_packed_shape = pack_one(atom_ref_pos, '* m c')
+    atom_ref_pos, unpack_one = pack_one(atom_ref_pos, '* m c')
     atom_ref_space_uid, _ = pack_one(atom_ref_space_uid, '* m')
 
     assert atom_ref_pos.shape[0] == atom_ref_space_uid.shape[0]
@@ -228,7 +231,7 @@ def atom_ref_pos_to_atompair_inputs(
 
     # reconstitute optional batch dimension
 
-    atompair_inputs = unpack_one(atompair_inputs, batch_packed_shape, '* i j dapi')
+    atompair_inputs = unpack_one(atompair_inputs, '* i j dapi')
 
     # return
 
@@ -727,7 +730,7 @@ class TriangleAttention(Module):
         if exists(mask):
             mask = repeat(mask, 'b ... -> (b repeat) ...', repeat = batch_repeat)
 
-        pairwise_repr, packed_shape = pack_one(pairwise_repr, '* n d')
+        pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
 
         out = self.attn(
             pairwise_repr,
@@ -736,7 +739,7 @@ class TriangleAttention(Module):
             **kwargs
         )
 
-        out = unpack_one(out, packed_shape, '* n d')
+        out = unpack_one(out)
 
         if self.need_transpose:
             out = rearrange(out, 'b j i d -> b i j d')
@@ -1312,7 +1315,7 @@ class TemplateEmbedder(Module):
 
         v = self.template_feats_to_embed_input(templates) + pairwise_repr
 
-        v, merged_batch_ps = pack_one(v, '* i j d')
+        v, unpack_one = pack_one(v, '* i j d')
 
         has_templates = reduce(template_mask, 'b t -> b', 'any')
 
@@ -1327,7 +1330,7 @@ class TemplateEmbedder(Module):
 
         u = self.final_norm(v)
 
-        u = unpack_one(u, merged_batch_ps, '* i jk d')
+        u = unpack_one(u)
 
         # masked mean pool template repr
 
@@ -2995,9 +2998,9 @@ class ConfidenceHead(Module):
             pairwise_repr = repeat_consecutive_with_lens(pairwise_repr, molecule_atom_lens)
 
             molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
-            pairwise_repr, ps = pack_one(pairwise_repr, '* n d')
+            pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
             pairwise_repr = repeat_consecutive_with_lens(pairwise_repr, molecule_atom_lens)
-            pairwise_repr = unpack_one(pairwise_repr, ps, '* n d')
+            pairwise_repr = unpack_one(pairwise_repr)
 
             interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
 
@@ -3543,7 +3546,7 @@ class Alphafold3(Module):
         assert not (exists(is_molecule_mod) ^ self.has_molecule_mod_embeds), 'you either set `num_molecule_mods` and did not pass in `is_molecule_mod` or vice versa'
 
         if self.has_molecule_mod_embeds:
-            single_init, seq_packed_shape = pack_one(single_init, '* ds')
+            single_init, seq_unpack_one = pack_one(single_init, '* ds')
 
             is_molecule_mod, _ = pack_one(is_molecule_mod, '* mods')
 
@@ -3556,7 +3559,7 @@ class Alphafold3(Module):
             seq_indices = repeat(seq_indices, 'n -> n ds', ds = single_init.shape[-1])
             single_init = single_init.scatter_add(0, seq_indices, scatter_values)
 
-            single_init = unpack_one(single_init, seq_packed_shape, '* ds')
+            single_init = seq_unpack_one(single_init)
 
         # relative positional encoding
 
