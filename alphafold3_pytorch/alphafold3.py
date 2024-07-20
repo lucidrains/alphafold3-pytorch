@@ -3908,7 +3908,7 @@ class Alphafold3(Module):
 
             # cross entropy losses
 
-            assert all([t.shape[-1] for t in compact(pde_labels, plddt_labels, resolved_labels)])
+            assert len(set([t.shape[-1] for t in compact(pde_labels, plddt_labels, resolved_labels)])) == 1
             assert pde_labels.shape[-1] == ch_logits.pde.shape[-1]
 
             if exists(pae_labels):
