@@ -3137,7 +3137,8 @@ class Alphafold3(Module):
             S_noise = 1.003,
         ),
         augment_kwargs: dict = dict(),
-        stochastic_frame_average = False
+        stochastic_frame_average = False,
+        confidence_head_atom_resolution = False
     ):
         super().__init__()
 
@@ -3315,6 +3316,7 @@ class Alphafold3(Module):
             num_plddt_bins = num_plddt_bins,
             num_pde_bins = num_pde_bins,
             num_pae_bins = num_pae_bins,
+            atom_resolution = confidence_head_atom_resolution,
             **confidence_head_kwargs
         )
 
@@ -3434,11 +3436,11 @@ class Alphafold3(Module):
         molecule_atom_indices: Int['b n'] | None = None, # the 'token centre atoms' mentioned in the paper, unsure where it is used in the architecture
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
-        distance_labels: Int['b n n'] | None = None,
-        pae_labels: Int['b n n'] | None = None,
-        pde_labels: Int['b n n'] | None = None,
-        plddt_labels: Int['b n'] | None = None,
-        resolved_labels: Int['b n'] | None = None,
+        distance_labels: Int['b n n'] | Int['b m m'] | None = None,
+        pae_labels: Int['b n n'] | Int['b m m'] | None = None,
+        pde_labels: Int['b n n'] | Int['b m m'] | None = None,
+        plddt_labels: Int['b n'] | Int['b m'] | None = None,
+        resolved_labels: Int['b n'] | Int['b m'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_present_sampled_atoms: bool = False,
@@ -3710,6 +3712,8 @@ class Alphafold3(Module):
                 pairwise_repr = pairwise.detach(),
                 pred_atom_pos = confidence_head_atom_pos_input.detach(),
                 molecule_atom_indices = molecule_atom_indices,
+                molecule_atom_lens = molecule_atom_lens,
+                atom_feats = atom_feats,
                 mask = mask,
                 return_pae_logits = True
             )
@@ -3884,24 +3888,37 @@ class Alphafold3(Module):
                 pairwise_repr = pairwise.detach(),
                 pred_atom_pos = denoised_atom_pos.detach(),
                 molecule_atom_indices = molecule_atom_indices,
+                molecule_atom_lens = molecule_atom_lens,
                 mask = mask,
+                atom_feats = atom_feats,
                 return_pae_logits = return_pae_logits
             )
 
+            # determine which mask to use for labels depending on atom resolution or not for confidence head
+
+            label_mask = mask
+
+            if self.confidence_head.atom_resolution:
+                label_mask = atom_mask
+
+            label_pairwise_mask = einx.logical_and('... i, ... j -> ... i j', label_mask, label_mask)
+
+            # cross entropy losses
+
             if exists(pae_labels):
-                pae_labels = torch.where(pairwise_mask, pae_labels, ignore)
+                pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
                 pae_loss = F.cross_entropy(ch_logits.pae, pae_labels, ignore_index = ignore)
 
             if exists(pde_labels):
-                pde_labels = torch.where(pairwise_mask, pde_labels, ignore)
+                pde_labels = torch.where(label_pairwise_mask, pde_labels, ignore)
                 pde_loss = F.cross_entropy(ch_logits.pde, pde_labels, ignore_index = ignore)
 
             if exists(plddt_labels):
-                plddt_labels = torch.where(mask, plddt_labels, ignore)
+                plddt_labels = torch.where(label_mask, plddt_labels, ignore)
                 plddt_loss = F.cross_entropy(ch_logits.plddt, plddt_labels, ignore_index = ignore)
 
             if exists(resolved_labels):
-                resolved_labels = torch.where(mask, resolved_labels, ignore)
+                resolved_labels = torch.where(label_mask, resolved_labels, ignore)
                 resolved_loss = F.cross_entropy(ch_logits.resolved, resolved_labels, ignore_index = ignore)
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss

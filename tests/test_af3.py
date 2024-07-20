@@ -459,12 +459,14 @@ def test_distogram_head():
 @pytest.mark.parametrize('missing_atoms', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 @pytest.mark.parametrize('num_molecule_mods', (0, 5))
+@pytest.mark.parametrize('confidence_head_atom_resolution', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool,
     missing_atoms: bool,
     atom_transformer_intramolecular_attn: bool,
-    num_molecule_mods: int
+    num_molecule_mods: int,
+    confidence_head_atom_resolution: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -509,10 +511,11 @@ def test_alphafold3(
     distogram_atom_indices = molecule_atom_lens - 1
     molecule_atom_indices = molecule_atom_lens - 1
 
-    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    plddt_labels = torch.randint(0, 50, (2, seq_len))
-    resolved_labels = torch.randint(0, 2, (2, seq_len))
+    label_len = atom_seq_len if confidence_head_atom_resolution else seq_len
+    pae_labels = torch.randint(0, 64, (2, label_len, label_len))
+    pde_labels = torch.randint(0, 64, (2, label_len, label_len))
+    plddt_labels = torch.randint(0, 50, (2, label_len))
+    resolved_labels = torch.randint(0, 2, (2, label_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -538,7 +541,8 @@ def test_alphafold3(
             token_transformer_depth = 1,
             atom_decoder_depth = 1,
         ),
-        stochastic_frame_average = stochastic_frame_average
+        stochastic_frame_average = stochastic_frame_average,
+        confidence_head_atom_resolution = confidence_head_atom_resolution
     )
 
     loss, breakdown = alphafold3(
