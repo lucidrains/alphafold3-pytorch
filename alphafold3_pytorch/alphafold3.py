@@ -2925,13 +2925,23 @@ class ConfidenceHead(Module):
         single_inputs_repr: Float['b n dsi'],
         single_repr: Float['b n ds'],
         pairwise_repr: Float['b n n dp'],
-        pred_atom_pos: Float['b n 3'],
+        pred_atom_pos: Float['b n 3'] | Float['b m 3'],
+        molecule_atom_indices: Int['b n'] | None = None,
         mask: Bool['b n'] | None = None,
         return_pae_logits = True
 
     ) -> ConfidenceHeadLogits:
 
         pairwise_repr = pairwise_repr + self.single_inputs_to_pairwise(single_inputs_repr)
+
+        # pluck out the representative atoms for non-atomic resolution confidence head
+
+        is_atom_seq = pred_atom_pos.shape[-2] > single_inputs_repr.shape[-2]
+
+        assert not is_atom_seq or exists(molecule_atom_indices)
+
+        if is_atom_seq:
+            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', pred_atom_pos, molecule_atom_indices)
 
         # interatomic distances - embed and add to pairwise
 
@@ -3640,8 +3650,7 @@ class Alphafold3(Module):
                 sampled_atom_pos = einx.where('b m, b m c, -> b m c', atom_mask, sampled_atom_pos, 0.)
 
             if return_confidence_head_logits:
-                assert exists(molecule_atom_indices)
-                pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', sampled_atom_pos, molecule_atom_indices)
+                confidence_head_atom_pos_input = sampled_atom_pos.clone()
 
             if exists(missing_atom_mask) and return_present_sampled_atoms:
                 sampled_atom_pos = sampled_atom_pos[~missing_atom_mask]
@@ -3653,7 +3662,8 @@ class Alphafold3(Module):
                 single_repr = single.detach(),
                 single_inputs_repr = single_inputs.detach(),
                 pairwise_repr = pairwise.detach(),
-                pred_atom_pos = pred_atom_pos.detach(),
+                pred_atom_pos = confidence_head_atom_pos_input.detach(),
+                molecule_atom_indices = molecule_atom_indices,
                 mask = mask,
                 return_pae_logits = True
             )
@@ -3822,13 +3832,12 @@ class Alphafold3(Module):
                 tqdm_pbar_title = 'training rollout'
             )
 
-            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', denoised_atom_pos, molecule_atom_indices)
-
             ch_logits = self.confidence_head(
                 single_repr = single.detach(),
                 single_inputs_repr = single_inputs.detach(),
                 pairwise_repr = pairwise.detach(),
-                pred_atom_pos = pred_atom_pos.detach(),
+                pred_atom_pos = denoised_atom_pos.detach(),
+                molecule_atom_indices = molecule_atom_indices,
                 mask = mask,
                 return_pae_logits = return_pae_logits
             )
