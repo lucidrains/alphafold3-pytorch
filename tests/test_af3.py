@@ -472,6 +472,7 @@ def test_alphafold3(
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
+    molecule_atom_indices = molecule_atom_lens - 1
 
     pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
     pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
@@ -524,6 +525,7 @@ def test_alphafold3(
         template_mask = template_mask,
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
+        molecule_atom_indices = molecule_atom_indices,
         pae_labels = pae_labels,
         pde_labels = pde_labels,
         plddt_labels = plddt_labels,
@@ -630,6 +632,7 @@ def test_alphafold3_force_return_loss():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
+    molecule_atom_indices = molecule_atom_lens - 1
 
     distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
     pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
@@ -671,6 +674,7 @@ def test_alphafold3_force_return_loss():
         additional_token_feats = additional_token_feats,
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
+        molecule_atom_indices = molecule_atom_indices,
         distance_labels = distance_labels,
         pae_labels = pae_labels,
         pde_labels = pde_labels,
@@ -678,6 +682,91 @@ def test_alphafold3_force_return_loss():
         resolved_labels = resolved_labels,
         return_loss_breakdown = True,
         return_loss = False # force sampling even if labels are given
+    )
+
+    assert sampled_atom_pos.ndim == 3
+
+    loss, _ = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        molecule_ids = molecule_ids,
+        molecule_atom_lens = molecule_atom_lens,
+        atompair_inputs = atompair_inputs,
+        is_molecule_types = is_molecule_types,
+        additional_molecule_feats = additional_molecule_feats,
+        additional_token_feats = additional_token_feats,
+        molecule_atom_indices = molecule_atom_indices,
+        return_loss_breakdown = True,
+        return_loss = True # force returning loss even if no labels given
+    )
+
+    assert loss == 0.
+
+def test_alphafold3_force_return_loss_with_confidence_logits():
+    seq_len = 16
+    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+    additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+    additional_token_feats = torch.randn(2, seq_len, 2)
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
+    molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    distogram_atom_indices = molecule_atom_lens - 1
+    molecule_atom_indices = molecule_atom_lens - 1
+
+    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
+    pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
+    plddt_labels = torch.randint(0, 50, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, seq_len))
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
+    )
+
+    sampled_atom_pos, confidence_head_logits = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        molecule_ids = molecule_ids,
+        molecule_atom_lens = molecule_atom_lens,
+        atompair_inputs = atompair_inputs,
+        is_molecule_types = is_molecule_types,
+        additional_molecule_feats = additional_molecule_feats,
+        additional_token_feats = additional_token_feats,
+        atom_pos = atom_pos,
+        distogram_atom_indices = distogram_atom_indices,
+        molecule_atom_indices = molecule_atom_indices,
+        distance_labels = distance_labels,
+        pae_labels = pae_labels,
+        pde_labels = pde_labels,
+        plddt_labels = plddt_labels,
+        resolved_labels = resolved_labels,
+        return_loss_breakdown = True,
+        return_loss = False, # force sampling even if labels are given
+        return_confidence_head_logits = True
     )
 
     assert sampled_atom_pos.ndim == 3
@@ -733,6 +822,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1 # last atom, as an example
+    molecule_atom_indices = molecule_atom_lens - 1
 
     distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
     pae_labels = torch.randint(0, 64, (2, seq_len, seq_len))
@@ -759,6 +849,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
         template_mask = template_mask,
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
+        molecule_atom_indices = molecule_atom_indices,
         distance_labels = distance_labels,
         pae_labels = pae_labels,
         pde_labels = pde_labels,

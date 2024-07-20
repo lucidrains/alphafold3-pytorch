@@ -3386,9 +3386,16 @@ class Alphafold3(Module):
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_present_sampled_atoms: bool = False,
+        return_confidence_head_logits: bool = False,
         num_rollout_steps: int = 20,
         rollout_show_tqdm_pbar: bool = False
-    ) -> Float['b m 3'] | Float['l 3'] | Float[''] | Tuple[Float[''], LossBreakdown]:
+    ) -> (
+        Float['b m 3'] |
+        Float['l 3'] |
+        Tuple[Float['b m 3'] | Float['l 3'], ConfidenceHeadLogits] |
+        Float[''] |
+        Tuple[Float[''], LossBreakdown]
+    ):
 
         atom_seq_len = atom_inputs.shape[-2]
 
@@ -3635,7 +3642,25 @@ class Alphafold3(Module):
             if exists(missing_atom_mask) and return_present_sampled_atoms:
                 sampled_atom_pos = sampled_atom_pos[~missing_atom_mask]
 
-            return sampled_atom_pos
+            if not return_confidence_head_logits:
+                return sampled_atom_pos
+
+            # todo - handle missing atoms
+
+            assert exists(molecule_atom_indices)
+
+            pred_atom_pos = einx.get_at('b [m] c, b n -> b n c', sampled_atom_pos, molecule_atom_indices)
+
+            logits = self.confidence_head(
+                single_repr = single.detach(),
+                single_inputs_repr = single_inputs.detach(),
+                pairwise_repr = pairwise.detach(),
+                pred_atom_pos = pred_atom_pos.detach(),
+                mask = mask,
+                return_pae_logits = True
+            )
+
+            return sampled_atom_pos, logits
 
         # if being forced to return loss, but do not have sufficient information to return losses, just return 0
 
