@@ -306,7 +306,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
-    return
+
     # test training + validation
 
     trainer = Trainer(
@@ -322,6 +322,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         checkpoint_every = 1,
         checkpoint_folder = './test-folder/checkpoints',
         overwrite_checkpoints = True,
+        use_ema = False,
         ema_kwargs = dict(
             use_foreach = True,
             update_after_step = 0,

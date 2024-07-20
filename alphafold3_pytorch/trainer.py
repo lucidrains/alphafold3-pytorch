@@ -267,6 +267,7 @@ class Trainer:
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
         fabric_kwargs: dict = dict(),
+        use_ema: bool = True,
         ema_kwargs: dict = dict(
             use_foreach = True
         )
@@ -285,7 +286,10 @@ class Trainer:
 
         # exponential moving average
 
-        if self.is_main:
+        self.ema_model = None
+        self.has_ema = self.is_main and use_ema
+
+        if self.has_ema:
             self.ema_model = EMA(
                 model,
                 beta = ema_decay,
@@ -574,7 +578,7 @@ class Trainer:
 
             self.wait()
 
-            if self.is_main:
+            if self.has_ema:
                 self.ema_model.update()
 
             self.wait()
@@ -593,14 +597,16 @@ class Trainer:
                 self.needs_valid and
                 divisible_by(self.steps, self.valid_every)
             ):
+                eval_model = default(self.ema_model, self.model)
+
                 with torch.no_grad():
-                    self.ema_model.eval()
+                    eval_model.eval()
 
                     total_valid_loss = 0.
                     valid_loss_breakdown = None
 
                     for valid_batch in self.valid_dataloader:
-                        valid_loss, loss_breakdown = self.ema_model(
+                        valid_loss, loss_breakdown = eval_model(
                             **valid_batch.dict(),
                             return_loss_breakdown = True
                         )
@@ -631,14 +637,16 @@ class Trainer:
         # maybe test
 
         if self.is_main and self.needs_test:
+            eval_model = default(self.ema_model, self.model)
+
             with torch.no_grad():
-                self.ema_model.eval()
+                eval_model.eval()
 
                 total_test_loss = 0.
                 test_loss_breakdown = None
 
                 for test_batch in self.test_dataloader:
-                    test_loss, loss_breakdown = self.ema_model(
+                    test_loss, loss_breakdown = eval_model(
                         **test_batch.dict(),
                         return_loss_breakdown = True
                     )
