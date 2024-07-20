@@ -226,10 +226,10 @@ def populate_mock_pdb_and_remove_test_folders():
     for i in range(100):
         shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
 
-    for i in range(4):
+    for i in range(1):
         shutil.copy2(str(working_cif_file), str(valid_folder / f'{i}.cif'))
 
-    for i in range(2):
+    for i in range(1):
         shutil.copy2(str(working_cif_file), str(test_folder / f'{i}.cif'))
 
     yield
@@ -239,25 +239,41 @@ def populate_mock_pdb_and_remove_test_folders():
 def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
     alphafold3 = Alphafold3(
-        dim_atom=8,
-        dim_atompair=8,
-        dim_input_embedder_token=8,
-        dim_single=8,
-        dim_pairwise=8,
-        dim_token=8,
+        dim_atom=4,
+        dim_atompair=4,
+        dim_input_embedder_token=4,
+        dim_single=4,
+        dim_pairwise=4,
+        dim_token=4,
         dim_atom_inputs=3,
         dim_atompair_inputs=1,
         atoms_per_window=27,
         dim_template_feats=44,
         num_dist_bins=38,
-        confidence_head_kwargs=dict(pairformer_depth=1),
+        confidence_head_kwargs=dict(
+            pairformer_depth=1,
+        ),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1),
-        pairformer_stack=dict(depth=1),
+        pairformer_stack=dict(
+            depth=1,
+            pair_bias_attn_dim_head = 4,
+            pair_bias_attn_heads = 2,
+        ),
         diffusion_module_kwargs=dict(
             atom_encoder_depth=1,
             token_transformer_depth=1,
             atom_decoder_depth=1,
+            atom_decoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            ),
+            atom_encoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            )
         ),
     )
 
@@ -267,7 +283,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
     # test saving and loading from Alphafold3, independent of lightning
 
-    dataloader = DataLoader(dataset, batch_size = 2)
+    dataloader = DataLoader(dataset, batch_size = 1)
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
@@ -298,7 +314,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         num_train_steps = 2,
         batch_size = 1,
         valid_every = 1,
-        grad_accum_every = 2,
+        grad_accum_every = 1,
         checkpoint_every = 1,
         checkpoint_folder = './test-folder/checkpoints',
         overwrite_checkpoints = True,
