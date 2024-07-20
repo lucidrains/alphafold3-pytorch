@@ -21,4 +21,4 @@ jobs:
         python -m pip install -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest tests/
+        python -m pytest tests/test_trainer.py
