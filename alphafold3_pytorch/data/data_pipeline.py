@@ -150,15 +150,19 @@ if __name__ == "__main__":
         file_id=file_id,
     )
     mmcif_feats, assembly = make_mmcif_features(mmcif_object)
-    # cropped_assembly = assembly.contiguous_crop(384)
+    cropped_assembly = assembly.crop(
+        contiguous_weight=1.0,
+        spatial_weight=0.0,
+        spatial_interface_weight=0.0,
+    )
     mmcif_string = to_mmcif(
-        assembly,
-        # cropped_assembly,
+        # assembly,
+        cropped_assembly,
         file_id=file_id,
         gapless_poly_seq=True,
         insert_alphafold_mmcif_metadata=False,
-        unique_res_atom_names=assembly.unique_res_atom_names,
-        # unique_res_atom_names=cropped_assembly.unique_res_atom_names,
+        # unique_res_atom_names=assembly.unique_res_atom_names,
+        unique_res_atom_names=cropped_assembly.unique_res_atom_names,
     )
     with open(os.path.basename(filepath).replace(".cif", "_reconstructed.cif"), "w") as f:
         f.write(mmcif_string)
