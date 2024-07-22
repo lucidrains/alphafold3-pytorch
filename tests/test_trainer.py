@@ -416,6 +416,20 @@ def test_trainer_config():
 
     trainer()
 
+# test creating trainer + alphafold3 along with pdb dataset from config
+
+def test_trainer_config_with_pdb_dataset(populate_mock_pdb_and_remove_test_folders):
+    curr_dir = Path(__file__).parents[0]
+    trainer_yaml_path = curr_dir / 'configs/trainer_with_pdb_dataset.yaml'
+
+    trainer = create_trainer_from_yaml(trainer_yaml_path)
+
+    assert isinstance(trainer, Trainer)
+
+    # take a single training step
+
+    trainer()
+
 # test creating trainer without model, given when creating instance
 
 def test_trainer_config_without_model():

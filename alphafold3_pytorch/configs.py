@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from alphafold3_pytorch.tensor_typing import typecheck
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Literal
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
+
+from alphafold3_pytorch.inputs import (
+    PDBDataset
+)
 
 from alphafold3_pytorch.trainer import (
     Trainer,
@@ -132,6 +136,11 @@ class TrainerConfig(BaseModelWithExtra):
     checkpoint_every: int
     checkpoint_folder: str
     overwrite_checkpoints: bool
+    dataset_type: Literal['pdb'] | None = None
+    dataset_train_folder: str | None = None
+    dataset_valid_folder: str | None = None
+    dataset_test_folder: str | None = None
+    dataset_kwargs: dict = dict()
 
     @classmethod
     @typecheck
@@ -148,7 +157,7 @@ class TrainerConfig(BaseModelWithExtra):
 
     def create_instance(
         self,
-        dataset: Dataset,
+        dataset: Dataset | None = None,
         model: Alphafold3 | None = None,
         fabric: Fabric | None = None,
         test_dataset: Dataset | None = None,
@@ -162,14 +171,52 @@ class TrainerConfig(BaseModelWithExtra):
 
         assert exists(self.model) ^ exists(model), 'either model is available on the trainer config, or passed in when creating the instance, but not both or neither'
 
+        # handle model
+
         if exists(self.model):
             alphafold3 = self.model.create_instance()
         else:
             alphafold3 = model
 
+        # handle dataset
+
+        if exists(dataset):
+            trainer_kwargs.update(dataset = dataset)
+
+        if exists(valid_dataset):
+            trainer_kwargs.update(valid_dataset = dataset)
+
+        if exists(test_dataset):
+            trainer_kwargs.update(test_dataset = dataset)
+
+        if exists(trainer_kwargs['dataset_type']):
+            dataset_type = trainer_kwargs.pop('dataset_type', None)
+            dataset_kwargs = trainer_kwargs.pop('dataset_kwargs', dict())
+
+            if dataset_type == 'pdb':
+                train_folder, valid_folder, test_folder = tuple(trainer_kwargs.pop(key, None) for key in ('dataset_train_folder', 'dataset_valid_folder', 'dataset_test_folder'))
+
+                if exists(train_folder):
+                    assert 'dataset' not in trainer_kwargs
+                    dataset = PDBDataset(train_folder, **dataset_kwargs)
+                    trainer_kwargs.update(dataset = dataset)
+
+                if exists(valid_folder):
+                    assert 'valid_dataset' not in trainer_kwargs
+                    dataset = PDBDataset(valid_folder, **dataset_kwargs)
+                    trainer_kwargs.update(valid_dataset = dataset)
+
+                if exists(test_folder):
+                    assert 'test_dataset' not in trainer_kwargs
+                    dataset = PDBDataset(test_folder, **dataset_kwargs)
+                    trainer_kwargs.update(test_dataset = dataset)
+
+        assert 'dataset' in trainer_kwargs, 'dataset is absent - dataset_type must be specified along with train folders (pdb for now), or the Dataset instance must be passed in'
+
+        # handle rest
+
         trainer_kwargs.update(dict(
             model = alphafold3,
-            dataset = dataset,
             fabric = fabric,
             test_dataset = test_dataset,
             optimizer = optimizer,
