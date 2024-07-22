@@ -3076,6 +3076,7 @@ class Alphafold3(Module):
         num_pde_bins = 64,
         num_pae_bins = 64,
         sigma_data = 16,
+        num_rollout_steps = 20,
         diffusion_num_augmentations = 4,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
@@ -3314,6 +3315,8 @@ class Alphafold3(Module):
             num_dist_bins = num_dist_bins
         )
 
+        self.num_rollout_steps = num_rollout_steps
+
         self.confidence_head = ConfidenceHead(
             dim_single_inputs = dim_single_inputs,
             atompair_dist_bins = distance_bins,
@@ -3451,7 +3454,7 @@ class Alphafold3(Module):
         return_loss: bool = None,
         return_present_sampled_atoms: bool = False,
         return_confidence_head_logits: bool = False,
-        num_rollout_steps: int = 20,
+        num_rollout_steps: int | None = None,
         rollout_show_tqdm_pbar: bool = False
     ) -> (
         Float['b m 3'] |
@@ -3872,6 +3875,8 @@ class Alphafold3(Module):
         if calc_diffusion_loss and should_call_confidence_head and exists(molecule_atom_indices):
 
             # rollout
+
+            num_rollout_steps = default(num_rollout_steps, self.num_rollout_steps)
 
             denoised_atom_pos = self.edm.sample(
                 num_sample_steps = num_rollout_steps,
