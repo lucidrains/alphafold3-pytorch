@@ -464,3 +464,19 @@ def test_conductor_config():
 
     assert str(trainer.checkpoint_folder) == 'main-and-finetuning/main'
     assert str(trainer.checkpoint_prefix) == 'af3.main.ckpt.'
+
+# test creating trainer from training config yaml + pdb datasets
+
+def test_conductor_config_with_pdb_datasets(populate_mock_pdb_and_remove_test_folders):
+    curr_dir = Path(__file__).parents[0]
+    training_yaml_path = curr_dir / 'configs/training_with_pdb_dataset.yaml'
+
+    trainer = create_trainer_from_conductor_yaml(
+        training_yaml_path,
+        trainer_name = 'main'
+    )
+
+    assert isinstance(trainer, Trainer)
+
+    assert str(trainer.checkpoint_folder) == 'main-and-finetuning/main'
+    assert str(trainer.checkpoint_prefix) == 'af3.main.ckpt.'
