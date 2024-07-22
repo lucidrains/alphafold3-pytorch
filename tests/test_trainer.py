@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 from alphafold3_pytorch import (
     Alphafold3,
     PDBDataset,
+    DatasetWithReturnedIndex,
     AtomInput,
     DataLoader,
     Trainer,
@@ -386,6 +387,17 @@ def test_collate_fn():
     batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[i] for i in range(3)])
 
     _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
+
+# test use of a dataset wrapper that returns the indices, for caching
+
+def test_dataset_return_index_wrapper():
+    dataset = MockAtomDataset(5)
+    wrapped_dataset = DatasetWithReturnedIndex(dataset)
+
+    assert len(wrapped_dataset) == len(dataset)
+
+    idx, item = wrapped_dataset[3]
+    assert idx == 3 and isinstance(item, AtomInput)
 
 # test creating trainer + alphafold3 from config
 

@@ -1868,8 +1868,22 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
 
     return molecule_input
 
+# datasets
 
-# PDB Dataset
+# dataset wrapper for returning index along with dataset item
+# for caching logic both integrated into trainer and for precaching
+
+class DatasetWithReturnedIndex(Dataset):
+    def __init__(self, dataset: Dataset):
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return idx, self.dataset[idx]
+
+# PDB dataset that returns a PDBInput based on folder
 
 class PDBDataset(Dataset):
     def __init__(
