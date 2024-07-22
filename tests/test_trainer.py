@@ -224,7 +224,7 @@ def populate_mock_pdb_and_remove_test_folders():
     valid_folder.mkdir(exist_ok = True, parents = True)
     test_folder.mkdir(exist_ok = True, parents = True)
 
-    for i in range(2):
+    for i in range(10):
         shutil.copy2(str(working_cif_file), str(train_folder / f'{i}.cif'))
 
     for i in range(1):
