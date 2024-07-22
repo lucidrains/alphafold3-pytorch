@@ -5,6 +5,7 @@ import dataclasses
 import functools
 import io
 import random
+from functools import partial
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -235,7 +236,7 @@ class Biomolecule:
 
     def crop_chains_with_masks(
         self, chain_ids_and_lengths: List[Tuple[str, int]], crop_masks: List[np.ndarray]
-    ):
+    ) -> "Biomolecule":
         """
         Crop the chains and metadata within a Biomolecule
         to only include the specified chain residues.
@@ -243,9 +244,96 @@ class Biomolecule:
         assert len(chain_ids_and_lengths) == len(
             crop_masks
         ), "The number of chains and crop masks must be equal."
-        raise NotImplementedError("Chain cropping is not yet implemented.")
+        assert not all(
+            crop_mask.all() for crop_mask in crop_masks
+        ), "Not all tokens can be cropped out of a Biomolecule."
 
-    def contiguous_crop(self, n_res: int) -> "Biomolecule":
+        # collect metadata for each chain
+
+        unique_chain_ids = np.unique(self.chain_id)
+        chains_to_remove = {
+            chain_id_and_length[0]
+            for chain_id_and_length, crop_mask in zip(chain_ids_and_lengths, crop_masks)
+            if not crop_mask.any()
+        }
+        subset_chain_id_mapping = {
+            chain_id: n
+            for n, chain_id in enumerate(unique_chain_ids)
+            if chain_id not in chains_to_remove
+        }
+        subset_chain_index_mapping = {
+            n: chain_id for chain_id, n in subset_chain_id_mapping.items()
+        }
+        chain_id_to_index = {
+            chain_id_and_length[0]: i
+            for i, chain_id_and_length in enumerate(chain_ids_and_lengths)
+        }
+
+        # create metadata for cropping
+
+        chain_mask = np.concatenate(
+            [crop_masks[chain_id_to_index[c_id]] for c_id in unique_chain_ids]
+        )
+        chain_residue_index = np.array(
+            list(zip(self.chain_index[chain_mask], self.residue_index[chain_mask]))
+        )
+        # NOTE: We must only consider unique chain-residue index pairs here,
+        # as otherwise we might count each ligand heavy atom as a residue in this mapping
+        subset_chain_residue_mapping = set(map(tuple, chain_residue_index))
+
+        # manually subset certain Biomolecule metadata
+
+        entity_to_chain = {
+            entity_id: [
+                chain_id for chain_id in chain_ids if chain_id in subset_chain_index_mapping
+            ]
+            for entity_id, chain_ids in self.entity_to_chain.items()
+            if any(chain_id in subset_chain_index_mapping for chain_id in chain_ids)
+        }
+        mmcif_to_author_chain = {
+            mmcif_chain: author_chain_id
+            for mmcif_chain, author_chain_id in self.mmcif_to_author_chain.items()
+            if author_chain_id in subset_chain_index_mapping
+        }
+
+        # construct a new cropped Biomolecule
+
+        return Biomolecule(
+            atom_positions=self.atom_positions[chain_mask],
+            atom_name=self.atom_name[chain_mask],
+            restype=self.restype[chain_mask],
+            atom_mask=self.atom_mask[chain_mask],
+            residue_index=self.residue_index[chain_mask],
+            chain_index=self.chain_index[chain_mask],
+            chain_id=self.chain_id[chain_mask],
+            b_factors=self.b_factors[chain_mask],
+            chemid=self.chemid[chain_mask],
+            chemtype=self.chemtype[chain_mask],
+            bonds=[
+                bond
+                for bond in self.bonds
+                if bond.ptnr1_auth_asym_id not in chains_to_remove
+                and bond.ptnr2_auth_asym_id not in chains_to_remove
+            ],
+            unique_res_atom_names=[
+                unique_res_atom_names
+                for unique_res_atom_names in self.unique_res_atom_names
+                if unique_res_atom_names[1] not in chains_to_remove
+                and (subset_chain_id_mapping[unique_res_atom_names[1]], unique_res_atom_names[2])
+                in subset_chain_residue_mapping
+            ],
+            author_cri_to_new_cri={
+                author_cri: new_cri
+                for author_cri, new_cri in self.author_cri_to_new_cri.items()
+                if new_cri[0] in subset_chain_index_mapping
+            },
+            chem_comp_table=self.chem_comp_table,
+            entity_to_chain=entity_to_chain,
+            mmcif_to_author_chain=mmcif_to_author_chain,
+            mmcif_metadata=self.mmcif_metadata,
+        )
+
+    def contiguous_crop(self, n_res: int = 384) -> "Biomolecule":
         """
         Crop a Biomolecule to only include contiguous
         polymer residues and/or ligand atoms for each chain.
@@ -253,21 +341,44 @@ class Biomolecule:
         chain_ids_and_lengths = list(collections.Counter(self.chain_id).items())
         random.shuffle(chain_ids_and_lengths)
         crop_masks = create_contiguous_crop_masks(chain_ids_and_lengths, n_res)
-        self.crop_chains_with_masks(chain_ids_and_lengths, crop_masks)
+        return self.crop_chains_with_masks(chain_ids_and_lengths, crop_masks)
 
-    def spatial_crop(self) -> "Biomolecule":
+    def spatial_crop(
+        self, chain_1: Optional[str] = None, chain_2: Optional[str] = None
+    ) -> "Biomolecule":
         """
         Crop a Biomolecule to only include polymer residues and ligand atoms
         near a (random) reference atom within a sampled chain/interface.
         """
         raise NotImplementedError("Spatial cropping is not yet implemented.")
 
-    def spatial_interface_crop(self) -> "Biomolecule":
+    def spatial_interface_crop(
+        self, chain_1: Optional[str] = None, chain_2: Optional[str] = None
+    ) -> "Biomolecule":
         """
         Crop a Biomolecule to only include contiguous polymer residues
         and/or ligand atoms for each chain.
         """
         raise NotImplementedError("Spatial interface cropping is not yet implemented.")
+
+    def crop(
+        self,
+        contiguous_weight: float = 0.2,
+        spatial_weight: float = 0.4,
+        spatial_interface_weight: float = 0.4,
+        n_res: int = 384,
+        chain_1: Optional[str] = None,
+        chain_2: Optional[str] = None,
+    ) -> "Biomolecule":
+        """Crop a Biomolecule using a randomly-sampled cropping function."""
+        crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
+        crop_fns = [
+            partial(self.contiguous_crop, n_res=n_res),
+            partial(self.spatial_crop, chain_1=chain_1, chain_2=chain_2),
+            partial(self.spatial_interface_crop, chain_1=chain_1, chain_2=chain_2),
+        ]
+        crop_fn = random.choices(crop_fns, crop_fn_weights)[0]
+        return crop_fn()
 
 
 @typecheck
