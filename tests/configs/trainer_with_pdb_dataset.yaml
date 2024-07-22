@@ -55,7 +55,8 @@ checkpoint_prefix: af3.ckpt.
 checkpoint_every: 1
 checkpoint_folder: ./checkpoints
 overwrite_checkpoints: false
-dataset_type: pdb
-dataset_train_folder: ./test-folder/data/train
-dataset_valid_folder: ./test-folder/data/valid
-dataset_test_folder: ./test-folder/data/test
+dataset_config:
+    type: pdb
+    train_folder: ./test-folder/data/train
+    valid_folder: ./test-folder/data/valid
+    test_folder: ./test-folder/data/test

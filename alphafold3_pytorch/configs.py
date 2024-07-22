@@ -122,6 +122,13 @@ class Alphafold3Config(BaseModelWithExtra):
         af3_config = cls.from_yaml_file(path, dotpath)
         return af3_config.create_instance()
 
+class DatasetConfig(BaseModelWithExtra):
+    type: Literal['pdb'] | None = None
+    train_folder: str | None = None
+    valid_folder: str | None = None
+    test_folder: str | None = None
+    kwargs: dict = dict()
+
 class TrainerConfig(BaseModelWithExtra):
     model: Alphafold3Config | None = None
     num_train_steps: int
@@ -136,11 +143,7 @@ class TrainerConfig(BaseModelWithExtra):
     checkpoint_every: int
     checkpoint_folder: str
     overwrite_checkpoints: bool
-    dataset_type: Literal['pdb'] | None = None
-    dataset_train_folder: str | None = None
-    dataset_valid_folder: str | None = None
-    dataset_test_folder: str | None = None
-    dataset_kwargs: dict = dict()
+    dataset_config: DatasetConfig | None = None
 
     @classmethod
     @typecheck
@@ -189,12 +192,14 @@ class TrainerConfig(BaseModelWithExtra):
         if exists(test_dataset):
             trainer_kwargs.update(test_dataset = dataset)
 
-        if exists(trainer_kwargs['dataset_type']):
-            dataset_type = trainer_kwargs.pop('dataset_type', None)
-            dataset_kwargs = trainer_kwargs.pop('dataset_kwargs', dict())
+        dataset_config = trainer_kwargs.pop('dataset_config', None)
+
+        if exists(dataset_config):
+            dataset_type = dataset_config.pop('type')
+            dataset_kwargs = dataset_config.pop('kwargs', dict())
 
             if dataset_type == 'pdb':
-                train_folder, valid_folder, test_folder = tuple(trainer_kwargs.pop(key, None) for key in ('dataset_train_folder', 'dataset_valid_folder', 'dataset_test_folder'))
+                train_folder, valid_folder, test_folder = tuple(dataset_config.pop(key, None) for key in ('train_folder', 'valid_folder', 'test_folder'))
 
                 if exists(train_folder):
                     assert 'dataset' not in trainer_kwargs
