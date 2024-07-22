@@ -1898,18 +1898,23 @@ class PDBDataset(Dataset):
         assert folder.exists() and folder.is_dir()
 
         self.files = [*folder.glob('**/*.cif')]
+        self.filename_to_index = {path.stem: ind for ind, path in enumerate(self.files)}
+
         self.pdb_input_kwargs = pdb_input_kwargs
         self.training = training
 
     def __len__(self):
         return len(self.files)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int | str):
 
         kwargs = self.pdb_input_kwargs
 
         if exists(self.training):
             kwargs = {**kwargs, 'training': self.training}
+
+        if isinstance(idx, str):
+            idx = self.filename_to_index[idx]
 
         pdb_input = PDBInput(
             str(self.files[idx]),
