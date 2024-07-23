@@ -13,7 +13,7 @@ from alphafold3_pytorch import (
     pdb_inputs_to_batched_atom_input
 )
 
-from alphafold3_pytorch.data import mmcif_parsing, mmcif_writing
+from alphafold3_pytorch.data import mmcif_writing
 
 from alphafold3_pytorch.life import (
     reverse_complement,
@@ -213,16 +213,14 @@ def test_pdbinput_input():
 
     # visualizing
 
-    mmcif_object = mmcif_parsing.parse_mmcif_object(
+    mmcif_writing.write_mmcif_from_filepath_and_id(
         filepath=filepath,
         file_id=file_id,
-    )
-    mmcif_writing.write_mmcif(
-        mmcif_object=mmcif_object,
-        output_filepath=filepath.replace(".cif", "-sampled.cif"),
+        suffix="sampled",
         gapless_poly_seq=True,
         insert_orig_atom_names=True,
         insert_alphafold_mmcif_metadata=True,
         sampled_atom_positions=sampled_atom_pos.cpu().numpy(),
     )
+
     assert os.path.exists(filepath.replace(".cif", "-sampled.cif"))

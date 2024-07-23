@@ -9,9 +9,27 @@ from alphafold3_pytorch.common.biomolecule import (
     to_mmcif,
 )
 from alphafold3_pytorch.data.data_pipeline import get_assembly
-from alphafold3_pytorch.data.mmcif_parsing import MmcifObject
+from alphafold3_pytorch.data.mmcif_parsing import MmcifObject, parse_mmcif_object
 from alphafold3_pytorch.utils.utils import exists
 
+def write_mmcif_from_filepath_and_id(
+    filepath: str,
+    file_id: str,
+    suffix: str = 'sampled',
+    **kwargs
+):
+    mmcif_object = parse_mmcif_object(
+        filepath = filepath,
+        file_id = file_id
+    )
+
+    output_filepath = filepath.replace(".cif", f"-{suffix}.cif")
+
+    return write_mmcif(
+        mmcif_object,
+        output_filepath = output_filepath,
+        **kwargs
+    )
 
 def write_mmcif(
     mmcif_object: MmcifObject,

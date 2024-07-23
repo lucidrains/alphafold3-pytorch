@@ -28,6 +28,10 @@ from alphafold3_pytorch.inputs import (
     alphafold3_input_to_molecule_input
 )
 
+from alphafold3_pytorch.data import (
+    mmcif_writing
+)
+
 import torch
 from torch import Tensor
 from torch.optim import Adam, Optimizer
