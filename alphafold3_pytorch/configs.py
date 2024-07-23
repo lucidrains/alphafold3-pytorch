@@ -17,11 +17,15 @@ from alphafold3_pytorch.trainer import (
     LRScheduler
 )
 
+from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
+
 import yaml
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
+
 from pydantic.types import (
+    FilePath,
     DirectoryPath
 )
 
@@ -125,11 +129,20 @@ class Alphafold3Config(BaseModelWithExtra):
         af3_config = cls.from_yaml_file(path, dotpath)
         return af3_config.create_instance()
 
+class WeightedPDBSamplerConfig(BaseModelWithExtra):
+    batch_size: int
+    chain_mapping_paths: List[FilePath]
+    interface_mapping_path: FilePath
+
+    def create_instance(self):
+        return WeightedPDBSampler(**self.model_dump())
+
 class DatasetConfig(BaseModelWithExtra):
     dataset_type: Literal['pdb'] = 'pdb'
     train_folder: DirectoryPath
     valid_folder: DirectoryPath | None = None
     test_folder: DirectoryPath | None = None
+    train_weighted_sampler_config: WeightedPDBSamplerConfig | None = None
     kwargs: dict = dict()
 
 class TrainerConfig(BaseModelWithExtra):
@@ -220,6 +233,13 @@ class TrainerConfig(BaseModelWithExtra):
                     assert 'test_dataset' not in trainer_kwargs
                     dataset = PDBDataset(test_folder, **dataset_kwargs)
                     trainer_kwargs.update(test_dataset = dataset)
+
+            # handle weighted pdb sampling
+
+            if exists(dataset_config.train_weighted_sampler_config):
+                sampler = dataset_config.train_weighted_sampler_config.create_instance()
+
+                trainer_kwargs.update(sampler = sampler)
 
         assert 'dataset' in trainer_kwargs, 'dataset is absent - dataset_type must be specified along with train folders (pdb for now), or the Dataset instance must be passed in'
 

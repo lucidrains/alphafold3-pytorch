@@ -31,8 +31,8 @@ from alphafold3_pytorch.inputs import (
 import torch
 from torch import Tensor
 from torch.optim import Adam, Optimizer
-from torch.utils.data import Dataset, DataLoader as OrigDataLoader
 from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Sampler, Dataset, DataLoader as OrigDataLoader
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from ema_pytorch import EMA
@@ -260,6 +260,7 @@ class Trainer:
         ),
         clip_grad_norm = 10.,
         default_lambda_lr = default_lambda_lr_fn,
+        train_sampler: Sampler | None = None,
         fabric: Fabric | None = None,
         accelerator = 'auto',
         checkpoint_prefix = 'af3.ckpt.',
@@ -315,9 +316,22 @@ class Trainer:
         if exists(map_dataset_input_fn):
             DataLoader_ = partial(DataLoader_, map_input_fn = map_dataset_input_fn)
 
+        # maybe weighted sampling
+
+        train_dl_kwargs = dict()
+
+        if exists(train_sampler):
+            train_dl_kwargs.update(sampler = train_sampler)
+        else:
+            train_dl_kwargs.update(shuffle = True, drop_last = True)
+
         # train dataloader
 
-        self.dataloader = DataLoader_(dataset, batch_size = batch_size, shuffle = True, drop_last = True)
+        self.dataloader = DataLoader_(
+            dataset,
+            batch_size = batch_size,
+            **train_dl_kwargs
+        )
 
         # validation dataloader on the EMA model
 
