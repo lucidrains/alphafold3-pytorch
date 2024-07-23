@@ -173,7 +173,9 @@ class TrainerConfig(BaseModelWithExtra):
         map_dataset_input_fn: Callable | None = None,
     ) -> Trainer:
 
-        trainer_kwargs = self.model_dump()
+        trainer_kwargs = self.model_dump(
+            exclude = {'dataset_config'}
+        )
 
         assert exists(self.model) ^ exists(model), 'either model is available on the trainer config, or passed in when creating the instance, but not both or neither'
 
@@ -195,14 +197,14 @@ class TrainerConfig(BaseModelWithExtra):
         if exists(test_dataset):
             trainer_kwargs.update(test_dataset = dataset)
 
-        dataset_config = trainer_kwargs.pop('dataset_config', None)
+        if exists(self.dataset_config):
+            dataset_config = self.dataset_config
 
-        if exists(dataset_config):
-            dataset_type = dataset_config.pop('dataset_type')
-            dataset_kwargs = dataset_config.pop('kwargs', dict())
+            dataset_type = dataset_config.dataset_type
+            dataset_kwargs = dataset_config.kwargs
 
             if dataset_type == 'pdb':
-                train_folder, valid_folder, test_folder = tuple(dataset_config.pop(key, None) for key in ('train_folder', 'valid_folder', 'test_folder'))
+                train_folder, valid_folder, test_folder = tuple(getattr(dataset_config, key, None) for key in ('train_folder', 'valid_folder', 'test_folder'))
 
                 if exists(train_folder):
                     assert 'dataset' not in trainer_kwargs
