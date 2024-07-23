@@ -63,7 +63,7 @@ training:
         checkpoint_folder: ./main
         overwrite_checkpoints: false
         dataset_config:
-            type: pdb
+            dataset_type: pdb
             train_folder: ./test-folder/data/train
             valid_folder: ./test-folder/data/valid
             test_folder: ./test-folder/data/test
@@ -81,7 +81,7 @@ training:
         checkpoint_folder: ./nucleic-acids
         overwrite_checkpoints: false
         dataset_config:
-            type: pdb
+            dataset_type: pdb
             train_folder: ./test-folder/data/train
             valid_folder: ./test-folder/data/valid
             test_folder: ./test-folder/data/test
@@ -99,7 +99,7 @@ training:
         checkpoint_folder: ./ligands
         overwrite_checkpoints: false
         dataset_config:
-            type: pdb
+            dataset_type: pdb
             train_folder: ./test-folder/data/train
             valid_folder: ./test-folder/data/valid
             test_folder: ./test-folder/data/test

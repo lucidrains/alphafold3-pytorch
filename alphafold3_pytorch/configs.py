@@ -21,6 +21,9 @@ import yaml
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
+from pydantic.types import (
+    DirectoryPath
+)
 
 # functions
 
@@ -123,10 +126,10 @@ class Alphafold3Config(BaseModelWithExtra):
         return af3_config.create_instance()
 
 class DatasetConfig(BaseModelWithExtra):
-    type: Literal['pdb']
-    train_folder: str
-    valid_folder: str
-    test_folder: str
+    dataset_type: Literal['pdb'] = 'pdb'
+    train_folder: DirectoryPath
+    valid_folder: DirectoryPath | None = None
+    test_folder: DirectoryPath | None = None
     kwargs: dict = dict()
 
 class TrainerConfig(BaseModelWithExtra):
@@ -195,7 +198,7 @@ class TrainerConfig(BaseModelWithExtra):
         dataset_config = trainer_kwargs.pop('dataset_config', None)
 
         if exists(dataset_config):
-            dataset_type = dataset_config.pop('type')
+            dataset_type = dataset_config.pop('dataset_type')
             dataset_kwargs = dataset_config.pop('kwargs', dict())
 
             if dataset_type == 'pdb':

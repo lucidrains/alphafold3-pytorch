@@ -56,7 +56,7 @@ checkpoint_every: 1
 checkpoint_folder: ./checkpoints
 overwrite_checkpoints: false
 dataset_config:
-    type: pdb
+    dataset_type: pdb
     train_folder: ./test-folder/data/train
     valid_folder: ./test-folder/data/valid
     test_folder: ./test-folder/data/test
