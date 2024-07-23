@@ -43,7 +43,7 @@ model:
             attn_pair_bias_kwargs:
                 dim_head: 4
 num_train_steps: 1
-batch_size: 2
+batch_size: 1
 grad_accum_every: 1
 valid_every: 1
 use_ema: false

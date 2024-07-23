@@ -63,11 +63,11 @@ def populate_mock_pdb_and_remove_test_folders():
 
     pdb_ids = []
 
-    for path in CHAIN_MAPPING_PATHS:
+    for path in [*CHAIN_MAPPING_PATHS, INTERFACE_MAPPING_PATH]:
         dataset = pl.read_csv(path)
         pdb_ids.extend(list(dataset.get_column('pdb_id')))
 
-    for pdb_id in pdb_ids:
+    for pdb_id in {*pdb_ids}:
         shutil.copy2(str(working_cif_file), str(train_folder / f'{pdb_id}.cif'))
 
     yield
