@@ -144,7 +144,7 @@ class DatasetConfig(BaseModelWithExtra):
     train_folder: DirectoryPath
     valid_folder: DirectoryPath | None = None
     test_folder: DirectoryPath | None = None
-    train_weighted_sampler_config: WeightedPDBSamplerConfig | None = None
+    train_weighted_sampler: WeightedPDBSamplerConfig | None = None
     kwargs: dict = dict()
 
 class TrainerConfig(BaseModelWithExtra):
@@ -238,10 +238,10 @@ class TrainerConfig(BaseModelWithExtra):
 
             # handle weighted pdb sampling
 
-            if exists(dataset_config.train_weighted_sampler_config):
-                sampler = dataset_config.train_weighted_sampler_config.create_instance(batch_size = self.batch_size)
+            if exists(dataset_config.train_weighted_sampler):
+                sampler = dataset_config.train_weighted_sampler.create_instance(batch_size = self.batch_size)
 
-                trainer_kwargs.update(sampler = sampler)
+                trainer_kwargs.update(train_sampler = sampler)
 
         assert 'dataset' in trainer_kwargs, 'dataset is absent - dataset_type must be specified along with train folders (pdb for now), or the Dataset instance must be passed in'
 

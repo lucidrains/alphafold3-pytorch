@@ -4,10 +4,10 @@ import copy
 import json
 import os
 from pathlib import Path
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
 from functools import partial
 from itertools import groupby
+from collections import defaultdict
+from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, List, Set, Tuple, Type
 
 import einx

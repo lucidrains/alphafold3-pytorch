@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import os
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import Dict, Iterator, List, Tuple
 
 import numpy as np
 import polars as pl
@@ -170,7 +172,7 @@ class WeightedPDBSampler(Sampler[List[str]]):
 
     def __init__(
         self,
-        chain_mapping_paths: Union[str, List[str]],
+        chain_mapping_paths: str | List[str],
         interface_mapping_path: str,
         batch_size: int,
         beta_chain: float = 0.5,
@@ -252,7 +254,10 @@ class WeightedPDBSampler(Sampler[List[str]]):
     def __iter__(self) -> Iterator[List[str]]:
         """Returns an iterator that yields batches of PDB IDs."""
         while True:
-            yield self.sample(self.batch_size)
+            sampled = self.sample(self.batch_size)
+
+            for pdb_id, _, _, in sampled:
+                yield pdb_id
 
     @typecheck
     def sample(self, batch_size: int) -> List[Tuple[str, str, str]]:
