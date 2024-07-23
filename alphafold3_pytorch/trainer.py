@@ -324,7 +324,6 @@ class Trainer:
             train_dl_kwargs.update(sampler = train_sampler)
         else:
             train_dl_kwargs.update(
-                batch_size = batch_size,
                 shuffle = True,
                 drop_last = True
             )
@@ -333,6 +332,7 @@ class Trainer:
 
         self.dataloader = DataLoader_(
             dataset,
+            batch_size = batch_size,
             **train_dl_kwargs
         )
 
