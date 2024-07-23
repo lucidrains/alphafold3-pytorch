@@ -323,13 +323,16 @@ class Trainer:
         if exists(train_sampler):
             train_dl_kwargs.update(sampler = train_sampler)
         else:
-            train_dl_kwargs.update(shuffle = True, drop_last = True)
+            train_dl_kwargs.update(
+                batch_size = batch_size,
+                shuffle = True,
+                drop_last = True
+            )
 
         # train dataloader
 
         self.dataloader = DataLoader_(
             dataset,
-            batch_size = batch_size,
             **train_dl_kwargs
         )
 

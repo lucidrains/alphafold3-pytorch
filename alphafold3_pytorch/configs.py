@@ -130,12 +130,14 @@ class Alphafold3Config(BaseModelWithExtra):
         return af3_config.create_instance()
 
 class WeightedPDBSamplerConfig(BaseModelWithExtra):
-    batch_size: int
     chain_mapping_paths: List[FilePath]
     interface_mapping_path: FilePath
 
-    def create_instance(self):
-        return WeightedPDBSampler(**self.model_dump())
+    def create_instance(self, batch_size: int):
+        return WeightedPDBSampler(**{
+            'batch_size': batch_size,
+            **self.model_dump()
+        })
 
 class DatasetConfig(BaseModelWithExtra):
     dataset_type: Literal['pdb'] = 'pdb'
@@ -237,7 +239,7 @@ class TrainerConfig(BaseModelWithExtra):
             # handle weighted pdb sampling
 
             if exists(dataset_config.train_weighted_sampler_config):
-                sampler = dataset_config.train_weighted_sampler_config.create_instance()
+                sampler = dataset_config.train_weighted_sampler_config.create_instance(batch_size = self.batch_size)
 
                 trainer_kwargs.update(sampler = sampler)
 
