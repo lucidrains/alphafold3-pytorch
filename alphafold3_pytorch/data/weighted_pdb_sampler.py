@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, Iterator, List, Tuple
+from typing import Dict, Iterator, List, Literal, Tuple
 
 import numpy as np
 import polars as pl
 from torch.utils.data import Sampler
 
 from alphafold3_pytorch.tensor_typing import typecheck
-from scripts.cluster_pdb_mmcifs import CLUSTERING_MOLECULE_TYPE
+
+# constants
+
+CLUSTERING_RESIDUE_MOLECULE_TYPE = Literal["protein", "rna", "dna", "ligand", "peptide"]
+
+# helper functions
 
 
-def get_chain_count(molecule_type: CLUSTERING_MOLECULE_TYPE) -> Tuple[int, int, int]:
+def get_chain_count(molecule_type: CLUSTERING_RESIDUE_MOLECULE_TYPE) -> Tuple[int, int, int]:
     """
-    Returns the number of protein, nucleic acid, and ligand chains in a
-    molecule based on its type.
+    Returns the number of protein (or `peptide`), nucleic acid (i.e., `rna` or `dna`), and
+    ligand chains in a molecule based on its type.
 
     Example:
         n_prot, n_nuc, n_ligand = get_chain_count("protein")
@@ -22,7 +27,9 @@ def get_chain_count(molecule_type: CLUSTERING_MOLECULE_TYPE) -> Tuple[int, int, 
     match molecule_type:
         case "protein":
             return 1, 0, 0
-        case "nucleic_acid":
+        case "rna":
+            return 0, 1, 0
+        case "dna":
             return 0, 1, 0
         case "ligand":
             return 0, 0, 1
@@ -51,7 +58,7 @@ def calculate_weight(
 
 @typecheck
 def get_chain_weight(
-    molecule_type: CLUSTERING_MOLECULE_TYPE,
+    molecule_type: CLUSTERING_RESIDUE_MOLECULE_TYPE,
     cluster_size: int,
     alphas: Dict[str, float],
     beta: float,
@@ -63,8 +70,8 @@ def get_chain_weight(
 
 @typecheck
 def get_interface_weight(
-    molecule_type_1: CLUSTERING_MOLECULE_TYPE,
-    molecule_type_2: CLUSTERING_MOLECULE_TYPE,
+    molecule_type_1: CLUSTERING_RESIDUE_MOLECULE_TYPE,
+    molecule_type_2: CLUSTERING_RESIDUE_MOLECULE_TYPE,
     cluster_size: int,
     alphas: Dict[str, float],
     beta: float,
@@ -256,7 +263,11 @@ class WeightedPDBSampler(Sampler[List[str]]):
         while True:
             sampled = self.sample(self.batch_size)
 
-            for pdb_id, _, _, in sampled:
+            for (
+                pdb_id,
+                _,
+                _,
+            ) in sampled:
                 yield pdb_id
 
     @typecheck
