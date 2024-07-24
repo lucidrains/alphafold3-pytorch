@@ -543,6 +543,20 @@ def map_pdb_chain_id_to_chain_cluster_id(
         chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id]}"
     elif (
         "rna" in pdb_chain_id
+        and pdb_chain_id.replace("rna", "dna") in nucleic_acid_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-RNA (or RNA-X) interaction is actually a DNA interaction, e.g., PDB `216d`
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('rna', 'dna')]}"
+    elif (
+        "dna" in pdb_chain_id
+        and pdb_chain_id.replace("dna", "rna") in nucleic_acid_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-DNA (or DNA-X) interaction is actually an RNA interaction, e.g., PDB `216d`
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('dna', 'rna')]}"
+    elif (
+        "rna" in pdb_chain_id
         and pdb_chain_id.replace("rna", "protein") in protein_chain_cluster_mapping
     ):
         # Based on (majority) chain molecule types, handle instances where
