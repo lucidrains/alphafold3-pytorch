@@ -75,13 +75,14 @@ DNA_LETTERS_1TO3 = {
 
 # Helper functions
 
+
 @typecheck
 def convert_modified_residue_three_to_one(
     residue_id: str, residue_mol_type: RESIDUE_MOLECULE_TYPE
-) -> Tuple[str, CLUSTERING_MOLECULE_TYPE]:
+) -> Tuple[str, RESIDUE_MOLECULE_TYPE]:
     """
     Convert a three-letter amino acid, nucleotide, or CCD code to a one-letter code (if applicable).
-    Also return the clustering-specific molecule type of the residue.
+    Also return the chemically-specific molecule type of the residue.
 
     NOTE: All unknown residues or unmappable modified residues (be they protein, RNA, or DNA) are
     converted to the unknown residue type of the residue's chemical type (e.g., `N` for RNA).
@@ -140,7 +141,7 @@ def convert_modified_residue_three_to_one(
                 if mapped_residue in NUCLEIC_LETTERS_3TO1
                 else "X"
             ),
-            "nucleic_acid",
+            ("rna" if residue_mol_type == "rna" else "dna"),
         )
     else:
         return mapped_residue, "ligand"
@@ -154,7 +155,7 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
 ) -> Tuple[Dict[str, str], Set[str]]:
     """
     Parse an mmCIF file and return a dictionary mapping chain IDs
-    to sequences for all molecule types (i.e., proteins, nucleic acids, peptides, ligands, etc)
+    to sequences for all molecule types (i.e., proteins, rna, dna, peptides, ligands, etc)
     as well as a set of chain ID pairs denoting structural interfaces.
     """
     assert filepath.endswith(".cif"), "The input file must be an mmCIF file."
@@ -336,7 +337,12 @@ def write_sequences_to_fasta(
                 for chain_id, sequence in chain_sequences.items():
                     chain_id_, molecule_type_ = chain_id.split(":")
                     molecule_type_and_name = molecule_type_.split("-")
-                    if molecule_type_and_name[0] == molecule_type:
+                    mol_type = (
+                        molecule_type_and_name[0]
+                        .replace("rna", "nucleic_acid")
+                        .replace("dna", "nucleic_acid")
+                    )
+                    if mol_type == molecule_type:
                         molecule_index_postfix = (
                             f"-{molecule_type_and_name[1]}"
                             if len(molecule_type_and_name) == 2
@@ -437,9 +443,9 @@ def cluster_sequences_using_mmseqs2(
     local_chain_cluster_mapping = pl.DataFrame(
         chain_cluster_mapping.get_column("cluster_member")
         .map_elements(
-            extract_pdb_chain_and_molecule_ids_from_clustering_string, 
-            return_dtype=pl.List
-        ).to_list(),
+            extract_pdb_chain_and_molecule_ids_from_clustering_string, return_dtype=pl.List
+        )
+        .to_list(),
         schema=["pdb_id", "chain_id", "molecule_id"],
         orient="row",
     )
@@ -519,27 +525,50 @@ def map_pdb_chain_id_to_chain_cluster_id(
         chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('protein', 'peptide')]}"
     elif (
         "protein" in pdb_chain_id
-        and pdb_chain_id.replace("protein", "nucleic_acid") in nucleic_acid_chain_cluster_mapping
+        and pdb_chain_id.replace("protein", "rna") in nucleic_acid_chain_cluster_mapping
     ):
         # Based on (majority) chain molecule types, handle instances where
         # a X-protein (or protein-X) interaction is actually a nucleic acid interaction, e.g., PDB `1b23`
-        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('protein', 'nucleic_acid')]}"
-    elif "nucleic_acid" in pdb_chain_id and pdb_chain_id in nucleic_acid_chain_cluster_mapping:
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('protein', 'rna')]}"
+    elif (
+        "protein" in pdb_chain_id
+        and pdb_chain_id.replace("protein", "dna") in nucleic_acid_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-protein (or protein-X) interaction is actually a nucleic acid interaction, e.g., PDB `1b23`
+        chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id.replace('protein', 'dna')]}"
+    elif (
+        "rna" in pdb_chain_id or "dna" in pdb_chain_id
+    ) and pdb_chain_id in nucleic_acid_chain_cluster_mapping:
         chain_cluster = f"{molecule_id}-cluster-{nucleic_acid_chain_cluster_mapping[pdb_chain_id]}"
     elif (
-        "nucleic_acid" in pdb_chain_id
-        and pdb_chain_id.replace("nucleic_acid", "protein") in protein_chain_cluster_mapping
+        "rna" in pdb_chain_id
+        and pdb_chain_id.replace("rna", "protein") in protein_chain_cluster_mapping
     ):
         # Based on (majority) chain molecule types, handle instances where
         # a X-nucleic acid (or nucleic acid-X) interaction is actually a protein interaction, e.g., PDB `3a1s`
-        chain_cluster = f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id.replace('nucleic_acid', 'protein')]}"
+        chain_cluster = f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id.replace('rna', 'protein')]}"
     elif (
-        "nucleic_acid" in pdb_chain_id
-        and pdb_chain_id.replace("nucleic_acid", "peptide") in peptide_chain_cluster_mapping
+        "dna" in pdb_chain_id
+        and pdb_chain_id.replace("dna", "protein") in protein_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-nucleic acid (or nucleic acid-X) interaction is actually a protein interaction, e.g., PDB `3a1s`
+        chain_cluster = f"{molecule_id}-cluster-{protein_chain_cluster_mapping[pdb_chain_id.replace('dna', 'protein')]}"
+    elif (
+        "rna" in pdb_chain_id
+        and pdb_chain_id.replace("rna", "peptide") in peptide_chain_cluster_mapping
     ):
         # Based on (majority) chain molecule types, handle instances where
         # a X-nucleic acid (or nucleic acid-X) interaction is actually a peptide interaction, e.g., PDB `2aiz`
-        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('nucleic_acid', 'peptide')]}"
+        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('rna', 'peptide')]}"
+    elif (
+        "dna" in pdb_chain_id
+        and pdb_chain_id.replace("dna", "peptide") in peptide_chain_cluster_mapping
+    ):
+        # Based on (majority) chain molecule types, handle instances where
+        # a X-nucleic acid (or nucleic acid-X) interaction is actually a peptide interaction, e.g., PDB `2aiz`
+        chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id.replace('dna', 'peptide')]}"
     elif "peptide" in pdb_chain_id and pdb_chain_id in peptide_chain_cluster_mapping:
         chain_cluster = f"{molecule_id}-cluster-{peptide_chain_cluster_mapping[pdb_chain_id]}"
     elif "ligand" in pdb_chain_id and pdb_chain_id in ligand_chain_cluster_mapping:
@@ -713,11 +742,10 @@ if __name__ == "__main__":
     ligand_chain_cluster_mapping = {}
 
     if os.path.exists(os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")):
-        protein_chain_cluster_mapping = (
-            pl.read_csv(os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv"))
-            .with_columns(
-                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
-            )
+        protein_chain_cluster_mapping = pl.read_csv(
+            os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")
+        ).with_columns(
+            pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
         )
         protein_chain_cluster_mapping = dict(
             zip(
@@ -726,11 +754,10 @@ if __name__ == "__main__":
             )
         )
     if os.path.exists(os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv")):
-        nucleic_acid_chain_cluster_mapping = (
-            pl.read_csv(os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv"))
-            .with_columns(
-                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
-            )
+        nucleic_acid_chain_cluster_mapping = pl.read_csv(
+            os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv")
+        ).with_columns(
+            pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
         )
         nucleic_acid_chain_cluster_mapping = dict(
             zip(
@@ -739,11 +766,10 @@ if __name__ == "__main__":
             )
         )
     if os.path.exists(os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv")):
-        peptide_chain_cluster_mapping = (
-            pl.read_csv(os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv"))
-            .with_columns(
-                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
-            )
+        peptide_chain_cluster_mapping = pl.read_csv(
+            os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv")
+        ).with_columns(
+            pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
         )
         peptide_chain_cluster_mapping = dict(
             zip(
@@ -752,11 +778,10 @@ if __name__ == "__main__":
             )
         )
     if os.path.exists(os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")):
-        ligand_chain_cluster_mapping = (
-            pl.read_csv(os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv"))
-            .with_columns(
-                pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
-            )
+        ligand_chain_cluster_mapping = pl.read_csv(
+            os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")
+        ).with_columns(
+            pl.format("{}{}:{}", "pdb_id", "chain_id", "molecule_id").alias("combined_key")
         )
         ligand_chain_cluster_mapping = dict(
             zip(
