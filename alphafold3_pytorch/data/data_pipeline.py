@@ -151,9 +151,12 @@ if __name__ == "__main__":
     )
     mmcif_feats, assembly = make_mmcif_features(mmcif_object)
     cropped_assembly = assembly.crop(
-        contiguous_weight=1.0,
-        spatial_weight=0.0,
-        spatial_interface_weight=0.0,
+        contiguous_weight=0.2,
+        spatial_weight=0.4,
+        spatial_interface_weight=0.4,
+        n_res=384,
+        chain_1="A",
+        chain_2="B",
     )
     mmcif_string = to_mmcif(
         # assembly,
