@@ -2292,9 +2292,9 @@ class ElucidatedAtomDiffusion(Module):
         # section 3.7.1 equation 2 - weighted rigid aligned ground truth
 
         atom_pos_aligned_ground_truth = self.weighted_rigid_align(
-            pred_coords = denoised_atom_pos,
-            true_coords = atom_pos_ground_truth,
-            weights = align_weights,
+            atom_pos_ground_truth,
+            denoised_atom_pos,
+            align_weights,
             mask = atom_mask
         )
 
@@ -2489,10 +2489,10 @@ class WeightedRigidAlign(Module):
         rot_matrix = einsum(U, F, V, "b i j, b j k, b l k -> b i l")
 
         # Apply the rotation and translation
-        aligned_true_coords = einsum(true_coords_centered, rot_matrix, 'b n i, b j i -> b n j') + true_centroid
-        aligned_true_coords.detach_()
+        aligned_coords = einsum(pred_coords_centered, rot_matrix, 'b n i, b j i -> b n j') + true_centroid
+        aligned_coords.detach_()
 
-        return aligned_true_coords
+        return aligned_coords
 
 class ExpressCoordinatesInFrame(Module):
     """ Algorithm  29 """
