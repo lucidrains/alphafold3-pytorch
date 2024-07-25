@@ -344,22 +344,90 @@ class Biomolecule:
         return self.crop_chains_with_masks(chain_ids_and_lengths, crop_masks)
 
     def spatial_crop(
-        self, chain_1: Optional[str] = None, chain_2: Optional[str] = None
+        self,
+        interface_cropping: bool,
+        n_res: int = 384,
+        chain_1: Optional[str] = None,
+        chain_2: Optional[str] = None,
+        interface_distance_threshold: float = 15.0,
     ) -> "Biomolecule":
         """
         Crop a Biomolecule to only include polymer residues and ligand atoms
         near a (random) reference atom within a sampled chain/interface.
         """
-        raise NotImplementedError("Spatial cropping is not yet implemented.")
 
-    def spatial_interface_crop(
-        self, chain_1: Optional[str] = None, chain_2: Optional[str] = None
-    ) -> "Biomolecule":
-        """
-        Crop a Biomolecule to only include contiguous polymer residues
-        and/or ligand atoms for each chain.
-        """
-        raise NotImplementedError("Spatial interface cropping is not yet implemented.")
+        # curate a list of candidate token center atoms from which to sample a reference atom
+
+        token_num_chains = np.unique(self.chain_id).size
+        token_center_atom_indices = np.arange(self.chain_id.size)
+        token_center_atom_mask = np.zeros(self.chain_id.size, dtype=bool)
+        token_res_atom_position_mask = np.zeros(self.atom_positions.shape[:-1], dtype=bool)
+        token_res_rep_atom_indices = np.array(
+            [
+                get_residue_constants(res_chem_index=chemtype).res_rep_atom_index
+                for chemtype in self.chemtype
+            ]
+        )
+        # NOTE: ligand atom position indices vary per ligand residue, so we can't rely on representative atom indices here
+        token_res_rep_atom_indices[self.chemtype == 3] = np.where(
+            self.atom_mask[self.chemtype == 3]
+        )[1]
+        token_res_atom_position_mask[np.arange(self.chain_id.size), token_res_rep_atom_indices] = (
+            True
+        )
+        token_center_atom_positions = self.atom_positions[token_res_atom_position_mask]
+
+        # potentially filter candidate token center atoms by chain ID
+
+        if exists(chain_1) and exists(chain_2):
+            chain_1_mask = self.chain_id == chain_1
+            chain_2_mask = self.chain_id == chain_2
+            token_center_atom_mask[chain_1_mask | chain_2_mask] = True
+        elif exists(chain_1):
+            token_center_atom_mask[self.chain_id == chain_1] = True
+        elif exists(chain_2):
+            token_center_atom_mask[self.chain_id == chain_2] = True
+
+        # potentially filter candidate token center atoms by interface proximity
+
+        if interface_cropping and token_num_chains > 1:
+            token_center_atom_positions_ = token_center_atom_positions[token_center_atom_mask]
+            token_center_atom_chains_ = self.chain_id[token_center_atom_mask]
+
+            interface_token_center_atom_distances = np.linalg.norm(
+                token_center_atom_positions_[:, None] - token_center_atom_positions_[None, :],
+                axis=-1,
+            )
+            interface_token_center_atom_mask = np.where(
+                (
+                    (interface_token_center_atom_distances < interface_distance_threshold)
+                    & (token_center_atom_chains_[:, None] != token_center_atom_chains_[None, :])
+                ).any(axis=1)
+            )[0]
+
+            token_center_atom_mask.fill(False)
+            token_center_atom_mask[interface_token_center_atom_mask] = True
+
+        token_center_atom_indices = token_center_atom_indices[token_center_atom_mask]
+        if token_center_atom_indices.size == 0:
+            raise ValueError(
+                "No chain atoms found for the specified chain(s) after spatial cropping."
+            )
+
+        # sample a reference atom for spatial cropping
+
+        reference_atom_index = random.choice(token_center_atom_indices).item()
+
+        # perform spatial cropping according to reference atom proximity
+
+        chain_ids_and_lengths = list(collections.Counter(self.chain_id).items())
+        crop_masks = create_spatial_crop_masks(
+            token_center_atom_positions,
+            self.chain_index,
+            reference_atom_index,
+            n_res,
+        )
+        return self.crop_chains_with_masks(chain_ids_and_lengths, crop_masks)
 
     def crop(
         self,
@@ -374,8 +442,20 @@ class Biomolecule:
         crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
         crop_fns = [
             partial(self.contiguous_crop, n_res=n_res),
-            partial(self.spatial_crop, chain_1=chain_1, chain_2=chain_2),
-            partial(self.spatial_interface_crop, chain_1=chain_1, chain_2=chain_2),
+            partial(
+                self.spatial_crop,
+                interface_cropping=False,
+                n_res=n_res,
+                chain_1=chain_1,
+                chain_2=chain_2,
+            ),
+            partial(
+                self.spatial_crop,
+                interface_cropping=True,
+                n_res=n_res,
+                chain_1=chain_1,
+                chain_2=chain_2,
+            ),
         ]
         crop_fn = random.choices(crop_fns, crop_fn_weights)[0]
         return crop_fn()
@@ -405,6 +485,44 @@ def create_contiguous_crop_masks(
         keep = np.arange(crop_start, crop_start + crop_size)
         m_k[keep] = True
         m_ks.append(m_k)
+    return m_ks
+
+
+@typecheck
+def create_spatial_crop_masks(
+    token_center_atom_positions: np.ndarray,
+    token_center_atom_chains: np.ndarray,
+    reference_token_center_atom_index: int,
+    n_res: int,
+) -> List[np.ndarray]:
+    """
+    Create spatial crop masks for each given chain.
+    Implements Algorithm 2 from the AlphaFold-Multimer paper.
+    """
+    # calculate distances with small uniquifying values to break ties
+
+    num_atoms = len(token_center_atom_positions)
+    uniquifying_values = np.arange(num_atoms) * 1e-3
+    reference_position = token_center_atom_positions[reference_token_center_atom_index]
+    distances = np.linalg.norm(token_center_atom_positions - reference_position, axis=-1)
+    distances_with_ties_broken = distances + uniquifying_values
+
+    # select the `n_res`th nearest neighbor distance as cutoff
+
+    d_cutoff = np.partition(distances_with_ties_broken, n_res - 1)[n_res - 1]
+
+    # create a mask for atoms within the cutoff distance
+
+    m_k = distances_with_ties_broken <= d_cutoff
+
+    # identify the indices where chains change
+
+    chain_change_indices = np.where(np.diff(token_center_atom_chains) != 0)[0] + 1
+
+    # split the mask into separate arrays for each chain
+
+    m_ks = np.split(m_k, chain_change_indices)
+
     return m_ks
 
 
