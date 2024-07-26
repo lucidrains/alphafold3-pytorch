@@ -86,7 +86,7 @@ def test_weighted_rigid_align():
     assert (rmsd < 1e-5).all()
 
     random_augment_fn = CentreRandomAugmentation()
-    aligned_coords = align_fn(random_augment_fn(pred_coords), pred_coords, weights)
+    aligned_coords = align_fn(pred_coords, random_augment_fn(pred_coords), weights)
 
     # `pred_coords` should match a random augmentation of itself after alignment
 
