@@ -30,7 +30,8 @@ from alphafold3_pytorch.alphafold3 import (
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
-    Alphafold3WithHubMixin
+    Alphafold3WithHubMixin,
+    ConfidenceHeadLogits,
 )
 
 from alphafold3_pytorch.inputs import (
@@ -61,6 +62,10 @@ from alphafold3_pytorch.configs import (
     create_alphafold3_from_yaml,
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml
+)
+
+from alphafold3_pytorch.confidence import (
+    ComputeRankingScore,
 )
 
 __all__ = [
@@ -102,4 +107,6 @@ __all__ = [
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml,
     pdb_inputs_to_batched_atom_input,
+    ComputeRankingScore,
+    ConfidenceHeadLogits,
 ]

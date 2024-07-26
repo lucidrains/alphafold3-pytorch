@@ -22,7 +22,9 @@ from alphafold3_pytorch import (
     InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
-    Alphafold3
+    Alphafold3,
+    ComputeRankingScore,
+    ConfidenceHeadLogits,
 )
 
 from alphafold3_pytorch.configs import (
@@ -926,3 +928,59 @@ def test_alphafold3_config():
 
     alphafold3_from_trainer_yml = create_alphafold3_from_yaml(trainer_yml, 'model')
     assert isinstance(alphafold3_from_trainer_yml, Alphafold3)
+
+# test compute ranking score
+
+def test_compute_ranking_score():
+    
+    import random 
+    import itertools
+
+    # mock inputs
+    
+    batch_size = 2
+    seq_len = 16
+    molecule_atom_lens = torch.randint(1, 3, (batch_size, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    is_molecule_types = torch.randint(0, 2, (batch_size, seq_len, 5)).bool()
+    atom_pos = torch.randn(batch_size, atom_seq_len, 3) * 5
+    atom_mask = torch.randint(0, 2, (atom_pos.shape[:-1])).type_as(atom_pos).bool()
+    has_frame = torch.randint(0, 2, (batch_size, seq_len)).bool()
+    is_modified_residue = torch.randint(0, 2, (batch_size, atom_seq_len))
+
+    pae_logits = torch.randn(batch_size, 64, seq_len, seq_len)
+    pde_logits = torch.randn(batch_size, 64, seq_len, seq_len)
+    plddt_logits = torch.randn(batch_size, 50, atom_seq_len)
+    resolved_logits = torch.randint(0, 2, (batch_size, 2, seq_len))
+    confidence_head_logits = ConfidenceHeadLogits(pae_logits, pde_logits, plddt_logits, resolved_logits)
+
+
+    chain_length = [random.randint(seq_len // 4, seq_len //2) 
+                    for _ in range(batch_size)]
+
+    asym_id = torch.tensor([
+        [item for val, count in enumerate([chain_len, seq_len - chain_len]) for item in itertools.repeat(val, count)]
+        for chain_len in chain_length
+    ]).long()
+
+
+    compute_ranking_score = ComputeRankingScore()
+
+    full_complex_metric = compute_ranking_score.compute_full_complex_metric(
+        confidence_head_logits, asym_id, has_frame, molecule_atom_lens,
+        atom_pos, atom_mask, is_molecule_types)
+
+    single_chain_metric = compute_ranking_score.compute_single_chain_metric(
+        confidence_head_logits, asym_id, has_frame,)
+
+    interface_metric = compute_ranking_score.compute_interface_metric(
+        confidence_head_logits, asym_id, has_frame,
+        interface_chains=[(0, 1), (1,)])
+
+    modified_residue_score = compute_ranking_score.compute_modified_residue_score(
+        confidence_head_logits, atom_mask, is_modified_residue)
+
+    assert full_complex_metric.numel() == batch_size
+    assert single_chain_metric.numel() == batch_size
+    assert interface_metric.numel() == batch_size
+    assert modified_residue_score.numel() == batch_size
