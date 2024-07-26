@@ -1,19 +1,16 @@
 from __future__ import annotations
-
+from typing import List, NamedTuple
 from collections import namedtuple
 
 import torch
 import torch.nn.functional as F
-
-from torch.nn import (
-    Module,
-)
+from torch.nn import Module
 
 from alphafold3_pytorch.alphafold3 import (
     ConfidenceHeadLogits,
-    repeat_consecutive_with_lens)
+    repeat_consecutive_with_lens
+)
 
-from typing import List, NamedTuple, Optional
 
 from alphafold3_pytorch.tensor_typing import (
     Float,
@@ -29,23 +26,24 @@ from alphafold3_pytorch.inputs import (
 
 from einops import rearrange, repeat
 
+def exists(v):
+    return v is not None
+
 class ConfidenceScore(NamedTuple):
     plddt: Float['b n']
-    ptm: Float['b']
-    iptm: Float['b'] | None 
+    ptm: Float[' b']
+    iptm: Float[' b'] | None
 
 class ComputeConfidenceScore(Module):
     
     @typecheck
     def __init__(
         self,
-        pae_breaks: Optional[Float['nbreak']] = None,
+        pae_breaks: Float[' nbreak'] = torch.arange(0, 31.5, 0.5),
         eps: float = 1e-8
     ):
 
         super().__init__()
-        if pae_breaks is None:
-            pae_breaks = torch.arange(0, 31.5, 0.5)
         self.pae_breaks = pae_breaks
         self.eps = eps
 
@@ -80,7 +78,7 @@ class ComputeConfidenceScore(Module):
         confidence_head_logits: ConfidenceHeadLogits,
         asym_id: Int['b n'],
         has_frame: Bool['b n'],
-        ptm_residue_weight: Optional[Float['b n']] = None,
+        ptm_residue_weight: Float['b n'] | None = None,
         multimer_mode: bool=True,
     ):
         device = asym_id.device
@@ -90,12 +88,12 @@ class ComputeConfidenceScore(Module):
         ptm = self.compute_ptm(confidence_head_logits.pae, self.pae_breaks.to(device),
                                asym_id, has_frame, ptm_residue_weight, interface=False)
 
+        iptm = None
+
         if multimer_mode:
             # Section 5.9.2 equation 18
             iptm = self.compute_ptm(confidence_head_logits.pae, self.pae_breaks.to(device),
                                 asym_id, has_frame, ptm_residue_weight, interface=True)
-        else:
-            iptm = None
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
         return confidence_score
@@ -119,18 +117,19 @@ class ComputeConfidenceScore(Module):
     def compute_ptm(
         self,
         logits: Float['b c n n '],
-        breaks: Float['d'],
+        breaks: Float[' d'],
         asym_id: Int['b n'],
         has_frame: Bool['b n'],
-        residue_weights: Optional[Float['b n']]=None,
+        residue_weights: Float['b n'] | None = None,
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,  
     ): 
 
         device = logits.device
 
-        if residue_weights is None:
+        if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
+
         residue_weights = residue_weights * has_frame
                 
         num_batch = logits.shape[0]
@@ -217,7 +216,8 @@ class ComputeClash(Module):
         self,
         atom_clash_dist=1.1,
         chain_clash_count=100,
-        chain_clash_ratio=0.5):
+        chain_clash_ratio=0.5
+    ):
 
         super().__init__()
         self.atom_clash_dist = atom_clash_dist
@@ -227,10 +227,10 @@ class ComputeClash(Module):
     def compute_has_clash(
         self,
         atom_pos: Float['m 3'],
-        asym_id: Int['n'],
-        indices: Int['m'],
-        valid_indices: Int['m'],
-    )-> Bool:
+        asym_id: Int[' n'],
+        indices: Int[' m'],
+        valid_indices: Int[' m'],
+    )-> Bool['']:
 
         # Section 5.9.2
 
@@ -265,9 +265,9 @@ class ComputeClash(Module):
     def forward(
         self,
         atom_pos: Float['b m 3'] | Float['m 3'],
-        atom_mask: Bool['b m'] | Bool['m'],
-        molecule_atom_lens: Int['b n'] | Int['n'],
-        asym_id: Int['b n']| Int['n'], 
+        atom_mask: Bool['b m'] | Bool[' m'],
+        molecule_atom_lens: Int['b n'] | Int[' n'],
+        asym_id: Int['b n']| Int[' n'],
     )-> Bool:
 
         if atom_pos.ndim ==2:
@@ -316,7 +316,7 @@ class ComputeRankingScore(Module):
         plddt: Float['b m'],
         atom_mask: Float['b m'],
         atom_is_molecule_types: Float['b m'],
-    )-> Float['b']:
+    )-> Float[' b']:
         
         is_protein_mask = atom_is_molecule_types[..., IS_PROTEIN_INDEX]
         mask = atom_mask * is_protein_mask

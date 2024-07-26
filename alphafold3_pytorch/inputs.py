@@ -102,9 +102,6 @@ elif os.path.exists(CCD_COMPONENTS_FILEPATH):
 def flatten(arr):
     return [el for sub_arr in arr for el in sub_arr]
 
-def exclusive_cumsum(t):
-    return t.cumsum(dim = -1) - t
-
 def pad_to_len(t, length, value = 0, dim = -1):
     assert dim < 0
     zeros = (0, 0) * (-dim - 1)
