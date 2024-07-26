@@ -14,6 +14,7 @@ from alphafold3_pytorch import (
     PDBDataset,
     DatasetWithReturnedIndex,
     AtomInput,
+    atom_input_to_file,
     DataLoader,
     Trainer,
     ConductorConfig,
@@ -354,6 +355,37 @@ def test_trainer_config_with_pdb_dataset(populate_mock_pdb_and_remove_test_folde
     # take a single training step
 
     trainer()
+
+# test creating trainer + alphafold3 along with atom dataset from config
+
+def test_trainer_config_with_atom_dataset():
+
+    curr_dir = Path(__file__).parents[0]
+
+    # setup atom dataset
+
+    atom_folder = './test-atom-folder'
+    mock_atom_dataset = MockAtomDataset(10)
+
+    for i in range(10):
+        atom_input = mock_atom_dataset[i]
+        atom_input_to_file(atom_input, f'{atom_folder}/train/{i}.pt', overwrite = True)
+
+    # path to config
+
+    trainer_yaml_path = curr_dir / 'configs/trainer_with_atom_dataset.yaml'
+
+    trainer = create_trainer_from_yaml(trainer_yaml_path)
+
+    assert isinstance(trainer, Trainer)
+
+    # take a single training step
+
+    trainer()
+
+    # cleanup
+
+    shutil.rmtree(atom_folder, ignore_errors = True)
 
 # test creating trainer without model, given when creating instance
 

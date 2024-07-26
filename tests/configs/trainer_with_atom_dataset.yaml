@@ -1,0 +1,39 @@
+---
+model:
+    dim_atom_inputs: 77
+    dim_template_feats: 44
+    dim_template_model: 64
+    atoms_per_window: 27
+    dim_atom: 128
+    dim_atompair_inputs: 5
+    dim_atompair: 16
+    dim_input_embedder_token: 384
+    dim_single: 384
+    dim_pairwise: 128
+    dim_token: 768
+    ignore_index: -1
+    num_dist_bins: null
+    num_plddt_bins: 50
+    num_pde_bins: 64
+    num_pae_bins: 64
+    sigma_data: 16
+    diffusion_num_augmentations: 4
+    loss_confidence_weight: 0.0001
+    loss_distogram_weight: 0.01
+    loss_diffusion_weight: 4.
+num_train_steps: 1
+batch_size: 1
+grad_accum_every: 1
+valid_every: 1
+use_ema: false
+ema_decay: 0.999
+lr: 0.0001
+clip_grad_norm: 10.
+accelerator: cpu
+checkpoint_prefix: af3.ckpt.
+checkpoint_every: 1
+checkpoint_folder: ./checkpoints
+overwrite_checkpoints: false
+dataset_config:
+    dataset_type: atom
+    train_folder: ./test-atom-folder/train

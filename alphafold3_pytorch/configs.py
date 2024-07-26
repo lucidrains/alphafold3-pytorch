@@ -6,6 +6,7 @@ from typing import Callable, List, Dict, Literal
 from alphafold3_pytorch.alphafold3 import Alphafold3
 
 from alphafold3_pytorch.inputs import (
+    AtomDataset,
     PDBDataset
 )
 
@@ -140,7 +141,7 @@ class WeightedPDBSamplerConfig(BaseModelWithExtra):
         })
 
 class DatasetConfig(BaseModelWithExtra):
-    dataset_type: Literal['pdb'] = 'pdb'
+    dataset_type: Literal['pdb', 'atom'] = 'pdb'
     train_folder: DirectoryPath
     valid_folder: DirectoryPath | None = None
     test_folder: DirectoryPath | None = None
@@ -219,22 +220,28 @@ class TrainerConfig(BaseModelWithExtra):
             dataset_kwargs = dataset_config.kwargs
 
             if dataset_type == 'pdb':
-                train_folder, valid_folder, test_folder = tuple(getattr(dataset_config, key, None) for key in ('train_folder', 'valid_folder', 'test_folder'))
+                dataset_klass = PDBDataset
+            elif dataset_type == 'atom':
+                dataset_klass = AtomDataset
+            else:
+                raise ValueError(f'unhandled dataset_type {dataset_type}')
 
-                if exists(train_folder):
-                    assert 'dataset' not in trainer_kwargs
-                    dataset = PDBDataset(train_folder, **dataset_kwargs)
-                    trainer_kwargs.update(dataset = dataset)
+            train_folder, valid_folder, test_folder = tuple(getattr(dataset_config, key, None) for key in ('train_folder', 'valid_folder', 'test_folder'))
 
-                if exists(valid_folder):
-                    assert 'valid_dataset' not in trainer_kwargs
-                    dataset = PDBDataset(valid_folder, **dataset_kwargs)
-                    trainer_kwargs.update(valid_dataset = dataset)
+            if exists(train_folder):
+                assert 'dataset' not in trainer_kwargs
+                dataset = dataset_klass(train_folder, **dataset_kwargs)
+                trainer_kwargs.update(dataset = dataset)
 
-                if exists(test_folder):
-                    assert 'test_dataset' not in trainer_kwargs
-                    dataset = PDBDataset(test_folder, **dataset_kwargs)
-                    trainer_kwargs.update(test_dataset = dataset)
+            if exists(valid_folder):
+                assert 'valid_dataset' not in trainer_kwargs
+                dataset = dataset_klass(valid_folder, **dataset_kwargs)
+                trainer_kwargs.update(valid_dataset = dataset)
+
+            if exists(test_folder):
+                assert 'test_dataset' not in trainer_kwargs
+                dataset = dataset_klass(test_folder, **dataset_kwargs)
+                trainer_kwargs.update(test_dataset = dataset)
 
             # handle weighted pdb sampling
 
