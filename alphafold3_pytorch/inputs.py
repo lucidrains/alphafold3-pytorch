@@ -13,6 +13,8 @@ from typing import Any, Callable, List, Set, Tuple, Type
 import einx
 
 import numpy as np
+from numpy.lib.format import open_memmap
+
 import torch
 from torch import tensor
 from torch.utils.data import Dataset
@@ -179,6 +181,35 @@ class BatchedAtomInput:
 
     def dict(self):
         return asdict(self)
+
+# functions for saving an AtomInput to disk or loading from disk to AtomInput
+
+@typecheck
+def atom_input_to_file(
+    atom_input: AtomInput,
+    path: str,
+    overwrite: bool = False
+) -> Path:
+
+    path = Path(path)
+
+    if not overwrite:
+        assert not path.exists()
+
+    path.parents[0].mkdir(exist_ok = True, parents = True)
+
+    torch.save(atom_input.dict(), str(path))
+    return path
+
+@typecheck
+def file_to_atom_input(path: str | Path) -> AtomInput:
+    if isinstance(path, str):
+        path = Path(path)
+
+    assert path.is_file()
+
+    atom_input_dict = torch.load(str(path))
+    return AtomInput(**atom_input_dict)
 
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
 
@@ -996,7 +1027,6 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     return molecule_input
 
 # pdb input
-
 
 @typecheck
 @dataclass

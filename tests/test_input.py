@@ -1,5 +1,6 @@
 import os
 import pytest
+import shutil
 import torch
 
 from alphafold3_pytorch import (
@@ -10,7 +11,9 @@ from alphafold3_pytorch import (
     maybe_transform_to_atom_input,
     collate_inputs_to_batched_atom_input,
     alphafold3_inputs_to_batched_atom_input,
-    pdb_inputs_to_batched_atom_input
+    pdb_inputs_to_batched_atom_input,
+    atom_input_to_file,
+    file_to_atom_input
 )
 
 from alphafold3_pytorch.data import mmcif_writing
@@ -20,6 +23,10 @@ from alphafold3_pytorch.life import (
     reverse_complement_tensor
 )
 
+from alphafold3_pytorch.mocks import MockAtomDataset
+
+# reverse complements
+
 def test_string_reverse_complement():
     assert reverse_complement('ATCG') == 'CGAT'
     assert reverse_complement('AUCG', 'rna') == 'CGAU'
@@ -28,6 +35,18 @@ def test_tensor_reverse_complement():
     seq = torch.randint(0, 5, (100,))
     rc = reverse_complement_tensor(seq)
     assert torch.allclose(reverse_complement_tensor(rc), seq)
+
+# atom input
+
+def test_atom_input_to_file_and_from():
+    mock_atom_dataset = MockAtomDataset(64)
+    atom_input = mock_atom_dataset[0]
+
+    file = atom_input_to_file(atom_input, './test-atom-input.pt', overwrite = True)
+    atom_input_reconstituted = file_to_atom_input(str(file))
+    assert torch.allclose(atom_input.atom_inputs, atom_input_reconstituted.atom_inputs)
+
+# alphafold3 input
 
 @pytest.mark.parametrize('directed_bonds', (False, True))
 def test_alphafold3_input(directed_bonds):

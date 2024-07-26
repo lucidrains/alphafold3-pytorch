@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.2.37"
+version = "0.2.38"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" }
@@ -35,6 +35,7 @@ dependencies = [
     "huggingface_hub>=0.21.4",
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
+    "numpy",
     "polars>=1.1.0",
     "pdbeccdutils>=0.8.5",
     "pydantic>=2.7.2",

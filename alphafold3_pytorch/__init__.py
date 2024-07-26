@@ -44,7 +44,9 @@ from alphafold3_pytorch.inputs import (
     PDBDataset,
     DatasetWithReturnedIndex,
     maybe_transform_to_atom_input,
-    maybe_transform_to_atom_inputs
+    maybe_transform_to_atom_inputs,
+    atom_input_to_file,
+    file_to_atom_input
 )
 
 from alphafold3_pytorch.trainer import (
