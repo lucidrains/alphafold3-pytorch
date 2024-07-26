@@ -7,6 +7,7 @@ from alphafold3_pytorch import (
     Alphafold3,
     Alphafold3Input,
     AtomInput,
+    AtomDataset,
     PDBInput,
     maybe_transform_to_atom_input,
     collate_inputs_to_batched_atom_input,
@@ -45,6 +46,21 @@ def test_atom_input_to_file_and_from():
     file = atom_input_to_file(atom_input, './test-atom-input.pt', overwrite = True)
     atom_input_reconstituted = file_to_atom_input(str(file))
     assert torch.allclose(atom_input.atom_inputs, atom_input_reconstituted.atom_inputs)
+
+def test_atom_dataset():
+    num_atom_inputs = 10
+    test_folder = './test_atom_folder'
+
+    mock_atom_dataset = MockAtomDataset(num_atom_inputs)
+
+    for i in range(num_atom_inputs):
+        atom_input = mock_atom_dataset[i]
+        atom_input_to_file(atom_input, f'{test_folder}/{i}.pt', overwrite = True)
+
+    atom_dataset_from_disk = AtomDataset(test_folder)
+    assert len(atom_dataset_from_disk) == num_atom_inputs
+
+    shutil.rmtree(test_folder, ignore_errors = True)
 
 # alphafold3 input
 

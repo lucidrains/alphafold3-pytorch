@@ -211,6 +211,28 @@ def file_to_atom_input(path: str | Path) -> AtomInput:
     atom_input_dict = torch.load(str(path))
     return AtomInput(**atom_input_dict)
 
+# Atom dataset that returns a AtomInput based on folders of atom inputs stored on disk
+
+class AtomDataset(Dataset):
+    def __init__(
+        self,
+        folder: str | Path
+    ):
+        if isinstance(folder, str):
+            folder = Path(folder)
+
+        assert folder.exists() and folder.is_dir()
+
+        self.folder = folder
+        self.files = [*folder.glob('**/*.pt')]
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx: int) -> AtomInput:
+        file = self.files[idx]
+        return file_to_atom_input(file)
+
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
 
 def default_extract_atom_feats_fn(atom: Atom):
