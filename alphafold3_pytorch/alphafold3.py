@@ -2494,6 +2494,7 @@ class WeightedRigidAlign(Module):
         true_aligned_coords.detach_()
 
         return true_aligned_coords
+
 class ExpressCoordinatesInFrame(Module):
     """ Algorithm  29 """
 
@@ -3046,8 +3047,8 @@ class ComputeConfidenceScore(Module):
     ):
 
         super().__init__()
-        self.pae_breaks = pae_breaks # this is never used?
         self.eps = eps
+        self.register_buffer('pae_breaks', pae_breaks)
 
     @typecheck
     def _calculate_bin_centers(
@@ -3086,15 +3087,13 @@ class ComputeConfidenceScore(Module):
         plddt = self.compute_plddt(confidence_head_logits.plddt)
 
         # Section 5.9.1 equation 17
-        ptm = self.compute_ptm(confidence_head_logits.pae, self.pae_breaks.to(device),
-                               asym_id, has_frame, ptm_residue_weight, interface=False)
+        ptm = self.compute_ptm(confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False)
 
         iptm = None
 
         if multimer_mode:
             # Section 5.9.2 equation 18
-            iptm = self.compute_ptm(confidence_head_logits.pae, self.pae_breaks.to(device),
-                                asym_id, has_frame, ptm_residue_weight, interface=True)
+            iptm = self.compute_ptm(confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True)
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
         return confidence_score
@@ -3118,7 +3117,6 @@ class ComputeConfidenceScore(Module):
     def compute_ptm(
         self,
         logits: Float['b c n n '],
-        breaks: Float[' d'],
         asym_id: Int['b n'],
         has_frame: Bool['b n'],
         residue_weights: Float['b n'] | None = None,
@@ -3137,7 +3135,7 @@ class ComputeConfidenceScore(Module):
         num_res = logits.shape[-1]
         logits = rearrange(logits, 'b c i j -> b i j c')
 
-        bin_centers = self._calculate_bin_centers(breaks.to(device))
+        bin_centers = self._calculate_bin_centers(self.pae_breaks)
 
         num_frame = torch.sum(has_frame, dim=-1)
         # Clip num_frame to avoid negative/undefined d0.
@@ -3430,7 +3428,7 @@ class ComputeRankingScore(Module):
         #  - compute 1/2 [R(A) + R(b)] for two chain
 
         chain_wise_iptm, chain_wise_iptm_mask, unique_chains = self.compute_confidence_score.compute_ptm(
-            confidence_head_logits.pae, self.compute_confidence_score.pae_breaks, asym_id, has_frame, compute_chain_wise_iptm=True
+            confidence_head_logits.pae, asym_id, has_frame, compute_chain_wise_iptm=True
         )
 
         # Section 5.9.3 equation 20
@@ -3438,7 +3436,6 @@ class ComputeRankingScore(Module):
         interface_metric = torch.zeros(batch).type_as(chain_wise_iptm)
 
         for b, chains in enumerate(interface_chains):
-            num_chains = len(chains)
             for chain in chains:
                 idx = unique_chains[b].index(chain)
                 if chain_wise_iptm_mask[idx].sum() == 0:
@@ -3446,7 +3443,7 @@ class ComputeRankingScore(Module):
 
                 interface_metric[b] += (chain_wise_iptm[idx] * chain_wise_iptm_mask[idx]).sum() / chain_wise_iptm_mask[idx].sum()
 
-            interface_metric[b] /= num_chains
+            interface_metric[b] /= len(chains)
 
         return interface_metric
             
