@@ -56,6 +56,6 @@ checkpoint_every: 1
 checkpoint_folder: ./checkpoints
 overwrite_checkpoints: false
 dataset_config:
-    dataset_type: atom
+    dataset_type: pdb
     convert_pdb_to_atom: true
     train_folder: ./test-folder/data/train

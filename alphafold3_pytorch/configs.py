@@ -224,7 +224,7 @@ class TrainerConfig(BaseModelWithExtra):
             convert_pdb_to_atom = dataset_config.convert_pdb_to_atom
 
             if convert_pdb_to_atom:
-                assert dataset_type == 'atom', 'must be `atom` dataset_type if `convert_pdb_to_atom` is set to True'
+                assert dataset_type == 'pdb', 'must be `pdb` dataset_type if `convert_pdb_to_atom` is set to True'
 
             if dataset_type == 'pdb':
                 dataset_klass = PDBDataset
@@ -238,21 +238,29 @@ class TrainerConfig(BaseModelWithExtra):
             if exists(train_folder):
                 assert 'dataset' not in trainer_kwargs
 
-                if convert_pdb_to_atom:
-                    pdb_dataset = PDBDataset(train_folder, **dataset_kwargs)
-                    train_folder = pdb_dataset_to_atom_inputs(pdb_dataset)
-
                 dataset = dataset_klass(train_folder, **dataset_kwargs)
+
+                if convert_pdb_to_atom:
+                    dataset = pdb_dataset_to_atom_inputs(dataset, return_atom_dataset = True)
+
                 trainer_kwargs.update(dataset = dataset)
 
             if exists(valid_folder):
                 assert 'valid_dataset' not in trainer_kwargs
                 dataset = dataset_klass(valid_folder, **dataset_kwargs)
+
+                if convert_pdb_to_atom:
+                    dataset = pdb_dataset_to_atom_inputs(dataset, return_atom_dataset = True)
+
                 trainer_kwargs.update(valid_dataset = dataset)
 
             if exists(test_folder):
                 assert 'test_dataset' not in trainer_kwargs
                 dataset = dataset_klass(test_folder, **dataset_kwargs)
+
+                if convert_pdb_to_atom:
+                    dataset = pdb_dataset_to_atom_inputs(dataset, return_atom_dataset = True)
+
                 trainer_kwargs.update(test_dataset = dataset)
 
             # handle weighted pdb sampling
