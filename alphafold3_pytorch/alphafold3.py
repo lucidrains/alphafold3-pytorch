@@ -3360,9 +3360,8 @@ class ComputeRankingScore(Module):
         indices = repeat_consecutive_with_lens(indices, molecule_atom_lens)
         valid_indices = repeat_consecutive_with_lens(valid_indices, molecule_atom_lens)
 
-        expand_indices = indices.unsqueeze(-1).expand(-1, -1, is_molecule_types.shape[-1])
         # broadcast is_molecule_types to atom
-        atom_is_molecule_types = torch.gather(is_molecule_types, 1, expand_indices) * valid_indices[..., None]
+        atom_is_molecule_types = einx.get_at('b [n] is_type, b m -> b m is_type', is_molecule_types, indices) * valid_indices[..., None]
 
         confidence_score = self.compute_confidence_score(
             confidence_head_logits, asym_id, has_frame, multimer_mode=True
