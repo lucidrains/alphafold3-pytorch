@@ -7,7 +7,8 @@ from alphafold3_pytorch.alphafold3 import Alphafold3
 
 from alphafold3_pytorch.inputs import (
     AtomDataset,
-    PDBDataset
+    PDBDataset,
+    pdb_dataset_to_atom_inputs
 )
 
 from alphafold3_pytorch.trainer import (
@@ -145,6 +146,7 @@ class DatasetConfig(BaseModelWithExtra):
     train_folder: DirectoryPath
     valid_folder: DirectoryPath | None = None
     test_folder: DirectoryPath | None = None
+    convert_pdb_to_atom: bool = False
     train_weighted_sampler: WeightedPDBSamplerConfig | None = None
     kwargs: dict = dict()
 
@@ -219,6 +221,11 @@ class TrainerConfig(BaseModelWithExtra):
             dataset_type = dataset_config.dataset_type
             dataset_kwargs = dataset_config.kwargs
 
+            convert_pdb_to_atom = dataset_config.convert_pdb_to_atom
+
+            if convert_pdb_to_atom:
+                assert dataset_type == 'atom', 'must be `atom` dataset_type if `convert_pdb_to_atom` is set to True'
+
             if dataset_type == 'pdb':
                 dataset_klass = PDBDataset
             elif dataset_type == 'atom':
@@ -230,6 +237,11 @@ class TrainerConfig(BaseModelWithExtra):
 
             if exists(train_folder):
                 assert 'dataset' not in trainer_kwargs
+
+                if convert_pdb_to_atom:
+                    pdb_dataset = PDBDataset(train_folder, **dataset_kwargs)
+                    train_folder = pdb_dataset_to_atom_inputs(pdb_dataset)
+
                 dataset = dataset_klass(train_folder, **dataset_kwargs)
                 trainer_kwargs.update(dataset = dataset)
 

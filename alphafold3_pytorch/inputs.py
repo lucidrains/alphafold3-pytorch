@@ -7,6 +7,7 @@ from pathlib import Path
 from functools import partial
 from itertools import groupby
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, List, Literal, Set, Tuple, Type
 
@@ -187,11 +188,12 @@ class BatchedAtomInput:
 @typecheck
 def atom_input_to_file(
     atom_input: AtomInput,
-    path: str,
+    path: str | Path,
     overwrite: bool = False
 ) -> Path:
 
-    path = Path(path)
+    if isinstance(path, str):
+        path = Path(path)
 
     if not overwrite:
         assert not path.exists()
@@ -211,6 +213,53 @@ def file_to_atom_input(path: str | Path) -> AtomInput:
     atom_input_dict = torch.load(str(path))
     return AtomInput(**atom_input_dict)
 
+@typecheck
+def pdb_dataset_to_atom_inputs(
+    pdb_dataset: PDBDataset,
+    *,
+    output_atom_folder: str | Path | None = None,
+    indices: Iterable | None = None,
+    return_atom_dataset = False,
+    verbose = True
+) -> Path | AtomDataset:
+
+    if not exists(output_atom_folder):
+        pdb_folder = Path(pdb_dataset.folder).resolve()
+        parent_folder = pdb_folder.parents[0]
+        output_atom_folder = parent_folder / f'{pdb_folder.stem}.atom-inputs'
+
+    if isinstance(output_atom_folder, str):
+        output_atom_folder = Path(output_atom_folder)
+
+    if not exists(indices):
+        indices = torch.randperm(len(pdb_dataset)).tolist()
+
+    indices = iter(indices)
+
+    to_atom_input_fn = compose(
+        pdb_input_to_molecule_input,
+        molecule_to_atom_input
+    )
+
+    while index := next(indices, None):
+        if not exists(index):
+            break
+
+        pdb_input = pdb_dataset[index]
+
+        atom_input = to_atom_input_fn(pdb_input)
+        atom_input_path = output_atom_folder / f'{index}.pt'
+
+        atom_input_to_file(atom_input, atom_input_path)
+
+        if verbose:
+            logger.info(f'converted pdb input with index {index} to {str(atom_input_path)}')
+
+    if not return_atom_dataset:
+        return output_atom_folder
+
+    return AtomDataset(output_atom_folder)
+
 # Atom dataset that returns a AtomInput based on folders of atom inputs stored on disk
 
 class AtomDataset(Dataset):
@@ -221,10 +270,12 @@ class AtomDataset(Dataset):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir()
+        assert folder.exists() and folder.is_dir(), f'atom dataset not found at {str(folder)}'
 
         self.folder = folder
         self.files = [*folder.glob('**/*.pt')]
+
+        assert len(self) > 0, f'no valid atom .pt files found at {str(folder)}'
 
     def __len__(self):
         return len(self.files)
@@ -1919,19 +1970,6 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
 
 # datasets
 
-# dataset wrapper for returning index along with dataset item
-# for caching logic both integrated into trainer and for precaching
-
-class DatasetWithReturnedIndex(Dataset):
-    def __init__(self, dataset: Dataset):
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        return idx, self.dataset[idx]
-
 # PDB dataset that returns a PDBInput based on folder
 
 class PDBDataset(Dataset):
@@ -1953,7 +1991,9 @@ class PDBDataset(Dataset):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir()
+        assert folder.exists() and folder.is_dir(), f'{str(folder)} does not exist for PDBDataset'
+        self.folder = folder
+
         self.files = {
             os.path.splitext(os.path.basename(file.name))[0]: file
             for file in folder.glob(os.path.join("**", "*.cif"))
@@ -1966,6 +2006,8 @@ class PDBDataset(Dataset):
         self.crop_size = crop_size
         self.training = training
         self.pdb_input_kwargs = pdb_input_kwargs
+
+        assert len(self) > 0, f'no valid mmcifs / pdbs found at {str(folder)}'
 
     def __len__(self):
         """Return the number of PDB mmCIF files in the dataset."""

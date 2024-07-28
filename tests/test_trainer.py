@@ -12,7 +12,6 @@ from torch.utils.data import Dataset
 from alphafold3_pytorch import (
     Alphafold3,
     PDBDataset,
-    DatasetWithReturnedIndex,
     AtomInput,
     atom_input_to_file,
     DataLoader,
@@ -314,17 +313,6 @@ def test_collate_fn():
 
     _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
 
-# test use of a dataset wrapper that returns the indices, for caching
-
-def test_dataset_return_index_wrapper():
-    dataset = MockAtomDataset(5)
-    wrapped_dataset = DatasetWithReturnedIndex(dataset)
-
-    assert len(wrapped_dataset) == len(dataset)
-
-    idx, item = wrapped_dataset[3]
-    assert idx == 3 and isinstance(item, AtomInput)
-
 # test creating trainer + alphafold3 from config
 
 def test_trainer_config():
@@ -386,6 +374,21 @@ def test_trainer_config_with_atom_dataset():
     # cleanup
 
     shutil.rmtree(atom_folder, ignore_errors = True)
+
+# test creating trainer + alphafold3 with atom dataset that is precomputed from a pdb dataset
+
+def test_trainer_config_with_atom_dataset_from_pdb_dataset(populate_mock_pdb_and_remove_test_folders):
+
+    curr_dir = Path(__file__).parents[0]
+    trainer_yaml_path = curr_dir / 'configs/trainer_with_atom_dataset_created_from_pdb.yaml'
+
+    trainer = create_trainer_from_yaml(trainer_yaml_path)
+
+    assert isinstance(trainer, Trainer)
+
+    # take a single training step
+
+    trainer()
 
 # test creating trainer without model, given when creating instance
 

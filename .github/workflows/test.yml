@@ -1,6 +1,9 @@
 name: Pytest
 on: [push, pull_request]
 
+env:
+  TYPECHECK: True
+
 jobs:
   build:
 

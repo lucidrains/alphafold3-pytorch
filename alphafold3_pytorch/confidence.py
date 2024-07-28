@@ -11,7 +11,6 @@ from alphafold3_pytorch.alphafold3 import (
     repeat_consecutive_with_lens
 )
 
-
 from alphafold3_pytorch.tensor_typing import (
     Float,
     Int,

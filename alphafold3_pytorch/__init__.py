@@ -45,7 +45,6 @@ from alphafold3_pytorch.inputs import (
     AtomDataset,
     PDBInput,
     PDBDataset,
-    DatasetWithReturnedIndex,
     maybe_transform_to_atom_input,
     maybe_transform_to_atom_inputs,
 )
