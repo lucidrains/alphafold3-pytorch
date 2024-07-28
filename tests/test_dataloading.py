@@ -1,13 +1,13 @@
 import os
 
-from alphafold3_pytorch.data.atom_datamodule import collate_inputs_to_batched_atom_input
-from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
-from alphafold3_pytorch.models.components.alphafold3 import Alphafold3
-from alphafold3_pytorch.models.components.inputs import (
+from alphafold3_pytorch. import collate_inputs_to_batched_atom_input
+from alphafold3_pytorch.alphafold3 import Alphafold3
+from alphafold3_pytorch.inputs import (
     PDBDataset,
     molecule_to_atom_input,
     pdb_input_to_molecule_input,
 )
+from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
 
 
 def test_data_input():
