@@ -42,6 +42,7 @@ from alphafold3_pytorch.inputs import (
     Alphafold3Input,
     atom_input_to_file,
     file_to_atom_input,
+    pdb_dataset_to_atom_inputs,
     AtomDataset,
     PDBInput,
     PDBDataset,
