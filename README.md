@@ -38,7 +38,7 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 - <a href="https://github.com/xluo233">@xluo233</a> for contributing the confidence measures, clash penalty ranking, and sample ranking logic!
 
-- - <a href="https://github.com/sj900">sj900</a> for integrating and testing the `WeightedPDBSampler` within the `PDBDataset`!
+- <a href="https://github.com/sj900">sj900</a> for integrating and testing the `WeightedPDBSampler` within the `PDBDataset`!
 
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
 
