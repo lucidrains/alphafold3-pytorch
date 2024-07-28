@@ -3053,8 +3053,8 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def _calculate_bin_centers(
         self,
-        breaks: Float['breaks'],
-    ) -> Float['breaks+1']:
+        breaks: Float[' breaks'],
+    ) -> Float[' breaks+1']:
         """
         Args:
             breaks: [num_bins -1] bin edges
@@ -3083,7 +3083,6 @@ class ComputeConfidenceScore(Module):
         ptm_residue_weight: Float['b n'] | None = None,
         multimer_mode: bool=True,
     ):
-        device = asym_id.device
         plddt = self.compute_plddt(confidence_head_logits.plddt)
 
         # Section 5.9.1 equation 17
@@ -3123,9 +3122,6 @@ class ComputeConfidenceScore(Module):
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
     ):
-
-        device = logits.device
-
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
 

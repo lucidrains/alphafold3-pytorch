@@ -38,6 +38,7 @@ from alphafold3_pytorch.common.biomolecule import (
 )
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.data.data_pipeline import get_assembly
+from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
 
 from alphafold3_pytorch.life import (
     ATOM_BONDS,
