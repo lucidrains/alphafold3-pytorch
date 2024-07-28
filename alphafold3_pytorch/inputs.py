@@ -1937,10 +1937,11 @@ class DatasetWithReturnedIndex(Dataset):
 class PDBDataset(Dataset):
     """A PyTorch Dataset for PDB mmCIF files."""
 
+    @typecheck
     def __init__(
         self,
         folder: str | Path,
-        sampler: WeightedPDBSampler,
+        sampler: WeightedPDBSampler | None = None,
         sample_type: Literal["default", "clustered"] = "default",
         contiguous_weight: float = 0.2,
         spatial_weight: float = 0.4,
@@ -1970,24 +1971,34 @@ class PDBDataset(Dataset):
         """Return the number of PDB mmCIF files in the dataset."""
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> PDBInput:
+    def __getitem__(self, idx: int | str) -> PDBInput:
         """Return a PDBInput object for the specified index."""
         kwargs = self.pdb_input_kwargs
         if exists(self.training):
             kwargs = {**kwargs, "training": self.training}
 
-        if self.sample_type == "clustered":
-            sampled_ids = self.sampler.cluster_based_sample(1)
-        else:
-            sampled_ids = self.sampler.sample(1)
+        sampled_id = None
 
-        pdb_id, chain_id_1, chain_id_2 = sampled_ids[0]
+        if exists(self.sampler):
+            if self.sample_type == "clustered":
+                sampled_id, = self.sampler.cluster_based_sample(1)
+            else:
+                sampled_id, = self.sampler.sample(1)
+
+        if exists(sampled_id):
+            pdb_id, chain_id_1, chain_id_2 = sampled_id
+            mmcif_filepath = self.files.get(pdb_id, None)
+
+        elif isinstance(idx, int):
+            pdb_id, mmcif_filepath = [*self.files.items()][idx]
+
+        elif isinstance(idx, str):
+            pdb_id = idx
+            mmcif_filepath = self.files.get(pdb_id, None)
 
         # get the mmCIF file corresponding to the sampled structure
 
-        mmcif_filepath = self.files.get(pdb_id, None)
-
-        if mmcif_filepath is None:
+        if not exists(mmcif_filepath):
             raise FileNotFoundError(f"mmCIF file for PDB ID {pdb_id} not found.")
 
         if exists(self.training) and self.training:
@@ -1996,15 +2007,18 @@ class PDBDataset(Dataset):
                 file_id=pdb_id,
             )
             biomol = _from_mmcif_object(mmcif_object)
-            cropped_biomol = biomol.crop(
-                contiguous_weight=self.contiguous_weight,
-                spatial_weight=self.spatial_weight,
-                spatial_interface_weight=self.spatial_interface_weight,
-                n_res=self.crop_size,
-                chain_1=chain_id_1,
-                chain_2=chain_id_2,
-            )
-            pdb_input = PDBInput(biomol=cropped_biomol, **kwargs)
+
+            if exists(sampled_id):
+                biomol = biomol.crop(
+                    contiguous_weight=self.contiguous_weight,
+                    spatial_weight=self.spatial_weight,
+                    spatial_interface_weight=self.spatial_interface_weight,
+                    n_res=self.crop_size,
+                    chain_1=chain_id_1,
+                    chain_2=chain_id_2,
+                )
+
+            pdb_input = PDBInput(biomol=biomol, **kwargs)
         else:
             pdb_input = PDBInput(mmcif_filepath=str(mmcif_filepath), **kwargs)
 
