@@ -3309,12 +3309,19 @@ class ComputeRankingScore(Module):
 
     def __init__(
         self,
-        eps = 1e-8
+        eps = 1e-8,
+        score_iptm_weight = 0.8,
+        score_ptm_weight = 0.2,
+        score_disorder_weight = 0.5
     ):
         super().__init__()
         self.eps = eps
         self.compute_clash = ComputeClash()
         self.compute_confidence_score = ComputeConfidenceScore(eps=eps)
+
+        self.score_iptm_weight = score_iptm_weight
+        self.score_ptm_weight = score_ptm_weight
+        self.score_disorder_weight = score_disorder_weight
 
     @typecheck
     def compute_disorder(
@@ -3342,7 +3349,8 @@ class ComputeRankingScore(Module):
         atom_pos: Float['b m 3'],
         atom_mask: Bool['b m'],
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
-    ) -> Float[' b']:
+        return_confidence_score: bool = False
+    ) -> Float[' b'] | Tuple[Float[' b'], Tuple[ConfidenceScore, Bool[' b']]]:
 
         # Section 5.9.3.1
         
@@ -3372,9 +3380,18 @@ class ComputeRankingScore(Module):
         disorder = self.compute_disorder(confidence_score.plddt, atom_mask, atom_is_molecule_types)
 
         # Section 5.9.3 equation 19
-        score = 0.8 * confidence_score.iptm + 0.2 * confidence_score.ptm + 0.5 * disorder - 100 * has_clash
 
-        return score
+        weighted_score = (
+            confidence_score.iptm * self.score_iptm_weight +
+            confidence_score.ptm * self.score_ptm_weight +
+            disorder * self.score_disorder_weight
+            - 100 * has_clash
+        )
+
+        if not return_confidence_score:
+            return weighted_score
+
+        return weighted_score, (confidence_score, has_clash)
 
     @typecheck
     def compute_single_chain_metric(
