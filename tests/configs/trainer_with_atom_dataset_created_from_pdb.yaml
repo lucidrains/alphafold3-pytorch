@@ -60,5 +60,5 @@ dataset_config:
     train_folder: ./test-folder/data/train
     convert_pdb_to_atom: true
     pdb_to_atom_kwargs:
-        n_jobs: 16
+        n_jobs: 1
 
