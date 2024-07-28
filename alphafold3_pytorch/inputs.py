@@ -23,6 +23,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 from loguru import logger
+from joblib import Parallel, delayed
+
 from pdbeccdutils.core import ccd_reader
 
 from rdkit import Chem
@@ -221,7 +223,8 @@ def pdb_dataset_to_atom_inputs(
     output_atom_folder: str | Path | None = None,
     indices: Iterable | None = None,
     return_atom_dataset = False,
-    verbose = True
+    n_jobs: int = 8,
+    parallel_kwargs: dict = dict()
 ) -> Path | AtomDataset:
 
     if not exists(output_atom_folder):
@@ -235,26 +238,21 @@ def pdb_dataset_to_atom_inputs(
     if not exists(indices):
         indices = torch.randperm(len(pdb_dataset)).tolist()
 
-    indices = iter(indices)
-
     to_atom_input_fn = compose(
         pdb_input_to_molecule_input,
         molecule_to_atom_input
     )
 
-    while index := next(indices, None):
-        if not exists(index):
-            break
-
+    @delayed
+    def pdb_input_to_atom_file(index, path):
         pdb_input = pdb_dataset[index]
 
         atom_input = to_atom_input_fn(pdb_input)
-        atom_input_path = output_atom_folder / f'{index}.pt'
+        atom_input_path = path / f'{index}.pt'
 
         atom_input_to_file(atom_input, atom_input_path)
 
-        if verbose:
-            logger.info(f'converted pdb input with index {index} to {str(atom_input_path)}')
+    Parallel(n_jobs = n_jobs, **parallel_kwargs)(pdb_input_to_atom_file(index, output_atom_folder) for index in indices)
 
     if not return_atom_dataset:
         return output_atom_folder
