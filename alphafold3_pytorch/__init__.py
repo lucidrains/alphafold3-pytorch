@@ -69,6 +69,7 @@ from alphafold3_pytorch.configs import (
 
 from alphafold3_pytorch.confidence import (
     ComputeRankingScore,
+    ComputeModelSelectionScore,
 )
 
 __all__ = [
@@ -112,4 +113,5 @@ __all__ = [
     pdb_inputs_to_batched_atom_input,
     ComputeRankingScore,
     ConfidenceHeadLogits,
+    ComputeModelSelectionScore,
 ]

@@ -279,9 +279,10 @@ def mean_pool_with_lens(
 
 @typecheck
 def repeat_consecutive_with_lens(
-    feats: Float['b n ...'] | Bool['b n'] | Int['b n'],
+    feats: Float['b n ...'] | Bool['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
-) -> Float['b m ...'] | Bool['b m'] | Int['b m']:
+    mask_value: Optional[float | int | bool] = None,
+) -> Float['b m ...'] | Bool['b m ...'] | Bool['b m'] | Int['b m']:
 
     device, dtype = feats.device, feats.dtype
 
@@ -328,7 +329,8 @@ def repeat_consecutive_with_lens(
 
     # final mask
 
-    mask_value = False if dtype == torch.bool else 0
+    if mask_value is None:
+        mask_value = False if dtype == torch.bool else 0
 
     output = einx.where(
         'b n, b n ..., -> b n ...',
