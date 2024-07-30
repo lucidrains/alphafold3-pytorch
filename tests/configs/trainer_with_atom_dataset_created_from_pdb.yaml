@@ -1,0 +1,64 @@
+---
+model:
+    dim_atom: 4
+    dim_atompair: 4
+    dim_input_embedder_token: 4
+    dim_single: 4
+    dim_pairwise: 4
+    dim_token: 4
+    dim_atom_inputs: 3
+    dim_atompair_inputs: 1
+    dim_template_model: 8
+    atoms_per_window: 27
+    dim_template_feats: 44
+    num_dist_bins: 38
+    ignore_index: -1
+    num_dist_bins: null
+    num_plddt_bins: 50
+    num_pde_bins: 64
+    num_pae_bins: 64
+    sigma_data: 16
+    diffusion_num_augmentations: 4
+    loss_confidence_weight: 0.0001
+    loss_distogram_weight: 0.01
+    loss_diffusion_weight: 4.
+    confidence_head_kwargs:
+        pairformer_depth: 1
+    template_embedder_kwargs:
+        pairformer_stack_depth: 1
+    msa_module_kwargs:
+        depth: 1
+    pairformer_stack:
+        depth: 1
+        pair_bias_attn_dim_head: 4
+        pair_bias_attn_heads: 2
+    diffusion_module_kwargs:
+        atom_encoder_depth: 1
+        token_transformer_depth: 1
+        atom_decoder_depth: 1
+        atom_decoder_kwargs:
+            attn_pair_bias_kwargs:
+                dim_head: 4
+        atom_encoder_kwargs:
+            attn_pair_bias_kwargs:
+                dim_head: 4
+num_train_steps: 1
+batch_size: 1
+grad_accum_every: 1
+valid_every: 1
+use_ema: false
+ema_decay: 0.999
+lr: 0.0001
+clip_grad_norm: 10.
+accelerator: cpu
+checkpoint_prefix: af3.ckpt.
+checkpoint_every: 1
+checkpoint_folder: ./checkpoints
+overwrite_checkpoints: false
+dataset_config:
+    dataset_type: pdb
+    train_folder: ./test-folder/data/train
+    convert_pdb_to_atom: true
+    pdb_to_atom_kwargs:
+        n_jobs: 1
+

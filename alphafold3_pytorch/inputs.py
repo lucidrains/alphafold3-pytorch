@@ -7,8 +7,9 @@ from pathlib import Path
 from functools import partial
 from itertools import groupby
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, List, Set, Tuple, Type
+from typing import Any, Callable, List, Literal, Set, Tuple, Type
 
 import einx
 
@@ -22,6 +23,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 from loguru import logger
+from joblib import Parallel, delayed
+
 from pdbeccdutils.core import ccd_reader
 
 from rdkit import Chem
@@ -37,6 +40,7 @@ from alphafold3_pytorch.common.biomolecule import (
 )
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.data.data_pipeline import get_assembly
+from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
 
 from alphafold3_pytorch.life import (
     ATOM_BONDS,
@@ -187,11 +191,12 @@ class BatchedAtomInput:
 @typecheck
 def atom_input_to_file(
     atom_input: AtomInput,
-    path: str,
+    path: str | Path,
     overwrite: bool = False
 ) -> Path:
 
-    path = Path(path)
+    if isinstance(path, str):
+        path = Path(path)
 
     if not overwrite:
         assert not path.exists()
@@ -211,6 +216,49 @@ def file_to_atom_input(path: str | Path) -> AtomInput:
     atom_input_dict = torch.load(str(path))
     return AtomInput(**atom_input_dict)
 
+@typecheck
+def pdb_dataset_to_atom_inputs(
+    pdb_dataset: PDBDataset,
+    *,
+    output_atom_folder: str | Path | None = None,
+    indices: Iterable | None = None,
+    return_atom_dataset = False,
+    n_jobs: int = 8,
+    parallel_kwargs: dict = dict()
+) -> Path | AtomDataset:
+
+    if not exists(output_atom_folder):
+        pdb_folder = Path(pdb_dataset.folder).resolve()
+        parent_folder = pdb_folder.parents[0]
+        output_atom_folder = parent_folder / f'{pdb_folder.stem}.atom-inputs'
+
+    if isinstance(output_atom_folder, str):
+        output_atom_folder = Path(output_atom_folder)
+
+    if not exists(indices):
+        indices = torch.randperm(len(pdb_dataset)).tolist()
+
+    to_atom_input_fn = compose(
+        pdb_input_to_molecule_input,
+        molecule_to_atom_input
+    )
+
+    @delayed
+    def pdb_input_to_atom_file(index, path):
+        pdb_input = pdb_dataset[index]
+
+        atom_input = to_atom_input_fn(pdb_input)
+        atom_input_path = path / f'{index}.pt'
+
+        atom_input_to_file(atom_input, atom_input_path)
+
+    Parallel(n_jobs = n_jobs, **parallel_kwargs)(pdb_input_to_atom_file(index, output_atom_folder) for index in indices)
+
+    if not return_atom_dataset:
+        return output_atom_folder
+
+    return AtomDataset(output_atom_folder)
+
 # Atom dataset that returns a AtomInput based on folders of atom inputs stored on disk
 
 class AtomDataset(Dataset):
@@ -221,10 +269,12 @@ class AtomDataset(Dataset):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir()
+        assert folder.exists() and folder.is_dir(), f'atom dataset not found at {str(folder)}'
 
         self.folder = folder
         self.files = [*folder.glob('**/*.pt')]
+
+        assert len(self) > 0, f'no valid atom .pt files found at {str(folder)}'
 
     def __len__(self):
         return len(self.files)
@@ -1919,58 +1969,99 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
 
 # datasets
 
-# dataset wrapper for returning index along with dataset item
-# for caching logic both integrated into trainer and for precaching
-
-class DatasetWithReturnedIndex(Dataset):
-    def __init__(self, dataset: Dataset):
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        return idx, self.dataset[idx]
-
 # PDB dataset that returns a PDBInput based on folder
 
 class PDBDataset(Dataset):
+    """A PyTorch Dataset for PDB mmCIF files."""
+
+    @typecheck
     def __init__(
         self,
         folder: str | Path,
-        training: bool | None = None, # extra training flag placed by Alex on PDBInput
-        **pdb_input_kwargs
+        sampler: WeightedPDBSampler | None = None,
+        sample_type: Literal["default", "clustered"] = "default",
+        contiguous_weight: float = 0.2,
+        spatial_weight: float = 0.4,
+        spatial_interface_weight: float = 0.4,
+        crop_size: int | None = None,
+        training: bool | None = None,  # extra training flag placed by Alex on PDBInput
+        **pdb_input_kwargs,
     ):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir()
-
+        assert folder.exists() and folder.is_dir(), f'{str(folder)} does not exist for PDBDataset'
         self.folder = folder
-        self.files = [*folder.glob('**/*.cif')]
-        self.filename_to_index = {path.stem: ind for ind, path in enumerate(self.files)}
 
-        self.pdb_input_kwargs = pdb_input_kwargs
+        self.files = {
+            os.path.splitext(os.path.basename(file.name))[0]: file
+            for file in folder.glob(os.path.join("**", "*.cif"))
+        }
+        self.sampler = sampler
+        self.sample_type = sample_type
+        self.contiguous_weight = contiguous_weight
+        self.spatial_weight = spatial_weight
+        self.spatial_interface_weight = spatial_interface_weight
+        self.crop_size = crop_size
         self.training = training
+        self.pdb_input_kwargs = pdb_input_kwargs
+
+        assert len(self) > 0, f'no valid mmcifs / pdbs found at {str(folder)}'
 
     def __len__(self):
+        """Return the number of PDB mmCIF files in the dataset."""
         return len(self.files)
 
-    def __getitem__(self, idx: int | str):
-
+    def __getitem__(self, idx: int | str) -> PDBInput:
+        """Return a PDBInput object for the specified index."""
         kwargs = self.pdb_input_kwargs
-
         if exists(self.training):
-            kwargs = {**kwargs, 'training': self.training}
+            kwargs = {**kwargs, "training": self.training}
 
-        if isinstance(idx, str):
-            assert idx in self.filename_to_index, f'pdb id ({idx}) not found in folder {str(self.folder)}'
-            idx = self.filename_to_index[idx]
+        sampled_id = None
 
-        pdb_input = PDBInput(
-            str(self.files[idx]),
-            **kwargs
-        )
+        if exists(self.sampler):
+            if self.sample_type == "clustered":
+                sampled_id, = self.sampler.cluster_based_sample(1)
+            else:
+                sampled_id, = self.sampler.sample(1)
+
+        if exists(sampled_id):
+            pdb_id, chain_id_1, chain_id_2 = sampled_id
+            mmcif_filepath = self.files.get(pdb_id, None)
+
+        elif isinstance(idx, int):
+            pdb_id, mmcif_filepath = [*self.files.items()][idx]
+
+        elif isinstance(idx, str):
+            pdb_id = idx
+            mmcif_filepath = self.files.get(pdb_id, None)
+
+        # get the mmCIF file corresponding to the sampled structure
+
+        if not exists(mmcif_filepath):
+            raise FileNotFoundError(f"mmCIF file for PDB ID {pdb_id} not found.")
+
+        if exists(self.training) and self.training:
+            mmcif_object = mmcif_parsing.parse_mmcif_object(
+                mmcif_filepath,
+                file_id=pdb_id,
+            )
+            biomol = _from_mmcif_object(mmcif_object)
+
+            if exists(sampled_id):
+                biomol = biomol.crop(
+                    contiguous_weight=self.contiguous_weight,
+                    spatial_weight=self.spatial_weight,
+                    spatial_interface_weight=self.spatial_interface_weight,
+                    n_res=self.crop_size,
+                    chain_1=chain_id_1,
+                    chain_2=chain_id_2,
+                )
+
+            pdb_input = PDBInput(biomol=biomol, **kwargs)
+        else:
+            pdb_input = PDBInput(mmcif_filepath=str(mmcif_filepath), **kwargs)
 
         return pdb_input
 

@@ -32,6 +32,7 @@ from alphafold3_pytorch.alphafold3 import (
     Alphafold3,
     Alphafold3WithHubMixin,
     ConfidenceHeadLogits,
+    ComputeRankingScore
 )
 
 from alphafold3_pytorch.inputs import (
@@ -42,10 +43,10 @@ from alphafold3_pytorch.inputs import (
     Alphafold3Input,
     atom_input_to_file,
     file_to_atom_input,
+    pdb_dataset_to_atom_inputs,
     AtomDataset,
     PDBInput,
     PDBDataset,
-    DatasetWithReturnedIndex,
     maybe_transform_to_atom_input,
     maybe_transform_to_atom_inputs,
 )
@@ -65,11 +66,6 @@ from alphafold3_pytorch.configs import (
     create_alphafold3_from_yaml,
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml
-)
-
-from alphafold3_pytorch.confidence import (
-    ComputeRankingScore,
-    ComputeModelSelectionScore,
 )
 
 __all__ = [
