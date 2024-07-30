@@ -25,6 +25,8 @@ from alphafold3_pytorch import (
     Alphafold3,
     ComputeRankingScore,
     ConfidenceHeadLogits,
+    ComputeModelSelectionScore,
+    ComputeModelSelectionScore,
 )
 
 from alphafold3_pytorch.configs import (
@@ -984,3 +986,55 @@ def test_compute_ranking_score():
     assert single_chain_metric.numel() == batch_size
     assert interface_metric.numel() == batch_size
     assert modified_residue_score.numel() == batch_size
+
+def test_model_selection_score():
+
+    import random
+    import itertools
+
+    # mock inputs
+    
+    batch_size = 2
+    seq_len = 16
+    molecule_atom_lens = torch.randint(1, 3, (batch_size, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    atom_pos_true = torch.randn(batch_size, atom_seq_len, 3) * 5
+    atom_pos_pred = torch.randn(batch_size, atom_seq_len, 3) * 5
+    atom_mask = torch.randint(0, 2, (atom_pos_true.shape[:-1])).type_as(atom_pos_true).bool()
+    tok_repr_atm_mask = torch.randint(0, 2, (batch_size, seq_len)).bool()
+
+    dist_logits = torch.randn(batch_size, 64, seq_len, seq_len)
+    pde_logits = torch.randn(batch_size, 64, seq_len, seq_len)
+
+    chain_length = [random.randint(seq_len // 4, seq_len //2) 
+                    for _ in range(batch_size)]
+
+    asym_id = torch.tensor([
+        [item for val, count in enumerate([chain_len, seq_len - chain_len]) for item in itertools.repeat(val, count)]
+        for chain_len in chain_length
+    ]).long()
+
+
+    is_molecule_types = torch.zeros_like(asym_id)
+    is_molecule_types = torch.nn.functional.one_hot(is_molecule_types, 5).bool()
+    
+    compute_model_selection_score = ComputeModelSelectionScore()
+
+    gpde = compute_model_selection_score.compute_gpde(
+        pde_logits,
+        dist_logits,
+        compute_model_selection_score.dist_breaks,
+        tok_repr_atm_mask,
+    )
+
+    weighted_lddt = compute_model_selection_score.compute_weighted_lddt(
+        atom_pos_pred,
+        atom_pos_true,
+        atom_mask,
+        asym_id,
+        is_molecule_types,
+        molecule_atom_lens,
+        chains_list = [(0, 1), (1,)],
+        is_fine_tuning=False
+    )

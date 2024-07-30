@@ -32,7 +32,8 @@ from alphafold3_pytorch.alphafold3 import (
     Alphafold3,
     Alphafold3WithHubMixin,
     ConfidenceHeadLogits,
-    ComputeRankingScore
+    ComputeRankingScore,
+    ComputeModelSelectionScore
 )
 
 from alphafold3_pytorch.inputs import (
@@ -109,4 +110,5 @@ __all__ = [
     pdb_inputs_to_batched_atom_input,
     ComputeRankingScore,
     ConfidenceHeadLogits,
+    ComputeModelSelectionScore,
 ]
