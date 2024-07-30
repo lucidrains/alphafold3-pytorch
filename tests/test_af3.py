@@ -1,9 +1,12 @@
 import os
 os.environ['TYPECHECK'] = 'True'
 
-import torch
 import pytest
+import random
+import itertools
 from pathlib import Path
+
+import torch
 
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
@@ -988,9 +991,6 @@ def test_compute_ranking_score():
     assert modified_residue_score.numel() == batch_size
 
 def test_model_selection_score():
-
-    import random
-    import itertools
 
     # mock inputs
     

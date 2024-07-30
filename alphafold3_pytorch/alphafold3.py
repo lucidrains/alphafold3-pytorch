@@ -292,7 +292,7 @@ def mean_pool_with_lens(
 def repeat_consecutive_with_lens(
     feats: Float['b n ...'] | Bool['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
-    mask_value: Optional[float | int | bool] = None,
+    mask_value: float | int | bool | None = None,
 ) -> Float['b m ...'] | Bool['b m ...'] | Bool['b m'] | Int['b m']:
 
     device, dtype = feats.device, feats.dtype
@@ -3227,12 +3227,11 @@ class ComputeConfidenceScore(Module):
     def compute_pde(
         self,
         logits: Float['b pde n n'],
-        breaks: Float[' pde_break'],
         tok_repr_atm_mask: Bool[' b n'],
     )-> Float[' b n n']:
 
         logits = rearrange(logits, 'b pde i j -> b i j pde')
-        bin_centers = self._calculate_bin_centers(breaks.to(logits.device))
+        bin_centers = self._calculate_bin_centers(self.pde_breaks)
         probs = F.softmax(logits, dim=-1)
 
         pde = einsum(probs, bin_centers, 'b i j pde, pde -> b i j ')
@@ -3495,7 +3494,7 @@ class ComputeRankingScore(Module):
 # model selection
 def get_cid_molecule_type(
     cid: int,
-    asym_id: Int['n'],
+    asym_id: Int[' n'],
     is_molecule_types: Bool['n {IS_MOLECULE_TYPES}'],
     return_one_hot: bool = False,
     ) -> int | Bool[' {IS_MOLECULE_TYPES}']:
@@ -3505,17 +3504,15 @@ def get_cid_molecule_type(
     """
 
     cid_is_molecule_types = is_molecule_types[asym_id == cid]
-    valid = torch.all(
-        einx.equal('b i, i -> b i', 
-                   cid_is_molecule_types,
-                   cid_is_molecule_types[0])
-        )
+    molecule_type, rest_molecule_type = cid_is_molecule_types[0], cid_is_molecule_types[1:]
+
+    valid = einx.equal('b i, i -> b i', rest_molecule_type, molecule_type).all()
+
     assert valid, f"Ambiguous molecule types for chain {cid}"
 
-    if return_one_hot:
-        molecule_type = cid_is_molecule_types[0]
-    else: 
-        molecule_type = cid_is_molecule_types[0].int().argmax().item()
+    if not return_one_hot:
+        molecule_type = molecule_type.int().argmax().item()
+
     return molecule_type
 
 class ComputeModelSelectionScore(Module):
@@ -3525,7 +3522,8 @@ class ComputeModelSelectionScore(Module):
         eps: float = 1e-8,
         dist_breaks: Float[' dist_break'] = torch.linspace(2.3125,21.6875,63,),
         nucleic_acid_cutoff: float = 30.0,
-        other_cutoff: float = 15.0
+        other_cutoff: float = 15.0,
+        contact_mask_threshold: float = 8.0
     ):
 
         super().__init__()
@@ -3533,6 +3531,8 @@ class ComputeModelSelectionScore(Module):
         self.eps = eps
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
+        self.contact_mask_threshold = contact_mask_threshold
+
         self.register_buffer('dist_breaks', dist_breaks)
 
     def compute_gpde(
@@ -3548,13 +3548,14 @@ class ComputeModelSelectionScore(Module):
         tok_repr_atm_mask: [b n] true if token representation atoms exists
         """
 
-        pde = self.compute_confidence_score.compute_pde(
-            pde_logits, self.compute_confidence_score.pde_breaks, tok_repr_atm_mask)
+        pde = self.compute_confidence_score.compute_pde(pde_logits, tok_repr_atm_mask)
 
         dist_logits = rearrange(dist_logits, 'b dist i j -> b i j dist')
         dist_probs = F.softmax(dist_logits, dim=-1)
-        contact_mask = dist_breaks < 8.0
-        contact_mask = torch.cat([contact_mask, torch.zeros([1], device=dist_logits.device)]).bool()
+
+        contact_mask = dist_breaks < self.contact_mask_threshold
+        contact_mask = F.pad(contact_mask, (0, 1), value = True)
+
         contact_prob = einx.where(
             ' dist, b i j dist, -> b i j dist',
             contact_mask, dist_probs, 0.
@@ -3577,7 +3578,7 @@ class ComputeModelSelectionScore(Module):
         is_rna: Bool['b m'],
         pairwise_mask: Bool['b m m'],
         coords_mask: Bool['b m'] | None = None,
-    ) -> Float['b']:
+    ) -> Float[' b']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
@@ -3635,7 +3636,7 @@ class ComputeModelSelectionScore(Module):
         true_coords: Float['b m 3'] | Float['m 3'], 
         is_molecule_types: Int['b m {IS_MOLECULE_TYPES}'] | Int['m {IS_MOLECULE_TYPES}'],
         coords_mask: Bool['b m'] | Bool [' m'] | None = None,
-    ) -> Float['b']:
+    ) -> Float[' b']:
         """
         
         plddt between atoms maked by asym_mask_a and asym_mask_b

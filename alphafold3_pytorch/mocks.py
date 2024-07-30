@@ -4,11 +4,7 @@ from dataclasses import asdict
 import torch
 from torch.utils.data import Dataset
 from alphafold3_pytorch import AtomInput
-
-from alphafold3_pytorch.inputs import (
-    IS_MOLECULE_TYPES,
-    AtomInput
-)
+from alphafold3_pytorch.inputs import IS_MOLECULE_TYPES
 
 # mock dataset
 
