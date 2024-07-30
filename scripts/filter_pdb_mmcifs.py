@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Curating AlphaFold 3 PDB Dataset
+# # Curating AlphaFold 3 PDB Training Dataset
 #
 # For training AlphaFold 3, we follow the training procedure outlined in Abramson et al (2024).
 #
@@ -35,13 +35,14 @@ import argparse
 import glob
 import os
 import random
-from operator import itemgetter
-from typing import Dict, List, Literal, Set, Tuple
 from datetime import datetime
+from operator import itemgetter
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 import timeout_decorator
 from Bio.PDB.NeighborSearch import NeighborSearch
+from dateutil import parser as date_parser
 from pdbeccdutils.core import ccd_reader
 from pdbeccdutils.core.ccd_reader import CCDReaderResult
 from tqdm.contrib.concurrent import process_map
@@ -67,8 +68,6 @@ from alphafold3_pytorch.utils.utils import exists
 FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT = (
     600  # Maximum time allocated to filter a single structure (in seconds)
 )
-
-EVALUATION_SPLITS = {"eval", "test"}
 
 # Helper functions
 
@@ -139,7 +138,7 @@ def filter_pdb_release_date(
         "release_date" in mmcif_object.header
         and exists(mmcif_object.header["release_date"])
         and min_cutoff_date
-        <= datetime.strptime(mmcif_object.header["release_date"], "%Y-%m-%d")
+        <= date_parser.parse(mmcif_object.header["release_date"])
         <= max_cutoff_date
     )
 
@@ -211,6 +210,8 @@ def prefilter_target(
             mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
         )
         and filter_resolution(mmcif_object)
+        # NOTE: Due to lack of clarity and rationale in the AF3 supplement, we retain
+        # up to 1,000 polymer chains for training, in constrast to the supplement's 300
         and filter_polymer_chains(mmcif_object)
     )
     return filter_resolved_chains(mmcif_object) if target_passes_prefilters else None
@@ -698,12 +699,12 @@ def filter_structure_with_timeout(
     output_dir: str,
     min_cutoff_date: datetime = datetime(1970, 1, 1),
     max_cutoff_date: datetime = datetime(2021, 9, 30),
-    split: Literal["train", "eval", "test"] = "train",
+    remove_ligands_in_exclusion_set: bool = False,
 ):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
-    using AlphaFold 3's PDB dataset filtering criteria under a
-    timeout constraint.
+    using AlphaFold 3's PDB training dataset filtering criteria
+    under a timeout constraint.
     """
     # Section 2.5.4 of the AlphaFold 3 supplement
     asym_filepath = os.path.join(
@@ -733,7 +734,7 @@ def filter_structure_with_timeout(
     mmcif_object = remove_hydrogens(mmcif_object, remove_waters=True)
     mmcif_object = remove_polymer_chains_with_all_unknown_residues(mmcif_object)
     mmcif_object = remove_clashing_chains(mmcif_object)
-    if split in EVALUATION_SPLITS:
+    if remove_ligands_in_exclusion_set:
         # NOTE: The AlphaFold 3 supplement suggests the training dataset retains these (excluded) ligands
         mmcif_object = remove_excluded_ligands(mmcif_object, LIGAND_EXCLUSION_SET)
     mmcif_object = remove_non_ccd_atoms(mmcif_object, CCD_READER_RESULTS)
@@ -761,12 +762,12 @@ def filter_structure_with_timeout(
 
 
 @typecheck
-def filter_structure(args: Tuple[str, str, datetime, datetime, str]):
+def filter_structure(args: Tuple[str, str, datetime, datetime, bool]):
     """
     Given an input mmCIF file, create a new filtered mmCIF file
-    using AlphaFold 3's PDB dataset filtering criteria.
+    using AlphaFold 3's PDB training dataset filtering criteria.
     """
-    filepath, output_dir, min_cutoff_date, max_cutoff_date, split = args
+    filepath, output_dir, min_cutoff_date, max_cutoff_date, remove_ligands_in_exclusion_set = args
     file_id = os.path.splitext(os.path.basename(filepath))[0]
     output_file_dir = os.path.join(output_dir, file_id[1:3])
     output_filepath = os.path.join(output_file_dir, f"{file_id}.cif")
@@ -777,7 +778,7 @@ def filter_structure(args: Tuple[str, str, datetime, datetime, str]):
             output_dir,
             min_cutoff_date=min_cutoff_date,
             max_cutoff_date=max_cutoff_date,
-            split=split,
+            remove_ligands_in_exclusion_set=remove_ligands_in_exclusion_set,
         )
     except Exception as e:
         print(f"Skipping structure filtering of {filepath} due to: {e}")
@@ -794,7 +795,7 @@ if __name__ == "__main__":
     # Parse command-line arguments
 
     parser = argparse.ArgumentParser(
-        description="Filter mmCIF files to curate the AlphaFold 3 PDB dataset."
+        description="Filter mmCIF files to curate the AlphaFold 3 PDB training dataset."
     )
     parser.add_argument(
         "-i",
@@ -821,7 +822,7 @@ if __name__ == "__main__":
         "-o",
         "--output_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "mmcifs"),
+        default=os.path.join("data", "pdb_data", "train_mmcifs"),
         help="Path to the output directory in which to store filtered mmCIF dataset files.",
     )
     parser.add_argument(
@@ -846,11 +847,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-e",
-        "--split",
-        type=str,
-        choices=["train", "eval", "test"],
-        default="train",
-        help="To which split the filtered dataset should be assigned (i.e., `train`, `eval`, or `test`).",
+        "--remove_ligands_in_exclusion_set",
+        action="store_true",
+        help="Remove ligands in the exclusion set during filtering.",
     )
     parser.add_argument(
         "-n",
@@ -901,7 +900,7 @@ if __name__ == "__main__":
             args.output_dir,
             args.min_cutoff_date,
             args.max_cutoff_date,
-            args.split,
+            args.remove_ligands_in_exclusion_set,
         )
         for filepath in glob.glob(os.path.join(args.mmcif_assembly_dir, "*", "*.cif"))
         if "assembly1" in os.path.basename(filepath)
