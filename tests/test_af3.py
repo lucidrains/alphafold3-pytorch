@@ -26,6 +26,7 @@ from alphafold3_pytorch import (
     ComputeRankingScore,
     ConfidenceHeadLogits,
     ComputeModelSelectionScore,
+    ComputeModelSelectionScore,
 )
 
 from alphafold3_pytorch.configs import (

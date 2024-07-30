@@ -32,7 +32,8 @@ from alphafold3_pytorch.alphafold3 import (
     Alphafold3,
     Alphafold3WithHubMixin,
     ConfidenceHeadLogits,
-    ComputeRankingScore
+    ComputeRankingScore,
+    ComputeModelSelectionScore
 )
 
 from alphafold3_pytorch.inputs import (
