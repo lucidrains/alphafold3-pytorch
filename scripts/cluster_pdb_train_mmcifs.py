@@ -1,7 +1,7 @@
 # %% [markdown]
-# # Clustering AlphaFold 3 PDB Dataset
+# # Clustering AlphaFold 3 PDB Training Dataset
 #
-# For clustering AlphaFold 3's PDB dataset, we follow the clustering procedure outlined in Abramson et al (2024).
+# For clustering AlphaFold 3's PDB training dataset, we follow the clustering procedure outlined in Abramson et al (2024).
 #
 # In order to reduce bias in the training and evaluation sets, clustering was performed on PDB chains and interfaces, as
 # follows.
@@ -147,7 +147,6 @@ def convert_modified_residue_three_to_one(
         return mapped_residue, "ligand"
 
 
-@typecheck
 def parse_chain_sequences_and_interfaces_from_mmcif(
     filepath: str,
     assume_one_based_residue_ids: bool = False,
@@ -265,7 +264,6 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
     return sequences, interface_chain_ids
 
 
-@typecheck
 def parse_chain_sequences_and_interfaces_from_mmcif_file(
     cif_filepath: str, assume_one_based_residue_ids: bool = False
 ) -> Tuple[str, Dict[str, str], Set[str]]:
@@ -682,24 +680,24 @@ def cluster_interfaces(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Cluster chains and interfaces within the AlphaFold 3 PDB dataset's filtered mmCIF files."
+        description="Cluster chains and interfaces within the AlphaFold 3 PDB training dataset's filtered mmCIF files."
     )
     parser.add_argument(
         "--mmcif_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "mmcifs"),
+        default=os.path.join("data", "pdb_data", "train_mmcifs"),
         help="Path to the input directory containing (filtered) mmCIF files.",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "data_caches", "clusterings"),
-        help="Path to the output FASTA file.",
+        default=os.path.join("data", "pdb_data", "data_caches", "train_clusterings"),
+        help="Path to the output clustering directory.",
     )
     parser.add_argument(
         "--clustering_filtered_pdb_dataset",
         action="store_true",
-        help="Whether the clustering is being performed on the filtered PDB dataset.",
+        help="Whether the clustering is being performed on a filtered PDB dataset.",
     )
     parser.add_argument(
         "-n",

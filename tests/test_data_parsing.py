@@ -23,7 +23,7 @@ ERRONEOUS_PDB_IDS = [
     [
         os.path.join("data", "pdb_data", "unfiltered_assembly_mmcifs"),
         os.path.join("data", "pdb_data", "unfiltered_asym_mmcifs"),
-        os.path.join("data", "pdb_data", "mmcifs"),
+        os.path.join("data", "pdb_data", "train_mmcifs"),
     ],
 )
 @pytest.mark.parametrize(
@@ -73,7 +73,7 @@ def test_mmcif_object_parsing(mmcif_dir: str, complex_id: str) -> None:
     [
         os.path.join("data", "pdb_data", "unfiltered_assembly_mmcifs"),
         os.path.join("data", "pdb_data", "unfiltered_asym_mmcifs"),
-        os.path.join("data", "pdb_data", "mmcifs"),
+        os.path.join("data", "pdb_data", "train_mmcifs"),
     ],
 )
 @pytest.mark.parametrize("num_random_complexes_to_parse", [500])
