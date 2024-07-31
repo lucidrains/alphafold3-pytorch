@@ -3518,6 +3518,46 @@ def get_cid_molecule_type(
     return molecule_type
 
 class ComputeModelSelectionScore(Module):
+    INITIAL_TRAINING_DICT = {
+        'protein-protein': {'interface': 20, 'intra-chain': 20},
+        'DNA-protein': {'interface': 10},
+        'RNA-protein': {'interface': 10},
+
+        'ligand-protein': {'interface': 10},
+        'DNA-ligand': {'interface': 5},
+        'RNA-ligand': {'interface': 5},
+
+        'DNA-DNA': {'intra-chain': 4},
+        'RNA-RNA': {'intra-chain': 16},
+        'ligand-ligand': {'intra-chain': 20},
+        'metal_ion-metal_ion': {'intra-chain': 10},
+        'unresolved': {'unresolved': 10}
+    }
+
+    FINETUNING_DICT = {
+        'protein-protein': {'interface': 20, 'intra-chain': 20},
+        'DNA-protein': {'interface': 10},
+        'RNA-protein': {'interface': 2},
+
+        'ligand-protein': {'interface': 10},
+        'DNA-ligand': {'interface': 5},
+        'RNA-ligand': {'interface': 2},
+
+        'DNA-DNA': {'intra-chain': 4},
+        'RNA-RNA': {'intra-chain': 16},
+        'ligand-ligand': {'intra-chain': 20},
+        'metal_ion-metal_ion': {'intra-chain': 0},
+
+        'unresolved': {'unresolved': 10}
+    }
+
+    TYPE_MAPPING = {
+        IS_PROTEIN: 'protein',
+        IS_DNA: 'DNA',
+        IS_RNA: 'RNA',
+        IS_LIGAND: 'ligand',
+        IS_METAL_ION: 'metal_ion'
+    }
 
     @typecheck
     def __init__(
@@ -3526,15 +3566,20 @@ class ComputeModelSelectionScore(Module):
         dist_breaks: Float[' dist_break'] = torch.linspace(2.3125,21.6875,63,),
         nucleic_acid_cutoff: float = 30.0,
         other_cutoff: float = 15.0,
-        contact_mask_threshold: float = 8.0
+        contact_mask_threshold: float = 8.0,
+        is_fine_tuning: bool = False,
+        weight_dict_config: dict = None
     ):
 
         super().__init__()
         self.compute_confidence_score = ComputeConfidenceScore(eps=eps)
+
         self.eps = eps
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
         self.contact_mask_threshold = contact_mask_threshold
+        self.is_fine_tuning = is_fine_tuning
+        self.weight_dict_config = weight_dict_config
 
         self.register_buffer('dist_breaks', dist_breaks)
 
@@ -3598,7 +3643,6 @@ class ComputeModelSelectionScore(Module):
         # Compute distance difference for all pairs of atoms
         dist_diff = torch.abs(true_dists - pred_dists)
 
-
         lddt = (
             ((0.5 - dist_diff) >=0).float() +
             ((1.0 - dist_diff) >=0).float() +
@@ -3653,9 +3697,7 @@ class ComputeModelSelectionScore(Module):
 
         if asym_mask_a.ndim == 1:
             args = [asym_mask_a, asym_mask_b, pred_coords, true_coords, is_molecule_types, coords_mask ]
-            args = list(
-                map(lambda x: x.unsqueeze(0), args)
-            )
+            args = [x.unsqueeze(0) for x in args]
             asym_mask_a, asym_mask_b, pred_coords, true_coords, is_molecule_types, coords_mask = args
 
 
@@ -3677,59 +3719,18 @@ class ComputeModelSelectionScore(Module):
         type_chain_a,
         type_chain_b,
         lddt_type: Literal['interface', 'intra-chain', 'unresolved'],
-        is_fine_tuning: bool = False,
+        is_fine_tuning: bool = None,
     ):
+        is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
 
-        type_mapping = {
-            IS_PROTEIN: 'protein',
-            IS_DNA: 'DNA',
-            IS_RNA: 'RNA',
-            IS_LIGAND: 'ligand',
-            IS_METAL_ION: 'metal_ion'
-        }
-
-        initial_training_dict = {
-            'protein-protein': {'interface': 20, 'intra-chain': 20}, 
-            'DNA-protein': {'interface': 10}, 
-            'RNA-protein': {'interface': 10}, 
-
-            'ligand-protein': {'interface': 10}, 
-            'DNA-ligand': {'interface': 5}, 
-            'RNA-ligand': {'interface': 5}, 
-
-            'DNA-DNA': {'intra-chain': 4}, 
-            'RNA-RNA': {'intra-chain': 16},
-            'ligand-ligand': {'intra-chain': 20},
-            'metal_ion-metal_ion': {'intra-chain': 10},
-
-            'unresolved': {'unresolved': 10} 
-        }
-
-        fine_tuning_dict = {
-            'protein-protein': {'interface': 20, 'intra-chain': 20}, 
-            'DNA-protein': {'interface': 10},  
-            'RNA-protein': {'interface': 2}, 
-
-            'ligand-protein': {'interface': 10}, 
-            'DNA-ligand': {'interface': 5}, 
-            'RNA-ligand': {'interface': 2}, 
-
-            'DNA-DNA': {'intra-chain': 4}, 
-            'RNA-RNA': {'intra-chain': 16},
-            'ligand-ligand': {'intra-chain': 20},
-            'metal_ion-metal_ion': {'intra-chain': 0},
-
-            'unresolved': {'unresolved': 10} 
-        }
-
-        weight_dict = fine_tuning_dict if is_fine_tuning else initial_training_dict
+        weight_dict = default(self.weight_dict_config, self.FINETUNING_DICT if is_fine_tuning else self.INITIAL_TRAINING_DICT)
 
         if lddt_type == 'unresolved':
             weight =  weight_dict.get(lddt_type, {}).get(lddt_type, None)
             assert weight
             return weight
 
-        interface_type = sorted([type_mapping[type_chain_a], type_mapping[type_chain_b]])
+        interface_type = sorted([self.TYPE_MAPPING[type_chain_a], self.TYPE_MAPPING[type_chain_b]])
         interface_type = '-'.join(interface_type)
         weight = weight_dict.get(interface_type, {}).get(lddt_type, None)
         assert weight, f"Weight not found for {interface_type} {lddt_type}"
@@ -3748,8 +3749,9 @@ class ComputeModelSelectionScore(Module):
         molecule_atom_lens: Int['b n'],
         # additional input
         chains_list: List[Tuple[int, int] | Tuple[int]],
-        is_fine_tuning: bool = False,
+        is_fine_tuning: bool = None,
     ):
+        is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
 
         device = pred_coords.device
         batch_size = pred_coords.shape[0]
