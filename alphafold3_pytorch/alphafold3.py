@@ -449,12 +449,12 @@ class Dropout(Module):
             return self.dropout(t)
 
         if self.dropout_type == 'row':
-            batch, row, _, _ = t.shape
-            ones_shape = (batch, row, 1, 1)
+            batch, _, col, dim = t.shape
+            ones_shape = (batch, 1, col, dim)
 
         elif self.dropout_type == 'col':
-            batch, _, col, _ = t.shape
-            ones_shape = (batch, 1, col, 1)
+            batch, row, _, dim = t.shape
+            ones_shape = (batch, row, 1, dim)
 
         ones = t.new_ones(ones_shape)
         dropped = self.dropout(ones)
@@ -624,9 +624,8 @@ class TriangleMultiplication(Module):
         out = self.to_out_norm(out)
 
         out_gate = self.out_gate(x).sigmoid()
-        out = out * out_gate
 
-        return self.to_out(out)
+        return self.to_out(out) * out_gate
 
 # there are two types of attention in this paper, triangle and attention-pair-bias
 # they differ by how the attention bias is computed
@@ -1316,8 +1315,8 @@ class TemplateEmbedder(Module):
         # final projection of mean pooled repr -> out
 
         self.to_out = nn.Sequential(
-            LinearNoBias(dim, dim_pairwise),
-            nn.ReLU()
+            nn.ReLU(),
+            LinearNoBias(dim, dim_pairwise)
         )
 
         self.layerscale = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
