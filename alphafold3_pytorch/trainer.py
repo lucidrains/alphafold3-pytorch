@@ -39,6 +39,8 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Sampler, Dataset, DataLoader as OrigDataLoader
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
+from adam_atan2_pytorch.foreach import AdamAtan2
+
 from ema_pytorch import EMA
 
 from lightning import Fabric
@@ -275,7 +277,8 @@ class Trainer:
         use_ema: bool = True,
         ema_kwargs: dict = dict(
             use_foreach = True
-        )
+        ),
+        use_adam_atan2: bool = False
     ):
         super().__init__()
 
@@ -305,7 +308,13 @@ class Trainer:
         # optimizer
 
         if not exists(optimizer):
-            optimizer = Adam(
+            adam_klass = Adam
+
+            if use_adam_atan2:
+                del default_adam_kwargs['eps']
+                adam_klass = AdamAtan2
+
+            optimizer = adam_klass(
                 model.parameters(),
                 lr = lr,
                 **default_adam_kwargs

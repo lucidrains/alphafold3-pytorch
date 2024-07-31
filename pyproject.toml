@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.2.53"
+version = "0.2.54"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" }
@@ -23,6 +23,7 @@ classifiers=[
 ]
 
 dependencies = [
+    "adam-atan2-pytorch>=0.0.8",
     "beartype",
     "biopython>=1.83",
     "CoLT5-attention>=0.11.0",
