@@ -263,6 +263,16 @@ def lens_to_mask(
     return einx.less('m, ... -> ... m', arange, lens)
 
 @typecheck
+def to_pairwise_mask(
+    mask_i: Bool['... n'],
+    mask_j: Bool['... n'] | None = None
+) -> Bool['... n n']:
+
+    mask_j = default(mask_j, mask_i)
+    assert mask_i.shape == mask_j.shape
+    return einx.logical_and('... i, ... j -> ... i j', mask_i, mask_j)
+
+@typecheck
 def mean_pool_with_lens(
     feats: Float['b m d'],
     lens: Int['b n']
@@ -598,7 +608,8 @@ class TriangleMultiplication(Module):
     ) -> Float['b n n d']:
 
         if exists(mask):
-            mask = einx.logical_and('b i, b j -> b i j 1', mask, mask)
+            mask = to_pairwise_mask(mask)
+            mask = rearrange(mask, '... -> ... 1')
 
         x = self.norm(x)
 
@@ -867,8 +878,8 @@ class OuterProductMean(Module):
         # masking for pairwise repr
 
         if exists(mask):
-            mask = einx.logical_and('b i , b j -> b i j 1', mask, mask)
-            outer_product_mean = outer_product_mean * mask
+            mask = to_pairwise_mask(mask)
+            outer_product_mean = einx.multiply('b i j d, b i j', outer_product_mean, mask.float())
 
         pairwise_repr = self.to_pairwise_repr(outer_product_mean)
         return pairwise_repr
@@ -2338,7 +2349,7 @@ class ElucidatedAtomDiffusion(Module):
         bond_loss = self.zero
 
         if add_bond_loss:
-            atompair_mask = einx.logical_and('b i, b j -> b i j', atom_mask, atom_mask)
+            atompair_mask = to_pairwise_mask(atom_mask)
 
             denoised_cdist = torch.cdist(denoised_atom_pos, denoised_atom_pos, p = 2)
             normalized_cdist = torch.cdist(atom_pos_ground_truth, atom_pos_ground_truth, p = 2)
@@ -2420,7 +2431,7 @@ class SmoothLDDTLoss(Module):
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
-        is_nucleotide_pair = einx.logical_and('b i, b j -> b i j', is_nucleotide, is_nucleotide)
+        is_nucleotide_pair = to_pairwise_mask(is_nucleotide)
 
         inclusion_radius = torch.where(
             is_nucleotide_pair,
@@ -2433,7 +2444,7 @@ class SmoothLDDTLoss(Module):
 
         # Take into account variable lengthed atoms in batch
         if exists(coords_mask):
-            paired_coords_mask = einx.logical_and('b i, b j -> b i j', coords_mask, coords_mask)
+            paired_coords_mask = to_pairwise_mask(coords_mask)
             mask = mask & paired_coords_mask
 
         # Calculate masked averaging
@@ -3236,8 +3247,7 @@ class ComputeConfidenceScore(Module):
 
         pde = einsum(probs, bin_centers, 'b i j pde, pde -> b i j ')
 
-        mask = einx.logical_and(
-            'b i, b j -> b i j', tok_repr_atm_mask, tok_repr_atm_mask)
+        mask = to_pairwise_mask(tok_repr_atm_mask)
 
         pde = pde * mask
         return pde
@@ -3610,8 +3620,7 @@ class ComputeModelSelectionScore(Module):
             contact_mask, dist_probs, 0.
         ).sum(dim=-1)
 
-        mask = einx.logical_and(
-            'b i, b j -> b i j', tok_repr_atm_mask, tok_repr_atm_mask)
+        mask = to_pairwise_mask(tok_repr_atm_mask)
         contact_prob = contact_prob * mask
 
         # Section 5.7 equation 16
@@ -3652,7 +3661,7 @@ class ComputeModelSelectionScore(Module):
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
-        is_nucleotide_pair = einx.logical_and('b i, b j -> b i j', is_nucleotide, is_nucleotide)
+        is_nucleotide_pair = to_pairwise_mask(is_nucleotide)
 
         inclusion_radius = torch.where(
             is_nucleotide_pair,
@@ -3665,7 +3674,7 @@ class ComputeModelSelectionScore(Module):
 
         # Take into account variable lengthed atoms in batch
         if exists(coords_mask):
-            paired_coords_mask = einx.logical_and('b i, b j -> b i j', coords_mask, coords_mask)
+            paired_coords_mask = to_pairwise_mask(coords_mask)
             mask = mask & paired_coords_mask
 
         mask = mask * pairwise_mask
@@ -3703,9 +3712,7 @@ class ComputeModelSelectionScore(Module):
 
         is_dna = is_molecule_types[..., IS_DNA_INDEX]
         is_rna = is_molecule_types[..., IS_RNA_INDEX]
-        pairwise_mask = einx.logical_and(
-             'b m, b n -> b m n', asym_mask_a, asym_mask_b,
-        )
+        pairwise_mask = to_pairwise_mask(asym_mask_a)
 
         lddt = self.compute_lddt(
             pred_coords, true_coords, is_dna, is_rna, pairwise_mask, coords_mask
@@ -4342,7 +4349,7 @@ class Alphafold3(Module):
         # not to ligands + metal ions
 
         is_chained_biomol = is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim = -1) # first three types are chained biomolecules (protein, rna, dna)
-        paired_is_chained_biomol = einx.logical_and('b i, b j -> b i j', is_chained_biomol, is_chained_biomol)
+        paired_is_chained_biomol = to_pairwise_mask(is_chained_biomol)
 
         relative_position_encoding = einx.where(
             'b i j, b i j d, -> b i j d',
@@ -4374,7 +4381,7 @@ class Alphafold3(Module):
         # molecule mask and pairwise mask
 
         mask = molecule_atom_lens > 0
-        pairwise_mask = einx.logical_and('b i, b j -> b i j', mask, mask)
+        pairwise_mask = to_pairwise_mask(mask)
 
         # prepare mask for msa module and template embedder
         # which is equivalent to the `is_protein` of the `is_molecular_types` input
@@ -4525,7 +4532,7 @@ class Alphafold3(Module):
 
             # account for representative distogram atom missing from residue (-1 set on distogram_atom_indices field)
 
-            valid_distogram_mask = einx.logical_and('b i, b j -> b i j', valid_distogram_mask, valid_distogram_mask)
+            valid_distogram_mask = to_pairwise_mask(valid_distogram_mask)
             distance_labels.masked_fill_(~valid_distogram_mask, ignore)
 
         if exists(distance_labels):
@@ -4680,7 +4687,7 @@ class Alphafold3(Module):
             if self.confidence_head.atom_resolution:
                 label_mask = atom_mask
 
-            label_pairwise_mask = einx.logical_and('... i, ... j -> ... i j', label_mask, label_mask)
+            label_pairwise_mask = to_pairwise_mask(label_mask)
 
             # cross entropy losses
 
