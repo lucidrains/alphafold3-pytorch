@@ -319,7 +319,7 @@ class Trainer:
             adam_klass = Adam
 
             if use_adam_atan2:
-                del default_adam_kwargs['eps']
+                default_adam_kwargs.pop('eps', None)
                 adam_klass = AdamAtan2
 
             optimizer = adam_klass(
