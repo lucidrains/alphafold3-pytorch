@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      matrix:
+        group: [1, 2, 3]
 
     steps:
     - uses: actions/checkout@v4
@@ -25,4 +27,4 @@ jobs:
         python -m pip install -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest tests/
+        python -m pytest --splits 3 --group ${{ matrix.group }} tests/
