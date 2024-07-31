@@ -61,4 +61,5 @@ dataset_config:
     convert_pdb_to_atom: true
     pdb_to_atom_kwargs:
         n_jobs: 1
+        overwrite_existing: true
 

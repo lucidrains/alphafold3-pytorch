@@ -224,7 +224,8 @@ def pdb_dataset_to_atom_inputs(
     indices: Iterable | None = None,
     return_atom_dataset = False,
     n_jobs: int = 8,
-    parallel_kwargs: dict = dict()
+    parallel_kwargs: dict = dict(),
+    overwrite_existing: bool = False,
 ) -> Path | AtomDataset:
 
     if not exists(output_atom_folder):
@@ -243,16 +244,20 @@ def pdb_dataset_to_atom_inputs(
         molecule_to_atom_input
     )
 
+    def should_process_pdb_input(index):
+        atom_input_path = output_atom_folder / f'{index}.pt'
+        return not atom_input_path.exists() or overwrite_existing
+
     @delayed
     def pdb_input_to_atom_file(index, path):
         pdb_input = pdb_dataset[index]
 
         atom_input = to_atom_input_fn(pdb_input)
-        atom_input_path = path / f'{index}.pt'
 
+        atom_input_path = path / f'{index}.pt'
         atom_input_to_file(atom_input, atom_input_path)
 
-    Parallel(n_jobs = n_jobs, **parallel_kwargs)(pdb_input_to_atom_file(index, output_atom_folder) for index in indices)
+    Parallel(n_jobs = n_jobs, **parallel_kwargs)(pdb_input_to_atom_file(index, output_atom_folder) for index in filter(should_process_pdb_input, indices))
 
     if not return_atom_dataset:
         return output_atom_folder
