@@ -69,5 +69,6 @@ __all__ = [
     Int,
     Bool,
     typecheck,
+    should_typecheck,
     beartype_isinstance
 ]

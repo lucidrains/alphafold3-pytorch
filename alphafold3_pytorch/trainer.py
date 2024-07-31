@@ -10,6 +10,7 @@ from alphafold3_pytorch.attention import pad_at_dim, pad_or_slice_to
 from typing import TypedDict, List, Callable
 
 from alphafold3_pytorch.tensor_typing import (
+    should_typecheck,
     typecheck,
     Int, Bool, Float
 )
@@ -278,7 +279,8 @@ class Trainer:
         ema_kwargs: dict = dict(
             use_foreach = True
         ),
-        use_adam_atan2: bool = False
+        use_adam_atan2: bool = False,
+        use_torch_compile: bool = False
     ):
         super().__init__()
 
@@ -287,10 +289,6 @@ class Trainer:
 
         self.fabric = fabric
         fabric.launch()
-
-        # model
-
-        self.model = model
 
         # exponential moving average
 
@@ -304,6 +302,16 @@ class Trainer:
                 include_online_model = False,
                 **ema_kwargs
             )
+
+        # maybe torch compile
+
+        if use_torch_compile:
+            assert not should_typecheck, f'does not work well with jaxtyping + beartype, please invoke your training script with the environment flag `TYPECHECK=False` - ex. `TYPECHECK=False python train_af3.py`'
+            model = torch.compile(model)
+
+        # model
+
+        self.model = model
 
         # optimizer
 
