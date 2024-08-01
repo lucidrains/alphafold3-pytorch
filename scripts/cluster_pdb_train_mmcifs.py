@@ -151,10 +151,11 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
     filepath: str,
     assume_one_based_residue_ids: bool = False,
     min_num_residues_for_protein_classification: int = 10,
+    interface_distance_threshold: float = 5.0,
 ) -> Tuple[Dict[str, str], Set[str]]:
     """
     Parse an mmCIF file and return a dictionary mapping chain IDs
-    to sequences for all molecule types (i.e., proteins, rna, dna, peptides, ligands, etc)
+    to sequences for all molecule types (i.e., proteins, rna, dna, peptides, ligands, etc.)
     as well as a set of chain ID pairs denoting structural interfaces.
     """
     assert filepath.endswith(".cif"), "The input file must be an mmCIF file."
@@ -192,7 +193,9 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
 
             # Find all interfaces defined as pairs of chains with minimum heavy atom (i.e. non-hydrogen) separation less than 5 Å
             for atom in res:
-                for neighbor in neighbor_search.search(atom.coord, 5.0, "R"):
+                for neighbor in neighbor_search.search(
+                    atom.coord, interface_distance_threshold, "R"
+                ):
                     neighbor_chain_id = neighbor.get_parent().get_id()
                     if chain.id == neighbor_chain_id:
                         continue
