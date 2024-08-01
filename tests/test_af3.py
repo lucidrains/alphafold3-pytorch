@@ -208,14 +208,17 @@ def test_pairformer(
         loss = single_out.sum() + pairwise_out.sum()
         loss.backward()
 
-def test_msa_module():
-
-    single = torch.randn(2, 16, 384)
-    pairwise = torch.randn(2, 16, 16, 128)
+@pytest.mark.parametrize('checkpoint', (False, True))
+def test_msa_module(
+    checkpoint
+):
+    single = torch.randn(2, 16, 384).requires_grad_()
+    pairwise = torch.randn(2, 16, 16, 128).requires_grad_()
     msa = torch.randn(2, 7, 16, 64)
     mask = torch.randint(0, 2, (2, 16)).bool()
 
     msa_module = MSAModule(
+        checkpoint = checkpoint,
         max_num_msa = 3 # will randomly select 3 out of the MSAs, accounting for mask, using sample without replacement
     )
 
@@ -227,6 +230,10 @@ def test_msa_module():
     )
 
     assert pairwise.shape == pairwise_out.shape
+
+    if checkpoint:
+        loss = pairwise_out.sum()
+        loss.backward()
 
 @pytest.mark.parametrize('serial,checkpoint', ((False, False), (True, False), (True, True)))
 @pytest.mark.parametrize('use_linear_attn', (False, True))

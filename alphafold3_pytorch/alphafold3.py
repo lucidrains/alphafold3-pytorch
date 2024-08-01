@@ -981,6 +981,8 @@ class MSAModule(Module):
         msa_pwa_dropout_row_prob = 0.15,
         msa_pwa_heads = 8,
         msa_pwa_dim_head = 32,
+        checkpoint = False,
+        checkpoint_segments = 1,
         pairwise_block_kwargs: dict = dict(),
         max_num_msa: int | None = None,
         layerscale_output: bool = True
@@ -1028,9 +1030,104 @@ class MSAModule(Module):
                 pairwise_block
             ]))
 
+        self.checkpoint = checkpoint
+        self.checkpoint_segments = checkpoint_segments
+
         self.layers = layers
 
         self.layerscale_output = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
+
+    @typecheck
+    def to_layers(
+        self,
+        *,
+        pairwise_repr: Float['b n n dp'],
+        msa: Float['b s n dm'],
+        mask: Bool['b n'] | None = None,
+        msa_mask: Bool['b s'] | None = None,
+    ) -> Float['b n n dp']:
+
+        for (
+            outer_product_mean,
+            msa_pair_weighted_avg,
+            msa_transition,
+            pairwise_block
+        ) in self.layers:
+
+            # communication between msa and pairwise rep
+
+            pairwise_repr = outer_product_mean(msa, mask = mask, msa_mask = msa_mask) + pairwise_repr
+
+            msa = msa_pair_weighted_avg(msa = msa, pairwise_repr = pairwise_repr, mask = mask) + msa
+            msa = msa_transition(msa) + msa
+
+            # pairwise block
+
+            pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+
+        return pairwise_repr
+
+    @typecheck
+    def to_checkpointed_layers(
+        self,
+        *,
+        pairwise_repr: Float['b n n dp'],
+        msa: Float['b s n dm'],
+        mask: Bool['b n'] | None = None,
+        msa_mask: Bool['b s'] | None = None,
+    ) -> Float['b n n dp']:
+
+        inputs = (pairwise_repr, mask, msa, msa_mask)
+
+        wrapped_layers = []
+
+        def outer_product_mean_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, mask, msa, msa_mask = inputs
+                pairwise_repr = fn(msa = msa, mask = mask, msa_mask = msa_mask) + pairwise_repr
+                return pairwise_repr, mask, msa, msa_mask
+            return inner
+
+        def msa_pair_weighted_avg_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, mask, msa, msa_mask = inputs
+                msa = fn(msa = msa, pairwise_repr = pairwise_repr, mask = mask) + msa
+                return pairwise_repr, mask, msa, msa_mask
+            return inner
+
+        def pairwise_block_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, mask, msa, msa_mask = inputs
+                pairwise_repr = fn(pairwise_repr = pairwise_repr, mask = mask)
+                return pairwise_repr, mask, msa, msa_mask
+            return inner
+
+        def msa_transition_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, mask, msa, msa_mask = inputs
+                msa = fn(msa) + msa
+                return pairwise_repr, mask, msa, msa_mask
+            return inner
+
+        for (
+            outer_product_mean,
+            msa_pair_weighted_avg,
+            msa_transition,
+            pairwise_block
+        ) in self.layers:
+
+            wrapped_layers.append(outer_product_mean_wrapper(outer_product_mean))
+            wrapped_layers.append(msa_pair_weighted_avg_wrapper(msa_pair_weighted_avg))
+            wrapped_layers.append(msa_transition_wrapper(msa_transition))
+            wrapped_layers.append(pairwise_block_wrapper(pairwise_block))
+
+        pairwise_repr, *_ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs, use_reentrant = False)
+
+        return pairwise_repr
 
     @typecheck
     def forward(
@@ -1073,23 +1170,21 @@ class MSAModule(Module):
 
         msa = rearrange(single_msa_feats, 'b n d -> b 1 n d') + msa
 
-        for (
-            outer_product_mean,
-            msa_pair_weighted_avg,
-            msa_transition,
-            pairwise_block
-        ) in self.layers:
+        # going through the layers
 
-            # communication between msa and pairwise rep
+        if should_checkpoint(self, (pairwise_repr, msa)):
+            to_layers_fn = self.to_checkpointed_layers
+        else:
+            to_layers_fn = self.to_layers
 
-            pairwise_repr = outer_product_mean(msa, mask = mask, msa_mask = msa_mask) + pairwise_repr
+        pairwise_repr = to_layers_fn(
+            msa = msa,
+            mask = mask,
+            pairwise_repr = pairwise_repr,
+            msa_mask = msa_mask
+        )
 
-            msa = msa_pair_weighted_avg(msa = msa, pairwise_repr = pairwise_repr, mask = mask) + msa
-            msa = msa_transition(msa) + msa            
-
-            # pairwise block
-
-            pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+        # final masking and then layer scale
 
         if exists(msa_mask):
             pairwise_repr = einx.where(
@@ -1208,6 +1303,7 @@ class PairformerStack(Module):
         inputs = (single_repr, pairwise_repr, mask)
 
         def pairwise_block_wrapper(layer):
+            @wraps(layer)
             def inner(inputs, *args, **kwargs):
                 single_repr, pairwise_repr, mask = inputs
                 pairwise_repr = layer(pairwise_repr = pairwise_repr, mask = mask)
@@ -1215,6 +1311,7 @@ class PairformerStack(Module):
             return inner
 
         def pair_bias_attn_wrapper(layer):
+            @wraps(layer)
             def inner(inputs, *args, **kwargs):
                 single_repr, pairwise_repr, mask = inputs
                 single_repr = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
@@ -1222,6 +1319,7 @@ class PairformerStack(Module):
             return inner
 
         def single_transition_wrapper(layer):
+            @wraps(layer)
             def inner(inputs, *args, **kwargs):
                 single_repr, pairwise_repr, mask = inputs
                 single_repr = layer(single_repr) + single_repr
@@ -1725,6 +1823,7 @@ class DiffusionTransformer(Module):
         wrapped_layers = []
 
         def efficient_attn_wrapper(fn):
+            @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
                 noised_repr = fn(noised_repr, mask = mask) + noised_repr
@@ -1732,6 +1831,7 @@ class DiffusionTransformer(Module):
             return inner
 
         def attn_wrapper(fn):
+            @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
                 noised_repr = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask) + noised_repr
@@ -1739,6 +1839,7 @@ class DiffusionTransformer(Module):
             return inner
 
         def transition_wrapper(fn):
+            @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
                 noised_repr = fn(noised_repr, cond = single_repr) + noised_repr
