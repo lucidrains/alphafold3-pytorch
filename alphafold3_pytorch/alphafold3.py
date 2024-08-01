@@ -170,6 +170,19 @@ def pack_one(t, pattern):
 def exclusive_cumsum(t, dim = -1):
     return t.cumsum(dim = dim) - t
 
+@typecheck
+def masked_average(
+    t: Shaped['...'],
+    mask: Shaped['...'],
+    *,
+    dim: int | Tuple[int, ...],
+    eps = 1.
+) -> Float['...']:
+
+    num = (t * mask).sum(dim = dim)
+    den = mask.sum(dim = dim)
+    return num / den.clamp(min = eps)
+
 # checkpointing utils
 
 @typecheck
@@ -3565,11 +3578,10 @@ class ComputeConfidenceScore(Module):
                     mask_j = (asym_id[b] == chain_j)
                     pair_mask = einx.multiply('i, j -> i j', mask_i, mask_j)
 
-                    pair_residue_weights = pair_mask * (
-                        residue_weights[b, None, :] * residue_weights[b, :, None])
+                    pair_residue_weights = pair_mask * einx.multiply('... i, ... j -> ... i j', residue_weights[b], residue_weights[b])
 
                     if pair_residue_weights.sum() == 0:
-                        # chain i or chain j doesnot have any valid frame
+                        # chain i or chain j does not have any valid frame
                         continue
 
                     normed_residue_mask = pair_residue_weights / (self.eps + torch.sum(
@@ -3738,7 +3750,7 @@ class ComputeRankingScore(Module):
         is_protein_mask = atom_is_molecule_types[..., IS_PROTEIN_INDEX]
         mask = atom_mask * is_protein_mask
 
-        atom_rasa = 1 - plddt
+        atom_rasa = 1. - plddt
 
         disorder = ( (atom_rasa > 0.581) * mask ).sum(dim=-1) / ( self.eps + mask.sum(dim=1)) 
         return disorder
@@ -3864,7 +3876,7 @@ class ComputeRankingScore(Module):
         plddt = self.compute_confidence_score.compute_plddt(confidence_head_logits.plddt)
 
         mask = atom_is_modified_residue * atom_mask
-        plddt_mean =  (plddt * mask).sum(dim=-1) / ( self.eps +  mask.sum(dim=-1)) 
+        plddt_mean = masked_average(plddt, mask, dim = -1, eps = self.eps)
 
         return plddt_mean
 
@@ -3991,7 +4003,7 @@ class ComputeModelSelectionScore(Module):
         contact_prob = contact_prob * mask
 
         # Section 5.7 equation 16
-        gpde = einsum(contact_prob * pde, 'b i j -> b') / einsum(contact_prob, 'b i j -> b').clamp(min=1.)
+        gpde = masked_average(pde, contact_prob, dim = (-1, -2))
 
         return gpde
 
@@ -4050,9 +4062,7 @@ class ComputeModelSelectionScore(Module):
         mask = mask * pairwise_mask
 
         # Calculate masked averaging
-        lddt_sum = (lddt * mask).sum(dim=(-1, -2))
-        lddt_count = mask.sum(dim=(-1, -2))
-        lddt_mean = lddt_sum / lddt_count.clamp(min=1)
+        lddt_mean = masked_average(lddt, mask, dim = (-1, -2))
 
         return lddt_mean
 
