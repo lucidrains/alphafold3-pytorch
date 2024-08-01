@@ -447,6 +447,8 @@ class Attend(Module):
         memory_kv: Float['2 h m d'] | None = None
     ) -> Float['b h i d']:
 
+        dtype = q.dtype
+
         is_windowed_attn_bias = None
 
         if exists(attn_bias):
@@ -506,7 +508,9 @@ class Attend(Module):
 
         # attention
 
-        attn = sim.softmax(dim = -1)
+        attn = sim.softmax(dim = -1, dtype = torch.float32)
+        attn = attn.to(dtype)
+
         attn = self.attn_dropout(attn)
 
         # aggregate values
