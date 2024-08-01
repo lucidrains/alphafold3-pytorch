@@ -275,6 +275,7 @@ class Trainer:
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
         fabric_kwargs: dict = dict(),
+        fp16: bool = False,
         use_ema: bool = True,
         ema_kwargs: dict = dict(
             use_foreach = True
@@ -283,6 +284,14 @@ class Trainer:
         use_torch_compile: bool = False
     ):
         super().__init__()
+
+        # fp16 precision is a root level kwarg
+
+        if fp16:
+            assert 'precision' not in fabric_kwargs
+            fabric_kwargs.update(precision = '16-mixed')
+
+        # instantiate fabric
 
         if not exists(fabric):
             fabric = Fabric(accelerator = accelerator, **fabric_kwargs)
