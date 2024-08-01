@@ -42,10 +42,11 @@ import os
 import subprocess
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, List, Literal, Set, Tuple, Union
+from typing import Dict, List, Literal, Set, Tuple
 
 import numpy as np
 import polars as pl
+import timeout_decorator
 from Bio.Data import PDBData
 from Bio.PDB.NeighborSearch import NeighborSearch
 from loguru import logger
@@ -96,6 +97,24 @@ DNA_LETTERS_1TO3 = {
     "T": "DT",
     "U": "DT",  # NOTE: This mapping is present as a precaution based on outlier PDBs such as `410d`
 }
+
+INTERFACE_SAMPLE_SIZES = {
+    "protein-protein": 600,
+    "dna-protein": 100,
+    "dna-dna": 100,
+    "ligand-protein": 600,
+    "dna-ligand": 50,
+    "ligand-ligand": 200,
+    # NOTE: `None` implies all rows are taken
+    "protein-rna": None,
+    "rna-rna": None,
+    "dna-rna": None,
+    "ligand-rna": None,
+}
+
+IS_NOVEL_LIGAND_MAX_SECONDS_PER_INPUT = (
+    20  # Maximum time allocated to check a single ligand for novelty (in seconds)
+)
 
 
 # Helper functions
@@ -176,10 +195,11 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
     filepath: str,
     assume_one_based_residue_ids: bool = False,
     min_num_residues_for_protein_classification: int = 10,
+    interface_distance_threshold: float = 5.0,
 ) -> Tuple[Dict[str, str], Set[str]]:
     """
     Parse an mmCIF file and return a dictionary mapping chain IDs
-    to sequences for all molecule types (i.e., proteins, rna, dna, peptides, ligands, etc)
+    to sequences for all molecule types (i.e., proteins, rna, dna, peptides, ligands, etc.)
     as well as a set of chain ID pairs denoting structural interfaces.
     """
     assert filepath.endswith(".cif"), "The input file must be an mmCIF file."
@@ -217,7 +237,9 @@ def parse_chain_sequences_and_interfaces_from_mmcif(
 
             # Find all interfaces defined as pairs of chains with minimum heavy atom (i.e. non-hydrogen) separation less than 5 Å
             for atom in res:
-                for neighbor in neighbor_search.search(atom.coord, 5.0, "R"):
+                for neighbor in neighbor_search.search(
+                    atom.coord, interface_distance_threshold, "R"
+                ):
                     neighbor_chain_id = neighbor.get_parent().get_id()
                     if chain.id == neighbor_chain_id:
                         continue
@@ -375,9 +397,10 @@ def filter_to_low_homology_sequences(
     input_all_chain_sequences: CHAIN_SEQUENCES,
     reference_all_chain_sequences: CHAIN_SEQUENCES,
     input_interface_chain_ids: CHAIN_INTERFACES,
-    reference_interface_chain_ids: CHAIN_INTERFACES,
     input_fasta_filepath: str,
     reference_fasta_filepath: str,
+    max_polymer_similarity: float = 0.4,
+    max_ligand_similarity: float = 0.85,
     max_workers: int = 2,
 ) -> Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Filter targets to only low homology sequences."""
@@ -451,19 +474,16 @@ def filter_to_low_homology_sequences(
         reference_multimer_chain_sequences,
         reference_multimer_fasta_filepath,
         molecule_type="protein",
-        interface_chain_ids=reference_interface_chain_ids,
     )
     write_sequences_to_fasta(
         reference_multimer_chain_sequences,
         reference_multimer_fasta_filepath,
         molecule_type="nucleic_acid",
-        interface_chain_ids=reference_interface_chain_ids,
     )
     write_sequences_to_fasta(
         reference_multimer_chain_sequences,
         reference_multimer_fasta_filepath,
         molecule_type="peptide",
-        interface_chain_ids=reference_interface_chain_ids,
     )
 
     # Use MMseqs2 to perform all-against-all sequence identity comparisons for monomers
@@ -473,10 +493,12 @@ def filter_to_low_homology_sequences(
         reference_monomer_fasta_filepath,
         args.output_dir,
         molecule_type="protein",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
         extra_parameters={
             # force protein mode
             "--dbtype": 1,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
         },
     )
     input_monomer_nucleic_acid_sequence_names = search_sequences_using_mmseqs2(
@@ -484,12 +506,14 @@ def filter_to_low_homology_sequences(
         reference_monomer_fasta_filepath,
         args.output_dir,
         molecule_type="nucleic_acid",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
         extra_parameters={
             # force nucleotide mode
             "--dbtype": 2,
             # force nucleotide search mode
             "--search-type": 3,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
             # 7 or 8 should work best, something to test
             "-k": 8,
             # there is currently an issue in mmseqs2 with nucleotide search and spaced k-mers
@@ -501,12 +525,14 @@ def filter_to_low_homology_sequences(
         reference_monomer_fasta_filepath,
         args.output_dir,
         molecule_type="peptide",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
         # some of these parameters are from the spacepharer optimized parameters
         # these were for short CRISPR spacer recognition, so they should work well for arbitrary peptides
         extra_parameters={
             # force protein mode
             "--dbtype": 1,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
             # spacepharer optimized parameters
             "--gap-open": 16,
             "--gap-extend": 2,
@@ -542,48 +568,57 @@ def filter_to_low_homology_sequences(
     # Use MMseqs2 and RDKit to perform all-against-all sequence identity
     # and thresholded Tanimoto similarity comparisons for multimers
 
-    input_multimer_protein_sequence_names = search_sequences_using_mmseqs2(
+    input_multimer_protein_chain_mappings = search_sequences_using_mmseqs2(
         input_multimer_fasta_filepath,
         reference_multimer_fasta_filepath,
         args.output_dir,
         molecule_type="protein",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
+        interface_chain_ids=input_interface_chain_ids,
         alignment_file_prefix="alnRes_multimer_",
         extra_parameters={
             # force protein mode
             "--dbtype": 1,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
         },
     )
-    input_multimer_nucleic_acid_sequence_names = search_sequences_using_mmseqs2(
+    input_multimer_nucleic_acid_chain_mappings = search_sequences_using_mmseqs2(
         input_multimer_fasta_filepath,
         reference_multimer_fasta_filepath,
         args.output_dir,
         molecule_type="nucleic_acid",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
+        interface_chain_ids=input_interface_chain_ids,
         alignment_file_prefix="alnRes_multimer_",
         extra_parameters={
             # force nucleotide mode
             "--dbtype": 2,
             # force nucleotide search mode
             "--search-type": 3,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
             # 7 or 8 should work best, something to test
             "-k": 8,
             # there is currently an issue in mmseqs2 with nucleotide search and spaced k-mers
             "--spaced-kmer-mode": 0,
         },
     )
-    input_multimer_peptide_sequence_names = search_sequences_using_mmseqs2(
+    input_multimer_peptide_chain_mappings = search_sequences_using_mmseqs2(
         input_multimer_fasta_filepath,
         reference_multimer_fasta_filepath,
         args.output_dir,
         molecule_type="peptide",
-        max_seq_id=0.4,
+        max_seq_id=max_polymer_similarity,
+        interface_chain_ids=input_interface_chain_ids,
         alignment_file_prefix="alnRes_multimer_",
         # some of these parameters are from the spacepharer optimized parameters
         # these were for short CRISPR spacer recognition, so they should work well for arbitrary peptides
         extra_parameters={
             # force protein mode
             "--dbtype": 1,
+            # force sensitivity level 8 per @milot-mirdita's suggestion
+            "-s": 8,
             # spacepharer optimized parameters
             "--gap-open": 16,
             "--gap-extend": 2,
@@ -604,25 +639,47 @@ def filter_to_low_homology_sequences(
             "-e": "inf",
         },
     )
-    input_multimer_sequence_names = (
-        input_multimer_protein_sequence_names
-        | input_multimer_nucleic_acid_sequence_names
-        | input_multimer_peptide_sequence_names
-    )
+
+    input_multimer_chain_mappings_list = []
+    if len(input_multimer_protein_chain_mappings):
+        input_multimer_chain_mappings_list.append(input_multimer_protein_chain_mappings)
+    if len(input_multimer_nucleic_acid_chain_mappings):
+        input_multimer_chain_mappings_list.append(input_multimer_nucleic_acid_chain_mappings)
+    if len(input_multimer_peptide_chain_mappings):
+        input_multimer_chain_mappings_list.append(input_multimer_peptide_chain_mappings)
+    input_multimer_chain_mappings = pl.concat(input_multimer_chain_mappings_list)
 
     # Identify multimer sequences and interfaces that passed the sequence identity and Tanimoto similarity criteria
 
-    reference_ligand_chain_sequences = filter_chains_by_molecule_type(
+    fpgen = AllChem.GetRDKitFPGenerator()
+    reference_ligand_ccd_codes = filter_chains_by_molecule_type(
         reference_multimer_chain_sequences,
         molecule_type="ligand",
-        interface_chain_ids=reference_interface_chain_ids,
     )
+    reference_ligand_fps = []
+    for reference_ligand_ccd_code in reference_ligand_ccd_codes:
+        reference_ligand_smiles = CCD_COMPONENTS_SMILES.get(reference_ligand_ccd_code, None)
+        if not exists(reference_ligand_smiles):
+            logger.warning(
+                f"Could not find SMILES for reference CCD ligand: {reference_ligand_ccd_code}"
+            )
+            continue
+        reference_ligand_mol = Chem.MolFromSmiles(reference_ligand_smiles)
+        if not exists(reference_ligand_mol):
+            logger.warning(
+                f"Could not generate RDKit molecule for reference CCD ligand: {reference_ligand_ccd_code}"
+            )
+            continue
+        reference_ligand_fp = fpgen.GetFingerprint(reference_ligand_mol)
+        reference_ligand_fps.append(reference_ligand_fp)
+
     input_multimer_chain_sequences, input_interface_chain_ids = filter_chains_by_sequence_names(
         input_multimer_chain_sequences,
-        input_multimer_sequence_names,
+        input_multimer_chain_mappings.select(["query", "fident"]).to_numpy(),
         interface_chain_ids=input_interface_chain_ids,
-        reference_ligand_chain_sequences=reference_ligand_chain_sequences,
-        max_ligand_similarity=0.85,
+        reference_ligand_fps=reference_ligand_fps,
+        max_polymer_similarity=max_polymer_similarity,
+        max_ligand_similarity=max_ligand_similarity,
         max_workers=max_workers,
     )
 
@@ -682,9 +739,10 @@ def write_sequences_to_fasta(
     return molecule_ids
 
 
+@timeout_decorator.timeout(IS_NOVEL_LIGAND_MAX_SECONDS_PER_INPUT, use_signals=False)
 def is_novel_ligand(
     ligand_sequence: str,
-    reference_ligand_chain_sequences: List[str],
+    reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect],
     max_sim: float = 0.85,
     verbose: bool = False,
 ) -> bool:
@@ -702,24 +760,9 @@ def is_novel_ligand(
                 f"Could not generate RDKit molecule for ligand sequence: {ligand_sequence}"
             )
         return True
+    ligand_fp = fpgen.GetFingerprint(ligand_mol)
 
-    for reference_ligand_sequence in reference_ligand_chain_sequences:
-        reference_ligand_smiles = CCD_COMPONENTS_SMILES.get(reference_ligand_sequence, None)
-        if not exists(reference_ligand_smiles):
-            if verbose:
-                logger.warning(
-                    f"Could not find SMILES for reference ligand sequence: {reference_ligand_sequence}"
-                )
-            continue
-        reference_ligand_mol = Chem.MolFromSmiles(reference_ligand_smiles)
-        if not exists(reference_ligand_mol):
-            if verbose:
-                logger.warning(
-                    f"Could not generate RDKit molecule for reference ligand sequence: {reference_ligand_sequence}"
-                )
-            continue
-        ligand_fp = fpgen.GetFingerprint(ligand_mol)
-        reference_ligand_fp = fpgen.GetFingerprint(reference_ligand_mol)
+    for reference_ligand_fp in reference_ligand_fps:
         sim = DataStructs.TanimotoSimilarity(ligand_fp, reference_ligand_fp)
         if sim > max_sim:
             return False
@@ -729,37 +772,107 @@ def is_novel_ligand(
 
 def filter_structure_chain_sequences(
     structure_chain_sequences: Dict[str, Dict[str, str]],
-    sequence_names: Set[str],
-    interface_chain_ids: CHAIN_INTERFACES,
-    reference_ligand_chain_sequences: List[str],
+    sequence_names: Set[str] | np.ndarray,
+    interface_chain_ids: CHAIN_INTERFACES | None,
+    reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect] | None,
+    max_polymer_similarity: float,
     max_ligand_similarity: float,
-    interfaces_provided: bool,
     filtered_structure_ids: Set[str],
 ):
     """Filter chain sequences based on either sequence names or Tanimoto similarity."""
     structure_id, chain_sequences = list(structure_chain_sequences.items())[0]
+    interfaces_provided = exists(interface_chain_ids)
+
+    if interfaces_provided:
+        assert isinstance(
+            sequence_names, np.ndarray
+        ), "Sequence names must be provided as a NumPy array if interfaces are also provided."
+        assert exists(
+            reference_ligand_fps
+        ), "Reference ligand fingerprints must be provided if interfaces are also provided."
+
     filtered_structure_chain_sequences = {}
     filtered_interface_chain_ids = defaultdict(set)
 
     for chain_id, sequence in chain_sequences.items():
-        _, molecule_type_ = chain_id.split(":")
-        molecule_type = molecule_type_.split("-")[0]
         sequence_name = f"{structure_id}{chain_id}"
-        if interfaces_provided and sequence_name in sequence_names:
-            filtered_structure_chain_sequences[chain_id] = sequence
-        elif (
-            interfaces_provided
-            and any(
-                chain_id in interface_chain_id.split("+")
+        molecule_type = chain_id.split(":")[1].split("-")[0]
+        if interfaces_provided:
+            matching_interfaces = [
+                interface_chain_id
                 for interface_chain_id in interface_chain_ids[structure_id]
-            )
-            and molecule_type == "ligand"
-        ):
-            ligand_is_novel = is_novel_ligand(
-                sequence, reference_ligand_chain_sequences, max_sim=max_ligand_similarity
-            )
-            if ligand_is_novel:
+                if chain_id in interface_chain_id.split("+")
+            ]
+
+            if any(matching_interfaces):
+                interface_is_novel = True
+                for interface in matching_interfaces:
+                    ptnr1_chain_id, ptnr2_chain_id = interface.split("+")
+                    ptnr1_sequence = chain_sequences.get(ptnr1_chain_id, None)
+                    ptnr2_sequence = chain_sequences.get(ptnr2_chain_id, None)
+                    ptnr1_molecule_type = ptnr1_chain_id.split(":")[1].split("-")[0]
+                    ptnr2_molecule_type = ptnr2_chain_id.split(":")[1].split("-")[0]
+
+                    if not (exists(ptnr1_sequence) and exists(ptnr2_sequence)):
+                        continue
+
+                    if ptnr1_molecule_type == "ligand":
+                        # NOTE: We currently do not filter out interfaces
+                        # involving a ligand with ranking model fit less
+                        # than 0.5 or with multiple residues, due to a lack
+                        # of available metadata within the context of this
+                        # clustering script. This may be revisited in the future.
+                        try:
+                            ptnr1_is_novel = is_novel_ligand(
+                                ptnr1_sequence,
+                                reference_ligand_fps,
+                                max_sim=max_ligand_similarity,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to check if partner 1 ligand is novel due to: {e}. Assuming it is not novel..."
+                            )
+                            ptnr1_is_novel = False
+                    else:
+                        matching_ptnr1_sequence_names = sequence_names[
+                            sequence_names[:, 0] == f"{structure_id}{ptnr1_chain_id}"
+                        ]
+                        ptnr1_is_novel = not matching_ptnr1_sequence_names.size or (
+                            matching_ptnr1_sequence_names[:, 1].max() <= max_polymer_similarity
+                        )
+
+                    if ptnr2_molecule_type == "ligand":
+                        try:
+                            ptnr2_is_novel = is_novel_ligand(
+                                ptnr2_sequence,
+                                reference_ligand_fps,
+                                max_sim=max_ligand_similarity,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to check if partner 2 ligand is novel due to: {e}. Assuming it is not novel..."
+                            )
+                            ptnr2_is_novel = False
+                    else:
+                        matching_ptnr2_sequence_names = sequence_names[
+                            sequence_names[:, 0] == f"{structure_id}{ptnr2_chain_id}"
+                        ]
+                        ptnr2_is_novel = not matching_ptnr2_sequence_names.size or (
+                            matching_ptnr2_sequence_names[:, 1].max() <= max_polymer_similarity
+                        )
+
+                    if not (ptnr1_is_novel or ptnr2_is_novel):
+                        # NOTE: An interface is only considered novel if at least one of its chains is novel
+                        interface_is_novel = False
+                        break
+
+                if interface_is_novel:
+                    # NOTE: Only if all of a chain's associated interfaces are novel will the chain be kept
+                    filtered_structure_chain_sequences[chain_id] = sequence
+            else:
+                # NOTE: Chains within a multimeric structure that are not interfacing with any other chain are kept as is
                 filtered_structure_chain_sequences[chain_id] = sequence
+
         elif not interfaces_provided and (
             sequence_name in sequence_names
             or (structure_id in filtered_structure_ids and molecule_type == "ligand")
@@ -782,22 +895,31 @@ def filter_structure_chain_sequences(
 @typecheck
 def filter_chains_by_sequence_names(
     all_chain_sequences: CHAIN_SEQUENCES,
-    sequence_names: Set[str],
+    sequence_names: Set[str] | np.ndarray,
     interface_chain_ids: CHAIN_INTERFACES | None = None,
-    reference_ligand_chain_sequences: List[str] | None = None,
+    reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect] | None = None,
+    max_polymer_similarity: float = 0.4,
     max_ligand_similarity: float = 0.85,
     max_workers: int = 2,
-) -> Union[CHAIN_SEQUENCES, Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]]:
+) -> CHAIN_SEQUENCES | Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Return only chains (and potentially interfaces) with sequence names in the given set."""
     filtered_structure_ids = set(
-        name.split("-assembly1")[0] + "-assembly1" for name in sequence_names
+        name.split("-assembly1")[0] + "-assembly1"
+        for name in (
+            sequence_names[:, 0].tolist()
+            if isinstance(sequence_names, np.ndarray)
+            else sequence_names
+        )
     )
-    interfaces_provided = interface_chain_ids is not None
+    interfaces_provided = exists(interface_chain_ids)
 
     if interfaces_provided:
-        assert (
-            reference_ligand_chain_sequences is not None
-        ), "Reference ligand sequences must be provided if interfaces are also provided."
+        assert isinstance(
+            sequence_names, np.ndarray
+        ), "Sequence names must be provided as a NumPy array if interfaces are also provided."
+        assert exists(
+            reference_ligand_fps
+        ), "Reference ligand fingerprints must be provided if interfaces are also provided."
 
     filtered_chain_sequences = []
     filtered_interface_chain_ids = defaultdict(set)
@@ -806,13 +928,13 @@ def filter_chains_by_sequence_names(
         future_to_structure = {
             executor.submit(
                 filter_structure_chain_sequences,
-                structure_chain_sequences,
-                sequence_names,
-                interface_chain_ids,
-                reference_ligand_chain_sequences,
-                max_ligand_similarity,
-                interfaces_provided,
-                filtered_structure_ids,
+                structure_chain_sequences=structure_chain_sequences,
+                sequence_names=sequence_names,
+                interface_chain_ids=interface_chain_ids,
+                reference_ligand_fps=reference_ligand_fps,
+                max_polymer_similarity=max_polymer_similarity,
+                max_ligand_similarity=max_ligand_similarity,
+                filtered_structure_ids=filtered_structure_ids,
             ): structure_chain_sequences
             for structure_chain_sequences in all_chain_sequences
         }
@@ -899,9 +1021,10 @@ def search_sequences_using_mmseqs2(
     output_dir: str,
     molecule_type: CLUSTERING_MOLECULE_TYPE,
     max_seq_id: float = 0.4,
+    interface_chain_ids: CHAIN_INTERFACES | None = None,
     alignment_file_prefix: str = "alnRes_",
-    extra_parameters: Dict[str, Union[int, float, str]] | None = None,
-) -> Set[str]:
+    extra_parameters: Dict[str, int | float | str] | None = None,
+) -> Set[str] | pl.DataFrame:
     """Run MMseqs2 on the input FASTA file and write the resulting search outputs to a local output directory."""
     assert input_filepath.endswith(".fasta"), "The input file must be a FASTA file."
     assert reference_filepath.endswith(".fasta"), "The reference file must be a FASTA file."
@@ -939,38 +1062,61 @@ def search_sequences_using_mmseqs2(
             f"Output alignment file '{output_alignment_filepath}' does not exist. No input sequences were found."
         )
         return set()
+    try:
+        chain_search_mapping = pl.read_csv(
+            output_alignment_filepath,
+            separator="\t",
+            has_header=False,
+            new_columns=[
+                "query",
+                "target",
+                "fident",
+                "alnlen",
+                "mismatch",
+                "gapopen",
+                "qstart",
+                "qend",
+                "tstart",
+                "tend",
+                "evalue",
+                "bits",
+            ],
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to read MMseqs2 alignment file '{output_alignment_filepath}' due to: {e}"
+        )
+        return set()
 
-    chain_search_mapping = pl.read_csv(
-        output_alignment_filepath,
-        separator="\t",
-        has_header=False,
-        new_columns=[
-            "query",
-            "target",
-            "fident",
-            "alnlen",
-            "mismatch",
-            "gapopen",
-            "qstart",
-            "qend",
-            "tstart",
-            "tend",
-            "evalue",
-            "bits",
-        ],
-    )
+    # For monomers, filter out sequences with reference sequence identity greater than the maximum threshold;
+    # For multimers, return the chain search results for all input-reference combinations
 
-    # Filter out sequences with reference sequence identity greater than the maximum threshold
+    if exists(interface_chain_ids):
+        return chain_search_mapping
+    else:
+        input_queries = set()
+        with open(input_filepath, "r") as f:
+            for line in f:
+                if line.startswith(">"):
+                    input_queries.add(line.strip().lstrip(">"))
 
-    filtered_chains = set(
-        chain_search_mapping.group_by("query")
-        .agg(pl.max("fident"))
-        .filter(pl.col("fident") <= max_seq_id)
-        .get_column("query")
-        .to_list()
-    )
+        # Re-insert the names of input queries for which MMseqs2 could not find a match,
+        # as these are safely not homologous to any reference sequence (due to MMseqs2's
+        # default sensitivity settings)
 
-    return filtered_chains
+        mappable_queries = set(chain_search_mapping.get_column("query").to_list())
+        unmappable_queries = input_queries - mappable_queries
+
+        return (
+            set(
+                chain_search_mapping.group_by("query")
+                .agg(pl.max("fident"))
+                .filter(pl.col("fident") <= max_seq_id)
+                .get_column("query")
+                .to_list()
+            )
+            | unmappable_queries
+        )
 
 
 @typecheck
@@ -981,7 +1127,7 @@ def cluster_sequences_using_mmseqs2(
     min_seq_id: float = 0.5,
     coverage: float = 0.8,
     coverage_mode: Literal[0, 1, 2, 3] = 1,
-    extra_parameters: Dict[str, Union[int, float, str]] | None = None,
+    extra_parameters: Dict[str, int | float | str] | None = None,
 ) -> Dict[str, int]:
     """Run MMseqs2 on the input FASTA file and write the resulting clusters to a local output directory."""
     assert input_filepath.endswith(".fasta"), "The input file must be a FASTA file."
@@ -1416,11 +1562,6 @@ if __name__ == "__main__":
         ) as f:
             reference_all_chain_sequences = json.load(f)
 
-        with open(
-            os.path.join(args.reference_clustering_dir, "interface_chain_ids.json"), "r"
-        ) as f:
-            reference_interface_chain_ids = json.load(f)
-
         (
             all_chain_sequences,
             interface_chain_ids,
@@ -1428,7 +1569,6 @@ if __name__ == "__main__":
             all_chain_sequences,
             reference_all_chain_sequences,
             interface_chain_ids,
-            reference_interface_chain_ids,
             fasta_filepath,
             reference_fasta_filepath,
             max_workers=args.no_workers,
@@ -1684,22 +1824,8 @@ if __name__ == "__main__":
         .alias("interface_type")
     )
 
-    interface_sample_sizes = {
-        "protein-protein": 600,
-        "dna-protein": 100,
-        "dna-dna": 100,
-        "ligand-protein": 600,
-        "dna-ligand": 50,
-        "ligand-ligand": 200,
-        # NOTE: `None` implies all rows are taken
-        "protein-rna": None,
-        "rna-rna": None,
-        "dna-rna": None,
-        "ligand-rna": None,
-    }
-
     sampled_interface_dataframes = []
-    for interface_type, sample_size in interface_sample_sizes.items():
+    for interface_type, sample_size in INTERFACE_SAMPLE_SIZES.items():
         filtered_interface_df = interface_clusters.filter(
             pl.col("interface_type") == interface_type
         )
