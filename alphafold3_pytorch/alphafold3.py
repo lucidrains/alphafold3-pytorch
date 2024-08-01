@@ -1241,7 +1241,7 @@ class PairformerStack(Module):
                 wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
                 wrapped_layers.append(single_transition_wrapper(single_transition))
 
-        single_repr, pairwise_repr, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+        single_repr, pairwise_repr, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs, use_reentrant = False)
 
         return single_repr, pairwise_repr
 
@@ -1615,6 +1615,8 @@ class DiffusionTransformer(Module):
         serial = False,
         add_residual = True,
         use_linear_attn = False,
+        checkpoint = False,
+        checkpoint_segments = 1,
         linear_attn_kwargs = dict(
             heads = 8,
             dim_head = 16
@@ -1689,6 +1691,9 @@ class DiffusionTransformer(Module):
                 conditionable_transition
             ]))
 
+        self.checkpoint = checkpoint
+        self.checkpoint_segments = checkpoint_segments
+
         self.layers = layers
 
         self.serial = serial
@@ -1701,6 +1706,134 @@ class DiffusionTransformer(Module):
             assert not exists(attn_window_size), 'register tokens disabled for windowed attention'
 
             self.registers = nn.Parameter(torch.zeros(num_register_tokens, dim))
+
+    @typecheck
+    def to_checkpointed_serial_layers(
+        self,
+        noised_repr: Float['b n d'],
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
+        mask: Bool['b n'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None
+    ):
+
+        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask)
+
+        wrapped_layers = []
+
+        def efficient_attn_wrapper(fn):
+            def inner(inputs):
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr = fn(noised_repr, mask = mask) + noised_repr
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+            return inner
+
+        def attn_wrapper(fn):
+            def inner(inputs):
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask) + noised_repr
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+            return inner
+
+        def transition_wrapper(fn):
+            def inner(inputs):
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr = fn(noised_repr, cond = single_repr) + noised_repr
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+            return inner
+
+        for linear_attn, colt5_attn, attn, transition in self.layers:
+
+            if exists(linear_attn):
+                wrapped_layers.append(efficient_attn_wrapper(linear_attn))
+
+            if exists(colt5_attn):
+                wrapped_layers.append(efficient_attn_wrapper(colt5_attn))
+
+            wrapped_layers.append(attn_wrapper(attn))
+            wrapped_layers.append(transition_wrapper(transition))
+
+        out = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs, use_reentrant = False)
+
+        noised_repr, *_ = out
+        return noised_repr
+
+    @typecheck
+    def to_serial_layers(
+        self,
+        noised_repr: Float['b n d'],
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
+        mask: Bool['b n'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None
+    ):
+
+        for linear_attn, colt5_attn, attn, transition in self.layers:
+
+            if exists(linear_attn):
+                noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
+
+            if exists(colt5_attn):
+                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
+
+            noised_repr = attn(
+                noised_repr,
+                cond = single_repr,
+                pairwise_repr = pairwise_repr,
+                mask = mask,
+                windowed_mask = windowed_mask
+            ) + noised_repr
+
+            noised_repr = transition(
+                noised_repr,
+                cond = single_repr
+            ) + noised_repr
+
+        return noised_repr
+
+    @typecheck
+    def to_parallel_layers(
+        self,
+        noised_repr: Float['b n d'],
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
+        mask: Bool['b n'] | None = None,
+        windowed_mask: Bool['b nw w (w*2)'] | None = None
+    ):
+
+        for linear_attn, colt5_attn, attn, transition in self.layers:
+
+            if exists(linear_attn):
+                noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
+
+            if exists(colt5_attn):
+                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
+
+            attn_out = attn(
+                noised_repr,
+                cond = single_repr,
+                pairwise_repr = pairwise_repr,
+                mask = mask,
+                windowed_mask = windowed_mask
+            )
+
+            ff_out = transition(
+                noised_repr,
+                cond = single_repr
+            )
+
+            # in the algorithm, they omitted the residual, but it could be an error
+            # attn + ff + residual was used in GPT-J and PaLM, but later found to be unstable configuration, so it seems unlikely attn + ff would work
+            # but in the case they figured out something we have not, you can use their exact formulation by setting `serial = False` and `add_residual = False`
+
+            residual = noised_repr if self.add_residual else 0.
+
+            noised_repr = ff_out + attn_out + residual
+
+        return noised_repr
 
     @typecheck
     def forward(
@@ -1739,41 +1872,20 @@ class DiffusionTransformer(Module):
 
         # main transformer
 
-        for linear_attn, colt5_attn, attn, transition in self.layers:
+        if self.serial and should_checkpoint(self, (noised_repr, single_repr, pairwise_repr)):
+            to_layers_fn = self.to_checkpointed_serial_layers
+        elif self.serial:
+            to_layers_fn = self.to_serial_layers
+        else:
+            to_layers_fn = self.to_parallel_layers
 
-            if exists(linear_attn):
-                noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
-
-            if exists(colt5_attn):
-                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
-
-            attn_out = attn(
-                noised_repr,
-                cond = single_repr,
-                pairwise_repr = pairwise_repr,
-                mask = mask,
-                windowed_mask = windowed_mask
-            )
-
-            if serial:
-                noised_repr = attn_out + noised_repr
-
-            ff_out = transition(
-                noised_repr,
-                cond = single_repr
-            )
-
-            if serial:
-                noised_repr = ff_out + noised_repr
-
-            # in the algorithm, they omitted the residual, but it could be an error
-            # attn + ff + residual was used in GPT-J and PaLM, but later found to be unstable configuration, so it seems unlikely attn + ff would work
-            # but in the case they figured out something we have not, you can use their exact formulation by setting `serial = False` and `add_residual = False`
-
-            residual = noised_repr if self.add_residual else 0.
-
-            if not serial:
-                noised_repr = ff_out + attn_out + residual
+        noised_repr = to_layers_fn(
+            noised_repr,
+            single_repr = single_repr,
+            pairwise_repr = pairwise_repr,
+            mask = mask,
+            windowed_mask = windowed_mask,
+        )
 
         # splice out registers
 
