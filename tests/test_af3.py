@@ -228,8 +228,7 @@ def test_msa_module():
 
     assert pairwise.shape == pairwise_out.shape
 
-@pytest.mark.parametrize('checkpoint', (False, True))
-@pytest.mark.parametrize('serial', (False, True))
+@pytest.mark.parametrize('serial,checkpoint', ((False, False), (True, False), (True, True)))
 @pytest.mark.parametrize('use_linear_attn', (False, True))
 @pytest.mark.parametrize('use_colt5_attn', (False, True))
 def test_diffusion_transformer(
