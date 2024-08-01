@@ -10,7 +10,7 @@ import torch
 from torch import nn
 from torch import Tensor
 import torch.nn.functional as F
-from loguru import logger
+from torch.utils.checkpoint import checkpoint, checkpoint_sequential
 
 from torch.nn import (
     Module,
@@ -42,21 +42,19 @@ from alphafold3_pytorch.attention import (
 from alphafold3_pytorch.inputs import (
     IS_MOLECULE_TYPES,
     IS_PROTEIN_INDEX,
+    IS_DNA_INDEX,
+    IS_RNA_INDEX,
     IS_LIGAND_INDEX,
     IS_METAL_ION_INDEX,
     IS_BIOMOLECULE_INDICES,
+    IS_PROTEIN,
+    IS_DNA,
+    IS_RNA,
+    IS_LIGAND,
+    IS_METAL_ION,
     NUM_MOLECULE_IDS,
     ADDITIONAL_MOLECULE_FEATS
 )
-
-
-IS_DNA_INDEX = 1
-IS_RNA_INDEX = 2
-
-IS_PROTEIN, IS_DNA, IS_RNA, IS_LIGAND, IS_METAL_ION = map(
-    lambda x: IS_MOLECULE_TYPES - x if x < 0 else x, [
-        IS_PROTEIN_INDEX, IS_DNA_INDEX, IS_RNA_INDEX, IS_LIGAND_INDEX, IS_METAL_ION_INDEX])
-
 
 from frame_averaging_pytorch import FrameAverage
 
@@ -69,6 +67,8 @@ from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
 
 from tqdm import tqdm
+
+from loguru import logger
 
 from importlib.metadata import version
 
@@ -168,6 +168,21 @@ def pack_one(t, pattern):
 
 def exclusive_cumsum(t, dim = -1):
     return t.cumsum(dim = dim) - t
+
+# checkpointing utils
+
+@typecheck
+def should_checkpoint(
+    self: Module,
+    inputs: Tuple[Tensor, ...],
+    check_instance_variable: str | None = 'checkpoint'
+) -> bool:
+
+    return (
+        self.training and
+        any([i.requires_grad for i in inputs]) and
+        (not exists(check_instance_variable) or getattr(self, check_instance_variable, False))
+    )
 
 # decorators
 
@@ -350,8 +365,7 @@ def repeat_consecutive_with_lens(
 
     # final mask
 
-    if mask_value is None:
-        mask_value = False if dtype == torch.bool else 0
+    mask_value = default(mask_value, False if dtype == torch.bool else 0)
 
     output = einx.where(
         'b n, b n ..., -> b n ...',
@@ -1101,6 +1115,8 @@ class PairformerStack(Module):
         pair_bias_attn_heads = 16,
         dropout_row_prob = 0.25,
         num_register_tokens = 0,
+        checkpoint = False,
+        checkpoint_segments = 1,
         pairwise_block_kwargs: dict = dict(),
         pair_bias_attn_kwargs: dict = dict()
     ):
@@ -1136,6 +1152,11 @@ class PairformerStack(Module):
 
         self.layers = layers
 
+        # checkpointing
+
+        self.checkpoint = checkpoint
+        self.checkpoint_segments = checkpoint_segments
+
         # https://arxiv.org/abs/2405.16039 and https://arxiv.org/abs/2405.15071
         # although possibly recycling already takes care of this
 
@@ -1149,6 +1170,80 @@ class PairformerStack(Module):
             self.single_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_single))
             self.pairwise_row_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
             self.pairwise_col_registers = nn.Parameter(torch.zeros(num_register_tokens, dim_pairwise))
+
+    @typecheck
+    def to_layers(
+        self,
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'],
+        mask: Bool['b n'] | None = None
+
+    ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
+
+        for _ in range(self.recurrent_depth):
+            for (
+                pairwise_block,
+                pair_bias_attn,
+                single_transition
+            ) in self.layers:
+
+                pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+
+                single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
+                single_repr = single_transition(single_repr) + single_repr
+
+        return single_repr, pairwise_repr
+
+    @typecheck
+    def to_checkpointed_layers(
+        self,
+        *,
+        single_repr: Float['b n ds'],
+        pairwise_repr: Float['b n n dp'],
+        mask: Bool['b n'] | None = None
+
+    ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
+
+        inputs = (single_repr, pairwise_repr, mask)
+
+        def pairwise_block_wrapper(layer):
+            def inner(inputs, *args, **kwargs):
+                single_repr, pairwise_repr, mask = inputs
+                pairwise_repr = layer(pairwise_repr = pairwise_repr, mask = mask)
+                return single_repr, pairwise_repr, mask
+            return inner
+
+        def pair_bias_attn_wrapper(layer):
+            def inner(inputs, *args, **kwargs):
+                single_repr, pairwise_repr, mask = inputs
+                single_repr = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
+                return single_repr, pairwise_repr, mask
+            return inner
+
+        def single_transition_wrapper(layer):
+            def inner(inputs, *args, **kwargs):
+                single_repr, pairwise_repr, mask = inputs
+                single_repr = layer(single_repr) + single_repr
+                return single_repr, pairwise_repr, mask
+            return inner
+
+        wrapped_layers = []
+
+        for _ in range(self.recurrent_depth):
+            for (
+                pairwise_block,
+                pair_bias_attn,
+                single_transition
+            ) in self.layers:
+
+                wrapped_layers.append(pairwise_block_wrapper(pairwise_block))
+                wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
+                wrapped_layers.append(single_transition_wrapper(single_transition))
+
+        single_repr, pairwise_repr, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+
+        return single_repr, pairwise_repr
 
     @typecheck
     def forward(
@@ -1175,19 +1270,20 @@ class PairformerStack(Module):
             if exists(mask):
                 mask = F.pad(mask, (num_registers, 0), value = True)
 
+        # maybe checkpoint
+
+        if should_checkpoint(self, (single_repr, pairwise_repr)):
+            to_layers_fn = self.to_checkpointed_layers
+        else:
+            to_layers_fn = self.to_layers
+
         # main transformer block layers
 
-        for _ in range(self.recurrent_depth):
-            for (
-                pairwise_block,
-                pair_bias_attn,
-                single_transition
-            ) in self.layers:
-
-                pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
-
-                single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
-                single_repr = single_transition(single_repr) + single_repr
+        single_repr, pairwise_repr = to_layers_fn(
+            single_repr = single_repr,
+            pairwise_repr = pairwise_repr,
+            mask = mask
+        )
 
         # splice out registers
 
@@ -3644,6 +3740,9 @@ class ComputeModelSelectionScore(Module):
         is_rna: boolean tensor indicating RNA atoms
         pairwise_mask: boolean tensor indicating atompair for which LDDT is computed
         """
+
+        atom_seq_len, device = pred_coords.shape[1], pred_coords.device
+
         # Compute distances between all pairs of atoms
         pred_dists = torch.cdist(pred_coords, pred_coords)
         true_dists = torch.cdist(true_coords, true_coords)
@@ -3669,7 +3768,7 @@ class ComputeModelSelectionScore(Module):
         )
 
         # Compute mean, avoiding self term
-        mask = inclusion_radius & ~torch.eye(pred_coords.shape[1], dtype=torch.bool, device=pred_coords.device)
+        mask = inclusion_radius & ~torch.eye(atom_seq_len, dtype=torch.bool, device=device)
 
         # Take into account variable lengthed atoms in batch
         if exists(coords_mask):
@@ -3700,7 +3799,7 @@ class ComputeModelSelectionScore(Module):
         plddt between atoms maked by asym_mask_a and asym_mask_b
         """
 
-        if coords_mask is None:
+        if not exists(coords_mask):
             coords_mask = torch.ones_like(asym_mask_a)
 
         if asym_mask_a.ndim == 1:
