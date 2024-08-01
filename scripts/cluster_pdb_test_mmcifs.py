@@ -1,37 +1,19 @@
 # %% [markdown]
-# # Clustering AlphaFold 3 PDB Validation Dataset
+# # Clustering AlphaFold 3 PDB Evaluation Dataset
 #
-# For clustering AlphaFold 3's PDB validation dataset, we follow the clustering procedure outlined in Abramson et al (2024).
+# For clustering AlphaFold 3's PDB evaluation dataset, we propose a modified (i.e., more stringent) clustering procedure
+# inspired by Abramson et al (2024).
 #
-# The process for selecting these targets was broken up into two separate stages. The first was for selecting multimers,
-# the second for selecting monomers. Multimer selection proceeded as follows:
-#
-# # ... (see the PDB validation set filtering script)
-# 2. Filter to only low homology interfaces, which are defined as those where no target in the training set contains
-# two chains with high homology to the chains involved in the interface, where high homology here means >
-# 40% sequence identity for polymers or > 0.85 tanimoto similarity for ligands. Additionally filter out interfaces
-# involving a ligand with ranking model fit less than 0.5 or with multiple residues.
-# 3. Assign interfaces to clusters as per subsubsection 2.5.3, other than for polymer-ligand interfaces which use cluster
-# ID (polymer_cluster, CCD-code) and sample one interface per cluster.
-# 4. Take the following interface types only, possibly reducing number of clusters by sampling a subset of clusters
-# (number of samples given in brackets if reduced): protein-protein (600), protein-DNA (100), DNA-DNA (100),
-# Protein-ligand (600), DNA-ligand (50), ligand-ligand (200), protein-RNA, RNA-RNA, DNA-RNA, RNA-ligand.
-# 5. Take the set of all PDB targets containing the remaining interfaces with a final additional restriction of max total
-# tokens 2048 and make the set of scored chains and interfaces equal to all low homology chains and interfaces in
-# those targets.
-# 6. Manually exclude a small set of targets (11 in our case) where alignment for scoring took too long to be practical
-# for generating validation scores during experiments.
-#
-# Monomer selection proceeded similarly:
-#
-# ... (see the PDB validation set filtering script)
-# 2. Filter to only low homology polymers.
-# 3. Assign polymers to clusters as per subsubsection 2.5.3.
-# 4. Sample 40 protein monomers and take all DNA and RNA monomers.
-# 5. Add a final additional restriction of max total tokens 2048 and make the set of scored chains and interfaces equal
-# to all low homology chains and interfaces in the remaining targets.
-# 6. Manually exclude a set of RNA monomers (8 in our case) that all come from one over represented cluster.
-# The end result was 1,220 PDB targets containing 2,333 low homology interfaces and 2,099 low homology chains.
+# With the full evaluation set curated by the PDB test set filtering script we create a “low homology” subset
+# that is filtered on homology to the training and validation sets.
+# Evaluation is done either on individual chains, or on specific interfaces extracted from the full complex prediction.
+# For intra-chain metrics, we keep polymers that have less than 30% sequence identity to the training or validation sets.
+# Here we define sequence identity as the percent of residues in the evaluation set chain that are identical to the
+# training or validation set chain. For interface metrics the following filters are applied:
+# • Polymer-polymer interfaces: If both polymers have greater than 30% sequence identity to two chains in the same
+# complex in the training or validation sets, then this interface is filtered out.
+# • Polymer-ligand interfaces: If both the polymer and ligand have greater than 30% sequence identity and 0.3 Tanimoto similarity,
+# respectively, to two chains in the same complex in the training or validation sets, then this interface is filtered out.
 
 # %%
 
@@ -54,7 +36,6 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
 from tqdm import tqdm
 
-from alphafold3_pytorch.common.biomolecule import _from_mmcif_object
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.models.components.inputs import CCD_COMPONENTS_SMILES
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
@@ -96,20 +77,6 @@ DNA_LETTERS_1TO3 = {
     "G": "DG",
     "T": "DT",
     "U": "DT",  # NOTE: This mapping is present as a precaution based on outlier PDBs such as `410d`
-}
-
-INTERFACE_SAMPLE_SIZES = {
-    "protein-protein": 600,
-    "dna-protein": 100,
-    "dna-dna": 100,
-    "ligand-protein": 600,
-    "dna-ligand": 50,
-    "ligand-ligand": 200,
-    # NOTE: `None` implies all rows are taken
-    "protein-rna": None,
-    "rna-rna": None,
-    "dna-rna": None,
-    "ligand-rna": None,
 }
 
 IS_NOVEL_LIGAND_MAX_SECONDS_PER_INPUT = (
@@ -399,8 +366,8 @@ def filter_to_low_homology_sequences(
     input_interface_chain_ids: CHAIN_INTERFACES,
     input_fasta_filepath: str,
     reference_fasta_filepath: str,
-    max_polymer_similarity: float = 0.4,
-    max_ligand_similarity: float = 0.85,
+    max_polymer_similarity: float = 0.3,
+    max_ligand_similarity: float = 0.3,
     max_workers: int = 2,
 ) -> Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Filter targets to only low homology sequences."""
@@ -743,7 +710,7 @@ def write_sequences_to_fasta(
 def is_novel_ligand(
     ligand_sequence: str,
     reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect],
-    max_sim: float = 0.85,
+    max_sim: float = 0.3,
     verbose: bool = False,
 ) -> bool:
     """Check if a ligand sequence is novel based on Tanimoto similarity to a reference set of ligand sequences."""
@@ -898,8 +865,8 @@ def filter_chains_by_sequence_names(
     sequence_names: Set[str] | np.ndarray,
     interface_chain_ids: CHAIN_INTERFACES | None = None,
     reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect] | None = None,
-    max_polymer_similarity: float = 0.4,
-    max_ligand_similarity: float = 0.85,
+    max_polymer_similarity: float = 0.3,
+    max_ligand_similarity: float = 0.3,
     max_workers: int = 2,
 ) -> CHAIN_SEQUENCES | Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Return only chains (and potentially interfaces) with sequence names in the given set."""
@@ -1020,7 +987,7 @@ def search_sequences_using_mmseqs2(
     reference_filepath: str,
     output_dir: str,
     molecule_type: CLUSTERING_MOLECULE_TYPE,
-    max_seq_id: float = 0.4,
+    max_seq_id: float = 0.3,
     interface_chain_ids: CHAIN_INTERFACES | None = None,
     alignment_file_prefix: str = "alnRes_",
     extra_parameters: Dict[str, int | float | str] | None = None,
@@ -1430,40 +1397,6 @@ def cluster_interfaces(
     return interface_clusters
 
 
-def filter_structure_by_token_count(
-    structure_id: str, mmcif_dir: str, max_num_tokens: int
-) -> str | None:
-    """Filter structure based on the number of tokens it contains."""
-    mmcif_filepath = os.path.join(mmcif_dir, structure_id[1:3], f"{structure_id}.cif")
-    mmcif_object = mmcif_parsing.parse_mmcif_object(mmcif_filepath, structure_id)
-    biomol = _from_mmcif_object(mmcif_object)
-    if len(biomol.atom_mask) <= max_num_tokens:
-        return structure_id
-    return None
-
-
-@typecheck
-def filter_structures_by_token_count(
-    structure_ids: Set[str], mmcif_dir: str, max_num_tokens: int, max_workers: int
-) -> Set[str]:
-    """Filter structures based on the number of tokens they contain."""
-    structure_ids_to_keep = set()
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(
-                filter_structure_by_token_count, structure_id, mmcif_dir, max_num_tokens
-            ): structure_id
-            for structure_id in structure_ids
-        }
-        for future in tqdm(
-            as_completed(futures), total=len(futures), desc="Applying final token count filter"
-        ):
-            result = future.result()
-            if exists(result):
-                structure_ids_to_keep.add(result)
-    return structure_ids_to_keep
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Cluster chains and interfaces within the AlphaFold 3 PDB validation dataset's filtered mmCIF files."
@@ -1471,32 +1404,31 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mmcif_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "val_mmcifs"),
+        default=os.path.join("data", "pdb_data", "test_mmcifs"),
         help="Path to the input directory containing (filtered) mmCIF files.",
     )
     parser.add_argument(
-        "--reference_clustering_dir",
+        "--reference_1_clustering_dir",
         type=str,
         default=os.path.join("data", "pdb_data", "data_caches", "train_clusterings"),
-        help="Path to the reference clustering directory.",
+        help="Path to the first reference clustering directory.",
+    )
+    parser.add_argument(
+        "--reference_2_clustering_dir",
+        type=str,
+        default=os.path.join("data", "pdb_data", "data_caches", "val_clusterings"),
+        help="Path to the second reference clustering directory.",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.path.join("data", "pdb_data", "data_caches", "val_clusterings"),
+        default=os.path.join("data", "pdb_data", "data_caches", "test_clusterings"),
         help="Path to the output clustering directory.",
     )
     parser.add_argument(
         "--clustering_filtered_pdb_dataset",
         action="store_true",
         help="Whether the clustering is being performed on a filtered PDB dataset.",
-    )
-    parser.add_argument(
-        "-m",
-        "--max_num_tokens",
-        type=int,
-        default=2048,
-        help="The maximum number of tokens allowed within each clustered structure.",
     )
     parser.add_argument(
         "-n",
@@ -1514,7 +1446,8 @@ if __name__ == "__main__":
     # Determine paths for intermediate files
 
     fasta_filepath = os.path.join(args.output_dir, "sequences.fasta")
-    reference_fasta_filepath = os.path.join(args.reference_clustering_dir, "sequences.fasta")
+    reference_1_fasta_filepath = os.path.join(args.reference_1_clustering_dir, "sequences.fasta")
+    reference_2_fasta_filepath = os.path.join(args.reference_2_clustering_dir, "sequences.fasta")
 
     # Attempt to load existing chain sequences and interfaces from local storage
 
@@ -1558,19 +1491,34 @@ if __name__ == "__main__":
             interface_chain_ids = json.load(f)
     else:
         with open(
-            os.path.join(args.reference_clustering_dir, "all_chain_sequences.json"), "r"
+            os.path.join(args.reference_1_clustering_dir, "all_chain_sequences.json"), "r"
         ) as f:
-            reference_all_chain_sequences = json.load(f)
+            reference_1_all_chain_sequences = json.load(f)
+        with open(
+            os.path.join(args.reference_2_clustering_dir, "filtered_all_chain_sequences.json"), "r"
+        ) as f:
+            reference_2_all_chain_sequences = json.load(f)
 
         (
             all_chain_sequences,
             interface_chain_ids,
         ) = filter_to_low_homology_sequences(
             all_chain_sequences,
-            reference_all_chain_sequences,
+            reference_1_all_chain_sequences,
             interface_chain_ids,
             fasta_filepath,
-            reference_fasta_filepath,
+            reference_1_fasta_filepath,
+            max_workers=args.no_workers,
+        )
+        (
+            all_chain_sequences,
+            interface_chain_ids,
+        ) = filter_to_low_homology_sequences(
+            all_chain_sequences,
+            reference_2_all_chain_sequences,
+            interface_chain_ids,
+            fasta_filepath,
+            reference_2_fasta_filepath,
             max_workers=args.no_workers,
         )
 
@@ -1768,143 +1716,5 @@ if __name__ == "__main__":
         pl.DataFrame([], schema=["pdb_id", "chain_id", "molecule_id", "cluster_id"]).write_csv(
             os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")
         )
-
-    # Load current clusters to subsample chain and interface clusters according to Step(s) 4 of Section 5.8 of the AF3 supplement
-
-    protein_chain_clusters = pl.read_csv(
-        os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")
-    )
-    nucleic_acid_chain_clusters = pl.read_csv(
-        os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv")
-    )
-    peptide_chain_clusters = pl.read_csv(
-        os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv")
-    )
-    ligand_chain_clusters = pl.read_csv(
-        os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")
-    )
-    interface_clusters = pl.read_csv(
-        os.path.join(args.output_dir, "interface_cluster_mapping.csv")
-    )
-
-    # Sample one member of 40 random protein chain clusters and leave the RNA and DNA chain clusters unchanged
-
-    protein_chain_clusters_grouped = protein_chain_clusters.group_by("cluster_id").agg(
-        pl.col("*").sample(1, seed=42)
-    )
-    protein_random_chain_clusters = np.random.choice(
-        protein_chain_clusters_grouped.shape[0], 40, replace=False
-    )
-    protein_chain_clusters = (
-        protein_chain_clusters_grouped[protein_random_chain_clusters]
-        .with_columns(
-            [
-                pl.col("pdb_id").explode().alias("pdb_id"),
-                pl.col("chain_id").explode().alias("chain_id"),
-                pl.col("molecule_id").explode().alias("molecule_id"),
-            ]
-        )
-        .select(["pdb_id", "chain_id", "molecule_id", "cluster_id"])
-    )
-    protein_chain_clusters.write_csv(
-        os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")
-    )
-
-    # Subsample interface cluster types
-
-    interface_clusters = interface_clusters.with_columns(
-        pl.concat_list(
-            [
-                pl.col("interface_molecule_id_1").str.split_exact("-", 0).struct.field("field_0"),
-                pl.col("interface_molecule_id_2").str.split_exact("-", 0).struct.field("field_0"),
-            ]
-        )
-        .list.sort()
-        .list.join("-")
-        .alias("interface_type")
-    )
-
-    sampled_interface_dataframes = []
-    for interface_type, sample_size in INTERFACE_SAMPLE_SIZES.items():
-        filtered_interface_df = interface_clusters.filter(
-            pl.col("interface_type") == interface_type
-        )
-        if sample_size is not None:
-            interface_chain_clusters_grouped = filtered_interface_df.group_by(
-                "interface_cluster_id"
-            ).agg(pl.col("*").sample(1, seed=42))
-            interface_random_chain_clusters = np.random.choice(
-                interface_chain_clusters_grouped.shape[0],
-                min(len(interface_chain_clusters_grouped), sample_size),
-                replace=False,
-            )
-            sampled_interface_df = interface_chain_clusters_grouped[
-                interface_random_chain_clusters
-            ].with_columns(
-                [
-                    pl.col("pdb_id").explode().alias("pdb_id"),
-                    pl.col("interface_chain_id_1").explode().alias("interface_chain_id_1"),
-                    pl.col("interface_chain_id_2").explode().alias("interface_chain_id_2"),
-                    pl.col("interface_molecule_id_1").explode().alias("interface_molecule_id_1"),
-                    pl.col("interface_molecule_id_2").explode().alias("interface_molecule_id_2"),
-                    pl.col("interface_chain_cluster_id_1")
-                    .explode()
-                    .alias("interface_chain_cluster_id_1"),
-                    pl.col("interface_chain_cluster_id_2")
-                    .explode()
-                    .alias("interface_chain_cluster_id_2"),
-                ]
-            )
-        else:
-            sampled_interface_df = filtered_interface_df
-        sampled_interface_dataframes.append(
-            sampled_interface_df.select(
-                [
-                    "pdb_id",
-                    "interface_chain_id_1",
-                    "interface_chain_id_2",
-                    "interface_molecule_id_1",
-                    "interface_molecule_id_2",
-                    "interface_chain_cluster_id_1",
-                    "interface_chain_cluster_id_2",
-                    "interface_cluster_id",
-                ]
-            )
-        )
-    interface_clusters = pl.concat(sampled_interface_dataframes)
-    interface_clusters.write_csv(os.path.join(args.output_dir, "interface_cluster_mapping.csv"))
-
-    # Apply a final token count filter to the chain and interface clusters using `Biomolecule` featurization
-
-    structure_ids = set(protein_chain_clusters["pdb_id"].to_list())
-    structure_ids.update(set(nucleic_acid_chain_clusters["pdb_id"].to_list()))
-    structure_ids.update(set(peptide_chain_clusters["pdb_id"].to_list()))
-    structure_ids.update(set(ligand_chain_clusters["pdb_id"].to_list()))
-    structure_ids.update(set(interface_clusters["pdb_id"].to_list()))
-
-    structure_ids_to_keep = filter_structures_by_token_count(
-        structure_ids,
-        args.mmcif_dir,
-        max_num_tokens=args.max_num_tokens,
-        max_workers=args.no_workers,
-    )
-
-    # Filter chain and interface clusters according to the final token count filter
-
-    protein_chain_clusters.filter(pl.col("pdb_id").is_in(structure_ids_to_keep)).write_csv(
-        os.path.join(args.output_dir, "protein_chain_cluster_mapping.csv")
-    )
-    nucleic_acid_chain_clusters.filter(pl.col("pdb_id").is_in(structure_ids_to_keep)).write_csv(
-        os.path.join(args.output_dir, "nucleic_acid_chain_cluster_mapping.csv")
-    )
-    peptide_chain_clusters.filter(pl.col("pdb_id").is_in(structure_ids_to_keep)).write_csv(
-        os.path.join(args.output_dir, "peptide_chain_cluster_mapping.csv")
-    )
-    ligand_chain_clusters.filter(pl.col("pdb_id").is_in(structure_ids_to_keep)).write_csv(
-        os.path.join(args.output_dir, "ligand_chain_cluster_mapping.csv")
-    )
-    interface_clusters.filter(pl.col("pdb_id").is_in(structure_ids_to_keep)).write_csv(
-        os.path.join(args.output_dir, "interface_cluster_mapping.csv")
-    )
 
 # %%
