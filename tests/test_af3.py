@@ -380,15 +380,19 @@ def test_relative_position_encoding():
         additional_molecule_feats = additional_molecule_feats
     )
 
-def test_template_embed():
+@pytest.mark.parametrize('checkpoint', (False, True))
+def test_template_embed(
+    checkpoint
+):
     template_feats = torch.randn(2, 2, 16, 16, 77)
     template_mask = torch.ones((2, 2)).bool()
 
-    pairwise_repr = torch.randn(2, 16, 16, 128)
+    pairwise_repr = torch.randn(2, 16, 16, 128).requires_grad_()
     mask = torch.ones((2, 16)).bool()
 
     embedder = TemplateEmbedder(
-        dim_template_feats = 77
+        dim_template_feats = 77,
+        checkpoint = checkpoint
     )
 
     template_embed = embedder(
@@ -398,6 +402,9 @@ def test_template_embed():
         mask = mask
     )
 
+    if checkpoint:
+        loss = template_embed.sum()
+        loss.backward()
 
 def test_confidence_head():
     single_inputs_repr = torch.randn(2, 16, 77)

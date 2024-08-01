@@ -174,9 +174,11 @@ def exclusive_cumsum(t, dim = -1):
 @typecheck
 def should_checkpoint(
     self: Module,
-    inputs: Tuple[Tensor, ...],
+    inputs: Tensor | Tuple[Tensor, ...],
     check_instance_variable: str | None = 'checkpoint'
 ) -> bool:
+    if torch.is_tensor(inputs):
+        inputs = (inputs,)
 
     return (
         self.training and
@@ -1481,6 +1483,8 @@ class TemplateEmbedder(Module):
         pairformer_stack_depth = 2,
         pairwise_block_kwargs: dict = dict(),
         eps = 1e-5,
+        checkpoint = False,
+        checkpoint_segments = 1,
         layerscale_output = True
     ):
         super().__init__()
@@ -1504,6 +1508,9 @@ class TemplateEmbedder(Module):
 
         self.pairformer_stack = layers
 
+        self.checkpoint = checkpoint
+        self.checkpoint_segments = checkpoint_segments
+
         self.final_norm = nn.LayerNorm(dim)
 
         # final projection of mean pooled repr -> out
@@ -1514,6 +1521,48 @@ class TemplateEmbedder(Module):
         )
 
         self.layerscale = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
+
+    @typecheck
+    def to_layers(
+        self,
+        v: Float['bt n n dt'],
+        *,
+        mask: Bool['bt n'] | None = None
+    ) -> Float['bt n n dt']:
+
+        for block in self.pairformer_stack:
+            v = block(
+                pairwise_repr = v,
+                mask = mask
+            ) + v
+
+        return v
+
+    @typecheck
+    def to_checkpointed_layers(
+        self,
+        v: Float['bt n n dt'],
+        *,
+        mask: Bool['bt n'] | None = None
+    ) -> Float['bt n n dt']:
+
+        wrapped_layers = []
+        inputs = (v, mask)
+
+        def block_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                v, mask = inputs
+                v = fn(pairwise_repr = v, mask = mask)
+                return v, mask
+            return inner
+
+        for block in self.pairformer_stack:
+            wrapped_layers.append(block_wrapper(block))
+
+        v, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs, use_reentrant = False)
+
+        return v
 
     @typecheck
     def forward(
@@ -1539,11 +1588,19 @@ class TemplateEmbedder(Module):
         if exists(mask):
             mask = repeat(mask, 'b n -> (b t) n', t = num_templates)
 
-        for block in self.pairformer_stack:
-            v = block(
-                pairwise_repr = v,
-                mask = mask
-            ) + v
+        # going through the pairformer stack
+
+        if should_checkpoint(self, v):
+            to_layers_fn = self.to_checkpointed_layers
+        else:
+            to_layers_fn = self.to_layers
+
+        # layers
+        # todo - figure out why single-variable names v and u used here and name it better.
+
+        v = to_layers_fn(v)
+
+        # final norm
 
         u = self.final_norm(v)
 
