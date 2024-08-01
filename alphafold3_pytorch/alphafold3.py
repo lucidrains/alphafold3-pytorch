@@ -1677,7 +1677,7 @@ class DiffusionTransformer(Module):
             residual = noised_repr if self.add_residual else 0.
 
             if not serial:
-                ff_out = ff_out + attn_out + residual
+                noised_repr = ff_out + attn_out + residual
 
         # splice out registers
 
