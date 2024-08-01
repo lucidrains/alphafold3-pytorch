@@ -1768,7 +1768,7 @@ class DiffusionTransformer(Module):
         attn_num_memory_kv = False,
         trans_expansion_factor = 2,
         num_register_tokens = 0,
-        serial = False,
+        serial = True,
         add_residual = True,
         use_linear_attn = False,
         checkpoint = False,
@@ -2112,7 +2112,7 @@ class DiffusionModule(Module):
         token_transformer_heads = 16,
         atom_decoder_depth = 3,
         atom_decoder_heads = 4,
-        serial = False,
+        serial = True,
         atom_encoder_kwargs: dict = dict(),
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
@@ -4276,7 +4276,6 @@ class Alphafold3(Module):
             token_transformer_heads = 16,
             atom_decoder_depth = 3,
             atom_decoder_heads = 4,
-            serial = True # believe they have an error on Algorithm 23. lacking a residual - default to serial architecture until further news
         ),
         edm_kwargs: dict = dict(
             sigma_min = 0.002,
