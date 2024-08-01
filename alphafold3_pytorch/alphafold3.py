@@ -1691,6 +1691,8 @@ class DiffusionTransformer(Module):
                 conditionable_transition
             ]))
 
+        assert not (not serial and checkpoint), 'checkpointing can only be used for serial version of diffusion transformer'
+
         self.checkpoint = checkpoint
         self.checkpoint_segments = checkpoint_segments
 
