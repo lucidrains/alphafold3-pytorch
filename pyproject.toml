@@ -61,7 +61,7 @@ Repository = "https://github.com/lucidrains/alphafold3-pytorch"
 examples = []
 test = [
     "pytest",
-    "pytest-split"
+    "pytest-split-tests",
 ]
 
 [build-system]
