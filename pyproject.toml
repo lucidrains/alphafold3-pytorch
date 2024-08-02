@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.2.71"
+version = "0.2.73"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" }
@@ -31,6 +31,7 @@ dependencies = [
     "einx>=0.2.2",
     "ema-pytorch>=0.5.0",
     "environs",
+    "lion-pytorch",
     "joblib",
     "gemmi>=0.6.6",
     "frame-averaging-pytorch>=0.0.18",
