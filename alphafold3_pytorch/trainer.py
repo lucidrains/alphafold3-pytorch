@@ -70,10 +70,16 @@ def to_device_and_back(
     module: Module,
     device: torch.device
 ):
-    current_device = next(module.parameters()).device
-    module.to(device)
+    orig_device = next(module.parameters()).device
+    need_move_device = orig_device != device
+
+    if need_move_device:
+        module.to(device)
+
     yield
-    module.to(orig_device)
+
+    if need_move_device:
+        module.to(orig_device)
 
 def cycle(dataloader: DataLoader):
     while True:
