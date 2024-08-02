@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import wraps, partial
 from dataclasses import asdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
@@ -63,6 +64,16 @@ def divisible_by(num, den):
 
 def at_most_one_of(*flags: bool) -> bool:
     return sum([*map(int, flags)]) <= 1
+
+@contextmanager
+def to_device_and_back(
+    module: Module,
+    device: torch.device
+):
+    current_device = next(module.parameters()).device
+    module.to(device)
+    yield
+    module.to(orig_device)
 
 def cycle(dataloader: DataLoader):
     while True:
@@ -284,6 +295,7 @@ class Trainer:
         ema_kwargs: dict = dict(
             use_foreach = True
         ),
+        ema_on_cpu = False,
         use_adam_atan2: bool = False,
         use_lion: bool = False,
         use_torch_compile: bool = False
@@ -314,8 +326,12 @@ class Trainer:
                 model,
                 beta = ema_decay,
                 include_online_model = False,
+                allow_different_devices = True,
                 **ema_kwargs
             )
+
+            self.ema_device = 'cpu' if ema_on_cpu else self.device
+            self.ema_model.to(self.ema_device)
 
         # maybe torch compile
 
@@ -436,6 +452,10 @@ class Trainer:
 
         self.last_loaded_train_id = None
         self.model_loaded_from_path: Path | None = None
+
+    @property
+    def device(self):
+        return self.fabric.device
 
     @property
     def is_main(self):
@@ -656,7 +676,7 @@ class Trainer:
             ):
                 eval_model = default(self.ema_model, self.model)
 
-                with torch.no_grad():
+                with torch.no_grad(), to_device_and_back(eval_model, self.device):
                     eval_model.eval()
 
                     total_valid_loss = 0.
@@ -696,7 +716,7 @@ class Trainer:
         if self.is_main and self.needs_test:
             eval_model = default(self.ema_model, self.model)
 
-            with torch.no_grad():
+            with torch.no_grad(), to_device_and_back(eval_model, self.device):
                 eval_model.eval()
 
                 total_test_loss = 0.
