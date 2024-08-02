@@ -40,6 +40,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Sampler, Dataset, DataLoader as OrigDataLoader
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
+from lion_pytorch.foreach import Lion
 from adam_atan2_pytorch.foreach import AdamAtan2
 
 from ema_pytorch import EMA
@@ -59,6 +60,9 @@ def default(v, d):
 
 def divisible_by(num, den):
     return (num % den) == 0
+
+def at_most_one_of(*flags: bool) -> bool:
+    assert sum([*map(int, flags)]) <= 1
 
 def cycle(dataloader: DataLoader):
     while True:
@@ -281,6 +285,7 @@ class Trainer:
             use_foreach = True
         ),
         use_adam_atan2: bool = False,
+        use_lion: bool = False,
         use_torch_compile: bool = False
     ):
         super().__init__()
@@ -325,13 +330,18 @@ class Trainer:
         # optimizer
 
         if not exists(optimizer):
-            adam_klass = Adam
+            optimizer_klass = Adam
+
+            assert at_most_one_of(use_adam_atan2, use_lion)
 
             if use_adam_atan2:
                 default_adam_kwargs.pop('eps', None)
-                adam_klass = AdamAtan2
+                optimizer_klass = AdamAtan2
+            elif use_lion:
+                default_adam_kwargs.pop('eps', None)
+                optimizer_klass = Lion
 
-            optimizer = adam_klass(
+            optimizer = optimizer_klass(
                 model.parameters(),
                 lr = lr,
                 **default_adam_kwargs
