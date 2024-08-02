@@ -2,7 +2,7 @@
 # # Curating AlphaFold 3 PDB Evaluation Dataset
 #
 # For evaluating trained AlphaFold 3 models, we propose a modified (i.e., more stringent) version of the
-# evaluation procedure inspired by Abramson et al (2024).
+# evaluation procedure outlined in Abramson et al (2024).
 #
 # The recent PDB evaluation set construction started by taking all PDB entries released between 2023-01-14 and
 # 2024-04-30, a date range falling after any data in our training or validation sets which had maximum release dates
@@ -14,9 +14,6 @@
 # Predictions on the recent PDB set were made on the full post-assembly complex, but crystallization aids (Table 9)
 # were removed from the complex for prediction and scoring, along with all bonds for structures with homomeric sub-
 # complexes lacking the corresponding homomeric symmetry.
-# Not every entity and interface was included:
-# • The system can predict other entities like DNA/RNA hybrids, Peptide Nucleic Acids (PNA) and (D) polypeptides,
-# but these entities and interfaces involving them were not scored as they are too rare to get meaningful results on.
 # ... (see the PDB evaluation set clustering script)
 #
 
@@ -27,101 +24,31 @@ import argparse
 import glob
 import os
 from datetime import datetime
-from typing import Dict, List, Set, Tuple
+from typing import List, Tuple
 
 import timeout_decorator
 from tqdm.contrib.concurrent import process_map
 
-from alphafold3_pytorch.common.biomolecule import _from_mmcif_object
 from alphafold3_pytorch.common.paper_constants import (
     CRYSTALLOGRAPHY_METHODS,
     LIGAND_EXCLUSION_SET,
 )
 from alphafold3_pytorch.data import mmcif_parsing, mmcif_writing
-from alphafold3_pytorch.data.data_pipeline import get_assembly
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject
 from alphafold3_pytorch.tensor_typing import typecheck
-from alphafold3_pytorch.utils.data_utils import is_water
 from alphafold3_pytorch.utils.utils import exists
-
-# Constants
-
-FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT = (
-    600  # Maximum time allocated to filter a single structure (in seconds)
+from scripts.filter_pdb_train_mmcifs import (
+    FILTER_STRUCTURE_MAX_SECONDS_PER_INPUT,
+    filter_pdb_release_date,
+    filter_resolution,
+    impute_missing_assembly_metadata,
+    remove_crystallization_aids,
+    remove_excluded_ligands,
+    remove_hydrogens,
 )
+from scripts.filter_pdb_val_mmcifs import filter_num_tokens
 
 # Helper functions
-
-
-@typecheck
-def impute_missing_assembly_metadata(
-    mmcif_object: MmcifObject, asym_mmcif_object: MmcifObject
-) -> MmcifObject:
-    """Impute missing assembly metadata from the asymmetric unit mmCIF."""
-    mmcif_object.header.update(asym_mmcif_object.header)
-    mmcif_object.bonds.extend(asym_mmcif_object.bonds)
-
-    # Impute structure method
-    if (
-        "_exptl.method" not in mmcif_object.raw_string
-        and "_exptl.method" in asym_mmcif_object.raw_string
-    ):
-        mmcif_object.raw_string["_exptl.method"] = asym_mmcif_object.raw_string["_exptl.method"]
-
-    # Impute release date
-    if (
-        "_pdbx_audit_revision_history.revision_date" not in mmcif_object.raw_string
-        and "_pdbx_audit_revision_history.revision_date" in asym_mmcif_object.raw_string
-    ):
-        mmcif_object.raw_string[
-            "_pdbx_audit_revision_history.revision_date"
-        ] = asym_mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
-
-    # Impute resolution
-    if (
-        "_refine.ls_d_res_high" not in mmcif_object.raw_string
-        and "_refine.ls_d_res_high" in asym_mmcif_object.raw_string
-    ):
-        mmcif_object.raw_string["_refine.ls_d_res_high"] = asym_mmcif_object.raw_string[
-            "_refine.ls_d_res_high"
-        ]
-    if (
-        "_em_3d_reconstruction.resolution" not in mmcif_object.raw_string
-        and "_em_3d_reconstruction.resolution" in asym_mmcif_object.raw_string
-    ):
-        mmcif_object.raw_string["_em_3d_reconstruction.resolution"] = asym_mmcif_object.raw_string[
-            "_em_3d_reconstruction.resolution"
-        ]
-    if (
-        "_reflns.d_resolution_high" not in mmcif_object.raw_string
-        and "_reflns.d_resolution_high" in asym_mmcif_object.raw_string
-    ):
-        mmcif_object.raw_string["_reflns.d_resolution_high"] = asym_mmcif_object.raw_string[
-            "_reflns.d_resolution_high"
-        ]
-
-    # Impute structure connectivity
-    for key in asym_mmcif_object.raw_string:
-        if key.startswith("_struct_conn.") and key not in mmcif_object.raw_string:
-            mmcif_object.raw_string[key] = asym_mmcif_object.raw_string[key]
-
-    return mmcif_object
-
-
-@typecheck
-def filter_pdb_release_date(
-    mmcif_object: MmcifObject,
-    min_cutoff_date: datetime = datetime(2023, 1, 14),
-    max_cutoff_date: datetime = datetime(2024, 4, 30),
-) -> bool:
-    """Filter based on PDB release date."""
-    return (
-        "release_date" in mmcif_object.header
-        and exists(mmcif_object.header["release_date"])
-        and min_cutoff_date
-        <= datetime.strptime(mmcif_object.header["release_date"], "%Y-%m-%d")
-        <= max_cutoff_date
-    )
 
 
 @typecheck
@@ -138,130 +65,24 @@ def filter_experiment_type(mmcif_object: MmcifObject, types_to_ignore: List[str]
 
 
 @typecheck
-def filter_resolution(mmcif_object: MmcifObject, max_resolution: float = 4.5) -> bool:
-    """Filter based on resolution."""
-    return (
-        "resolution" in mmcif_object.header
-        and exists(mmcif_object.header["resolution"])
-        and mmcif_object.header["resolution"] < max_resolution
-    )
-
-
-@typecheck
-def filter_num_tokens(mmcif_object: MmcifObject, max_tokens: int = 5120) -> bool:
-    """Filter based on number of tokens."""
-    biomol = (
-        _from_mmcif_object(mmcif_object)
-        if "assembly" in mmcif_object.file_id
-        else get_assembly(_from_mmcif_object(mmcif_object))
-    )
-    return len(biomol.atom_mask) < max_tokens
-
-
-@typecheck
 def prefilter_target(
     mmcif_object: MmcifObject,
     min_cutoff_date: datetime = datetime(2023, 1, 14),
     max_cutoff_date: datetime = datetime(2024, 4, 30),
+    experiment_types_to_ignore: List[str] = ["NMR"],
+    max_resolution: float = 4.5,
+    max_tokens: int = 5120,
 ) -> MmcifObject | None:
     """Pre-filter a target based on various criteria."""
     target_passes_prefilters = (
         filter_pdb_release_date(
             mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
         )
-        and filter_experiment_type(mmcif_object, types_to_ignore=["NMR"])
-        and filter_resolution(mmcif_object)
-        and filter_num_tokens(mmcif_object)
+        and filter_experiment_type(mmcif_object, types_to_ignore=experiment_types_to_ignore)
+        and filter_resolution(mmcif_object, max_resolution=max_resolution, exclusive_max=True)
+        and filter_num_tokens(mmcif_object, max_tokens=max_tokens, exclusive_max=True)
     )
     return mmcif_object if target_passes_prefilters else None
-
-
-@typecheck
-def remove_hydrogens(mmcif_object: MmcifObject, remove_waters: bool = False) -> MmcifObject:
-    """Identify hydrogens (and optionally waters) to remove from a structure."""
-    atoms_to_remove = set()
-    residues_to_remove = set()
-    chains_to_remove = set()
-
-    for chain in mmcif_object.structure.get_chains():
-        res_to_remove = set()
-        for res in chain:
-            res_atoms_to_remove = {
-                atom.get_full_id() for atom in res.get_atoms() if atom.element == "H"
-            }
-            if remove_waters and is_water(res.resname):
-                res_to_remove.add(res.get_full_id())
-            if len(res_atoms_to_remove) == len(res):  # If no atoms are left in the residue
-                res_to_remove.add(res.get_full_id())
-            atoms_to_remove.update(res_atoms_to_remove)
-        if len(res_to_remove) == len(chain):  # If no residues are left in the chain
-            chains_to_remove.add(chain.get_full_id())
-        residues_to_remove.update(res_to_remove)
-
-    mmcif_object.atoms_to_remove.update(atoms_to_remove)
-    mmcif_object.residues_to_remove.update(residues_to_remove)
-    mmcif_object.chains_to_remove.update(chains_to_remove)
-
-    return mmcif_object
-
-
-@typecheck
-def remove_excluded_ligands(
-    mmcif_object: MmcifObject, ligand_exclusion_set: Set[str]
-) -> MmcifObject:
-    """
-    Identify ligands in the ligand exclusion set to be removed.
-
-    NOTE: Here, we remove all excluded ligands, even though
-    the AlphaFold 3 supplement doesn't mention removing them.
-    """
-    residues_to_remove = set()
-    chains_to_remove = set()
-
-    for chain in mmcif_object.structure.get_chains():
-        res_to_remove = set()
-        for res in chain:
-            if res.resname in ligand_exclusion_set:
-                res_to_remove.add(res.get_full_id())
-        if len(res_to_remove) == len(chain):
-            chains_to_remove.add(chain.get_full_id())
-        residues_to_remove.update(res_to_remove)
-
-    mmcif_object.residues_to_remove.update(residues_to_remove)
-    mmcif_object.chains_to_remove.update(chains_to_remove)
-
-    return mmcif_object
-
-
-@typecheck
-def remove_crystallization_aids(
-    mmcif_object: MmcifObject, crystallography_methods: Dict[str, Set[str]]
-) -> MmcifObject:
-    """Identify crystallization aids to remove."""
-    if (
-        "structure_method" in mmcif_object.header
-        and exists(mmcif_object.header["structure_method"])
-        and mmcif_object.header["structure_method"].upper() in crystallography_methods
-    ):
-        residues_to_remove = set()
-        chains_to_remove = set()
-
-        structure_method_crystallization_aids = crystallography_methods[
-            mmcif_object.header["structure_method"].upper()
-        ]
-        for chain in mmcif_object.structure.get_chains():
-            res_to_remove = set()
-            for res in chain:
-                if res.resname in structure_method_crystallization_aids:
-                    res_to_remove.add(res.get_full_id())
-            if len(res_to_remove) == len(chain):
-                chains_to_remove.add(chain.get_full_id())
-            residues_to_remove.update(res_to_remove)
-
-        mmcif_object.residues_to_remove.update(residues_to_remove)
-        mmcif_object.chains_to_remove.update(chains_to_remove)
-
-    return mmcif_object
 
 
 @typecheck
@@ -296,7 +117,12 @@ def filter_structure_with_timeout(
     # these from the asymmetric unit mmCIF
     mmcif_object = impute_missing_assembly_metadata(mmcif_object, asym_mmcif_object)
     mmcif_object = prefilter_target(
-        mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
+        mmcif_object,
+        min_cutoff_date=min_cutoff_date,
+        max_cutoff_date=max_cutoff_date,
+        experiment_types_to_ignore=["NMR"],
+        max_resolution=4.5,
+        max_tokens=5120,
     )
     if not exists(mmcif_object):
         print(f"Skipping target due to prefiltering: {file_id}")

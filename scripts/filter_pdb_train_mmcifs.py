@@ -143,12 +143,18 @@ def filter_pdb_release_date(
 
 
 @typecheck
-def filter_resolution(mmcif_object: MmcifObject, max_resolution: float = 9.0) -> bool:
+def filter_resolution(
+    mmcif_object: MmcifObject, max_resolution: float = 9.0, exclusive_max: bool = False
+) -> bool:
     """Filter based on resolution."""
     return (
         "resolution" in mmcif_object.header
         and exists(mmcif_object.header["resolution"])
-        and mmcif_object.header["resolution"] <= max_resolution
+        and (
+            mmcif_object.header["resolution"] < max_resolution
+            if exclusive_max
+            else mmcif_object.header["resolution"] <= max_resolution
+        )
     )
 
 
@@ -723,7 +729,9 @@ def filter_structure_with_timeout(
     # these from the asymmetric unit mmCIF
     mmcif_object = impute_missing_assembly_metadata(mmcif_object, asym_mmcif_object)
     mmcif_object = prefilter_target(
-        mmcif_object, min_cutoff_date=min_cutoff_date, max_cutoff_date=max_cutoff_date
+        mmcif_object,
+        min_cutoff_date=min_cutoff_date,
+        max_cutoff_date=max_cutoff_date,
     )
     if not exists(mmcif_object):
         print(f"Skipping target due to prefiltering: {file_id}")

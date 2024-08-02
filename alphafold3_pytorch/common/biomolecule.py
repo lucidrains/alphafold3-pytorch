@@ -372,9 +372,9 @@ class Biomolecule:
         token_res_rep_atom_indices[self.chemtype == 3] = np.where(
             self.atom_mask[self.chemtype == 3]
         )[1]
-        token_res_atom_position_mask[np.arange(self.chain_id.size), token_res_rep_atom_indices] = (
-            True
-        )
+        token_res_atom_position_mask[
+            np.arange(self.chain_id.size), token_res_rep_atom_indices
+        ] = True
         token_center_atom_positions = self.atom_positions[token_res_atom_position_mask]
 
         # potentially filter candidate token center atoms by chain ID
@@ -435,8 +435,8 @@ class Biomolecule:
         spatial_weight: float = 0.4,
         spatial_interface_weight: float = 0.4,
         n_res: int = 384,
-        chain_1: Optional[str] = None,
-        chain_2: Optional[str] = None,
+        chain_1: str | None = None,
+        chain_2: str | None = None,
     ) -> "Biomolecule":
         """Crop a Biomolecule using a randomly-sampled cropping function."""
         crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
@@ -602,6 +602,7 @@ def get_unique_res_atom_names(
 def _from_mmcif_object(
     mmcif_object: mmcif_parsing.MmcifObject,
     chain_ids: Optional[Set[str]] = None,
+    atomize_modified_polymer_residues: bool = False,
 ) -> Biomolecule:
     """Takes a Biopython structure/model mmCIF object and creates a `Biomolecule` instance.
 
@@ -619,6 +620,10 @@ def _from_mmcif_object(
     :param mmcif_object: The parsed Biopython structure/model mmCIF object.
     :param chain_ids: If chain_ids are specified (e.g. A), then only these chains are parsed.
         Otherwise all chains are parsed.
+    :param atomize_modified_polymer_residues: If True, then the atoms of modified
+        polymer residues are treated as "pseudoresidues". This is useful for
+        representing modified polymer residues as a collection of (e.g., ligand)
+        atoms rather than as a single residue.
 
     :return: A new `Biomolecule` created from the structure/model mmCIF object contents.
 
@@ -673,7 +678,10 @@ def _from_mmcif_object(
             restype_idx = residue_constants.restype_order.get(
                 res_shortname, residue_constants.restype_num
             )
-            if is_polymer_residue:
+            is_modified_polymer_residue = is_polymer_residue and res_shortname == "X"
+            if is_polymer_residue and not (
+                is_modified_polymer_residue and atomize_modified_polymer_residues
+            ):
                 pos = np.zeros((residue_constants.atom_type_num, 3))
                 mask = np.zeros((residue_constants.atom_type_num,))
                 res_b_factors = np.zeros((residue_constants.atom_type_num,))
