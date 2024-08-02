@@ -25,6 +25,7 @@ from alphafold3_pytorch.tensor_typing import (
     Float,
     Int,
     Bool,
+    Shaped,
     typecheck
 )
 
