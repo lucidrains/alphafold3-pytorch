@@ -4,7 +4,11 @@ from dataclasses import asdict
 import torch
 from torch.utils.data import Dataset
 from alphafold3_pytorch import AtomInput
-from alphafold3_pytorch.inputs import IS_MOLECULE_TYPES
+
+from alphafold3_pytorch.inputs import (
+    IS_MOLECULE_TYPES,
+    DEFAULT_NUM_MOLECULE_MODS
+)
 
 # mock dataset
 
@@ -13,11 +17,13 @@ class MockAtomDataset(Dataset):
         self,
         data_length,
         max_seq_len = 16,
-        atoms_per_window = 4
+        atoms_per_window = 4,
+        has_molecule_mods = False
     ):
         self.data_length = data_length
         self.max_seq_len = max_seq_len
         self.atoms_per_window = atoms_per_window
+        self.has_molecule_mods = has_molecule_mods
 
     def __len__(self):
         return self.data_length
@@ -33,6 +39,11 @@ class MockAtomDataset(Dataset):
         additional_molecule_feats = torch.randint(0, 2, (seq_len, 5))
         additional_token_feats = torch.randn(seq_len, 2)
         is_molecule_types = torch.randint(0, 2, (seq_len, IS_MOLECULE_TYPES)).bool()
+
+        is_molecule_mod = None
+        if self.has_molecule_mods:
+            is_molecule_mod = torch.rand((seq_len, DEFAULT_NUM_MOLECULE_MODS)) < 0.05
+
         molecule_ids = torch.randint(0, 32, (seq_len,))
         token_bonds = torch.randint(0, 2, (seq_len, seq_len)).bool()
 
@@ -65,6 +76,7 @@ class MockAtomDataset(Dataset):
             additional_molecule_feats = additional_molecule_feats,
             additional_token_feats = additional_token_feats,
             is_molecule_types = is_molecule_types,
+            is_molecule_mod = is_molecule_mod,
             templates = templates,
             template_mask = template_mask,
             msa = msa,

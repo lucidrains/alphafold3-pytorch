@@ -54,6 +54,7 @@ from alphafold3_pytorch.inputs import (
     IS_LIGAND,
     IS_METAL_ION,
     NUM_MOLECULE_IDS,
+    DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS
 )
 
@@ -4519,6 +4520,7 @@ class Alphafold3(Module):
         self.w = atoms_per_window
         self.dapi = self.dim_atompair_inputs
         self.dai = self.dim_atom_inputs
+        self.num_mods = num_molecule_mods
 
     @property
     def device(self):
@@ -4605,7 +4607,7 @@ class Alphafold3(Module):
         additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw {self.w} {self.w*2}'] | None = None,
-        is_molecule_mod: Bool['b n num_mods'] | None = None,
+        is_molecule_mod: Bool['b n {self.num_mods}'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,

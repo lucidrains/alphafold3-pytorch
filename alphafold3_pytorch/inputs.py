@@ -79,6 +79,7 @@ MOLECULE_GAP_ID = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEO
 MOLECULE_METAL_ION_ID = MOLECULE_GAP_ID + 1
 NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) + 2
 
+DEFAULT_NUM_MOLECULE_MODS = 5
 ADDITIONAL_MOLECULE_FEATS = 5
 
 CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
@@ -140,7 +141,8 @@ class AtomInput:
     atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    additional_token_feats:     Float[f'n dtf'] | None = None
+    is_molecule_mod:            Bool['n num_mods'] | None = None
+    additional_token_feats:     Float['n dtf'] | None = None
     templates:                  Float['t n n dt'] | None = None
     msa:                        Float['s n dm'] | None = None
     token_bonds:                Bool['n n'] | None = None
@@ -171,7 +173,8 @@ class BatchedAtomInput:
     atompair_inputs:            Float['b m m dapi'] | Float['b nw w (w*2) dapi']
     additional_molecule_feats:  Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'b n {IS_MOLECULE_TYPES}']
-    additional_token_feats:     Float[f'b n dtf'] | None = None
+    is_molecule_mod:            Bool['b n num_mods'] | None = None
+    additional_token_feats:     Float['b n dtf'] | None = None
     templates:                  Float['b t n n dt'] | None = None
     msa:                        Float['b s n dm'] | None = None
     token_bonds:                Bool['b n n'] | None = None
@@ -326,6 +329,7 @@ class MoleculeInput:
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
+    is_molecule_mod:            Bool['n num_mods'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
