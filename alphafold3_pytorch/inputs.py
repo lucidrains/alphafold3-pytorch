@@ -367,12 +367,12 @@ def default_extract_atompair_feats_fn(mol: Mol):
 @dataclass
 class MoleculeInput:
     molecules:                  List[Mol]
-    molecule_token_pool_lens:   List[int]
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
+    molecule_token_pool_lens:   List[int] | None = None
     is_molecule_mod:            Bool['n num_mods'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
@@ -407,6 +407,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     # get total number of atoms
 
     if not exists(atom_lens):
+
         atom_lens = []
 
         for mol, is_ligand in zip(molecules, i.is_molecule_types[:, IS_LIGAND_INDEX]):
@@ -416,6 +417,10 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
                 atom_lens.extend([1] * num_atoms)
             else:
                 atom_lens.append(num_atoms)
+    else:
+
+        mol_total_atoms = sum([mol.GetNumAtoms() for mol in molecules])
+        assert mol_total_atoms == sum(atom_lens), f'total atoms summed up from molecules passed in on `molecules` ({mol_total_atoms}) does not equal the number of atoms summed up in the field `molecule_token_pool_lens` {sum(atom_lens)}'
 
     atom_lens = tensor(atom_lens)
     total_atoms = atom_lens.sum().item()
