@@ -673,6 +673,8 @@ def test_alphafold3_without_msa_and_templates():
         dim_atom_inputs = 77,
         dim_template_feats = 44,
         num_dist_bins = 38,
+        checkpoint_trunk_pairformer = True,
+        checkpoint_diffusion_token_transformer = True,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
         ),

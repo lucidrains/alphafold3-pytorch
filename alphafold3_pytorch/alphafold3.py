@@ -54,6 +54,7 @@ from alphafold3_pytorch.inputs import (
     IS_LIGAND,
     IS_METAL_ION,
     NUM_MOLECULE_IDS,
+    DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS
 )
 
@@ -2130,6 +2131,7 @@ class DiffusionModule(Module):
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
         use_linear_attn = False,
+        checkpoint_token_transformer = False,
         linear_attn_kwargs: dict = dict(
             heads = 8,
             dim_head = 16
@@ -2221,6 +2223,10 @@ class DiffusionModule(Module):
         )
 
         self.attended_token_norm = nn.LayerNorm(dim_token)
+
+        # checkpointing
+
+        self.checkpoint_token_transformer = checkpoint_token_transformer
 
         # atom attention decoding related modules
 
@@ -2378,11 +2384,18 @@ class DiffusionModule(Module):
             molecule_atom_lens = molecule_atom_lens
         )
 
+        # maybe checkpoint token transformer
+
+        token_transformer = self.token_transformer
+
+        if should_checkpoint(self, tokens, 'checkpoint_token_transformer'):
+            token_transformer = partial(checkpoint, token_transformer, use_reentrant = False)
+
         # token transformer
 
         tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
 
-        tokens = self.token_transformer(
+        tokens = token_transformer(
             tokens,
             mask = mask,
             single_repr = conditioned_single_repr,
@@ -4300,7 +4313,10 @@ class Alphafold3(Module):
         ),
         augment_kwargs: dict = dict(),
         stochastic_frame_average = False,
-        confidence_head_atom_resolution = False
+        confidence_head_atom_resolution = False,
+        checkpoint_input_embedding = False,
+        checkpoint_trunk_pairformer = False,
+        checkpoint_diffusion_token_transformer = False,
     ):
         super().__init__()
 
@@ -4447,6 +4463,7 @@ class Alphafold3(Module):
             dim_atompair = dim_atompair,
             dim_token = dim_token,
             dim_single = dim_single + dim_single_inputs,
+            checkpoint_token_transformer = checkpoint_diffusion_token_transformer,
             **diffusion_module_kwargs
         )
 
@@ -4484,6 +4501,11 @@ class Alphafold3(Module):
             **confidence_head_kwargs
         )
 
+        # checkpointing related
+
+        self.checkpoint_trunk_pairformer = checkpoint_trunk_pairformer
+        self.checkpoint_diffusion_token_transformer = checkpoint_diffusion_token_transformer
+
         # loss related
 
         self.ignore_index = ignore_index
@@ -4498,6 +4520,7 @@ class Alphafold3(Module):
         self.w = atoms_per_window
         self.dapi = self.dim_atompair_inputs
         self.dai = self.dim_atom_inputs
+        self.num_mods = num_molecule_mods
 
     @property
     def device(self):
@@ -4584,7 +4607,7 @@ class Alphafold3(Module):
         additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw {self.w} {self.w*2}'] | None = None,
-        is_molecule_mod: Bool['b n num_mods'] | None = None,
+        is_molecule_mod: Bool['b n {self.num_mods}'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
@@ -4817,9 +4840,16 @@ class Alphafold3(Module):
 
                 pairwise = embedded_msa + pairwise
 
+            # maybe checkpoint trunk pairformer
+
+            pairformer = self.pairformer
+
+            if should_checkpoint(self, (single, pairwise), 'checkpoint_trunk_pairformer'):
+                pairformer = partial(checkpoint, pairformer, use_reentrant = False)
+
             # main attention trunk (pairformer)
 
-            single, pairwise = self.pairformer(
+            single, pairwise = pairformer(
                 single_repr = single,
                 pairwise_repr = pairwise,
                 mask = mask
@@ -4877,7 +4907,7 @@ class Alphafold3(Module):
                 pred_atom_pos = confidence_head_atom_pos_input.detach(),
                 molecule_atom_indices = molecule_atom_indices,
                 molecule_atom_lens = molecule_atom_lens,
-                atom_feats = atom_feats,
+                atom_feats = atom_feats.detach(),
                 mask = mask,
                 return_pae_logits = True
             )
@@ -5056,7 +5086,7 @@ class Alphafold3(Module):
                 molecule_atom_indices = molecule_atom_indices,
                 molecule_atom_lens = molecule_atom_lens,
                 mask = mask,
-                atom_feats = atom_feats,
+                atom_feats = atom_feats.detach(),
                 return_pae_logits = return_pae_logits
             )
 
