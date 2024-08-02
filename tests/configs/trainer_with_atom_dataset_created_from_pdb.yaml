@@ -7,7 +7,7 @@ model:
     dim_pairwise: 4
     dim_token: 4
     dim_atom_inputs: 3
-    dim_atompair_inputs: 1
+    dim_atompair_inputs: 5
     dim_template_model: 8
     atoms_per_window: 27
     dim_template_feats: 44

@@ -40,12 +40,12 @@ from alphafold3_pytorch.configs import (
 from alphafold3_pytorch.alphafold3 import (
     mean_pool_with_lens,
     repeat_consecutive_with_lens,
-    full_pairwise_repr_to_windowed,
-    atom_ref_pos_to_atompair_inputs
+    full_pairwise_repr_to_windowed
 )
 
 from alphafold3_pytorch.inputs import (
-    IS_MOLECULE_TYPES
+    IS_MOLECULE_TYPES,
+    atom_ref_pos_to_atompair_inputs
 )
 
 def test_atom_ref_pos_to_atompair_inputs():

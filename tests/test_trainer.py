@@ -172,7 +172,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         dim_pairwise=4,
         dim_token=4,
         dim_atom_inputs=3,
-        dim_atompair_inputs=1,
+        dim_atompair_inputs=5,
         atoms_per_window=27,
         dim_template_feats=44,
         num_dist_bins=38,

@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, List, Literal, Set, Tuple, Type
 
 import einx
+from einops import pack
 
 import numpy as np
 from numpy.lib.format import open_memmap
@@ -53,7 +54,6 @@ from alphafold3_pytorch.life import (
     reverse_complement,
     reverse_complement_tensor,
 )
-
 
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.data_utils import RESIDUE_MOLECULE_TYPE, get_residue_molecule_type
@@ -298,6 +298,51 @@ class AtomDataset(Dataset):
         file = self.files[idx]
         return file_to_atom_input(file)
 
+# atom reference position to atompair inputs
+# will be used in the `default_extract_atompair_feats_fn` below in MoleculeInput
+
+@typecheck
+def atom_ref_pos_to_atompair_inputs(
+    atom_ref_pos: Float['m 3'],
+    atom_ref_space_uid: Int['m'] | None = None,
+) -> Float['m m 5']:
+
+    # Algorithm 5 - lines 2-6
+
+    # line 2
+
+    pairwise_rel_pos = einx.subtract('i c, j c -> i j c', atom_ref_pos, atom_ref_pos)
+
+    # line 5 - pairwise inverse squared distance
+
+    atom_inv_square_dist = (1 + pairwise_rel_pos.norm(dim = -1, p = 2) ** 2) ** -1
+    
+    # line 3
+
+    if exists(atom_ref_space_uid):
+        same_ref_space_mask = einx.equal('i, j -> i j', atom_ref_space_uid, atom_ref_space_uid)
+    else:
+        same_ref_space_mask = torch.ones_like(atom_inv_square_dist).bool()
+
+    # concat all into atompair_inputs for projection into atompair_feats within Alphafold3
+
+    atompair_inputs, _ = pack((
+        pairwise_rel_pos,
+        atom_inv_square_dist,
+        same_ref_space_mask.float(),
+    ), 'i j *')
+
+    # mask out
+
+    atompair_inputs = einx.where(
+        'i j, i j dapi, -> i j dapi',
+        same_ref_space_mask, atompair_inputs, 0.
+    )
+
+    # return
+
+    return atompair_inputs
+
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
 
 def default_extract_atom_feats_fn(atom: Atom):
@@ -316,8 +361,7 @@ def default_extract_atompair_feats_fn(mol: Mol):
 
     all_atom_pos_tensor = tensor(all_atom_pos)
 
-    dist_matrix = torch.cdist(all_atom_pos_tensor, all_atom_pos_tensor)
-    return torch.stack((dist_matrix,), dim = -1)
+    return atom_ref_pos_to_atompair_inputs(all_atom_pos_tensor) # what they did in the paper, but can be overwritten
 
 @typecheck
 @dataclass

@@ -41,7 +41,7 @@ def test_data_input():
 
     alphafold3 = Alphafold3(
         dim_atom_inputs=3,
-        dim_atompair_inputs=1,
+        dim_atompair_inputs=5,
         atoms_per_window=27,
         dim_template_feats=44,
         num_dist_bins=38,
