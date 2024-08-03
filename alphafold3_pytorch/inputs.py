@@ -681,7 +681,7 @@ class MoleculeLengthMoleculeInput:
     molecules:                  List[Mol]
     one_token_per_atom:         List[bool]
     molecule_ids:               Int[' n']
-    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
+    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS-1}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
@@ -738,7 +738,17 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim = 0)
     is_molecule_types = repeat_interleave(i.is_molecule_types, token_repeats, dim = 0)
+
     additional_molecule_feats = repeat_interleave(i.additional_molecule_feats, token_repeats, dim = 0)
+
+    # insert the 2nd entry into additional molecule feats, which is just an arange over the number of tokens
+
+    additional_molecule_feats, _ = pack((
+        additional_molecule_feats[..., :1],
+        torch.arange(additional_molecule_feats.shape[0]),
+        additional_molecule_feats[..., 1:]
+    ), 'n *')
+
     additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
     molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
 
@@ -1373,7 +1383,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     # asym ids
 
-    asym_ids = torch.arange(len(token_repeats))
+    asym_ids = repeat_interleave(torch.arange(len(token_repeats)), token_repeats)
 
     # entity ids
 
@@ -1415,7 +1425,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     additional_molecule_feats = torch.stack((
         residue_index,
-        torch.arange(num_tokens),
         asym_ids,
         entity_ids,
         sym_ids
