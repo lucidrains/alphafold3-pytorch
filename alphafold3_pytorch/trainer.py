@@ -26,8 +26,7 @@ from alphafold3_pytorch.inputs import (
     BatchedAtomInput,
     Alphafold3Input,
     PDBInput,
-    maybe_transform_to_atom_inputs,
-    alphafold3_input_to_molecule_input
+    maybe_transform_to_atom_inputs
 )
 
 from alphafold3_pytorch.data import (

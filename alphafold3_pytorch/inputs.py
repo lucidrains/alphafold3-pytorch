@@ -4,7 +4,7 @@ import copy
 import json
 import os
 from pathlib import Path
-from functools import partial
+from functools import partial, wraps
 from itertools import groupby
 from collections import defaultdict
 from collections.abc import Iterable
@@ -18,9 +18,9 @@ import numpy as np
 from numpy.lib.format import open_memmap
 
 import torch
-from torch import tensor
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+from torch import tensor, repeat_interleave
 from torch.nn.utils.rnn import pad_sequence
 
 from loguru import logger
@@ -119,7 +119,7 @@ def flatten(arr):
 def pad_to_len(t, length, value = 0, dim = -1):
     assert dim < 0
     zeros = (0, 0) * (-dim - 1)
-    return F.pad(t, (*zeros, 0, max(0, length - t.shape[-1])), value = value)
+    return F.pad(t, (*zeros, 0, max(0, length - t.shape[dim])), value = value)
 
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
@@ -128,6 +128,14 @@ def compose(*fns: Callable):
         for fn in fns:
             x = fn(x, *args, **kwargs)
         return x
+    return inner
+
+def maybe(fn):
+    @wraps(fn)
+    def inner(x, *args, **kwargs):
+        if not exists(x):
+            return x
+        return fn(x, *args, **kwargs)
     return inner
 
 # atom level, what Alphafold3 accepts
@@ -298,6 +306,8 @@ class AtomDataset(Dataset):
         file = self.files[idx]
         return file_to_atom_input(file)
 
+# functions for extracting atom and atompair features (atom_inputs, atompair_inputs)
+
 # atom reference position to atompair inputs
 # will be used in the `default_extract_atompair_feats_fn` below in MoleculeInput
 
@@ -343,8 +353,6 @@ def atom_ref_pos_to_atompair_inputs(
 
     return atompair_inputs
 
-# molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
-
 def default_extract_atom_feats_fn(atom: Atom):
     return tensor([
         atom.GetFormalCharge(),
@@ -363,16 +371,19 @@ def default_extract_atompair_feats_fn(mol: Mol):
 
     return atom_ref_pos_to_atompair_inputs(all_atom_pos_tensor) # what they did in the paper, but can be overwritten
 
+# molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
+# `n` here is the token length, which accounts for molecules that are one token per atom
+
 @typecheck
 @dataclass
 class MoleculeInput:
     molecules:                  List[Mol]
+    molecule_token_pool_lens:   List[int]
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
-    molecule_token_pool_lens:   List[int] | None = None
     is_molecule_mod:            Bool['n num_mods'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
@@ -404,23 +415,10 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     extract_atom_feats_fn = i.extract_atom_feats_fn
     extract_atompair_feats_fn = i.extract_atompair_feats_fn
 
-    # get total number of atoms
+    # validate total number of atoms
 
-    if not exists(atom_lens):
-
-        atom_lens = []
-
-        for mol, is_ligand in zip(molecules, i.is_molecule_types[:, IS_LIGAND_INDEX]):
-            num_atoms = mol.GetNumAtoms()
-
-            if is_ligand:
-                atom_lens.extend([1] * num_atoms)
-            else:
-                atom_lens.append(num_atoms)
-    else:
-
-        mol_total_atoms = sum([mol.GetNumAtoms() for mol in molecules])
-        assert mol_total_atoms == sum(atom_lens), f'total atoms summed up from molecules passed in on `molecules` ({mol_total_atoms}) does not equal the number of atoms summed up in the field `molecule_token_pool_lens` {sum(atom_lens)}'
+    mol_total_atoms = sum([mol.GetNumAtoms() for mol in molecules])
+    assert mol_total_atoms == sum(atom_lens), f'total atoms summed up from molecules passed in on `molecules` ({mol_total_atoms}) does not equal the number of atoms summed up in the field `molecule_token_pool_lens` {sum(atom_lens)}'
 
     atom_lens = tensor(atom_lens)
     total_atoms = atom_lens.sum().item()
@@ -509,9 +507,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
 
-        offset = 0
-
-        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
+        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
         # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
 
         asym_ids = i.additional_molecule_feats[..., 2]
@@ -671,6 +667,399 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     return atom_input
 
+# molecule lengthed molecule input
+# molecule input - accepting list of molecules as rdchem.Mol
+
+# `n` here refers to the actual number of molecules, NOT the `n` used within Alphafold3
+# the proper token length needs to be correctly computed in the corresponding function for MoleculeLengthMoleculeInput -> AtomInput
+
+@typecheck
+@dataclass
+class MoleculeLengthMoleculeInput:
+    molecules:                  List[Mol]
+    one_token_per_atom:         List[bool]
+    molecule_ids:               Int[' n']
+    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS-1}']
+    is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
+    src_tgt_atom_indices:       Int['n 2']
+    token_bonds:                Bool['n n']
+    is_molecule_mod:            Bool['n num_mods'] | None = None
+    molecule_atom_indices:      List[int | None] | None = None
+    distogram_atom_indices:     List[int | None] | None = None
+    missing_atom_indices:       List[Int[' _'] | None] | None = None
+    missing_token_indices:      List[Int[' _'] | None] | None = None
+    atom_parent_ids:            Int[' m'] | None = None
+    additional_token_feats:     Float[f'n dtf'] | None = None
+    templates:                  Float['t n n dt'] | None = None
+    msa:                        Float['s n dm'] | None = None
+    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
+    template_mask:              Bool[' t'] | None = None
+    msa_mask:                   Bool[' s'] | None = None
+    distance_labels:            Int['n n'] | None = None
+    pae_labels:                 Int['n n'] | None = None
+    pde_labels:                 Int[' n'] | None = None
+    resolved_labels:            Int[' n'] | None = None
+    add_atom_ids:               bool = False
+    add_atompair_ids:           bool = False
+    directed_bonds:             bool = False
+    extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
+    extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
+
+@typecheck
+def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMoleculeInput) -> AtomInput:
+    i = mol_input
+
+    molecules = i.molecules
+    extract_atom_feats_fn = i.extract_atom_feats_fn
+    extract_atompair_feats_fn = i.extract_atompair_feats_fn
+
+    # derive `atom_lens` based on `one_token_per_atom`, for ligands and modified biomolecules
+
+    assert len(molecules) == len(i.one_token_per_atom)
+
+    atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
+    ones = torch.ones_like(atoms_per_molecule)
+    one_token_per_atom = tensor(i.one_token_per_atom)
+
+    # derive the number of repeats needed to expand molecule lengths to token lengths
+
+    token_repeats = torch.where(one_token_per_atom, atoms_per_molecule, ones)
+
+    # derive atoms per token
+
+    atom_repeat_input = torch.where(one_token_per_atom, ones, atoms_per_molecule)
+    atoms_per_token = repeat_interleave(atom_repeat_input, token_repeats)
+
+    total_atoms = atoms_per_molecule.sum().item()
+
+    # derive `is_first_mol_in_chains` and `is_chainable_biomolecules` - needed for constructing `token_bonds
+
+    # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
+    # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
+
+    asym_ids = i.additional_molecule_feats[..., 2]
+    asym_ids = F.pad(asym_ids, (1, 0), value=-1)
+    is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
+    is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
+
+    # repeat all the molecule lengths to the token lengths, using `one_token_per_atom`
+
+    src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim = 0)
+    is_molecule_types = repeat_interleave(i.is_molecule_types, token_repeats, dim = 0)
+
+    additional_molecule_feats = repeat_interleave(i.additional_molecule_feats, token_repeats, dim = 0)
+
+    # insert the 2nd entry into additional molecule feats, which is just an arange over the number of tokens
+
+    additional_molecule_feats, _ = pack((
+        additional_molecule_feats[..., :1],
+        torch.arange(additional_molecule_feats.shape[0]),
+        additional_molecule_feats[..., 1:]
+    ), 'n *')
+
+    additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
+    molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
+
+    distogram_atom_indices = repeat_interleave(i.distogram_atom_indices, token_repeats)
+    molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
+
+    msa = maybe(repeat_interleave)(i.msa, token_repeats, dim = -2)
+    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim = -2)
+
+    templates = maybe(repeat_interleave)(i.templates, token_repeats, dim = -3)
+    templates = maybe(repeat_interleave)(templates, token_repeats, dim = -2)
+
+    # get all atoms
+
+    atoms: List[Atom] = []
+
+    for mol in molecules:
+        atoms.extend([*mol.GetAtoms()])
+
+    # construct the token bonds
+
+    # will be linearly connected for proteins and nucleic acids
+    # but for ligands, will have their atomic bond matrix (as ligands are atom resolution)
+
+    num_tokens = token_repeats.sum().item()
+
+    token_bonds = torch.zeros(num_tokens, num_tokens).bool()
+
+    offset = 0
+
+    for (
+        mol,
+        mol_is_chainable_biomolecule,
+        mol_is_first_mol_in_chain,
+        mol_is_one_token_per_atom
+    ) in zip(
+        molecules,
+        is_chainable_biomolecules,
+        is_first_mol_in_chains,
+        one_token_per_atom
+    ):
+        num_atoms = mol.GetNumAtoms()
+
+        if mol_is_chainable_biomolecule and not mol_is_first_mol_in_chain:
+            token_bonds[offset, offset - 1] = True
+            token_bonds[offset - 1, offset] = True
+
+        if mol_is_one_token_per_atom:
+            coordinates = []
+            updates = []
+
+            has_bond = torch.zeros(num_atoms, num_atoms).bool()
+
+            for bond in mol.GetBonds():
+                atom_start_index = bond.GetBeginAtomIdx()
+                atom_end_index = bond.GetEndAtomIdx()
+
+                coordinates.extend(
+                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                )
+
+                updates.extend([True, True])
+
+            coordinates = tensor(coordinates).long()
+            updates = tensor(updates).bool()
+
+            has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+
+            row_col_slice = slice(offset, offset + num_atoms)
+            token_bonds[row_col_slice, row_col_slice] = has_bond
+
+        offset += (num_atoms if mol_is_one_token_per_atom else 1)
+
+    # handle maybe atom embeds
+
+    atom_ids = None
+
+    if i.add_atom_ids:
+        atom_index = {symbol: i for i, symbol in enumerate(ATOMS)}
+
+        atom_ids = []
+
+        for atom in atoms:
+            atom_symbol = atom.GetSymbol()
+            assert (
+                atom_symbol in atom_index
+            ), f"{atom_symbol} not found in the ATOMS defined in life.py"
+
+            atom_ids.append(atom_index[atom_symbol])
+
+        atom_ids = tensor(atom_ids, dtype=torch.long)
+
+    # get List[int] of number of atoms per molecule
+    # for the offsets when building the atompair feature map / bonds
+
+    all_num_atoms = tensor([mol.GetNumAtoms() for mol in molecules])
+    offsets = exclusive_cumsum(all_num_atoms)
+
+    # handle maybe missing atom indices
+
+    missing_atom_mask = None
+    missing_atom_indices = None
+    missing_token_indices = None
+
+    if exists(i.missing_atom_indices) and len(i.missing_atom_indices) > 0:
+        assert len(molecules) == len(
+            i.missing_atom_indices
+        ), f"{len(i.missing_atom_indices)} missing atom indices does not match the number of molecules given ({len(molecules)})"
+
+        missing_atom_indices: List[Int[" _"]] = [
+            default(indices, torch.empty((0,), dtype=torch.long))
+            for indices in i.missing_atom_indices
+        ]
+        missing_token_indices: List[Int[" _"]] = [
+            default(indices, torch.empty((0,), dtype=torch.long))
+            for indices in i.missing_token_indices
+        ]
+
+        missing_atom_mask: List[Bool[" _"]] = []
+
+        for num_atoms, mol_missing_atom_indices in zip(all_num_atoms, missing_atom_indices):
+            mol_miss_atom_mask = torch.zeros(num_atoms, dtype=torch.bool)
+
+            if mol_missing_atom_indices.numel() > 0:
+                mol_miss_atom_mask.scatter_(-1, mol_missing_atom_indices, True)
+
+            missing_atom_mask.append(mol_miss_atom_mask)
+
+        missing_atom_mask = torch.cat(missing_atom_mask)
+        missing_token_indices = pad_sequence(
+            # NOTE: padding value must be any negative integer besides -1,
+            # to not erroneously detect "missing" token center/distogram atoms
+            # within ligands
+            missing_token_indices,
+            batch_first=True,
+            padding_value=-2,
+        )
+
+    # handle maybe atompair embeds
+
+    atompair_ids = None
+
+    if i.add_atompair_ids:
+        atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
+        num_atom_bond_types = len(atom_bond_index)
+
+        other_index = len(ATOM_BONDS) + 1
+
+        atompair_ids = torch.zeros(total_atoms, total_atoms).long()
+
+        # for every molecule, build the bonds id matrix and add to `atompair_ids`
+
+        prev_mol = None
+        prev_src_tgt_atom_indices = None
+
+        for (
+            mol,
+            is_first_mol_in_chain,
+            is_chainable_biomolecule,
+            src_tgt_atom_indices,
+            offset,
+        ) in zip(
+            molecules,
+            is_first_mol_in_chains,
+            is_chainable_biomolecules,
+            i.src_tgt_atom_indices,
+            offsets,
+        ):
+            coordinates = []
+            updates = []
+
+            num_atoms = mol.GetNumAtoms()
+            mol_atompair_ids = torch.zeros(num_atoms, num_atoms).long()
+
+            for bond in mol.GetBonds():
+                atom_start_index = bond.GetBeginAtomIdx()
+                atom_end_index = bond.GetEndAtomIdx()
+
+                coordinates.extend(
+                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                )
+
+                bond_type = bond.GetBondType()
+                bond_id = atom_bond_index.get(bond_type, other_index) + 1
+
+                # default to symmetric bond type (undirected atom bonds)
+
+                bond_to = bond_from = bond_id
+
+                # if allowing for directed bonds, assume num_atompair_embeds = (2 * num_atom_bond_types) + 1
+                # offset other edge by num_atom_bond_types
+
+                if i.directed_bonds:
+                    bond_from += num_atom_bond_types
+
+                updates.extend([bond_to, bond_from])
+
+            coordinates = tensor(coordinates).long()
+            updates = tensor(updates).long()
+
+            mol_atompair_ids = einx.set_at(
+                "[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates
+            )
+
+            row_col_slice = slice(offset, offset + num_atoms)
+            atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
+
+            # if is chainable biomolecule
+            # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom of the last biomolecule
+
+            if is_chainable_biomolecule and not is_first_mol_in_chain:
+                _, last_atom_index = prev_src_tgt_atom_indices
+                first_atom_index, _ = src_tgt_atom_indices
+
+                last_atom_index_from_end = prev_mol.GetNumAtoms() - last_atom_index
+
+                src_atom_offset = offset - last_atom_index_from_end
+                tgt_atom_offset = offset + first_atom_index
+
+                atompair_ids[src_atom_offset, tgt_atom_offset] = 1
+                atompair_ids[tgt_atom_offset, src_atom_offset] = 1
+
+            prev_mol = mol
+            prev_src_tgt_atom_indices = src_tgt_atom_indices
+
+    # atom_inputs
+
+    atom_inputs: List[Float["m dai"]] = []
+
+    for mol in molecules:
+        atom_feats = []
+
+        for atom in mol.GetAtoms():
+            atom_feats.append(extract_atom_feats_fn(atom))
+
+        atom_inputs.append(torch.stack(atom_feats, dim=0))
+
+    atom_inputs_tensor = torch.cat(atom_inputs).float()
+
+    # atompair_inputs
+
+    atompair_feats: List[Float["m m dapi"]] = []
+
+    for mol, offset in zip(molecules, offsets):
+        atompair_feats.append(extract_atompair_feats_fn(mol))
+
+    assert len(atompair_feats) > 0
+
+    dim_atompair_inputs = first(atompair_feats).shape[-1]
+
+    atompair_inputs = torch.zeros((total_atoms, total_atoms, dim_atompair_inputs))
+
+    for atompair_feat, num_atoms, offset in zip(atompair_feats, all_num_atoms, offsets):
+        row_col_slice = slice(offset, offset + num_atoms)
+        atompair_inputs[row_col_slice, row_col_slice] = atompair_feat
+
+    # mask out molecule atom indices and distogram atom indices where it is in the missing atom indices list
+
+    if exists(missing_token_indices):
+        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats, dim = 0)
+
+        is_missing_molecule_atom = einx.equal(
+            "n missing, n -> n missing", missing_token_indices, molecule_atom_indices
+        ).any(dim=-1)
+
+        is_missing_distogram_atom = einx.equal(
+            "n missing, n -> n missing", missing_token_indices, distogram_atom_indices
+        ).any(dim=-1)
+
+        molecule_atom_indices = molecule_atom_indices.masked_fill(is_missing_molecule_atom, -1)
+        distogram_atom_indices = distogram_atom_indices.masked_fill(is_missing_distogram_atom, -1)
+
+    # handle atom positions
+
+    atom_pos = i.atom_pos
+
+    if exists(atom_pos) and isinstance(atom_pos, list):
+        atom_pos = torch.cat(atom_pos, dim=-2)
+
+    # atom input
+
+    atom_input = AtomInput(
+        atom_inputs=atom_inputs_tensor,
+        atompair_inputs=atompair_inputs,
+        molecule_atom_lens=atoms_per_token,
+        molecule_ids=molecule_ids,
+        molecule_atom_indices=molecule_atom_indices,
+        distogram_atom_indices=distogram_atom_indices,
+        missing_atom_mask=missing_atom_mask,
+        additional_token_feats=additional_token_feats,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_types=is_molecule_types,
+        msa = msa,
+        templates = templates,
+        atom_pos=atom_pos,
+        token_bonds=token_bonds,
+        atom_parent_ids=i.atom_parent_ids,
+        atom_ids=atom_ids,
+        atompair_ids=atompair_ids,
+    )
+
+    return atom_input
+
 # alphafold3 input - support polypeptides, nucleic acids, metal ions + any number of ligands + misc biomolecules
 
 imm_list = partial(field, default_factory = list)
@@ -752,7 +1141,7 @@ def maybe_string_to_int(
     return tensor([index.get(c, unknown_index) for c in indices]).long()
 
 @typecheck
-def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeInput:
+def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthedMoleculeInput:
     i = alphafold3_input
 
     chainable_biomol_entries: List[List[dict]] = []  # for reordering the atom positions at the end
@@ -875,8 +1264,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         (mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands
     ]
 
-    for mol_ligand in mol_ligands:
-        molecule_ids.append(tensor([ligand_id] * mol_ligand.GetNumAtoms()))
+    molecule_ids.append(tensor([ligand_id] * len(mol_ligands)))
 
     # create the molecule input
 
@@ -890,31 +1278,16 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         *all_dna_mols,
     ]
 
-    molecule_token_pool_lens_without_ligands = [
-        mol.GetNumAtoms() for mol in molecules_without_ligands
-    ]
-
-    # metal ions pool lens
-
-    num_metal_ions = len(mol_metal_ions)
-    metal_ions_pool_lens = [1] * num_metal_ions
-
-    # in the paper, they treat each atom of the ligands as a token
-
-    ligands_token_pool_lens = [[1] * mol.GetNumAtoms() for mol in mol_ligands]
-
-    total_ligand_tokens = sum([mol.GetNumAtoms() for mol in mol_ligands])
-
-    # correctly generate the is_molecule_types, which is a boolean tensor of shape [*, 4]
-    # is_protein | is_rna | is_dna | is_ligand
+    # correctly generate the is_molecule_types, which is a boolean tensor of shape [*, 5]
+    # is_protein | is_rna | is_dna | is_ligand | is_metal_ions
     # this is needed for their special diffusion loss
 
     molecule_type_token_lens = [
         len(all_protein_mols),
         len(all_rna_mols),
         len(all_dna_mols),
-        total_ligand_tokens,
-        num_metal_ions
+        len(mol_ligands),
+        len(mol_metal_ions)
     ]
 
     num_tokens = sum(molecule_type_token_lens)
@@ -928,62 +1301,29 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     is_molecule_types = (arange >= left) & (arange < right)
 
+    # pad the src-tgt indices
+
+    src_tgt_atom_indices = tensor(src_tgt_atom_indices)
+
+    src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, dim = -2)
+
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
 
-    molecules = [*molecules_without_ligands, *mol_ligands, *mol_metal_ions]
-    for mol in molecules:
-        Chem.SanitizeMol(mol)
-
-    token_pool_lens = [
-        *molecule_token_pool_lens_without_ligands,
-        *flatten(ligands_token_pool_lens),
-        *metal_ions_pool_lens,
+    molecules = [
+        *molecules_without_ligands,
+        *mol_ligands,
+        *mol_metal_ions
     ]
 
-    # construct the token bonds
+    one_token_per_atom = [
+        *((False,) * len(molecules_without_ligands)),
+        *((True,) * len(mol_ligands)),
+        *((False,) * len(mol_metal_ions)),
+    ]
 
-    # will be linearly connected for proteins and nucleic acids
-    # but for ligands, will have their atomic bond matrix (as ligands are atom resolution)
-
-    token_bonds = torch.zeros(num_tokens, num_tokens).bool()
-
-    offset = 0
-
-    for biomolecule in (*mol_proteins, *mol_ss_rnas, *mol_ss_dnas):
-        chain_len = len(biomolecule)
-        eye = torch.eye(chain_len)
-
-        row_col_slice = slice(offset, offset + chain_len - 1)
-        token_bonds[row_col_slice, row_col_slice] = (eye[1:, :-1] + eye[:-1, 1:]) > 0
-        offset += chain_len
-
-    for ligand in mol_ligands:
-        coordinates = []
-        updates = []
-
-        num_atoms = ligand.GetNumAtoms()
-        has_bond = torch.zeros(num_atoms, num_atoms).bool()
-
-        for bond in ligand.GetBonds():
-            atom_start_index = bond.GetBeginAtomIdx()
-            atom_end_index = bond.GetEndAtomIdx()
-
-            coordinates.extend(
-                [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
-            )
-
-            updates.extend([True, True])
-
-        coordinates = tensor(coordinates).long()
-        updates = tensor(updates).bool()
-
-        has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
-
-        row_col_slice = slice(offset, offset + num_atoms)
-        token_bonds[row_col_slice, row_col_slice] = has_bond
-
-        offset += num_atoms
+    for mol in molecules:
+        Chem.SanitizeMol(mol)
 
     # handle molecule ids
 
@@ -1015,10 +1355,10 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         *num_ss_rna_atoms,
         *num_ss_dna_atoms,
         *num_ligand_atoms,
-        num_metal_ions,
+        len(metal_ions),
     ]
 
-    atom_parent_ids = torch.repeat_interleave(torch.arange(len(atom_counts)), tensor(atom_counts))
+    atom_parent_ids = repeat_interleave(torch.arange(len(atom_counts)), tensor(atom_counts))
 
     # constructing the additional_molecule_feats
     # which is in turn used to derive relative positions
@@ -1033,17 +1373,16 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
     num_protein_tokens = [len(protein) for protein in proteins]
     num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
-    num_ligand_tokens = [ligand.GetNumAtoms() for ligand in mol_ligands]
 
-    token_repeats = tensor(
-        [
-            *num_protein_tokens,
-            *num_ss_rna_tokens,
-            *num_ss_dna_tokens,
-            *num_ligand_tokens,
-            num_metal_ions,
-        ]
-    )
+    ligand_tokens: List[int] = [] if len(mol_ligands) == 0 else [len(mol_ligands)]
+
+    token_repeats = tensor([
+        *num_protein_tokens,
+        *num_ss_rna_tokens,
+        *num_ss_dna_tokens,
+        *ligand_tokens,
+        len(metal_ions),
+    ])
 
     # residue ids
 
@@ -1051,7 +1390,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
 
     # asym ids
 
-    asym_ids = torch.repeat_interleave(torch.arange(len(token_repeats)), token_repeats)
+    asym_ids = repeat_interleave(torch.arange(len(token_repeats)), token_repeats)
 
     # entity ids
 
@@ -1060,6 +1399,7 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         if entity_sequence in unrepeated_entity_sequences:
             continue
         unrepeated_entity_sequences[entity_sequence] = len(unrepeated_entity_sequences)
+
     unrepeated_entity_ids = [
         unrepeated_entity_sequences[entity_sequence]
         for entity_sequence in (*proteins, *ss_rnas, *ss_dnas, *ligands, *metal_ions)
@@ -1071,11 +1411,11 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         *[len(rna) for rna in i.ds_rna for _ in range(2)],
         *[len(dna) for dna in i.ss_dna],
         *[len(dna) for dna in i.ds_dna for _ in range(2)],
-        *num_ligand_tokens,
+        *ligand_tokens,
         *[1 for _ in metal_ions],
     ]
 
-    entity_ids = torch.repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
+    entity_ids = repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
 
     # sym ids
 
@@ -1086,13 +1426,16 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         if entity_sequence in unrepeated_sym_sequences:
             unrepeated_sym_sequences[entity_sequence] += 1
 
-    sym_ids = torch.repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
+    sym_ids = repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
 
     # concat for all of additional_molecule_feats
 
-    additional_molecule_feats = torch.stack(
-        (residue_index, torch.arange(num_tokens), asym_ids, entity_ids, sym_ids), dim=-1
-    )
+    additional_molecule_feats = torch.stack((
+        residue_index,
+        asym_ids,
+        entity_ids,
+        sym_ids
+    ), dim=-1)
 
     # distogram and token centre atom indices
 
@@ -1118,30 +1461,24 @@ def alphafold3_input_to_molecule_input(alphafold3_input: Alphafold3Input) -> Mol
         for mol_index, (mol_miss_atom_indices, mol) in enumerate(
             zip(i.missing_atom_indices, molecules)
         ):
-            is_ligand_residue = is_molecule_types[mol_index, IS_LIGAND_INDEX].item()
             mol_miss_atom_indices = default(mol_miss_atom_indices, [])
             mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
             missing_atom_indices.append(mol_miss_atom_indices)
-            if is_ligand_residue:
-                missing_token_indices.extend(
-                    [mol_miss_atom_indices for _ in range(mol.GetNumAtoms())]
-                )
-            else:
-                missing_token_indices.append(mol_miss_atom_indices)
+            missing_token_indices.append(mol_miss_atom_indices)
 
         assert len(molecules) == len(missing_atom_indices)
         assert len(missing_token_indices) == num_tokens
 
     # create molecule input
 
-    molecule_input = MoleculeInput(
+    molecule_input = MoleculeLengthMoleculeInput(
         molecules=molecules,
-        molecule_token_pool_lens=token_pool_lens,
+        one_token_per_atom=one_token_per_atom,
         molecule_atom_indices=molecule_atom_indices,
         distogram_atom_indices=distogram_atom_indices,
         molecule_ids=molecule_ids,
-        token_bonds=token_bonds,
+        token_bonds=None,
         additional_molecule_feats=additional_molecule_feats,
         additional_token_feats=default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types=is_molecule_types,
@@ -1783,7 +2120,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
         entity_id_counts.append(entity_len)
         unrepeated_entity_ids.append(unrepeated_entity_sequences[entity_sequence])
 
-    entity_ids = torch.repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
+    entity_ids = repeat_interleave(tensor(unrepeated_entity_ids), tensor(entity_id_counts))
 
     # sym ids
 
@@ -1795,7 +2132,7 @@ def pdb_input_to_molecule_input(pdb_input: PDBInput) -> MoleculeInput:
             unrepeated_sym_sequences[entity_sequence] += 1
     unrepeated_sym_ids = tensor(unrepeated_sym_ids)
 
-    sym_ids = torch.repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
+    sym_ids = repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
 
     # concat for all of additional_molecule_feats
 
@@ -2136,8 +2473,14 @@ class PDBDataset(Dataset):
 INPUT_TO_ATOM_TRANSFORM = {
     AtomInput: identity,
     MoleculeInput: molecule_to_atom_input,
-    Alphafold3Input: compose(alphafold3_input_to_molecule_input, molecule_to_atom_input),
-    PDBInput: compose(pdb_input_to_molecule_input, molecule_to_atom_input),
+    Alphafold3Input: compose(
+        alphafold3_input_to_molecule_lengthed_molecule_input,
+        molecule_lengthed_molecule_input_to_atom_input
+    ),
+    PDBInput: compose(
+        pdb_input_to_molecule_input,
+        molecule_to_atom_input
+    ),
 }
 
 # function for extending the config
@@ -2148,7 +2491,7 @@ def register_input_transform(
     fn: Callable[[Any], AtomInput]
 ):
     if input_type in INPUT_TO_ATOM_TRANSFORM:
-        print(f'{input_type} is already registered, but overwriting')
+        logger.warning(f'{input_type} is already registered, but overwriting')
 
     INPUT_TO_ATOM_TRANSFORM[input_type] = fn
 
