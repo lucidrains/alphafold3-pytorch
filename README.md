@@ -214,11 +214,12 @@ assert sampled_atom_pos.shape == (1, (5 + 4), 3)
 
 ### PDB dataset curation
 
-To acquire the AlphaFold 3 PDB dataset, first download all first-assembly (and asymmetric unit) complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The two Python scripts below (i.e., `filter_pdb_{train,val}_mmcifs.py` and `cluster_pdb_{train,val}_mmcifs.py`) assume you have downloaded the PDB in the **mmCIF file format**, placing its first-assembly and asymmetric unit mmCIF files at `data/pdb_data/unfiltered_assembly_mmcifs/` and `data/pdb_data/unfiltered_asym_mmcifs/`, respectively.
+To acquire the AlphaFold 3 PDB dataset, first download all first-assembly (and asymmetric unit) complexes in the Protein Data Bank (PDB), and then preprocess them with the script referenced below. The PDB can be downloaded from the RCSB: https://www.wwpdb.org/ftp/pdb-ftp-sites#rcsbpdb. The two Python scripts below (i.e., `filter_pdb_{train,val,test}_mmcifs.py` and `cluster_pdb_{train,val,test}_mmcifs.py`) assume you have downloaded the PDB in the **mmCIF file format**, placing its first-assembly and asymmetric unit mmCIF files at `data/pdb_data/unfiltered_assembly_mmcifs/` and `data/pdb_data/unfiltered_asym_mmcifs/`, respectively.
 
 For reproducibility, we recommend downloading the PDB using AWS snapshots (e.g., `20240101`). To do so, refer to [AWS's documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html) to set up the AWS CLI locally. Alternatively, on the RCSB website, navigate down to "Download Protocols", and follow the download instructions depending on your location.
 
 For example, one can use the following commands to download the PDB as two collections of mmCIF files:
+
 ```bash
 # For `assembly1` complexes, use the PDB's `20240101` AWS snapshot:
 aws s3 sync s3://pdbsnapshots/20240101/pub/pdb/data/assemblies/mmCIF/divided/ ./data/pdb_data/unfiltered_assembly_mmcifs
@@ -239,6 +240,7 @@ rsync.rcsb.org::ftp_data/structures/divided/mmCIF/ ./data/pdb_data/unfiltered_as
 
 After downloading, you should have two directories formatted like this:
 https://files.rcsb.org/pub/pdb/data/assemblies/mmCIF/divided/ & https://files.rcsb.org/pub/pdb/data/structures/divided/mmCIF/
+
 ```bash
 00/
 01/
@@ -248,27 +250,33 @@ zz/
 ```
 
 For these directories, unzip all the files:
+
 ```bash
 find ./data/pdb_data/unfiltered_assembly_mmcifs/ -type f -name "*.gz" -exec gzip -d {} \;
 find ./data/pdb_data/unfiltered_asym_mmcifs/ -type f -name "*.gz" -exec gzip -d {} \;
 ```
 
 Next run the commands
+
 ```bash
 wget -P ./data/ccd_data/ https://files.wwpdb.org/pub/pdb/data/monomers/components.cif.gz
 wget -P ./data/ccd_data/ https://files.wwpdb.org/pub/pdb/data/component-models/complete/chem_comp_model.cif.gz
 ```
+
 from the project's root directory to download the latest version of the PDB's Chemical Component Dictionary (CCD) and its structural models. Extract each of these files using the following command:
+
 ```bash
 find data/ccd_data/ -type f -name "*.gz" -exec gzip -d {} \;
 ```
 
 ### PDB dataset filtering
 
-Then run the following with `pdb_assembly_dir`, `pdb_asym_dir`, `ccd_dir`, and `mmcif_output_dir` replaced with the locations of your local copies of the first-assembly PDB, asymmetric unit PDB, CCD, and your desired dataset output directory (i.e., `./data/pdb_data/unfiltered_assembly_mmcifs/`, `./data/pdb_data/unfiltered_asym_mmcifs/`, `./data/ccd_data/`, and `./data/pdb_data/{train,val}_mmcifs/`).
+Then run the following with `pdb_assembly_dir`, `pdb_asym_dir`, `ccd_dir`, and `mmcif_output_dir` replaced with the locations of your local copies of the first-assembly PDB, asymmetric unit PDB, CCD, and your desired dataset output directory (i.e., `./data/pdb_data/unfiltered_assembly_mmcifs/`, `./data/pdb_data/unfiltered_asym_mmcifs/`, `./data/ccd_data/`, and `./data/pdb_data/{train,val,test}_mmcifs/`).
+
 ```bash
 python scripts/filter_pdb_train_mmcifs.py --mmcif_assembly_dir <pdb_assembly_dir> --mmcif_asym_dir <pdb_asym_dir> --ccd_dir <ccd_dir> --output_dir <mmcif_output_dir>
 python scripts/filter_pdb_val_mmcifs.py --mmcif_assembly_dir <pdb_assembly_dir> --mmcif_asym_dir <pdb_asym_dir> --output_dir <mmcif_output_dir>
+python scripts/filter_pdb_test_mmcifs.py --mmcif_assembly_dir <pdb_assembly_dir> --mmcif_asym_dir <pdb_asym_dir> --output_dir <mmcif_output_dir>
 ```
 
 See the scripts for more options. Each first-assembly mmCIF that successfully passes
@@ -277,15 +285,17 @@ named according to the mmCIF's second and third PDB ID characters (e.g. `5c`).
 
 ### PDB dataset clustering
 
-Next, run the following with `mmcif_dir` and `{train,val}_clustering_output_dir` replaced, respectively, with your local output directory created using the dataset filtering script above and with your desired clustering output directories (i.e., `./data/pdb_data/{train,val}_mmcifs/` and `./data/pdb_data/data_caches/{train,val}_clusterings/`):
+Next, run the following with `mmcif_dir` and `{train,val,test}_clustering_output_dir` replaced, respectively, with your local output directory created using the dataset filtering script above and with your desired clustering output directories (i.e., `./data/pdb_data/{train,val,test}_mmcifs/` and `./data/pdb_data/data_caches/{train,val,test}_clusterings/`):
+
 ```bash
 python scripts/cluster_pdb_train_mmcifs.py --mmcif_dir <mmcif_dir> --output_dir <train_clustering_output_dir> --clustering_filtered_pdb_dataset
 python scripts/cluster_pdb_val_mmcifs.py --mmcif_dir <mmcif_dir> --reference_clustering_dir <train_clustering_output_dir> --output_dir <val_clustering_output_dir> --clustering_filtered_pdb_dataset
+python scripts/cluster_pdb_test_mmcifs.py --mmcif_dir <mmcif_dir> --reference_1_clustering_dir <train_clustering_output_dir> --reference_2_clustering_dir <val_clustering_output_dir> --output_dir <test_clustering_output_dir> --clustering_filtered_pdb_dataset
 ```
 
 **Note**: The `--clustering_filtered_pdb_dataset` flag is recommended when clustering the filtered PDB dataset as curated using the scripts above, as this flag will enable faster runtimes in this context (since filtering leaves each chain's residue IDs 1-based). However, this flag must **not** be provided when clustering other (i.e., non-PDB) datasets of mmCIF files. Otherwise, interface clustering may be performed incorrectly, as these datasets' mmCIF files may not use strict 1-based residue indexing for each chain.
 
-**Note**: One can instead download preprocessed (i.e., filtered) mmCIF (`train`/`val`) files (~20GB, comprising 148k complexes) and chain/interface clustering (`train`/`val`) files (~1GB) for the PDB's `20240101` AWS snapshot via a [shared OneDrive folder](https://mailmissouri-my.sharepoint.com/:f:/g/personal/acmwhb_umsystem_edu/EqU8tjUmmKxJr-FAlq4tzaIBi2TIBtmw5Vl3k_kmgNlepA?e=mzlyv6). Each of these `tar` archives should be uncompressed within the `data/pdb_data/` directory.
+**Note**: One can instead download preprocessed (i.e., filtered) mmCIF (`train`/`val`/`test`) files (~25GB, comprising 148k complexes) and chain/interface clustering (`train`/`val`/`test`) files (~3GB) for the PDB's `20240101` AWS snapshot via a [shared OneDrive folder](https://mailmissouri-my.sharepoint.com/:f:/g/personal/acmwhb_umsystem_edu/EqU8tjUmmKxJr-FAlq4tzaIBi2TIBtmw5Vl3k_kmgNlepA?e=mzlyv6). Each of these `tar` archives should be uncompressed within the `data/pdb_data/` directory.
 
 ## Contributing
 
