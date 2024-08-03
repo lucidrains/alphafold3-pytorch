@@ -2407,8 +2407,10 @@ class ElucidatedAtomDiffusion(Module):
         S_tmax = 50,
         S_noise = 1.003,
         step_scale = 1.5,
+        augment_during_sampling = True,
         smooth_lddt_loss_kwargs: dict = dict(),
         weighted_rigid_align_kwargs: dict = dict(),
+        centre_random_augmentation_kwargs: dict = dict(),
         karras_formulation = False  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
     ):
         super().__init__()
@@ -2432,6 +2434,11 @@ class ElucidatedAtomDiffusion(Module):
         self.S_tmin = S_tmin
         self.S_tmax = S_tmax
         self.S_noise = S_noise
+
+        # centre random augmenter
+
+        self.augment_during_sampling = augment_during_sampling
+        self.centre_random_augmenter = CentreRandomAugmentation(**centre_random_augmentation_kwargs)
 
         # weighted rigid align
 
@@ -2553,8 +2560,12 @@ class ElucidatedAtomDiffusion(Module):
 
         maybe_tqdm_wrapper = tqdm if use_tqdm_pbar else identity
 
+        maybe_augment_fn = self.centre_random_augmenter if self.augment_during_sampling else identity
+
         for sigma, sigma_next, gamma in maybe_tqdm_wrapper(sigmas_and_gammas, desc = tqdm_pbar_title):
-            sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
+            sigma, sigma_next, gamma = tuple(t.item() for t in (sigma, sigma_next, gamma))
+
+            atom_pos = maybe_augment_fn(atom_pos)
 
             eps = self.S_noise * torch.randn(shape, device = self.device) # stochastic sampling
 
