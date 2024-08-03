@@ -402,7 +402,7 @@ class MoleculeInput:
     pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
-    chains:                     Tuple[int | None, int | None] = (None, None)
+    chains:                     Tuple[int | None, int | None] | None = (None, None)
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     directed_bonds:             bool = False
@@ -707,7 +707,7 @@ class MoleculeLengthMoleculeInput:
     pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
-    chains:                     Tuple[int | None, int | None] = (None, None)
+    chains:                     Tuple[int | None, int | None] | None = (None, None)
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     directed_bonds:             bool = False
@@ -1111,7 +1111,7 @@ class Alphafold3Input:
     pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
-    chains:                     Tuple[int | None, int | None] = (None, None)
+    chains:                     Tuple[int | None, int | None] | None = (None, None)
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     directed_bonds:             bool = False
@@ -1534,7 +1534,7 @@ class PDBInput:
 
     mmcif_filepath: str | None = None
     biomol: Biomolecule | None = None
-    chains: Tuple[str | None, str | None] = (None, None)
+    chains: Tuple[str | None, str | None] | None = (None, None)
     cropping_config: Dict[str, float | int] | None = None
     msa_dir: str | None = None
     templates_dir: str | None = None
@@ -1559,11 +1559,6 @@ class PDBInput:
             raise ValueError(
                 "Either an mmCIF file or a `Biomolecule` object must be provided."
             )
-
-        if exists(self.chains):
-            assert exists(self.chains[0]) or (
-                exists(self.chains[0]) and exists(self.chains[1])
-            ), "At least one (sampled) chain ID must be provided for training and evaluation."
 
         if exists(self.cropping_config):
             assert self.cropping_config.keys() == {
@@ -2434,15 +2429,18 @@ def pdb_input_to_molecule_input(
 
     # map (sampled) chain IDs to indices
 
-    chain_id_1, chain_id_2 = i.chains
-    chain_id_to_idx = {
-        chain_id: chain_idx
-        for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
-    }
-    if exists(chain_id_1):
-        chain_id_1 = chain_id_to_idx[chain_id_1]
-    if exists(chain_id_2):
-        chain_id_2 = chain_id_to_idx[chain_id_2]
+    chains = None
+
+    if exists(i.chains):
+        chain_id_1, chain_id_2 = i.chains
+        chain_id_to_idx = {
+            chain_id: chain_idx for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
+        }
+        if exists(chain_id_1):
+            chain_id_1 = chain_id_to_idx[chain_id_1]
+        if exists(chain_id_2):
+            chain_id_2 = chain_id_to_idx[chain_id_2]
+        chains = (chain_id_1, chain_id_2)
 
     # create molecule input
 
@@ -2467,7 +2465,7 @@ def pdb_input_to_molecule_input(
         template_mask=template_mask,
         msa_mask=msa_mask,
         atom_parent_ids=atom_parent_ids,
-        chains=(chain_id_1, chain_id_2),
+        chains=chains,
         add_atom_ids=i.add_atom_ids,
         add_atompair_ids=i.add_atompair_ids,
         directed_bonds=i.directed_bonds,
