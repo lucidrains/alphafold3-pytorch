@@ -677,12 +677,12 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 @dataclass
 class MoleculeLengthMoleculeInput:
     molecules:                  List[Mol]
-    one_token_per_atom:         List[bool]
     molecule_ids:               Int[' n']
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS-1}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
+    one_token_per_atom:         List[bool] | None = None
     is_molecule_mod:            Bool['n num_mods'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
@@ -719,7 +719,16 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
     ones = torch.ones_like(atoms_per_molecule)
-    one_token_per_atom = tensor(i.one_token_per_atom)
+
+    # get `one_token_per_atom`, which can be fully customizable
+
+    if exists(i.one_token_per_atom):
+        one_token_per_atom = tensor(i.one_token_per_atom)
+    else:
+        # if which molecule is `one_token_per_atom` is not passed in
+        # default to what the paper did, which is ligands and any modified biomolecule
+        is_ligand = i.is_molecule_types[..., IS_LIGAND_INDEX]
+        one_token_per_atom = is_ligand | is_molecule_mod.any(dim = -1)
 
     # derive the number of repeats needed to expand molecule lengths to token lengths
 
