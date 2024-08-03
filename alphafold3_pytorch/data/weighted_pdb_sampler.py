@@ -9,6 +9,7 @@ from loguru import logger
 from torch.utils.data import Sampler
 
 from alphafold3_pytorch.tensor_typing import typecheck
+from alphafold3_pytorch.utils.utils import exists
 
 # constants
 
