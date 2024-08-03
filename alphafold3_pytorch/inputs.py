@@ -955,11 +955,12 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     # mask out molecule atom indices and distogram atom indices where it is in the missing atom indices list
 
     if exists(missing_token_indices):
-        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats)
+        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats, dim = 0)
 
         is_missing_molecule_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, molecule_atom_indices
         ).any(dim=-1)
+
         is_missing_distogram_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, distogram_atom_indices
         ).any(dim=-1)
@@ -1356,15 +1357,15 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
 
-    token_repeats = tensor(
-        [
-            *num_protein_tokens,
-            *num_ss_rna_tokens,
-            *num_ss_dna_tokens,
-            len(mol_ligands),
-            len(metal_ions),
-        ]
-    )
+    ligand_tokens: List[int] = [] if len(mol_ligands) == 0 else [len(mol_ligands)]
+
+    token_repeats = tensor([
+        *num_protein_tokens,
+        *num_ss_rna_tokens,
+        *num_ss_dna_tokens,
+        *ligand_tokens,
+        len(metal_ions),
+    ])
 
     # residue ids
 
@@ -1372,7 +1373,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     # asym ids
 
-    asym_ids = repeat_interleave(torch.arange(len(token_repeats)), token_repeats)
+    asym_ids = torch.arange(len(token_repeats))
 
     # entity ids
 
@@ -1393,7 +1394,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *[len(rna) for rna in i.ds_rna for _ in range(2)],
         *[len(dna) for dna in i.ss_dna],
         *[len(dna) for dna in i.ds_dna for _ in range(2)],
-        len(mol_ligands),
+        *ligand_tokens,
         *[1 for _ in metal_ions],
     ]
 
@@ -1412,9 +1413,13 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     # concat for all of additional_molecule_feats
 
-    additional_molecule_feats = torch.stack(
-        (residue_index, torch.arange(num_tokens), asym_ids, entity_ids, sym_ids), dim=-1
-    )
+    additional_molecule_feats = torch.stack((
+        residue_index,
+        torch.arange(num_tokens),
+        asym_ids,
+        entity_ids,
+        sym_ids
+    ), dim=-1)
 
     # distogram and token centre atom indices
 
