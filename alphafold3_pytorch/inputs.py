@@ -1165,7 +1165,7 @@ def maybe_string_to_int(
     return tensor([index.get(c, unknown_index) for c in indices]).long()
 
 @typecheck
-def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthedMoleculeInput:
+def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthMoleculeInput:
     i = alphafold3_input
 
     chainable_biomol_entries: List[List[dict]] = []  # for reordering the atom positions at the end
