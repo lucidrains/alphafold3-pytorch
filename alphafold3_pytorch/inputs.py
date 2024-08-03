@@ -4,7 +4,7 @@ import copy
 import json
 import os
 from pathlib import Path
-from functools import partial
+from functools import partial, wraps
 from itertools import groupby
 from collections import defaultdict
 from collections.abc import Iterable
@@ -119,7 +119,7 @@ def flatten(arr):
 def pad_to_len(t, length, value = 0, dim = -1):
     assert dim < 0
     zeros = (0, 0) * (-dim - 1)
-    return F.pad(t, (*zeros, 0, max(0, length - t.shape[-1])), value = value)
+    return F.pad(t, (*zeros, 0, max(0, length - t.shape[dim])), value = value)
 
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
@@ -128,6 +128,14 @@ def compose(*fns: Callable):
         for fn in fns:
             x = fn(x, *args, **kwargs)
         return x
+    return inner
+
+def maybe(fn):
+    @wraps(fn)
+    def inner(x, *args, **kwargs):
+        if not exists(x):
+            return x
+        return fn(x, *args, **kwargs)
     return inner
 
 # atom level, what Alphafold3 accepts
@@ -501,7 +509,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
         offset = 0
 
-        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
+        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
         # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
 
         asym_ids = i.additional_molecule_feats[..., 2]
@@ -711,18 +719,37 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     assert len(molecules) == len(i.one_token_per_atom)
 
-    atom_lens = []
+    atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
+    ones = torch.ones_like(atoms_per_molecule)
+    one_token_per_atom = tensor(i.one_token_per_atom)
 
-    for mol, one_token_per_atom in zip(molecules, i.one_token_per_atom):
-        num_atoms = mol.GetNumAtoms()
+    # derive the number of repeats needed to expand molecule lengths to token lengths
 
-        if one_token_per_atom:
-            atom_lens.extend([1] * num_atoms)
-        else:
-            atom_lens.append(num_atoms)
+    token_repeats = torch.where(one_token_per_atom, atoms_per_molecule, ones)
 
-    atom_lens = tensor(atom_lens)
-    total_atoms = atom_lens.sum().item()
+    # derive atoms per token
+
+    atom_repeat_input = torch.where(one_token_per_atom, ones, atoms_per_molecule)
+    atoms_per_token = repeat_interleave(atom_repeat_input, token_repeats)
+
+    total_atoms = atoms_per_molecule.sum().item()
+
+    # repeat all the molecule lengths to the token lengths, using `one_token_per_atom`
+
+    src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim = 0)
+    is_molecule_types = repeat_interleave(i.is_molecule_types, token_repeats, dim = 0)
+    additional_molecule_feats = repeat_interleave(i.additional_molecule_feats, token_repeats, dim = 0)
+    additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
+    molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
+
+    distogram_atom_indices = repeat_interleave(i.distogram_atom_indices, token_repeats)
+    molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
+
+    msa = maybe(repeat_interleave)(i.msa, token_repeats, dim = -2)
+    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim = -2)
+
+    templates = maybe(repeat_interleave)(i.templates, token_repeats, dim = -3)
+    templates = maybe(repeat_interleave)(templates, token_repeats, dim = -2)
 
     # molecule_atom_lens
 
@@ -810,7 +837,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
         offset = 0
 
-        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna` for is_molecule_types (chainable biomolecules)
+        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
         # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
 
         asym_ids = i.additional_molecule_feats[..., 2]
@@ -927,10 +954,9 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # mask out molecule atom indices and distogram atom indices where it is in the missing atom indices list
 
-    molecule_atom_indices = i.molecule_atom_indices
-    distogram_atom_indices = i.distogram_atom_indices
-
     if exists(missing_token_indices):
+        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats)
+
         is_missing_molecule_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, molecule_atom_indices
         ).any(dim=-1)
@@ -953,14 +979,16 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     atom_input = AtomInput(
         atom_inputs=atom_inputs_tensor,
         atompair_inputs=atompair_inputs,
-        molecule_atom_lens=tensor(atom_lens, dtype=torch.long),
-        molecule_ids=i.molecule_ids,
-        molecule_atom_indices=i.molecule_atom_indices,
-        distogram_atom_indices=i.distogram_atom_indices,
+        molecule_atom_lens=atoms_per_token,
+        molecule_ids=molecule_ids,
+        molecule_atom_indices=molecule_atom_indices,
+        distogram_atom_indices=distogram_atom_indices,
         missing_atom_mask=missing_atom_mask,
-        additional_token_feats=i.additional_token_feats,
-        additional_molecule_feats=i.additional_molecule_feats,
-        is_molecule_types=i.is_molecule_types,
+        additional_token_feats=additional_token_feats,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_types=is_molecule_types,
+        msa = msa,
+        templates = templates,
         atom_pos=atom_pos,
         token_bonds=i.token_bonds,
         atom_parent_ids=i.atom_parent_ids,
@@ -1174,8 +1202,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         (mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands
     ]
 
-    for mol_ligand in mol_ligands:
-        molecule_ids.append(tensor([ligand_id] * mol_ligand.GetNumAtoms()))
+    molecule_ids.append(tensor([ligand_id] * len(mol_ligands)))
 
     # create the molecule input
 
@@ -1189,27 +1216,16 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *all_dna_mols,
     ]
 
-    # metal ions pool lens
-
-    num_metal_ions = len(mol_metal_ions)
-    metal_ions_pool_lens = [1] * num_metal_ions
-
-    # in the paper, they treat each atom of the ligands as a token
-
-    ligands_token_pool_lens = [[1] * mol.GetNumAtoms() for mol in mol_ligands]
-
-    total_ligand_tokens = sum([mol.GetNumAtoms() for mol in mol_ligands])
-
-    # correctly generate the is_molecule_types, which is a boolean tensor of shape [*, 4]
-    # is_protein | is_rna | is_dna | is_ligand
+    # correctly generate the is_molecule_types, which is a boolean tensor of shape [*, 5]
+    # is_protein | is_rna | is_dna | is_ligand | is_metal_ions
     # this is needed for their special diffusion loss
 
     molecule_type_token_lens = [
         len(all_protein_mols),
         len(all_rna_mols),
         len(all_dna_mols),
-        total_ligand_tokens,
-        num_metal_ions
+        len(mol_ligands),
+        len(mol_metal_ions)
     ]
 
     num_tokens = sum(molecule_type_token_lens)
@@ -1222,6 +1238,12 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     left, right = molecule_types_lens_cumsum[:-1], molecule_types_lens_cumsum[1:]
 
     is_molecule_types = (arange >= left) & (arange < right)
+
+    # pad the src-tgt indices
+
+    src_tgt_atom_indices = tensor(src_tgt_atom_indices)
+
+    src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, dim = -2)
 
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
@@ -1246,44 +1268,44 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     # will be linearly connected for proteins and nucleic acids
     # but for ligands, will have their atomic bond matrix (as ligands are atom resolution)
 
-    token_bonds = torch.zeros(num_tokens, num_tokens).bool()
+    # token_bonds = torch.zeros(num_tokens, num_tokens).bool()
 
-    offset = 0
+    # offset = 0
 
-    for biomolecule in (*mol_proteins, *mol_ss_rnas, *mol_ss_dnas):
-        chain_len = len(biomolecule)
-        eye = torch.eye(chain_len)
+    # for biomolecule in (*mol_proteins, *mol_ss_rnas, *mol_ss_dnas):
+    #     chain_len = len(biomolecule)
+    #     eye = torch.eye(chain_len)
 
-        row_col_slice = slice(offset, offset + chain_len - 1)
-        token_bonds[row_col_slice, row_col_slice] = (eye[1:, :-1] + eye[:-1, 1:]) > 0
-        offset += chain_len
+    #     row_col_slice = slice(offset, offset + chain_len - 1)
+    #     token_bonds[row_col_slice, row_col_slice] = (eye[1:, :-1] + eye[:-1, 1:]) > 0
+    #     offset += chain_len
 
-    for ligand in mol_ligands:
-        coordinates = []
-        updates = []
+    # for ligand in mol_ligands:
+    #     coordinates = []
+    #     updates = []
 
-        num_atoms = ligand.GetNumAtoms()
-        has_bond = torch.zeros(num_atoms, num_atoms).bool()
+    #     num_atoms = ligand.GetNumAtoms()
+    #     has_bond = torch.zeros(num_atoms, num_atoms).bool()
 
-        for bond in ligand.GetBonds():
-            atom_start_index = bond.GetBeginAtomIdx()
-            atom_end_index = bond.GetEndAtomIdx()
+    #     for bond in ligand.GetBonds():
+    #         atom_start_index = bond.GetBeginAtomIdx()
+    #         atom_end_index = bond.GetEndAtomIdx()
 
-            coordinates.extend(
-                [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
-            )
+    #         coordinates.extend(
+    #             [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+    #         )
 
-            updates.extend([True, True])
+    #         updates.extend([True, True])
 
-        coordinates = tensor(coordinates).long()
-        updates = tensor(updates).bool()
+    #     coordinates = tensor(coordinates).long()
+    #     updates = tensor(updates).bool()
 
-        has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+    #     has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
 
-        row_col_slice = slice(offset, offset + num_atoms)
-        token_bonds[row_col_slice, row_col_slice] = has_bond
+    #     row_col_slice = slice(offset, offset + num_atoms)
+    #     token_bonds[row_col_slice, row_col_slice] = has_bond
 
-        offset += num_atoms
+    #     offset += num_atoms
 
     # handle molecule ids
 
@@ -1315,7 +1337,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *num_ss_rna_atoms,
         *num_ss_dna_atoms,
         *num_ligand_atoms,
-        num_metal_ions,
+        len(metal_ions),
     ]
 
     atom_parent_ids = repeat_interleave(torch.arange(len(atom_counts)), tensor(atom_counts))
@@ -1333,15 +1355,14 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     num_protein_tokens = [len(protein) for protein in proteins]
     num_ss_rna_tokens = [len(rna) for rna in ss_rnas]
     num_ss_dna_tokens = [len(dna) for dna in ss_dnas]
-    num_ligand_tokens = [ligand.GetNumAtoms() for ligand in mol_ligands]
 
     token_repeats = tensor(
         [
             *num_protein_tokens,
             *num_ss_rna_tokens,
             *num_ss_dna_tokens,
-            *num_ligand_tokens,
-            num_metal_ions,
+            len(mol_ligands),
+            len(metal_ions),
         ]
     )
 
@@ -1372,7 +1393,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *[len(rna) for rna in i.ds_rna for _ in range(2)],
         *[len(dna) for dna in i.ss_dna],
         *[len(dna) for dna in i.ds_dna for _ in range(2)],
-        *num_ligand_tokens,
+        len(mol_ligands),
         *[1 for _ in metal_ions],
     ]
 
@@ -1419,17 +1440,11 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         for mol_index, (mol_miss_atom_indices, mol) in enumerate(
             zip(i.missing_atom_indices, molecules)
         ):
-            is_ligand_residue = is_molecule_types[mol_index, IS_LIGAND_INDEX].item()
             mol_miss_atom_indices = default(mol_miss_atom_indices, [])
             mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
             missing_atom_indices.append(mol_miss_atom_indices)
-            if is_ligand_residue:
-                missing_token_indices.extend(
-                    [mol_miss_atom_indices for _ in range(mol.GetNumAtoms())]
-                )
-            else:
-                missing_token_indices.append(mol_miss_atom_indices)
+            missing_token_indices.append(mol_miss_atom_indices)
 
         assert len(molecules) == len(missing_atom_indices)
         assert len(missing_token_indices) == num_tokens
@@ -1442,7 +1457,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         molecule_atom_indices=molecule_atom_indices,
         distogram_atom_indices=distogram_atom_indices,
         molecule_ids=molecule_ids,
-        token_bonds=token_bonds,
+        token_bonds=None,
         additional_molecule_feats=additional_molecule_feats,
         additional_token_feats=default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types=is_molecule_types,
