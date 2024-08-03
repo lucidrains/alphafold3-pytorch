@@ -186,7 +186,17 @@ def test_pdbinput_input():
     if os.path.exists(filepath.replace(".cif", "-sampled.cif")):
         os.remove(filepath.replace(".cif", "-sampled.cif"))
 
-    train_pdb_input = PDBInput(filepath, training=True)
+    train_pdb_input = PDBInput(
+        filepath,
+        chains=("A", "B"),
+        cropping_config={
+            "contiguous_weight": 0.2,
+            "spatial_weight": 0.4,
+            "spatial_interface_weight": 0.4,
+            "n_res": 384,
+        },
+        training=True,
+    )
 
     eval_pdb_input = PDBInput(filepath)
 
