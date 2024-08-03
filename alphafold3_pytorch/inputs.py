@@ -1189,10 +1189,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *all_dna_mols,
     ]
 
-    molecule_token_pool_lens_without_ligands = [
-        mol.GetNumAtoms() for mol in molecules_without_ligands
-    ]
-
     # metal ions pool lens
 
     num_metal_ions = len(mol_metal_ions)
@@ -1364,6 +1360,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         if entity_sequence in unrepeated_entity_sequences:
             continue
         unrepeated_entity_sequences[entity_sequence] = len(unrepeated_entity_sequences)
+
     unrepeated_entity_ids = [
         unrepeated_entity_sequences[entity_sequence]
         for entity_sequence in (*proteins, *ss_rnas, *ss_dnas, *ligands, *metal_ions)
