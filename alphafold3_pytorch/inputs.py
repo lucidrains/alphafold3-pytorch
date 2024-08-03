@@ -1245,12 +1245,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     for mol in molecules:
         Chem.SanitizeMol(mol)
 
-    token_pool_lens = [
-        *molecule_token_pool_lens_without_ligands,
-        *flatten(ligands_token_pool_lens),
-        *metal_ions_pool_lens,
-    ]
-
     # construct the token bonds
 
     # will be linearly connected for proteins and nucleic acids
