@@ -285,7 +285,10 @@ def test_sequence_local_attn():
     out = attn(atoms, attn_bias = attn_bias)
     assert out.shape == atoms.shape
 
-def test_diffusion_module():
+@pytest.mark.parametrize('karras_formulation', (True, False))
+def test_diffusion_module(
+    karras_formulation
+):
 
     seq_len = 16
 
@@ -338,6 +341,7 @@ def test_diffusion_module():
 
     edm = ElucidatedAtomDiffusion(
         diffusion_module,
+        karras_formulation = karras_formulation,
         num_sample_steps = 2
     )
 

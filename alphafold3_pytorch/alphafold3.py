@@ -2407,7 +2407,8 @@ class ElucidatedAtomDiffusion(Module):
         S_tmax = 50,
         S_noise = 1.003,
         smooth_lddt_loss_kwargs: dict = dict(),
-        weighted_rigid_align_kwargs: dict = dict()
+        weighted_rigid_align_kwargs: dict = dict(),
+        karras_formulation = False  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
     ):
         super().__init__()
         self.net = net
@@ -2439,6 +2440,10 @@ class ElucidatedAtomDiffusion(Module):
         self.smooth_lddt_loss = SmoothLDDTLoss(**smooth_lddt_loss_kwargs)
 
         self.register_buffer('zero', torch.tensor(0.), persistent = False)
+
+        # whether to use original karras formulation or not
+
+        self.karras_formulation = karras_formulation
 
     @property
     def device(self):
@@ -2504,7 +2509,9 @@ class ElucidatedAtomDiffusion(Module):
         sigmas = (self.sigma_max ** inv_rho + steps / (N - 1) * (self.sigma_min ** inv_rho - self.sigma_max ** inv_rho)) ** self.rho
 
         sigmas = F.pad(sigmas, (0, 1), value = 0.) # last step is sigma value of 0.
-        return sigmas
+
+        scale = 1. if self.karras_formulation else self.sigma_data
+        return sigmas * scale
 
     @torch.no_grad()
     def sample(
@@ -2573,11 +2580,17 @@ class ElucidatedAtomDiffusion(Module):
 
     # training
 
-    def loss_weight(self, sigma):
+    def karras_loss_weight(self, sigma):
         return (sigma ** 2 + self.sigma_data ** 2) * (sigma * self.sigma_data) ** -2
 
+    def loss_weight(self, sigma):
+        """ for some reason, in paper they add instead of multiply as in original paper """
+        return (sigma ** 2 + self.sigma_data ** 2) * (sigma + self.sigma_data) ** -2
+
     def noise_distribution(self, batch_size):
-        return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp()
+        scale = 1. if self.karras_formulation else self.sigma_data
+
+        return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp() * scale
 
     def forward(
         self,
@@ -2672,7 +2685,9 @@ class ElucidatedAtomDiffusion(Module):
 
         # regular loss weight as defined in EDM paper
 
-        loss_weights = self.loss_weight(padded_sigmas)
+        loss_weight_fn = self.karras_loss_weight if self.karras_formulation else self.loss_weight
+
+        loss_weights = loss_weight_fn(padded_sigmas)
 
         losses = losses * loss_weights
 
