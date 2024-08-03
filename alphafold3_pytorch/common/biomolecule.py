@@ -245,7 +245,7 @@ class Biomolecule:
             crop_masks
         ), "The number of chains and crop masks must be equal."
         assert not all(
-            crop_mask.all() for crop_mask in crop_masks
+            not crop_mask.any() for crop_mask in crop_masks
         ), "Not all tokens can be cropped out of a Biomolecule."
 
         # collect metadata for each chain
@@ -368,7 +368,8 @@ class Biomolecule:
                 for chemtype in self.chemtype
             ]
         )
-        # NOTE: ligand atom position indices vary per ligand residue, so we can't rely on representative atom indices here
+        # NOTE: ligand atom position indices vary per ligand residue,
+        # so we can't rely on representative atom indices here
         token_res_rep_atom_indices[self.chemtype == 3] = np.where(
             self.atom_mask[self.chemtype == 3]
         )[1]
@@ -439,6 +440,7 @@ class Biomolecule:
         chain_2: str | None = None,
     ) -> "Biomolecule":
         """Crop a Biomolecule using a randomly-sampled cropping function."""
+        n_res = min(n_res, len(self.atom_mask))
         crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
         crop_fns = [
             partial(self.contiguous_crop, n_res=n_res),
@@ -602,6 +604,7 @@ def get_unique_res_atom_names(
 def _from_mmcif_object(
     mmcif_object: mmcif_parsing.MmcifObject,
     chain_ids: Optional[Set[str]] = None,
+    atomize_ligand_residues: bool = True,
     atomize_modified_polymer_residues: bool = False,
 ) -> Biomolecule:
     """Takes a Biopython structure/model mmCIF object and creates a `Biomolecule` instance.
@@ -620,6 +623,10 @@ def _from_mmcif_object(
     :param mmcif_object: The parsed Biopython structure/model mmCIF object.
     :param chain_ids: If chain_ids are specified (e.g. A), then only these chains are parsed.
         Otherwise all chains are parsed.
+    :param atomize_ligand_residues: If True, then the atoms of ligand
+        residues are treated as "pseudoresidues". This is useful for
+        representing ligand residues as a collection of atoms rather
+        than as a single residue.
     :param atomize_modified_polymer_residues: If True, then the atoms of modified
         polymer residues are treated as "pseudoresidues". This is useful for
         representing modified polymer residues as a collection of (e.g., ligand)
@@ -679,9 +686,13 @@ def _from_mmcif_object(
                 res_shortname, residue_constants.restype_num
             )
             is_modified_polymer_residue = is_polymer_residue and res_shortname == "X"
-            if is_polymer_residue and not (
+            residize_polymer = is_polymer_residue and not (
                 is_modified_polymer_residue and atomize_modified_polymer_residues
-            ):
+            )
+            residize_non_polymer = (
+                not is_polymer_residue and not atomize_ligand_residues
+            )
+            if residize_polymer or residize_non_polymer:
                 pos = np.zeros((residue_constants.atom_type_num, 3))
                 mask = np.zeros((residue_constants.atom_type_num,))
                 res_b_factors = np.zeros((residue_constants.atom_type_num,))
@@ -755,9 +766,9 @@ def _from_mmcif_object(
                 else:
                     residue_chem_comp_details.add(res_chem_comp_details)
             else:
-                # Represent each ligand atom as a single "pseudoresidue".
-                # NOTE: Ligand "pseudoresidues" can later be grouped back
-                # into a single ligand residue using indexing operations
+                # Represent each residue atom as a single "pseudoresidue".
+                # NOTE: These "pseudoresidues" can later be grouped back
+                # into a single residue using indexing operations
                 # working jointly on chain_index and residue_index.
                 for atom in res:
                     # NOTE: This code assumes water residues have previously been filtered out.
