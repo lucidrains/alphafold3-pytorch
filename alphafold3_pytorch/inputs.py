@@ -689,7 +689,7 @@ class MoleculeLengthMoleculeInput:
     additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS-1}']
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
-    token_bonds:                Bool['n n']
+    token_bonds:                Bool['n n'] | None = None
     one_token_per_atom:         List[bool] | None = None
     is_molecule_mod:            Bool['n num_mods'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
@@ -1502,7 +1502,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         molecule_atom_indices=molecule_atom_indices,
         distogram_atom_indices=distogram_atom_indices,
         molecule_ids=molecule_ids,
-        token_bonds=None,
         additional_molecule_feats=additional_molecule_feats,
         additional_token_feats=default(i.additional_token_feats, torch.zeros(num_tokens, 2)),
         is_molecule_types=is_molecule_types,
