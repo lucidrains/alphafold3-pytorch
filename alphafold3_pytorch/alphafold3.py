@@ -2406,6 +2406,7 @@ class ElucidatedAtomDiffusion(Module):
         S_tmin = 0.05,
         S_tmax = 50,
         S_noise = 1.003,
+        step_scale = 1.5,
         smooth_lddt_loss_kwargs: dict = dict(),
         weighted_rigid_align_kwargs: dict = dict(),
         karras_formulation = False  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
@@ -2425,6 +2426,7 @@ class ElucidatedAtomDiffusion(Module):
         self.P_std = P_std
 
         self.num_sample_steps = num_sample_steps  # otherwise known as N in the paper
+        self.step_scale = step_scale
 
         self.S_churn = S_churn
         self.S_tmin = S_tmin
@@ -2523,7 +2525,7 @@ class ElucidatedAtomDiffusion(Module):
         tqdm_pbar_title = 'sampling time step',
         **network_condition_kwargs
     ):
-        num_sample_steps = default(num_sample_steps, self.num_sample_steps)
+        step_scale, num_sample_steps = self.step_scale, default(num_sample_steps, self.num_sample_steps)
 
         shape = (*atom_mask.shape, 3)
 
@@ -2562,14 +2564,14 @@ class ElucidatedAtomDiffusion(Module):
             model_output = self.preconditioned_network_forward(atom_pos_hat, sigma_hat, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
             denoised_over_sigma = (atom_pos_hat - model_output) / sigma_hat
 
-            atom_pos_next = atom_pos_hat + (sigma_next - sigma_hat) * denoised_over_sigma
+            atom_pos_next = atom_pos_hat + (sigma_next - sigma_hat) * denoised_over_sigma * step_scale
 
             # second order correction, if not the last timestep
 
             if sigma_next != 0:
                 model_output_next = self.preconditioned_network_forward(atom_pos_next, sigma_next, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
                 denoised_prime_over_sigma = (atom_pos_next - model_output_next) / sigma_next
-                atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma)
+                atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma) * step_scale
 
             atom_pos = atom_pos_next
 
