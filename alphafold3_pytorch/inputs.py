@@ -507,8 +507,6 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
 
-        offset = 0
-
         # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
         # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
 
@@ -734,6 +732,16 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     total_atoms = atoms_per_molecule.sum().item()
 
+    # derive `is_first_mol_in_chains` and `is_chainable_biomolecules` - needed for constructing `token_bonds
+
+    # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
+    # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
+
+    asym_ids = i.additional_molecule_feats[..., 2]
+    asym_ids = F.pad(asym_ids, (1, 0), value=-1)
+    is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
+    is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
+
     # repeat all the molecule lengths to the token lengths, using `one_token_per_atom`
 
     src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim = 0)
@@ -761,12 +769,66 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     templates = maybe(repeat_interleave)(i.templates, token_repeats, dim = -3)
     templates = maybe(repeat_interleave)(templates, token_repeats, dim = -2)
 
-    # molecule_atom_lens
+    # get all atoms
 
-    atoms: List[int] = []
+    atoms: List[Atom] = []
 
     for mol in molecules:
         atoms.extend([*mol.GetAtoms()])
+
+    # construct the token bonds
+
+    # will be linearly connected for proteins and nucleic acids
+    # but for ligands, will have their atomic bond matrix (as ligands are atom resolution)
+
+    num_tokens = token_repeats.sum().item()
+
+    token_bonds = torch.zeros(num_tokens, num_tokens).bool()
+
+    offset = 0
+
+    for (
+        mol,
+        mol_is_chainable_biomolecule,
+        mol_is_first_mol_in_chain,
+        mol_is_one_token_per_atom
+    ) in zip(
+        molecules,
+        is_chainable_biomolecules,
+        is_first_mol_in_chains,
+        one_token_per_atom
+    ):
+        num_atoms = mol.GetNumAtoms()
+
+        if mol_is_chainable_biomolecule and not mol_is_first_mol_in_chain:
+            token_bonds[offset, offset - 1] = True
+            token_bonds[offset - 1, offset] = True
+
+        if mol_is_one_token_per_atom:
+            coordinates = []
+            updates = []
+
+            has_bond = torch.zeros(num_atoms, num_atoms).bool()
+
+            for bond in mol.GetBonds():
+                atom_start_index = bond.GetBeginAtomIdx()
+                atom_end_index = bond.GetEndAtomIdx()
+
+                coordinates.extend(
+                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                )
+
+                updates.extend([True, True])
+
+            coordinates = tensor(coordinates).long()
+            updates = tensor(updates).bool()
+
+            has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+
+            row_col_slice = slice(offset, offset + num_atoms)
+            token_bonds[row_col_slice, row_col_slice] = has_bond
+
+        offset += (num_atoms if mol_is_one_token_per_atom else 1)
 
     # handle maybe atom embeds
 
@@ -844,17 +906,6 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         other_index = len(ATOM_BONDS) + 1
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
-
-        offset = 0
-
-        # need the asym_id (to keep track of each molecule for each chain ascending) as well as `is_protein | is_dna | is_rna | is_ligand | is_metal_ion` for is_molecule_types (chainable biomolecules)
-        # will do a single bond from a peptide or nucleotide to the one before. derive a `is_first_mol_in_chain` from `asym_ids`
-
-        asym_ids = i.additional_molecule_feats[..., 2]
-        asym_ids = F.pad(asym_ids, (1, 0), value=-1)
-        is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
-
-        is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
 
         # for every molecule, build the bonds id matrix and add to `atompair_ids`
 
@@ -1001,7 +1052,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         msa = msa,
         templates = templates,
         atom_pos=atom_pos,
-        token_bonds=i.token_bonds,
+        token_bonds=token_bonds,
         atom_parent_ids=i.atom_parent_ids,
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
@@ -1273,50 +1324,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     for mol in molecules:
         Chem.SanitizeMol(mol)
-
-    # construct the token bonds
-
-    # will be linearly connected for proteins and nucleic acids
-    # but for ligands, will have their atomic bond matrix (as ligands are atom resolution)
-
-    # token_bonds = torch.zeros(num_tokens, num_tokens).bool()
-
-    # offset = 0
-
-    # for biomolecule in (*mol_proteins, *mol_ss_rnas, *mol_ss_dnas):
-    #     chain_len = len(biomolecule)
-    #     eye = torch.eye(chain_len)
-
-    #     row_col_slice = slice(offset, offset + chain_len - 1)
-    #     token_bonds[row_col_slice, row_col_slice] = (eye[1:, :-1] + eye[:-1, 1:]) > 0
-    #     offset += chain_len
-
-    # for ligand in mol_ligands:
-    #     coordinates = []
-    #     updates = []
-
-    #     num_atoms = ligand.GetNumAtoms()
-    #     has_bond = torch.zeros(num_atoms, num_atoms).bool()
-
-    #     for bond in ligand.GetBonds():
-    #         atom_start_index = bond.GetBeginAtomIdx()
-    #         atom_end_index = bond.GetEndAtomIdx()
-
-    #         coordinates.extend(
-    #             [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
-    #         )
-
-    #         updates.extend([True, True])
-
-    #     coordinates = tensor(coordinates).long()
-    #     updates = tensor(updates).bool()
-
-    #     has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
-
-    #     row_col_slice = slice(offset, offset + num_atoms)
-    #     token_bonds[row_col_slice, row_col_slice] = has_bond
-
-    #     offset += num_atoms
 
     # handle molecule ids
 
