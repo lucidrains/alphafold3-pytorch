@@ -4594,6 +4594,7 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | Int['b m m'] | None = None,
         plddt_labels: Int['b n'] | Int['b m'] | None = None,
         resolved_labels: Int['b n'] | Int['b m'] | None = None,
+        chains: Int['b 2'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_present_sampled_atoms: bool = False,
