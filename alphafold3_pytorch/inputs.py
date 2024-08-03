@@ -168,7 +168,7 @@ class AtomInput:
     pde_labels:                 Int['n n'] | None = None
     plddt_labels:               Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
-    chains:                     Tuple[int | None, int | None] = (None, None)
+    chains:                     Int[" 2"] | None = None
 
     def dict(self):
         return asdict(self)
@@ -201,7 +201,7 @@ class BatchedAtomInput:
     pde_labels:                 Int['b n n'] | None = None
     plddt_labels:               Int['b n'] | None = None
     resolved_labels:            Int['b n'] | None = None
-    chains:                     Tuple[int | None, int | None] = (None, None)
+    chains:                     Int["b 2"] | None = None
 
     def dict(self):
         return asdict(self)
@@ -648,6 +648,10 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     if exists(atom_pos) and isinstance(atom_pos, list):
         atom_pos = torch.cat(atom_pos, dim=-2)
 
+    # coerce chain indices into a tensor
+
+    chains = tensor([default(chain, -1) for chain in i.chains]).long()
+
     # atom input
 
     atom_input = AtomInput(
@@ -666,7 +670,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         atom_parent_ids=i.atom_parent_ids,
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
-        chains=i.chains,
+        chains=chains,
     )
 
     return atom_input
@@ -1050,6 +1054,10 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     if exists(atom_pos) and isinstance(atom_pos, list):
         atom_pos = torch.cat(atom_pos, dim=-2)
 
+    # coerce chain indices into a tensor
+
+    chains = tensor([default(chain, -1) for chain in i.chains]).long()
+
     # atom input
 
     atom_input = AtomInput(
@@ -1070,7 +1078,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         atom_parent_ids=i.atom_parent_ids,
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
-        chains=i.chains,
+        chains=chains,
     )
 
     return atom_input
