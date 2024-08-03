@@ -2490,9 +2490,11 @@ class ElucidatedAtomDiffusion(Module):
 
         padded_sigma = rearrange(sigma, 'b -> b 1 1')
 
+        maybe_c_noise = self.c_noise if self.karras_formulation else identity
+
         net_out = self.net(
             self.c_in(padded_sigma) * noised_atom_pos,
-            times = self.c_noise(sigma),
+            times = maybe_c_noise(sigma),
             **network_condition_kwargs
         )
 
