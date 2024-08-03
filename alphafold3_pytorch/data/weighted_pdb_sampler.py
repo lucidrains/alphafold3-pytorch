@@ -5,9 +5,11 @@ from typing import Dict, Iterator, List, Literal, Tuple
 
 import numpy as np
 import polars as pl
+from loguru import logger
 from torch.utils.data import Sampler
 
 from alphafold3_pytorch.tensor_typing import typecheck
+from alphafold3_pytorch.utils.utils import exists
 
 # constants
 
@@ -168,6 +170,9 @@ class WeightedPDBSampler(Sampler[List[str]]):
         Allow extra data filtering to ensure we avoid training
         on anomolous complexes that passed through all filtering
         and clustering steps.
+    :param subset_to_ids: An optional list of mapping DataFrame indices
+        to which to subset the original combined mapping DataFrame. This
+        is primarily useful for debugging using a smaller set of clusters.
 
     Example:
     ```
@@ -188,6 +193,7 @@ class WeightedPDBSampler(Sampler[List[str]]):
         alpha_nuc: float = 3.0,
         alpha_ligand: float = 1.0,
         pdb_ids_to_skip: List[str] = [],
+        subset_to_ids: list[int] | None = None,
     ):
         # Load chain and interface mappings
         if not isinstance(chain_mapping_paths, list):
@@ -216,6 +222,34 @@ class WeightedPDBSampler(Sampler[List[str]]):
         self.betas = {"chain": beta_chain, "interface": beta_interface}
         self.batch_size = batch_size
 
+        logger.info(
+            "Precomputing chain and interface weights. This may take several minutes to complete."
+        )
+
+        # Subset to specific indices if provided
+        if exists(subset_to_ids):
+            chain_mapping = (
+                chain_mapping.with_row_index()
+                .filter(pl.col("index").is_in(subset_to_ids))
+                .select(["pdb_id", "chain_id", "molecule_id", "cluster_id"])
+            )
+            interface_mapping = (
+                interface_mapping.with_row_index()
+                .filter(pl.col("index").is_in(subset_to_ids))
+                .select(
+                    [
+                        "pdb_id",
+                        "interface_chain_id_1",
+                        "interface_chain_id_2",
+                        "interface_molecule_id_1",
+                        "interface_molecule_id_2",
+                        "interface_chain_cluster_id_1",
+                        "interface_chain_cluster_id_2",
+                        "interface_cluster_id",
+                    ]
+                )
+            )
+
         chain_mapping.insert_column(
             len(chain_mapping.columns),
             compute_chain_weights(chain_mapping, self.alphas, self.betas["chain"]),
@@ -224,6 +258,8 @@ class WeightedPDBSampler(Sampler[List[str]]):
             len(interface_mapping.columns),
             compute_interface_weights(interface_mapping, self.alphas, self.betas["interface"]),
         )
+
+        logger.info("Finished precomputing chain and interface weights.")
 
         # Concatenate chain and interface mappings
         chain_mapping = chain_mapping.with_columns(

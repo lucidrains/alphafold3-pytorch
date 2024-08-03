@@ -1165,7 +1165,7 @@ def maybe_string_to_int(
     return tensor([index.get(c, unknown_index) for c in indices]).long()
 
 @typecheck
-def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthedMoleculeInput:
+def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthMoleculeInput:
     i = alphafold3_input
 
     chainable_biomol_entries: List[List[dict]] = []  # for reordering the atom positions at the end
@@ -2497,7 +2497,7 @@ class PDBDataset(Dataset):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir(), f'{str(folder)} does not exist for PDBDataset'
+        assert folder.exists() and folder.is_dir(), f"{str(folder)} does not exist for PDBDataset"
         self.folder = folder
 
         self.files = {
@@ -2515,6 +2515,16 @@ class PDBDataset(Dataset):
             "spatial_interface_weight": spatial_interface_weight,
             "n_res": crop_size,
         }
+
+        # subsample mmCIF files to those that have a valid (post-filtering) association with a chain/interface cluster
+
+        if exists(self.sampler):
+            sampler_pdb_ids = set(self.sampler.mappings.get_column("pdb_id").to_list())
+            self.files = {
+                file: filepath
+                for (file, filepath) in self.files.items()
+                if file in sampler_pdb_ids
+            }
 
         assert len(self) > 0, f"No valid mmCIFs / PDBs found at {str(folder)}"
 
