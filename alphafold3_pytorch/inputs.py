@@ -670,7 +670,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         msa=i.msa,
         templates=i.templates,
         msa_mask=i.msa_mask,
-        templates_mask=i.templates_mask,
+        template_mask=i.template_mask,
         missing_atom_mask=missing_atom_mask,
         additional_token_feats=i.additional_token_feats,
         additional_molecule_feats=i.additional_molecule_feats,
