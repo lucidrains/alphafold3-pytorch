@@ -22,7 +22,7 @@ jobs:
         python-version: "3.10"
     - name: Install dependencies
       run: |
-        sudo apt-get install -y dssp
+        sudo apt-get install -y libboost-all-dev dssp
         python -m pip install --upgrade pip
         python -m pip install torch==2.3.1
         python -m pip install -e .[test]
