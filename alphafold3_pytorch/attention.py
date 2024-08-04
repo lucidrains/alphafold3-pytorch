@@ -145,10 +145,9 @@ def full_pairwise_repr_to_windowed(
 
     n = torch.arange(pairwise_repr.shape[-4], device = device)
 
-    pairwise_repr = einx.get_at(
-        '... [i j] w1 w2 d, n, n -> ... n w1 w2 d',
-        pairwise_repr, n, n
-    )
+    # pairwise_repr = einx.get_at('... [i j] w1 w2 d, n, n -> ... n w1 w2 d', pairwise_repr, n, n)
+
+    pairwise_repr = pairwise_repr[..., n, n, :, :, :]
 
     return pairwise_repr
 
