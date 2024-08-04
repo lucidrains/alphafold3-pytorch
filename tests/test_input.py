@@ -215,6 +215,7 @@ def test_pdbinput_input():
         dim_atompair_inputs=5,
         atoms_per_window=27,
         dim_template_feats=44,
+        num_molecule_mods=4,
         num_dist_bins=38,
         num_molecule_mods=1,
         confidence_head_kwargs=dict(pairformer_depth=1),
