@@ -4,6 +4,7 @@ os.environ['TYPECHECK'] = 'True'
 import pytest
 import random
 import itertools
+import subprocess
 from pathlib import Path
 
 import torch
@@ -1100,6 +1101,15 @@ def test_model_selection_score():
     )
 
 def test_unresolved_protein_rasa():
+
+    # skip the test if dssp not installed
+
+    try:
+        subprocess.check_output(["which", "mkdssp"])
+    except:
+        pytest.skip("mkdssp not found, test_unresolved_protein_rasa skipped")
+
+    # rest of the test
 
     mmcif_filepath = os.path.join('data', 'test', '7a4d-assembly1.cif')
     pdb_input = PDBInput(mmcif_filepath)
