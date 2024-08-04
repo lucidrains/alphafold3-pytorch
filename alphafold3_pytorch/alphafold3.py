@@ -4431,7 +4431,7 @@ class Alphafold3(Module):
         num_molecule_types: int = NUM_MOLECULE_IDS,     # restype in additional residue information, apparently 32. will do 33 to account for metal ions
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
-        num_molecule_mods: int | None = None,
+        num_molecule_mods: int | None = DEFAULT_NUM_MOLECULE_MODS,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,

@@ -18,7 +18,7 @@ class MockAtomDataset(Dataset):
         data_length,
         max_seq_len = 16,
         atoms_per_window = 4,
-        has_molecule_mods = False
+        has_molecule_mods = True
     ):
         self.data_length = data_length
         self.max_seq_len = max_seq_len

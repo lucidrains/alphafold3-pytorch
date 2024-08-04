@@ -689,6 +689,7 @@ def test_alphafold3_without_msa_and_templates():
         dim_atom_inputs = 77,
         dim_template_feats = 44,
         num_dist_bins = 38,
+        num_molecule_mods = 0,
         checkpoint_trunk_pairformer = True,
         checkpoint_diffusion_token_transformer = True,
         confidence_head_kwargs = dict(
@@ -767,6 +768,7 @@ def test_alphafold3_force_return_loss():
         dim_atom_inputs = 77,
         dim_template_feats = 44,
         num_dist_bins = 38,
+        num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
         ),
@@ -851,6 +853,7 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
         dim_atom_inputs = 77,
         dim_template_feats = 44,
         num_dist_bins = 38,
+        num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
         ),
@@ -913,6 +916,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
     alphafold3 = Alphafold3(
         num_atom_embeds = 7,
         num_atompair_embeds = 3,
+        num_molecule_mods = 0,
         dim_atom_inputs = 77,
         dim_template_feats = 44
     )

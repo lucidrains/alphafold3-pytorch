@@ -176,7 +176,6 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         atoms_per_window=27,
         dim_template_feats=44,
         num_dist_bins=38,
-        num_molecule_mods=1,
         confidence_head_kwargs=dict(
             pairformer_depth=1,
         ),
