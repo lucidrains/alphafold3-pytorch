@@ -398,7 +398,7 @@ def cluster_sequences_using_mmseqs2(
     output_db_filepath = os.path.join(output_dir, molecule_type, f"DB_{molecule_type}")
     tmp_output_dir = os.path.join(output_dir, molecule_type, "tmp")
     output_cluster_filepath = os.path.join(
-        args.output_dir, molecule_type, f"DB_{molecule_type}_cluster.tsv"
+        output_dir, molecule_type, f"DB_{molecule_type}_cluster.tsv"
     )
     os.makedirs(os.path.join(output_dir, molecule_type), exist_ok=True)
 
