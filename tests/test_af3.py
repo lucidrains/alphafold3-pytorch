@@ -514,7 +514,7 @@ def test_distogram_head():
 @pytest.mark.parametrize('stochastic_frame_average', (True, False))
 @pytest.mark.parametrize('missing_atoms', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
-@pytest.mark.parametrize('num_molecule_mods', (0, 5))
+@pytest.mark.parametrize('num_molecule_mods', (0, 4))
 @pytest.mark.parametrize('confidence_head_atom_resolution', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
