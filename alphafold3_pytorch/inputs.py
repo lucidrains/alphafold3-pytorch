@@ -7,7 +7,7 @@ from pathlib import Path
 from functools import partial, wraps
 from itertools import groupby
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterableassignment
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
@@ -28,7 +28,7 @@ from joblib import Parallel, delayed
 
 from pdbeccdutils.core import ccd_reader
 
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem, rdDetermineBonds
 from rdkit.Chem.rdchem import Atom, Mol
 from rdkit.Geometry import Point3D
@@ -61,9 +61,14 @@ from alphafold3_pytorch.utils.data_utils import (
     get_pdb_input_residue_molecule_type,
     is_atomized_residue,
     is_polymer,
+    remove_last_digit_character,
 )
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 from alphafold3_pytorch.utils.utils import default, exists, first, identity
+
+# silence RDKit's warnings
+
+RDLogger.DisableLog("rdApp.*")
 
 # constants
 
@@ -84,7 +89,7 @@ MOLECULE_GAP_ID = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEO
 MOLECULE_METAL_ION_ID = MOLECULE_GAP_ID + 1
 NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) + 2
 
-DEFAULT_NUM_MOLECULE_MODS = 5
+DEFAULT_NUM_MOLECULE_MODS = 4  # `mod_protein`, `mod_rna`, `mod_dna`, and `mod_unk`
 ADDITIONAL_MOLECULE_FEATS = 5
 
 CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
@@ -669,7 +674,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     atom_input = AtomInput(
         atom_inputs=atom_inputs_tensor,
         atompair_inputs=atompair_inputs,
-        molecule_atom_lens=tensor(atom_lens, dtype=torch.long),
+        molecule_atom_lens=atom_lens.long(),
         molecule_ids=i.molecule_ids,
         molecule_atom_indices=i.molecule_atom_indices,
         distogram_atom_indices=i.distogram_atom_indices,
@@ -1750,20 +1755,24 @@ def add_atom_positions_to_mol(
 
 
 def create_mol_from_atom_positions_and_types(
+    name: str,
     atom_positions: np.ndarray,
     element_types: List[str],
     missing_atom_indices: Set[int],
     num_bond_attempts: int = 2,
+    verbose: bool = False,
 ) -> Mol:
     """Create an RDKit molecule from a NumPy array of atom positions and a list of their element
     types.
 
+    :param name: The name of the molecule.
     :param atom_positions: A NumPy array of shape (num_atoms, 3) containing the 3D coordinates of
         each atom.
     :param element_types: A list of element symbols for each atom in the molecule.
     :param missing_atom_indices: A set of atom indices that are missing from the atom_positions
         array.
     :param num_bond_attempts: The number of attempts to determine the bonds in the molecule.
+    :param verbose: Whether to log warnings when bond determination fails.
     :return: An RDKit molecule with the specified atom positions and element types.
     """
     if len(atom_positions) != len(element_types):
@@ -1772,6 +1781,7 @@ def create_mol_from_atom_positions_and_types(
     # populate an empty editable molecule
 
     mol = Chem.RWMol()
+    mol.SetProp("_Name", name)
 
     for element_type in element_types:
         atom = Chem.Atom(element_type)
@@ -1789,18 +1799,23 @@ def create_mol_from_atom_positions_and_types(
     # finalize molecule by inferring bonds
 
     determined_bonds = False
-    for _ in range(num_bond_attempts):
+    for i in range(num_bond_attempts):
         try:
-            rdDetermineBonds.DetermineBonds(mol, charge=Chem.GetFormalCharge(mol))
+            charge = Chem.GetFormalCharge(mol)
+            rdDetermineBonds.DetermineBonds(mol, charge=charge)
             determined_bonds = True
         except Exception as e:
-            logger.warning(
-                f"Failed to determine bonds in the input molecule due to: {e}. "
-                "Retrying once more."
-            )
+            if verbose:
+                logger.warning(
+                    f"Failed to determine bonds for the input molecule {name} due to: {e}. "
+                    f"{'Retrying once more.' if i < num_bond_attempts - 1 else 'Terminating bond assignment.'}"
+                )
             continue
     if not determined_bonds:
-        raise ValueError("Failed to determine bonds in the input molecule.")
+        if verbose:
+            logger.warning(
+                "Failed to determine bonds in the input molecule. Skipping bond assignment."
+            )
 
     mol = Chem.RemoveHs(mol)
     Chem.SanitizeMol(mol)
@@ -1818,6 +1833,7 @@ def extract_template_molecules_from_biomolecule_chains(
     chain_seqs: List[str],
     chain_chem_types: List[PDB_INPUT_RESIDUE_MOLECULE_TYPE],
     mol_keyname: str = "rdchem_mol",
+    verbose: bool = False,
 ) -> Tuple[List[Mol], List[PDB_INPUT_RESIDUE_MOLECULE_TYPE]]:
     """Extract RDKit template molecules and their types for the residues of each `Biomolecule`
     chain.
@@ -1902,23 +1918,26 @@ def extract_template_molecules_from_biomolecule_chains(
                 res_atom_type_indices = np.where(res_atom_positions.all(axis=-1))[1]
                 res_atom_elements = [
                     # NOTE: here, we treat the first character of each atom type as its element symbol
-                    res_constants.element_types[idx]
+                    res_constants.element_types[idx].replace("ATM", "*")
                     for idx in res_atom_type_indices
                 ]
                 mol = create_mol_from_atom_positions_and_types(
                     # NOTE: for now, we construct molecules without referencing canonical
                     # SMILES strings, which means there are no missing molecule atoms by design
-                    res_atom_positions[res_atom_mask],
-                    res_atom_elements,
+                    name=seq,
+                    atom_positions=res_atom_positions[res_atom_mask],
+                    element_types=res_atom_elements,
                     missing_atom_indices=set(),
+                    verbose=verbose,
                 )
                 try:
                     mol = AllChem.AssignBondOrdersFromTemplate(template_mol, mol)
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to assign bond orders from the template ligand molecule for residue {res} due to: {e}. "
-                        "Skipping bond order assignment."
-                    )
+                    if verbose:
+                        logger.warning(
+                            f"Failed to assign bond orders from the template atomized molecule for residue {seq} due to: {e}. "
+                            "Skipping bond order assignment."
+                        )
                 res_index += mol.GetNumAtoms()
 
             # (Unmodified) polymer residues
@@ -1977,6 +1996,7 @@ def extract_template_molecules_from_biomolecule_chains(
                     res_atom_positions.reshape(-1, 3),
                     missing_atom_indices,
                 )
+                mol.SetProp("_Name", res)
                 res_index += 1
 
             mol_seq.append(mol)
@@ -2079,7 +2099,9 @@ def find_mismatched_symmetry(
 
 @typecheck
 def pdb_input_to_molecule_input(
-    pdb_input: PDBInput, biomol: Biomolecule | None = None
+    pdb_input: PDBInput,
+    biomol: Biomolecule | None = None,
+    verbose: bool = False,
 ) -> MoleculeInput:
     """Convert a PDBInput to a MoleculeInput."""
     i = pdb_input
@@ -2173,16 +2195,19 @@ def pdb_input_to_molecule_input(
         biomol,
         chain_seqs,
         chain_chem_types,
+        verbose=verbose,
     )
 
     # collect pooling lengths and atom-wise molecule types for each molecule,
-    # along with a token-wise boolean tensor indicating whether each molecule is modified
+    # along with a token-wise one-hot tensor indicating whether each molecule is modified
+    # and, if so, which type of modification it has (e.g., peptide vs. RNA modification)
     molecule_idx = 0
     token_pool_lens = []
     molecule_atom_types = []
     is_molecule_mod = []
     for mol, mol_type in zip(molecules, molecule_types):
         num_atoms = mol.GetNumAtoms()
+        is_mol_mod_type = [False for _ in range(DEFAULT_NUM_MOLECULE_MODS)]
         if is_atomized_residue(mol_type):
             # NOTE: in the paper, they treat each atom of the ligand and modified polymer residues as a token
             token_pool_lens.extend([1] * num_atoms)
@@ -2201,26 +2226,30 @@ def pdb_input_to_molecule_input(
                 is_mol_type_index = IS_LIGAND_INDEX
             elif mol_type == "mod_protein":
                 is_mol_type_index = IS_PROTEIN_INDEX
+                is_mol_mod_type_index = 0
             elif mol_type == "mod_rna":
                 is_mol_type_index = IS_RNA_INDEX
+                is_mol_mod_type_index = 1
             elif mol_type == "mod_dna":
                 is_mol_type_index = IS_DNA_INDEX
+                is_mol_mod_type_index = 2
             else:
                 raise ValueError(f"Unrecognized molecule type: {mol_type}")
 
             is_molecule_types[molecule_type_row_idx, is_mol_type_index] = True
 
-            is_molecule_mod.extend([True if "mod" in mol_type else False] * num_atoms)
+            if "mod" in mol_type:
+                is_mol_mod_type[is_mol_mod_type_index] = True
+            is_molecule_mod.extend([is_mol_mod_type] * num_atoms)
 
             molecule_idx += num_atoms
         else:
             token_pool_lens.append(num_atoms)
             molecule_atom_types.append(mol_type)
-            is_molecule_mod.append(False)
+            is_molecule_mod.append(is_mol_mod_type)
             molecule_idx += 1
 
     # collect token center, distogram, and source-target atom indices for each token
-    molecule_idx = 0
     molecule_atom_indices = []
     distogram_atom_indices = []
     src_tgt_atom_indices = []
@@ -2415,35 +2444,39 @@ def pdb_input_to_molecule_input(
             ptnr2_atom_id = (
                 f"{bond.ptnr2_auth_asym_id}:{bond.ptnr2_auth_seq_id}:{bond.ptnr2_label_atom_id}"
             )
+            ptnr1_label_atom_id = remove_last_digit_character(bond.ptnr1_label_atom_id)
+            ptnr2_label_atom_id = remove_last_digit_character(bond.ptnr2_label_atom_id)
             try:
                 row_idx = get_token_index_from_composite_atom_id(
                     biomol,
                     bond.ptnr1_auth_asym_id,
                     int(bond.ptnr1_auth_seq_id),
-                    bond.ptnr1_label_atom_id,
+                    ptnr1_label_atom_id,
                     bond_atom_indices[ptnr1_atom_id],
                     ptnr1_is_polymer,
                 )
             except Exception as e:
-                logger.warning(
-                    f"Could not find a matching token index for token1 {ptnr1_atom_id} due to: {e}. "
-                    "Skipping installing the current bond associated with this token."
-                )
+                if verbose:
+                    logger.warning(
+                        f"Could not find a matching token index for token1 {ptnr1_atom_id} due to: {e}. "
+                        "Skipping installing the current bond associated with this token."
+                    )
                 continue
             try:
                 col_idx = get_token_index_from_composite_atom_id(
                     biomol,
                     bond.ptnr2_auth_asym_id,
                     int(bond.ptnr2_auth_seq_id),
-                    bond.ptnr2_label_atom_id,
+                    ptnr2_label_atom_id,
                     bond_atom_indices[ptnr2_atom_id],
                     ptnr2_is_polymer,
                 )
             except Exception as e:
-                logger.warning(
-                    f"Could not find a matching token index for token2 {ptnr1_atom_id} due to: {e}. "
-                    "Skipping installing the current bond associated with this token."
-                )
+                if verbose:
+                    logger.warning(
+                        f"Could not find a matching token index for token2 {ptnr1_atom_id} due to: {e}. "
+                        "Skipping installing the current bond associated with this token."
+                    )
                 continue
             token_bonds[row_idx, col_idx] = True
             token_bonds[col_idx, row_idx] = True
