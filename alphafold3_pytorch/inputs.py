@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
 import einx
-from einops import pack
+from einops import pack, rearrange
 
 import numpy as np
 from numpy.lib.format import open_memmap
@@ -391,7 +391,7 @@ class MoleculeInput:
     is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n']
-    is_molecule_mod:            Bool['n num_mods'] | None = None
+    is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
@@ -657,6 +657,13 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     chains = tensor([default(chain, -1) for chain in i.chains]).long()
 
+    # handle is_molecule_mod being one dimensional
+
+    is_molecule_mod = i.is_molecule_mod
+
+    if is_molecule_mod.ndim == 1:
+        is_molecule_mod = rearrange(is_molecule_mod, 'n -> n 1')
+
     # atom input
 
     atom_input = AtomInput(
@@ -666,7 +673,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         molecule_ids=i.molecule_ids,
         molecule_atom_indices=i.molecule_atom_indices,
         distogram_atom_indices=i.distogram_atom_indices,
-        is_molecule_mod=i.is_molecule_mod,
+        is_molecule_mod=is_molecule_mod,
         msa=i.msa,
         templates=i.templates,
         msa_mask=i.msa_mask,

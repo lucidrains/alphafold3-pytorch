@@ -17,6 +17,7 @@ model:
     num_plddt_bins: 50
     num_pde_bins: 64
     num_pae_bins: 64
+    num_molecule_mods: 1
     sigma_data: 16
     diffusion_num_augmentations: 4
     loss_confidence_weight: 0.0001
