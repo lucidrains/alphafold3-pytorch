@@ -2304,10 +2304,14 @@ class DiffusionModule(Module):
 
         # pairwise_repr_cond = einx.get_at('b [i j] dap, b nw w1 w2, b nw w1 w2 -> b nw w1 w2 dap', pairwise_repr_cond, row_indices, col_indices)
 
-        batch_arange = repeat(torch.arange(batch_size, device = device), 'b -> b 1')
         row_indices, unpack_one = pack_one(row_indices, 'b *')
         col_indices, _ = pack_one(col_indices, 'b *')
-        pairwise_repr_cond = pairwise_repr_cond[batch_arange, row_indices, col_indices]
+
+        rowcol_indices = col_indices + row_indices * pairwise_repr_cond.shape[2]
+        rowcol_indices = repeat(rowcol_indices, 'b rc -> b rc dap', dap = pairwise_repr_cond.shape[-1])
+        pairwise_repr_cond, _ = pack_one(pairwise_repr_cond, 'b * dap')
+
+        pairwise_repr_cond = pairwise_repr_cond.gather(1, rowcol_indices)
         pairwise_repr_cond = unpack_one(pairwise_repr_cond, 'b * dap')
         
         atompair_feats = pairwise_repr_cond + atompair_feats
