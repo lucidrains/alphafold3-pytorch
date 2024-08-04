@@ -691,7 +691,7 @@ class MoleculeLengthMoleculeInput:
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n'] | None = None
     one_token_per_atom:         List[bool] | None = None
-    is_molecule_mod:            Bool['n num_mods'] | None = None
+    is_molecule_mod:            Bool['n num_mods'] | Bool['n'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
@@ -724,10 +724,18 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # derive `atom_lens` based on `one_token_per_atom`, for ligands and modified biomolecules
 
-    assert len(molecules) == len(i.one_token_per_atom)
-
     atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
     ones = torch.ones_like(atoms_per_molecule)
+
+    # `is_molecule_mod` can either be
+    # 1. Bool['n'], in which case it will only be used for determining `one_token_per_atom`, or
+    # 2. Bool['n num_mods'], where it will be passed to Alphafold3 for molecule modification embeds
+
+    if i.is_molecule_mod.ndim == 2:
+        is_molecule_any_mod = is_molecule_mod.any(dim = -1)
+    else:
+        is_molecule_any_mod = is_molecule_mod
+        is_molecule_mod = None
 
     # get `one_token_per_atom`, which can be fully customizable
 
@@ -737,7 +745,9 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         # if which molecule is `one_token_per_atom` is not passed in
         # default to what the paper did, which is ligands and any modified biomolecule
         is_ligand = i.is_molecule_types[..., IS_LIGAND_INDEX]
-        one_token_per_atom = is_ligand | is_molecule_mod.any(dim = -1)
+        one_token_per_atom = is_ligand | is_molecule_any_mod
+
+    assert len(molecules) == len(one_token_per_atom)
 
     # derive the number of repeats needed to expand molecule lengths to token lengths
 
@@ -782,7 +792,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
 
     msa = maybe(repeat_interleave)(i.msa, token_repeats, dim = -2)
-    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim = -2)
+    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim = 0)
 
     templates = maybe(repeat_interleave)(i.templates, token_repeats, dim = -3)
     templates = maybe(repeat_interleave)(templates, token_repeats, dim = -2)
@@ -1340,12 +1350,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         *mol_metal_ions
     ]
 
-    one_token_per_atom = [
-        *((False,) * len(molecules_without_ligands)),
-        *((True,) * len(mol_ligands)),
-        *((False,) * len(mol_metal_ions)),
-    ]
-
     for mol in molecules:
         Chem.SanitizeMol(mol)
 
@@ -1498,7 +1502,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     molecule_input = MoleculeLengthMoleculeInput(
         molecules=molecules,
-        one_token_per_atom=one_token_per_atom,
         molecule_atom_indices=molecule_atom_indices,
         distogram_atom_indices=distogram_atom_indices,
         molecule_ids=molecule_ids,
