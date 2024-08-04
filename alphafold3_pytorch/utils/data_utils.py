@@ -2,12 +2,14 @@ from typing import Any, Dict, Literal, Set
 
 import numpy as np
 
-from alphafold3_pytorch.models.components.inputs import PDB_INPUT_RESIDUE_MOLECULE_TYPE
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
 
 # constants
 
 RESIDUE_MOLECULE_TYPE = Literal["protein", "rna", "dna", "ligand"]
+PDB_INPUT_RESIDUE_MOLECULE_TYPE = Literal[
+    "protein", "rna", "dna", "mod_protein", "mod_rna", "mod_dna", "ligand"
+]
 
 
 @typecheck
