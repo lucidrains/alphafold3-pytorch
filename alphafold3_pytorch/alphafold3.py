@@ -2302,8 +2302,14 @@ class DiffusionModule(Module):
         col_indices = concat_previous_window(col_indices, dim_seq = 1, dim_window = -1)
         row_indices, col_indices = torch.broadcast_tensors(row_indices, col_indices)
 
-        pairwise_repr_cond = einx.get_at('b [i j] dap, b nw w1 w2, b nw w1 w2 -> b nw w1 w2 dap', pairwise_repr_cond, row_indices, col_indices)
+        # pairwise_repr_cond = einx.get_at('b [i j] dap, b nw w1 w2, b nw w1 w2 -> b nw w1 w2 dap', pairwise_repr_cond, row_indices, col_indices)
 
+        batch_arange = repeat(torch.arange(batch_size, device = device), 'b -> b 1')
+        row_indices, unpack_one = pack_one(row_indices, 'b *')
+        col_indices, _ = pack_one(col_indices, 'b *')
+        pairwise_repr_cond = pairwise_repr_cond[batch_arange, row_indices, col_indices]
+        pairwise_repr_cond = unpack_one(pairwise_repr_cond, 'b * dap')
+        
         atompair_feats = pairwise_repr_cond + atompair_feats
 
         # condition atompair feats further with single atom repr
