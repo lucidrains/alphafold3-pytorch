@@ -2,6 +2,7 @@ from typing import Any, Dict, Literal, Set
 
 import numpy as np
 
+from alphafold3_pytorch.models.components.inputs import PDB_INPUT_RESIDUE_MOLECULE_TYPE
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
 
 # constants
@@ -36,6 +37,19 @@ def is_water(res_name: str, water_res_names: Set[str] = {"HOH", "WAT"}) -> bool:
 
 
 @typecheck
+def is_atomized_residue(
+    res_name: str, atomized_res_mol_types: Set[str] = {"ligand", "mod"}
+) -> bool:
+    """Check if a residue is an atomized residue using its residue molecule type string.
+
+    :param res_name: The name of the residue as a descriptive string.
+    :param atomized_res_mol_types: The set of atomized residue molecule types as strings.
+    :return: Whether the residue is an atomized residue.
+    """
+    return any(mol_type in res_name.lower() for mol_type in atomized_res_mol_types)
+
+
+@typecheck
 def get_residue_molecule_type(res_chem_type: str) -> RESIDUE_MOLECULE_TYPE:
     """Get the molecule type of a residue."""
     if "peptide" in res_chem_type.lower():
@@ -44,6 +58,21 @@ def get_residue_molecule_type(res_chem_type: str) -> RESIDUE_MOLECULE_TYPE:
         return "rna"
     elif "dna" in res_chem_type.lower():
         return "dna"
+    else:
+        return "ligand"
+
+
+@typecheck
+def get_pdb_input_residue_molecule_type(
+    res_chem_type: str, is_modified_polymer_residue: bool = False
+) -> PDB_INPUT_RESIDUE_MOLECULE_TYPE:
+    """Get the molecule type of a residue."""
+    if "peptide" in res_chem_type.lower():
+        return "mod_protein" if is_modified_polymer_residue else "protein"
+    elif "rna" in res_chem_type.lower():
+        return "mod_rna" if is_modified_polymer_residue else "rna"
+    elif "dna" in res_chem_type.lower():
+        return "mod_dna" if is_modified_polymer_residue else "dna"
     else:
         return "ligand"
 
