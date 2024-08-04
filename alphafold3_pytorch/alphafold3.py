@@ -4067,7 +4067,7 @@ class ComputeModelSelectionScore(Module):
         other_cutoff: float = 15.0,
         contact_mask_threshold: float = 8.0,
         is_fine_tuning: bool = False,
-        weight_dict_config: dict = None
+        weight_dict_config: dict = None,
         dssp_path: str = 'mkdssp',
     ):
 

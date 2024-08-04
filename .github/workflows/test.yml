@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        group: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     steps:
     - uses: actions/checkout@v4
@@ -27,4 +27,4 @@ jobs:
         python -m pip install -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest --test-group-count 9 --test-group-random-seed 42 --test-group ${{ matrix.group }} tests/
+        python -m pytest --test-group-count 10 --test-group-random-seed 42 --test-group ${{ matrix.group }} tests/
