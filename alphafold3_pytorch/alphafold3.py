@@ -58,6 +58,10 @@ from alphafold3_pytorch.inputs import (
     ADDITIONAL_MOLECULE_FEATS
 )
 
+from alphafold3_pytorch.common.biomolecule import (
+    get_residue_constants,
+)
+
 from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
@@ -75,6 +79,11 @@ from loguru import logger
 from importlib.metadata import version
 
 from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
+
+from Bio.PDB.StructureBuilder import StructureBuilder
+from Bio.PDB.PDBIO import PDBIO
+from Bio.PDB.DSSP import DSSP
+import tempfile
 
 """
 global ein notation:
@@ -3934,6 +3943,79 @@ def get_cid_molecule_type(
 
     return molecule_type
 
+def _protein_structure_from_feature(
+    asym_id: Int[' n'],
+    molecule_ids: Int[' n'],
+    molecule_atom_lens: Int[' n'],
+    atom_pos: Float[' m 3'], 
+    atom_mask: Bool[' m'],):
+    """
+    
+    create structure for unresolved protein
+
+    atom_mask: True for valid atom, False for missing/padding atom
+    return: Bio.PDB.Structure.Structure
+    """
+
+    num_atom = atom_pos.shape[0]
+    num_res = molecule_ids.shape[0]
+    
+    residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
+    
+    molecule_atom_indices = exclusive_cumsum(molecule_atom_lens)
+    
+    builder = StructureBuilder()
+    builder.init_structure("structure")
+    builder.init_model(0)
+    
+    cur_cid = None
+    cur_res_id = None
+    
+    for res_idx in range(num_res):
+        num_atom = molecule_atom_lens[res_idx]
+        cid = str(asym_id[res_idx].detach().cpu().item())
+        
+        if cid != cur_cid:
+            builder.init_chain(cid)
+            builder.init_seg(segid = ' ')
+            cur_cid = cid
+            cur_res_id = 0
+            
+        restype = residue_constants.restypes[molecule_ids[res_idx]]
+        resname = residue_constants.restype_1to3[restype]
+        atom_names = residue_constants.restype_name_to_compact_atom_names[resname]
+        atom_names = list(filter(lambda x: x, atom_names))
+        # assume residues for unresolved protein are standard
+        assert len(atom_names) == num_atom, f"molecule atom lens {num_atom} doesn't match with residue constant {len(atom_names)}"
+        
+        # skip if all atom of the residue is missing
+        atom_idx_offset = molecule_atom_indices[res_idx]
+        if not torch.any(atom_mask[atom_idx_offset: atom_idx_offset + num_atom]):
+            continue
+        
+        builder.init_residue(resname, " ", cur_res_id +1 , " ")
+        cur_res_id += 1
+       
+        for atom_idx in range(num_atom):
+            if not atom_mask[atom_idx]:
+                continue
+                
+            atom_coord = atom_pos[atom_idx + atom_idx_offset].detach().cpu().numpy()
+            atom_name = atom_names[atom_idx]
+            builder.init_atom(
+                name=atom_name, 
+                coord=atom_coord, 
+                b_factor=1.0, 
+                occupancy=1.0, 
+                fullname=atom_name, 
+                altloc=' ',
+                # only N, C, O in restype_name_to_compact_atom_names for protein
+                # so just take the first char
+                element=atom_name[0], 
+            )
+            
+    return builder.get_structure()
+
 class ComputeModelSelectionScore(Module):
     INITIAL_TRAINING_DICT = {
         'protein-protein': {'interface': 20, 'intra-chain': 20},
@@ -3986,6 +4068,7 @@ class ComputeModelSelectionScore(Module):
         contact_mask_threshold: float = 8.0,
         is_fine_tuning: bool = False,
         weight_dict_config: dict = None
+        dssp_path: str = 'mkdssp',
     ):
 
         super().__init__()
@@ -3999,6 +4082,8 @@ class ComputeModelSelectionScore(Module):
         self.weight_dict_config = weight_dict_config
 
         self.register_buffer('dist_breaks', dist_breaks)
+    
+        self.dssp_path = dssp_path
 
     @typecheck
     def compute_gpde(
@@ -4019,8 +4104,9 @@ class ComputeModelSelectionScore(Module):
         dist_logits = rearrange(dist_logits, 'b dist i j -> b i j dist')
         dist_probs = F.softmax(dist_logits, dim=-1)
 
+        # for distances greater than the last breaks
+        dist_breaks = F.pdb(dist_breaks, (0, 1), value = 1e6)
         contact_mask = dist_breaks < self.contact_mask_threshold
-        contact_mask = F.pad(contact_mask, (0, 1), value = True)
 
         contact_prob = einx.where(
             ' dist, b i j dist, -> b i j dist',
@@ -4212,6 +4298,102 @@ class ComputeModelSelectionScore(Module):
             weighted_lddt[b] = lddt_weight * lddt
 
         return weighted_lddt
+
+    @typecheck
+    def _compute_unresolved_rasa(
+        self,
+        unresolved_cid: int,
+        unresolved_residue_mask: Bool[' n'], 
+        asym_id: Int[' n'],
+        molecule_ids: Int[' n'],
+        molecule_atom_lens: Int[' n'],
+        atom_pos: Float[' m 3'], 
+        atom_mask: Bool[' m'],
+    ) -> Float['']:
+        """
+        unresolved_cid: asym_id for protein chain with unresolved residues
+        unresolved_residue_mask: True for unresolved resideu
+        atom_mask: True for valid atom, False for missing/padding atom
+        """
+
+        residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
+
+        device = atom_pos.device
+        dtype = atom_pos.dtype
+        num_atom = atom_pos.shape[0]
+
+        chain_mask = asym_id == unresolved_cid
+        chain_unresolved_residue_mask = unresolved_residue_mask[chain_mask]
+        chain_asym_id = asym_id[chain_mask]
+        chain_molecule_ids = molecule_ids[chain_mask]
+        chain_molecule_atom_lens = molecule_atom_lens[chain_mask]
+        
+        chain_mask_to_atom = repeat_consecutive_with_lens(
+            chain_mask.unsqueeze(0), molecule_atom_lens.unsqueeze(0)
+        ).squeeze(0)
+        
+        # if there's padding in num atom
+        num_pad = num_atom - molecule_atom_lens.sum()
+        if num_pad > 0:
+            chain_mask_to_atom = F.pad(
+                chain_mask_to_atom, (0, num_pad), value = False)
+
+
+        chain_atom_pos = atom_pos[chain_mask_to_atom]
+        chain_atom_mask = atom_mask[chain_mask_to_atom]
+        
+        structure = _protein_structure_from_feature(
+            chain_asym_id, 
+            chain_molecule_ids,
+            chain_molecule_atom_lens,
+            chain_atom_pos,
+            chain_atom_mask,
+        )
+        
+        with tempfile.NamedTemporaryFile(suffix=".pdb", delete=True) as temp_file:
+            temp_file_path = temp_file.name
+
+            pdb_writer = PDBIO()
+            pdb_writer.set_structure(structure)
+            pdb_writer.save(temp_file_path)
+            dssp = DSSP(structure[0], temp_file_path, dssp=self.dssp_path)
+            dssp_dict = dict(dssp)
+        
+        rasa = []
+        aatypes = []
+        for i, residue in enumerate(structure.get_residues()):
+            rsa = float(dssp_dict.get((residue.get_full_id()[2], residue.id))[3])   
+            rasa.append(rsa)
+            
+            aatype = dssp_dict.get((residue.get_full_id()[2], residue.id))[1]
+            aatypes.append(residue_constants.restype_order[aatype])
+            
+        rasa = torch.tensor(rasa, dtype=dtype, device=device)
+        aatypes = torch.tensor(aatypes, device=device).int()
+        
+        unresolved_aatypes = aatypes[chain_unresolved_residue_mask]
+        unresolved_molecule_ids = chain_molecule_ids[chain_unresolved_residue_mask]
+
+        assert torch.equal(unresolved_aatypes, unresolved_molecule_ids), "aatype not match for input feature and structure"
+        unresolved_rasa = rasa[chain_unresolved_residue_mask]
+        
+        return unresolved_rasa.mean()
+
+    @typecheck
+    def compute_unresolved_rasa(
+        self,
+        unresolved_cid: List[int],
+        unresolved_residue_mask: Bool['b n'], 
+        asym_id: Int['b n'],
+        molecule_ids: Int['b n'],
+        molecule_atom_lens: Int['b n'],
+        atom_pos: Float['b m 3'], 
+        atom_mask: Bool['b m'],
+    ) -> Float['b']:
+
+        unresolved_rasa = [self._compute_unresolved_rasa(*args) for args in 
+                           zip(unresolved_cid, unresolved_residue_mask, asym_id, molecule_ids, molecule_atom_lens, atom_pos, atom_mask)]
+        return torch.stack(unresolved_rasa)  
 
 # main class
 
