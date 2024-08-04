@@ -3,9 +3,6 @@ on: [push, pull_request]
 
 env:
   TYPECHECK: True
-  TMPDIR: ${{ runner.temp }}
-  TEMP: ${{ runner.temp }}
-  TMP: ${{ runner.temp }}
 
 jobs:
   build:
@@ -31,4 +28,4 @@ jobs:
         python -m pip install -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest --test-group-count 10 --test-group-random-seed 42 --test-group ${{ matrix.group }} tests/
+        TMPDIR=${{ runner.temp }} python -m pytest --test-group-count 10 --test-group-random-seed 42 --test-group ${{ matrix.group }} tests/
