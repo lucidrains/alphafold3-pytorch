@@ -8,6 +8,8 @@ from pathlib import Path
 
 import torch
 
+from collections import namedtuple
+
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
@@ -30,6 +32,7 @@ from alphafold3_pytorch import (
     ConfidenceHeadLogits,
     ComputeModelSelectionScore,
     ComputeModelSelectionScore,
+    collate_inputs_to_batched_atom_input
 )
 
 from alphafold3_pytorch.configs import (
@@ -40,12 +43,20 @@ from alphafold3_pytorch.configs import (
 from alphafold3_pytorch.alphafold3 import (
     mean_pool_with_lens,
     repeat_consecutive_with_lens,
-    full_pairwise_repr_to_windowed
+    full_pairwise_repr_to_windowed,
+    get_cid_molecule_type,
 )
 
 from alphafold3_pytorch.inputs import (
     IS_MOLECULE_TYPES,
-    atom_ref_pos_to_atompair_inputs
+    IS_PROTEIN,
+    atom_ref_pos_to_atompair_inputs,
+    molecule_to_atom_input,
+    pdb_input_to_molecule_input,
+    PDBInput,
+    PDBDataset,
+    default_extract_atom_feats_fn,
+    default_extract_atompair_feats_fn
 )
 
 def test_atom_ref_pos_to_atompair_inputs():
@@ -1089,28 +1100,6 @@ def test_model_selection_score():
     )
 
 def test_unresolved_protein_rasa():
-
-    from collections import namedtuple
-
-    from alphafold3_pytorch.inputs import (
-        IS_MOLECULE_TYPES, 
-        PDBInput,
-        default_extract_atom_feats_fn,
-        default_extract_atompair_feats_fn
-        
-    )
-
-    from alphafold3_pytorch.inputs import (
-        PDBDataset,
-        molecule_to_atom_input,
-        pdb_input_to_molecule_input,
-        IS_PROTEIN,
-    )
-
-    from alphafold3_pytorch import collate_inputs_to_batched_atom_input
-    from alphafold3_pytorch.alphafold3 import (
-        get_cid_molecule_type,
-    )
 
     mmcif_filepath = os.path.join('data', 'test', '7a4d-assembly1.cif')
     pdb_input = PDBInput(mmcif_filepath)
