@@ -57,6 +57,7 @@ from alphafold3_pytorch.life import (
 
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.data_utils import (
+    PDB_INPUT_RESIDUE_MOLECULE_TYPE,
     get_pdb_input_residue_molecule_type,
     is_atomized_residue,
     is_polymer,
@@ -85,10 +86,6 @@ NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLE
 
 DEFAULT_NUM_MOLECULE_MODS = 5
 ADDITIONAL_MOLECULE_FEATS = 5
-
-PDB_INPUT_RESIDUE_MOLECULE_TYPE = Literal[
-    "protein", "rna", "dna", "mod_protein", "mod_rna", "mod_dna", "ligand"
-]
 
 CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
 CCD_COMPONENTS_SMILES_FILEPATH = os.path.join('data', 'ccd_data', 'components_smiles.json')
