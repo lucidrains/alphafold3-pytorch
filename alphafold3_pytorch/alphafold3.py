@@ -4103,7 +4103,7 @@ class ComputeModelSelectionScore(Module):
         dist_probs = F.softmax(dist_logits, dim=-1)
 
         # for distances greater than the last breaks
-        dist_breaks = F.pdb(dist_breaks, (0, 1), value = 1e6)
+        dist_breaks = F.pad(dist_breaks, (0, 1), value = 1e6)
         contact_mask = dist_breaks < self.contact_mask_threshold
 
         contact_prob = einx.where(
