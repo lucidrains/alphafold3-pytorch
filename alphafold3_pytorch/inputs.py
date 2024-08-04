@@ -56,7 +56,11 @@ from alphafold3_pytorch.life import (
 )
 
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
-from alphafold3_pytorch.utils.data_utils import RESIDUE_MOLECULE_TYPE, get_residue_molecule_type
+from alphafold3_pytorch.utils.data_utils import (
+    get_pdb_input_residue_molecule_type,
+    is_atomized_residue,
+    is_polymer,
+)
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 from alphafold3_pytorch.utils.utils import default, exists, first, identity
 
@@ -64,8 +68,8 @@ from alphafold3_pytorch.utils.utils import default, exists, first, identity
 
 IS_MOLECULE_TYPES = 5
 IS_PROTEIN_INDEX = 0
-IS_DNA_INDEX = 1
-IS_RNA_INDEX = 2
+IS_RNA_INDEX = 1
+IS_DNA_INDEX = 2
 IS_LIGAND_INDEX = -2
 IS_METAL_ION_INDEX = -1
 IS_BIOMOLECULE_INDICES = slice(0, 3)
@@ -81,6 +85,10 @@ NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLE
 
 DEFAULT_NUM_MOLECULE_MODS = 5
 ADDITIONAL_MOLECULE_FEATS = 5
+
+PDB_INPUT_RESIDUE_MOLECULE_TYPE = Literal[
+    "protein", "rna", "dna", "mod_protein", "mod_rna", "mod_dna", "ligand"
+]
 
 CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
 CCD_COMPONENTS_SMILES_FILEPATH = os.path.join('data', 'ccd_data', 'components_smiles.json')
@@ -316,7 +324,7 @@ class AtomDataset(Dataset):
 @typecheck
 def atom_ref_pos_to_atompair_inputs(
     atom_ref_pos: Float['m 3'],
-    atom_ref_space_uid: Int[' m'] | None = None,
+    atom_ref_space_uid: Int['m'] | None = None,
 ) -> Float['m m 5']:
 
     # Algorithm 5 - lines 2-6
@@ -691,7 +699,7 @@ class MoleculeLengthMoleculeInput:
     src_tgt_atom_indices:       Int['n 2']
     token_bonds:                Bool['n n'] | None = None
     one_token_per_atom:         List[bool] | None = None
-    is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
+    is_molecule_mod:            Bool['n num_mods'] | Bool['n'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
@@ -1610,7 +1618,7 @@ class PDBInput:
 def extract_chain_sequences_from_biomolecule_chemical_components(
     biomol: Biomolecule,
     chem_comps: List[mmcif_parsing.ChemComp],
-) -> Tuple[List[str], List[RESIDUE_MOLECULE_TYPE]]:
+) -> Tuple[List[str], List[PDB_INPUT_RESIDUE_MOLECULE_TYPE]]:
     """Extract paired chain sequences and chemical types from `Biomolecule` chemical components."""
     chain_index = biomol.chain_index
     residue_index = biomol.residue_index
@@ -1634,36 +1642,39 @@ def extract_chain_sequences_from_biomolecule_chemical_components(
             current_chain_seq = []
             continue
 
+        is_polymer_residue = is_polymer(comp_details.type)
         residue_constants = get_residue_constants(comp_details.type)
         restype = residue_constants.restype_3to1.get(comp_details.id, "X")
+        is_modified_polymer_residue = is_polymer_residue and restype == "X"
 
         # map chemical types to protein, DNA, RNA, or ligand,
         # treating modified polymer residues as ligands
 
-        res_chem_type = (
-            "ligand"
-            if comp_details.id not in {"UNK", "N", "DN"} and restype == "X"
-            else get_residue_molecule_type(comp_details.type)
+        res_chem_type = get_pdb_input_residue_molecule_type(
+            comp_details.type,
+            is_modified_polymer_residue=is_modified_polymer_residue,
         )
 
         # aggregate the residue sequences of each chain
 
         if not current_chain_seq:
             chain_seqs.append(current_chain_seq)
-        mapped_restype = comp_details.id if res_chem_type == "ligand" else restype
+        mapped_restype = comp_details.id if is_atomized_residue(res_chem_type) else restype
         current_chain_seq.append((mapped_restype, res_chem_type))
 
-        # reset current_chain_seq if the next residue is either not part of the current chain or is a different molecule type
+        # reset current_chain_seq if the next residue is either not part of the current chain or is a different (unmodified) molecule type
+
+        unmod_res_chem_type = get_pdb_input_residue_molecule_type(
+            comp_details.type,
+            is_modified_polymer_residue=False,
+        )
 
         chain_ending = idx + 1 < len(chain_index) and chain_index[idx] != chain_index[idx + 1]
-        chem_type_ending = idx + 1 < len(chem_comps) and res_chem_type != (
-            "ligand"
-            if chem_comps[idx + 1].id not in {"UNK", "N", "DN"}
-            and get_residue_constants(chem_comps[idx + 1].type).restype_3to1.get(
-                chem_comps[idx + 1].id, "X"
+        chem_type_ending = idx + 1 < len(chem_comps) and unmod_res_chem_type != (
+            get_pdb_input_residue_molecule_type(
+                chem_comps[idx + 1].type,
+                is_modified_polymer_residue=False,
             )
-            == "X"
-            else get_residue_molecule_type(chem_comps[idx + 1].type)
         )
         if chain_ending or chem_type_ending:
             current_chain_seq = []
@@ -1679,9 +1690,9 @@ def extract_chain_sequences_from_biomolecule_chemical_components(
     for chain_seq in chain_seqs:
         # NOTE: from here on, all residue chemical types are guaranteed to be identical within a chain
         chain_chem_type = chain_seq[-1][-1]
-        if chain_chem_type == "ligand":
+        if is_atomized_residue(chain_chem_type):
             for seq, chem_type in chain_seq:
-                # NOTE: there originally may have been multiple ligands in the same chain,
+                # NOTE: there originally may have been e.g., multiple ligands in the same chain,
                 # so we need to aggregate their CCD codes in order
                 mapped_chain_seqs.append(seq)
                 mapped_chain_chem_types.append(chem_type)
@@ -1702,7 +1713,8 @@ def add_atom_positions_to_mol(
     atom_positions: np.ndarray,
     missing_atom_indices: Set[int],
 ) -> Mol:
-    """Add atom positions to an RDKit molecule's first conformer while accounting for missing atoms."""
+    """Add atom positions to an RDKit molecule's first conformer while accounting for missing
+    atoms."""
     assert len(missing_atom_indices) <= mol.GetNumAtoms(), (
         f"The number of missing atom positions ({len(missing_atom_indices)}) and atoms in the RDKit molecule ({mol.GetNumAtoms()}) are not reconcilable. "
         "Please ensure that these input features are all correctly paired."
@@ -1734,12 +1746,14 @@ def create_mol_from_atom_positions_and_types(
     missing_atom_indices: Set[int],
     num_bond_attempts: int = 2,
 ) -> Mol:
-    """
-    Create an RDKit molecule from a NumPy array of atom positions and a list of their element types.
+    """Create an RDKit molecule from a NumPy array of atom positions and a list of their element
+    types.
 
-    :param atom_positions: A NumPy array of shape (num_atoms, 3) containing the 3D coordinates of each atom.
+    :param atom_positions: A NumPy array of shape (num_atoms, 3) containing the 3D coordinates of
+        each atom.
     :param element_types: A list of element symbols for each atom in the molecule.
-    :param missing_atom_indices: A set of atom indices that are missing from the atom_positions array.
+    :param missing_atom_indices: A set of atom indices that are missing from the atom_positions
+        array.
     :param num_bond_attempts: The number of attempts to determine the bonds in the molecule.
     :return: An RDKit molecule with the specified atom positions and element types.
     """
@@ -1770,10 +1784,15 @@ def create_mol_from_atom_positions_and_types(
         try:
             rdDetermineBonds.DetermineBonds(mol, charge=Chem.GetFormalCharge(mol))
             determined_bonds = True
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Failed to determine bonds in the input molecule due to: {e}. "
+                "Retrying once more."
+            )
             continue
     if not determined_bonds:
         raise ValueError("Failed to determine bonds in the input molecule.")
+
     mol = Chem.RemoveHs(mol)
     Chem.SanitizeMol(mol)
 
@@ -1788,11 +1807,11 @@ def create_mol_from_atom_positions_and_types(
 def extract_template_molecules_from_biomolecule_chains(
     biomol: Biomolecule,
     chain_seqs: List[str],
-    chain_chem_types: List[RESIDUE_MOLECULE_TYPE],
+    chain_chem_types: List[PDB_INPUT_RESIDUE_MOLECULE_TYPE],
     mol_keyname: str = "rdchem_mol",
-) -> Tuple[List[Mol], List[RESIDUE_MOLECULE_TYPE]]:
-    """
-    Extract RDKit template molecules and their types for the residues of each `Biomolecule` chain.
+) -> Tuple[List[Mol], List[PDB_INPUT_RESIDUE_MOLECULE_TYPE]]:
+    """Extract RDKit template molecules and their types for the residues of each `Biomolecule`
+    chain.
 
     NOTE: Missing atom indices are marked as a comma-separated property string for each RDKit molecule
     and can be retrieved via `mol.GetProp('missing_atom_indices')`.
@@ -1833,31 +1852,33 @@ def extract_template_molecules_from_biomolecule_chains(
             seq_mapping = RNA_NUCLEOTIDES
         elif chem_type == "dna":
             seq_mapping = DNA_NUCLEOTIDES
-        elif chem_type == "ligand":
+        elif is_atomized_residue(chem_type):
             seq_mapping = CCD_COMPONENTS_SMILES
         else:
             raise ValueError(f"Unrecognized chain chemical type: {chem_type}")
 
         # map residue types to atom positions
 
-        res_constants = get_residue_constants(chem_type.replace("protein", "peptide"))
+        res_constants = get_residue_constants(
+            chem_type.replace("protein", "peptide").replace("mod_", "")
+        )
         atom_mapping = res_constants.restype_atom47_to_compact_atom
 
         mol_seq = []
         for res in seq:
-            # Ligand residues
-            if chem_type == "ligand":
+            # Ligand and modified polymer (i.e., atomized) residues
+            if is_atomized_residue(chem_type):
                 if seq not in seq_mapping:
                     raise ValueError(
-                        f"Could not locate the PDB CCD's SMILES string for ligand residue: {seq}"
+                        f"Could not locate the PDB CCD's SMILES string for atomized residue: {seq}"
                     )
 
-                # construct template ligand molecule for post-mapping bond orders
+                # construct template molecule for post-mapping bond orders
 
                 smile = seq_mapping[seq]
                 template_mol = mol_from_smile(smile)
 
-                # find all atom positions and masks for the current ligand residue
+                # find all atom positions and masks for the current atomized residue
 
                 res_residue_index = residue_index[res_index]
                 res_chain_index = chain_index[res_index]
@@ -1867,7 +1888,7 @@ def extract_template_molecules_from_biomolecule_chains(
                 res_atom_positions = atom_positions[res_ligand_atom_mask]
                 res_atom_mask = atom_mask[res_ligand_atom_mask]
 
-                # manually construct an RDKit molecule from the ligand residue's atom positions and types
+                # manually construct an RDKit molecule from the atomized residue's atom positions and types
 
                 res_atom_type_indices = np.where(res_atom_positions.all(axis=-1))[1]
                 res_atom_elements = [
@@ -1876,8 +1897,8 @@ def extract_template_molecules_from_biomolecule_chains(
                     for idx in res_atom_type_indices
                 ]
                 mol = create_mol_from_atom_positions_and_types(
-                    # NOTE: for now, we construct molecules without referencing the canonical
-                    # ligand SMILES strings, which means there are no missing ligand atoms by design
+                    # NOTE: for now, we construct molecules without referencing canonical
+                    # SMILES strings, which means there are no missing molecule atoms by design
                     res_atom_positions[res_atom_mask],
                     res_atom_elements,
                     missing_atom_indices=set(),
@@ -1891,7 +1912,7 @@ def extract_template_molecules_from_biomolecule_chains(
                     )
                 res_index += mol.GetNumAtoms()
 
-            # Polymer residues
+            # (Unmodified) polymer residues
             else:
                 mol = copy.deepcopy(seq_mapping[res][mol_keyname])
 
@@ -1901,7 +1922,8 @@ def extract_template_molecules_from_biomolecule_chains(
                 # start by finding all possible atoms that may be present in the residue
 
                 res_unique_atom_mapping_indices = np.unique(
-                    atom_mapping[res_type - res_constants.min_restype_num], return_index=True
+                    atom_mapping[res_type - res_constants.min_restype_num],
+                    return_index=True,
                 )[1]
                 res_unique_atom_mapping = np.array(
                     [
@@ -1950,7 +1972,7 @@ def extract_template_molecules_from_biomolecule_chains(
 
             mol_seq.append(mol)
             molecule_types.append(chem_type)
-            if chem_type == "ligand":
+            if is_atomized_residue(chem_type):
                 break
 
         molecules.extend(mol_seq)
@@ -1975,7 +1997,8 @@ def get_token_index_from_composite_atom_id(
     atom_index: int,
     is_polymer_residue: bool,
 ) -> np.int64:
-    """Get the token index (indices) of an atom (residue) in a biomolecule from its chain ID, residue ID, and atom name."""
+    """Get the token index (indices) of an atom (residue) in a biomolecule from its chain ID,
+    residue ID, and atom name."""
     chain_mask = biomol.chain_id == chain_id
     res_mask = biomol.residue_index == res_id
     atom_mask = biomol.atom_name == atom_name
@@ -1987,15 +2010,21 @@ def get_token_index_from_composite_atom_id(
 
 
 @typecheck
-def find_mismatched_symmetry(asym_ids: np.ndarray, entity_ids: np.ndarray, sym_ids: np.ndarray, chemid: np.ndarray) -> bool:
-    """
-    Find mismatched symmetry in a biomolecule's asymmetry, entity, symmetry, and token chemical IDs.
-    
-    This function compares the chemical IDs of (related) regions with the same entity ID
-    but different symmetry IDs. If the chemical IDs of these regions' matching asymmetric
-    chain ID regions are not equal, then their symmetry is "mismatched".
+def find_mismatched_symmetry(
+    asym_ids: np.ndarray,
+    entity_ids: np.ndarray,
+    sym_ids: np.ndarray,
+    chemid: np.ndarray,
+) -> bool:
+    """Find mismatched symmetry in a biomolecule's asymmetry, entity, symmetry, and token chemical
+    IDs.
 
-    :param asym_ids: An array of asymmetric unit (i.e., chain) IDs for each token in the biomolecule.
+    This function compares the chemical IDs of (related) regions with the same entity ID but
+    different symmetry IDs. If the chemical IDs of these regions' matching asymmetric chain ID
+    regions are not equal, then their symmetry is "mismatched".
+
+    :param asym_ids: An array of asymmetric unit (i.e., chain) IDs for each token in the
+        biomolecule.
     :param entity_ids: An array of entity IDs for each token in the biomolecule.
     :param sym_ids: An array of symmetry IDs for each token in the biomolecule.
     :param chemid: An array of chemical IDs for each token in the biomolecule.
@@ -2008,19 +2037,19 @@ def find_mismatched_symmetry(asym_ids: np.ndarray, entity_ids: np.ndarray, sym_i
 
     # Create a combined array of tuples (asym_id, entity_id, sym_id, index)
     combined = np.array(list(zip(asym_ids, entity_ids, sym_ids, range(len(entity_ids)))))
-    
+
     # Group by entity_id
     grouped_by_entity = defaultdict(list)
     for entity, group in groupby(combined, key=lambda x: x[1]):
         grouped_by_entity[entity].extend(list(group))
-    
+
     # Compare regions with the same entity_id but different sym_id
     for entity, group in grouped_by_entity.items():
         # Group by sym_id within each entity_id group
         grouped_by_sym = defaultdict(list)
         for _, _, sym, idx in group:
             grouped_by_sym[sym].append(idx)
-        
+
         # Compare chemid sequences for the asym_id regions of different sym_id groups within the same entity_id group
         sym_ids_keys = list(grouped_by_sym.keys())
         for i in range(len(sym_ids_keys)):
@@ -2031,7 +2060,9 @@ def find_mismatched_symmetry(asym_ids: np.ndarray, entity_ids: np.ndarray, sym_i
                 indices2_asym_ids = np.unique(asym_ids[indices2])
                 chemid_seq1 = chemid[np.isin(asym_ids, indices1_asym_ids)]
                 chemid_seq2 = chemid[np.isin(asym_ids, indices2_asym_ids)]
-                if len(chemid_seq1) != len(chemid_seq2) or not np.array_equal(chemid_seq1, chemid_seq2):
+                if len(chemid_seq1) != len(chemid_seq2) or not np.array_equal(
+                    chemid_seq1, chemid_seq2
+                ):
                     return True
 
     return False
@@ -2065,6 +2096,22 @@ def pdb_input_to_molecule_input(
             else get_assembly(_from_mmcif_object(mmcif_object))
         )
 
+    # map (sampled) chain IDs to indices prior to cropping
+
+    chains = None
+
+    if exists(i.chains):
+        chain_id_1, chain_id_2 = i.chains
+        chain_id_to_idx = {
+            chain_id: chain_idx
+            for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
+        }
+        if exists(chain_id_1):
+            chain_id_1 = chain_id_to_idx[chain_id_1]
+        if exists(chain_id_2):
+            chain_id_2 = chain_id_to_idx[chain_id_2]
+        chains = (chain_id_1, chain_id_2)
+
     # crop the `Biomolecule` object during training only
 
     if i.training:
@@ -2088,21 +2135,22 @@ def pdb_input_to_molecule_input(
     chain_residue_index = np.array(list(zip(biomol.chain_index, biomol.residue_index)))
     _, unique_chain_residue_indices = np.unique(chain_residue_index, axis=0, return_index=True)
 
-    # retrieve molecule_ids from the `Biomolecule` object, where here it is the mapping of 32 possible residue types
-    # `proteins (20) | unknown protein (1) | rna (4) | unknown RNA (1) | dna (4) | unknown DNA (1) | gap (1)`,
+    # retrieve molecule_ids from the `Biomolecule` object, where here it is the mapping of 33 possible residue types
+    # `proteins (20) | unknown protein (1) | rna (4) | unknown RNA (1) | dna (4) | unknown DNA (1) | gap (1) | metal ion (1)`,
     # where ligands are mapped to the unknown protein category (i.e., residue index 20)
+    # NOTE: below, we will install values for our new (dedicated) type for metal ions
     molecule_ids = torch.from_numpy(biomol.restype)
 
-    # retrieve is_molecule_types from the `Biomolecule` object, which is a boolean tensor of shape [*, 4]
+    # retrieve is_molecule_types from the `Biomolecule` object, which is a boolean tensor of shape [*, 5]
     # is_protein | is_rna | is_dna | is_ligand | is_metal_ion
     # this is needed for their special diffusion loss
+    # NOTE: below, we will install values for our new (dedicated) one-hot class for metal ions
     n_one_hot = IS_MOLECULE_TYPES
     is_molecule_types = F.one_hot(torch.from_numpy(biomol.chemtype), num_classes=n_one_hot).bool()
 
     # manually derive remaining features using the `Biomolecule` object
 
     # extract chain sequences and chemical types from the `Biomolecule` object
-    # NOTE: modified polymer residues are treated as N-atom ligands from here on
     chem_comp_table = {comp.id: comp for comp in biomol.chem_comp_table}
     chem_comp_details = [chem_comp_table[chemid] for chemid in biomol.chemid]
     chain_seqs, chain_chem_types = extract_chain_sequences_from_biomolecule_chemical_components(
@@ -2118,38 +2166,48 @@ def pdb_input_to_molecule_input(
         chain_chem_types,
     )
 
-    # collect pooling lengths and atom-wise molecule types for each molecule
+    # collect pooling lengths and atom-wise molecule types for each molecule,
+    # along with a token-wise boolean tensor indicating whether each molecule is modified
     molecule_idx = 0
     token_pool_lens = []
     molecule_atom_types = []
-
+    is_molecule_mod = []
     for mol, mol_type in zip(molecules, molecule_types):
         num_atoms = mol.GetNumAtoms()
-        if mol_type == "ligand":
-            # NOTE: in the paper, they treat each atom of the ligands as a token
+        if is_atomized_residue(mol_type):
+            # NOTE: in the paper, they treat each atom of the ligand and modified polymer residues as a token
             token_pool_lens.extend([1] * num_atoms)
             molecule_atom_types.extend([mol_type] * num_atoms)
-            # ensure modified polymer residues are one-hot encoded as ligands
-            # TODO: double-check whether this handling of modified polymer residues makes sense
 
             molecule_type_row_idx = slice(molecule_idx, molecule_idx + num_atoms)
 
             # NOTE: we reset all type annotations e.g., since ions are initially considered ligands
             is_molecule_types[molecule_type_row_idx] = False
 
-            if num_atoms == 1:
+            if mol_type == "ligand" and num_atoms == 1:
                 # NOTE: we manually set the molecule ID of ions to a dedicated category
                 molecule_ids[molecule_idx] = MOLECULE_METAL_ION_ID
                 is_mol_type_index = IS_METAL_ION_INDEX
-            else:
+            elif mol_type == "ligand":
                 is_mol_type_index = IS_LIGAND_INDEX
+            elif mol_type == "mod_protein":
+                is_mol_type_index = IS_PROTEIN_INDEX
+            elif mol_type == "mod_rna":
+                is_mol_type_index = IS_RNA_INDEX
+            elif mol_type == "mod_dna":
+                is_mol_type_index = IS_DNA_INDEX
+            else:
+                raise ValueError(f"Unrecognized molecule type: {mol_type}")
 
             is_molecule_types[molecule_type_row_idx, is_mol_type_index] = True
+
+            is_molecule_mod.extend([True if "mod" in mol_type else False] * num_atoms)
 
             molecule_idx += num_atoms
         else:
             token_pool_lens.append(num_atoms)
             molecule_atom_types.append(mol_type)
+            is_molecule_mod.append(False)
             molecule_idx += 1
 
     # collect token center, distogram, and source-target atom indices for each token
@@ -2162,7 +2220,9 @@ def pdb_input_to_molecule_input(
         molecule_atom_types,
         biomol.chemid,
     ):
-        residue_constants = get_residue_constants(mol_type.replace("protein", "peptide"))
+        residue_constants = get_residue_constants(
+            mol_type.replace("protein", "peptide").replace("mod_", "")
+        )
 
         if mol_type == "protein":
             entry = HUMAN_AMINO_ACIDS[residue_constants.restype_3to1.get(chemid, "X")]
@@ -2171,11 +2231,11 @@ def pdb_input_to_molecule_input(
         elif mol_type == "dna":
             entry = DNA_NUCLEOTIDES[residue_constants.restype_3to1.get(chemid, "X")]
 
-        if mol_type == "ligand":
-            # collect indices for each ligand atom token
+        if is_atomized_residue(mol_type):
+            # collect indices for each ligand and modified polymer residue token (i.e., atom)
             molecule_atom_indices.append(-1)
             distogram_atom_indices.append(-1)
-            # NOTE: ligand tokens do not have source-target atom indices
+            # NOTE: ligand and modified polymer residue tokens do not have source-target atom indices
         else:
             # collect indices for each polymer residue token
             molecule_atom_indices.append(entry["token_center_atom_idx"])
@@ -2208,9 +2268,11 @@ def pdb_input_to_molecule_input(
     for entity_sequence, chain_chem_type in zip(chain_seqs, chain_chem_types):
         entity_mol = molecules[entity_idx]
         entity_len = (
-            entity_mol.GetNumAtoms() if chain_chem_type == "ligand" else len(entity_sequence)
+            entity_mol.GetNumAtoms()
+            if is_atomized_residue(chain_chem_type)
+            else len(entity_sequence)
         )
-        entity_idx += 1 if chain_chem_type == "ligand" else len(entity_sequence)
+        entity_idx += 1 if is_atomized_residue(chain_chem_type) else len(entity_sequence)
 
         entity_id_counts.append(entity_len)
         unrepeated_entity_ids.append(unrepeated_entity_sequences[entity_sequence])
@@ -2225,7 +2287,6 @@ def pdb_input_to_molecule_input(
         unrepeated_sym_ids.append(unrepeated_sym_sequences[entity_sequence])
         if entity_sequence in unrepeated_sym_sequences:
             unrepeated_sym_sequences[entity_sequence] += 1
-    unrepeated_sym_ids = tensor(unrepeated_sym_ids)
 
     sym_ids = repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
 
@@ -2244,8 +2305,9 @@ def pdb_input_to_molecule_input(
     )
 
     # construct token bonds, which will be linearly connected for proteins
-    # and nucleic acids, but for ligands will have their atomic bond matrix
-    # (as ligands are atom resolution)
+    # and nucleic acids, but for ligands and modified polymer residues
+    # will have their atomic bond matrix (as ligands and modified polymer
+    # residues are atom resolution)
     polymer_offset = 0
     ligand_offset = 0
     token_bonds = torch.zeros(num_tokens, num_tokens).bool()
@@ -2254,8 +2316,8 @@ def pdb_input_to_molecule_input(
         chain_seqs,
         chain_chem_types,
     ):
-        if chain_chem_type == "ligand":
-            # construct ligand chain token bonds
+        if is_atomized_residue(chain_chem_type):
+            # construct ligand and modified polymer chain token bonds
 
             coordinates = []
             updates = []
@@ -2269,7 +2331,10 @@ def pdb_input_to_molecule_input(
                 atom_end_index = bond.GetEndAtomIdx()
 
                 coordinates.extend(
-                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                    [
+                        [atom_start_index, atom_end_index],
+                        [atom_end_index, atom_start_index],
+                    ]
                 )
 
                 updates.extend([True, True])
@@ -2295,25 +2360,24 @@ def pdb_input_to_molecule_input(
             polymer_offset += chain_len
             ligand_offset += chain_len
 
-    # ascertain whether homomeric (e.g., bonded ligand) symmetry is preserved,
-    # which determines whether or not we use the mmCIF bond inputs (AF3 Section 5.1)
-    lacking_homomeric_symmetry = find_mismatched_symmetry(
-        biomol.chain_index,
-        entity_ids.numpy(),
-        sym_ids.numpy(),
-        biomol.chemid,
-    )
-
     # ensure mmCIF polymer-ligand (i.e., protein/RNA/DNA-ligand) and ligand-ligand bonds
     # (and bonds less than 2.4 Å) are installed in `MoleculeInput` during training only
     # per the AF3 supplement (Table 5, `token_bonds`)
     bond_atom_indices = defaultdict(int)
     for bond in biomol.bonds:
-        if not i.training or lacking_homomeric_symmetry:
+        # ascertain whether homomeric (e.g., bonded ligand) symmetry is preserved,
+        # which determines whether or not we use the mmCIF bond inputs (AF3 Section 5.1)
+        if not i.training or find_mismatched_symmetry(
+            biomol.chain_index,
+            entity_ids.numpy(),
+            sym_ids.numpy(),
+            biomol.chemid,
+        ):
             continue
 
         # determine bond type
 
+        # NOTE: in this context, modified polymer residues will be treated as ligands
         ptnr1_is_polymer = any(
             bond.ptnr1_auth_comp_id in rc.restype_3to1
             for rc in {amino_acid_constants, rna_constants, dna_constants}
@@ -2396,7 +2460,7 @@ def pdb_input_to_molecule_input(
             mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
             missing_atom_indices.append(mol_miss_atom_indices)
-            if mol_type == "ligand":
+            if is_atomized_residue(mol_type):
                 missing_token_indices.extend(
                     [mol_miss_atom_indices for _ in range(mol.GetNumAtoms())]
                 )
@@ -2417,7 +2481,7 @@ def pdb_input_to_molecule_input(
     msa, msa_mask = None, None
     templates, template_mask = None, None
 
-    # construct atom positions from template molecules installing their 3D conformers
+    # construct atom positions from template molecules after instantiating their 3D conformers
     atom_pos = torch.from_numpy(
         np.concatenate([mol.GetConformer().GetPositions() for mol in molecules]).astype(np.float32)
     )
@@ -2434,44 +2498,28 @@ def pdb_input_to_molecule_input(
         ]
     )
 
-    # map (sampled) chain IDs to indices
-
-    chains = None
-
-    if exists(i.chains):
-        chain_id_1, chain_id_2 = i.chains
-        chain_id_to_idx = {
-            chain_id: chain_idx for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
-        }
-        if exists(chain_id_1):
-            chain_id_1 = chain_id_to_idx[chain_id_1]
-        if exists(chain_id_2):
-            chain_id_2 = chain_id_to_idx[chain_id_2]
-        chains = (chain_id_1, chain_id_2)
-
     # create molecule input
 
     molecule_input = MoleculeInput(
         molecules=molecules,
         molecule_token_pool_lens=token_pool_lens,
+        molecule_ids=molecule_ids,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_types=is_molecule_types,
+        src_tgt_atom_indices=src_tgt_atom_indices,
+        token_bonds=token_bonds,
+        is_molecule_mod=tensor(is_molecule_mod),
         molecule_atom_indices=molecule_atom_indices,
         distogram_atom_indices=distogram_atom_indices,
-        molecule_ids=molecule_ids,
-        token_bonds=token_bonds,
-        additional_molecule_feats=additional_molecule_feats,
-        additional_token_feats=default(
-            additional_token_feats, torch.zeros(num_tokens, 2)
-        ),
-        is_molecule_types=is_molecule_types,
         missing_atom_indices=missing_atom_indices,
         missing_token_indices=missing_token_indices,
-        src_tgt_atom_indices=src_tgt_atom_indices,
-        atom_pos=atom_pos,
+        atom_parent_ids=atom_parent_ids,
+        additional_token_feats=default(additional_token_feats, torch.zeros(num_tokens, 2)),
         templates=templates,
         msa=msa,
+        atom_pos=atom_pos,
         template_mask=template_mask,
         msa_mask=msa_mask,
-        atom_parent_ids=atom_parent_ids,
         chains=chains,
         add_atom_ids=i.add_atom_ids,
         add_atompair_ids=i.add_atompair_ids,
