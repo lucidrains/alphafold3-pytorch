@@ -278,7 +278,8 @@ class Biomolecule:
             list(zip(self.chain_index[chain_mask], self.residue_index[chain_mask]))
         )
         # NOTE: We must only consider unique chain-residue index pairs here,
-        # as otherwise we might count each ligand heavy atom as a residue in this mapping
+        # as otherwise we might count each ligand or modified polymer residue
+        # heavy atom as a residue in this mapping
         subset_chain_residue_mapping = set(map(tuple, chain_residue_index))
 
         # manually subset certain Biomolecule metadata
@@ -368,10 +369,20 @@ class Biomolecule:
                 for chemtype in self.chemtype
             ]
         )
-        # NOTE: ligand atom position indices vary per ligand residue,
+        # NOTE: ligand and modified residue atom position indices vary per "pseudoresidue",
         # so we can't rely on representative atom indices here
-        token_res_rep_atom_indices[self.chemtype == 3] = np.where(
-            self.atom_mask[self.chemtype == 3]
+        is_ligand_residue = self.chemtype == 3
+        is_modified_polymer_residue = np.array(
+            [
+                chemtype < 3
+                and get_residue_constants(res_chem_index=chemtype).restype_3to1.get(chemid, "X")
+                == "X"
+                for (chemtype, chemid) in zip(self.chemtype, self.chemid)
+            ]
+        )
+        atomized_residue_mask = is_ligand_residue | is_modified_polymer_residue
+        token_res_rep_atom_indices[atomized_residue_mask] = np.where(
+            self.atom_mask[atomized_residue_mask]
         )[1]
         token_res_atom_position_mask[
             np.arange(self.chain_id.size), token_res_rep_atom_indices
@@ -581,18 +592,22 @@ def get_ligand_atom_name(atom_name: str, atom_types_set: Set[str]) -> str:
 def get_unique_res_atom_names(
     mmcif_object: mmcif_parsing.MmcifObject,
 ) -> List[Tuple[List[List[str]], str, int]]:
-    """Get atom name-chain ID tuples for each (e.g. ligand) "pseudoresidue" of each residue in each chain."""
+    """Get atom name-chain ID tuples for each (e.g. ligand) "pseudoresidue" of each residue in each
+    chain."""
     unique_res_atom_names = []
     for chain in mmcif_object.structure:
         chain_chem_comp = mmcif_object.chem_comp_details[chain.id]
         for res, res_chem_comp in zip(chain, chain_chem_comp):
             is_polymer_residue = is_polymer(res_chem_comp.type)
             residue_constants = get_residue_constants(res_chem_type=res_chem_comp.type)
-            if is_polymer_residue:
-                # For polymer residues, append the atom types directly.
+            is_modified_polymer_residue = (
+                is_polymer_residue and residue_constants.restype_3to1.get(res.resname, "X") == "X"
+            )
+            if is_polymer_residue and not is_modified_polymer_residue:
+                # For unmodified polymer residues, append the atom types directly.
                 atoms_to_append = [residue_constants.atom_types]
             else:
-                # For non-polymer residues, create a nested list of atom names.
+                # For non-polymer or modified polymer residues, create a nested list of atom names.
                 atoms_to_append = [
                     [atom.name for _ in range(residue_constants.atom_type_num)] for atom in res
                 ]
@@ -605,7 +620,7 @@ def _from_mmcif_object(
     mmcif_object: mmcif_parsing.MmcifObject,
     chain_ids: Optional[Set[str]] = None,
     atomize_ligand_residues: bool = True,
-    atomize_modified_polymer_residues: bool = False,
+    atomize_modified_polymer_residues: bool = True,
 ) -> Biomolecule:
     """Takes a Biopython structure/model mmCIF object and creates a `Biomolecule` instance.
 
@@ -857,7 +872,11 @@ def _from_mmcif_object(
 
 @typecheck
 def from_mmcif_string(
-    mmcif_str: str, file_id: str, chain_ids: Optional[Set[str]] = None
+    mmcif_str: str,
+    file_id: str,
+    chain_ids: Optional[Set[str]] = None,
+    atomize_ligand_residues: bool = True,
+    atomize_modified_polymer_residues: bool = True,
 ) -> Biomolecule:
     """Takes a mmCIF string and constructs a `Biomolecule` object.
 
@@ -881,7 +900,12 @@ def from_mmcif_string(
     if parsing_result.mmcif_object is None:
         raise list(parsing_result.errors.values())[0]
 
-    return _from_mmcif_object(parsing_result.mmcif_object, chain_ids=chain_ids)
+    return _from_mmcif_object(
+        parsing_result.mmcif_object,
+        chain_ids=chain_ids,
+        atomize_ligand_residues=atomize_ligand_residues,
+        atomize_modified_polymer_residues=atomize_modified_polymer_residues,
+    )
 
 
 @typecheck
