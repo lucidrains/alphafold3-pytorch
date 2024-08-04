@@ -1115,9 +1115,9 @@ if __name__ == "__main__":
         for multimer_chain_sequence in multimer_chain_sequences
     )
     # Retain all protein multimer chain clusters during monomer chain subsampling
-    protein_multimer_chain_clusters = protein_chain_clusters[
-        protein_chain_clusters["pdb_id"].is_in(multimer_pdb_ids)
-    ]
+    protein_multimer_chain_clusters = protein_chain_clusters.filter(
+        pl.col("pdb_id").is_in(multimer_pdb_ids)
+    )
 
     protein_chain_clusters_grouped = protein_chain_clusters.group_by("cluster_id").agg(
         pl.col("*").sample(1, seed=42)
