@@ -1995,10 +1995,8 @@ class DiffusionTransformer(Module):
         mask: Bool['b n'] | None = None,
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
-        w = self.attn_window_size
+        w, serial = self.attn_window_size, self.serial
         has_windows = exists(w)
-
-        serial = self.serial
 
         # handle windowing
 
@@ -2022,9 +2020,9 @@ class DiffusionTransformer(Module):
 
         # main transformer
 
-        if self.serial and should_checkpoint(self, (noised_repr, single_repr, pairwise_repr)):
+        if serial and should_checkpoint(self, (noised_repr, single_repr, pairwise_repr)):
             to_layers_fn = self.to_checkpointed_serial_layers
-        elif self.serial:
+        elif serial:
             to_layers_fn = self.to_serial_layers
         else:
             to_layers_fn = self.to_parallel_layers
@@ -4389,7 +4387,7 @@ class ComputeModelSelectionScore(Module):
         molecule_atom_lens: Int['b n'],
         atom_pos: Float['b m 3'], 
         atom_mask: Bool['b m'],
-    ) -> Float['b']:
+    ) -> Float[' b']:
 
         unresolved_rasa = [self._compute_unresolved_rasa(*args) for args in 
                            zip(unresolved_cid, unresolved_residue_mask, asym_id, molecule_ids, molecule_atom_lens, atom_pos, atom_mask)]
