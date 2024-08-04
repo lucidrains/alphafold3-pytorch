@@ -35,6 +35,7 @@ from alphafold3_pytorch.data import (
 
 import torch
 from torch import Tensor
+from torch.nn import Module
 from torch.optim import Adam, Optimizer
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Sampler, Dataset, DataLoader as OrigDataLoader
