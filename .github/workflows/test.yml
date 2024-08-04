@@ -27,4 +27,4 @@ jobs:
         python -m pip install -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest --splits 5 --randomly-seed 42 --random-order --group ${{ matrix.group }} tests/
+        python -m pytest --splits 5 --random-order-seed 42 --group ${{ matrix.group }} tests/

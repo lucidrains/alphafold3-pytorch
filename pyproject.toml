@@ -63,7 +63,7 @@ examples = []
 test = [
     "pytest",
     "pytest-split",
-    "pytest-randomly"
+    "pytest-random-order"
 ]
 
 [build-system]
