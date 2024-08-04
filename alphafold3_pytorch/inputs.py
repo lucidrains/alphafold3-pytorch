@@ -7,7 +7,7 @@ from pathlib import Path
 from functools import partial, wraps
 from itertools import groupby
 from collections import defaultdict
-from collections.abc import Iterableassignment
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
