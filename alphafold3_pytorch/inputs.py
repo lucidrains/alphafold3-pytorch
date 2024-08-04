@@ -7,7 +7,7 @@ from pathlib import Path
 from functools import partial, wraps
 from itertools import groupby
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterableassignment
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
@@ -1808,7 +1808,7 @@ def create_mol_from_atom_positions_and_types(
             if verbose:
                 logger.warning(
                     f"Failed to determine bonds for the input molecule {name} due to: {e}. "
-                    f"{'Retrying once more.' if i < num_bond_attempts - 1 else 'Terminating bond assigment.'}"
+                    f"{'Retrying once more.' if i < num_bond_attempts - 1 else 'Terminating bond assignment.'}"
                 )
             continue
     if not determined_bonds:
