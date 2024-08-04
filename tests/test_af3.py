@@ -1087,3 +1087,58 @@ def test_model_selection_score():
         chains_list = [(0, 1), (1,)],
         is_fine_tuning=False
     )
+
+def test_unresolved_protein_rasa():
+
+    from collections import namedtuple
+
+    from alphafold3_pytorch.inputs import (
+        IS_MOLECULE_TYPES, 
+        PDBInput,
+        default_extract_atom_feats_fn,
+        default_extract_atompair_feats_fn
+        
+    )
+
+    from alphafold3_pytorch.inputs import (
+        PDBDataset,
+        molecule_to_atom_input,
+        pdb_input_to_molecule_input,
+        IS_PROTEIN,
+    )
+
+    from alphafold3_pytorch import collate_inputs_to_batched_atom_input
+    from alphafold3_pytorch.alphafold3 import (
+        get_cid_molecule_type,
+    )
+
+    mmcif_filepath = os.path.join('data', 'test', '7a4d-assembly1.cif')
+    pdb_input = PDBInput(mmcif_filepath)
+
+    mol_input = pdb_input_to_molecule_input(pdb_input)
+    atom_input = molecule_to_atom_input(mol_input)
+    batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window=27)
+    batched_atom_input_dict = batched_atom_input.dict()
+
+    res_idx, token_idx, asym_id, entity_id, sym_id = batched_atom_input_dict['additional_molecule_feats'].unbind(dim = -1)
+
+    cid = 1
+    res_chem_index = get_cid_molecule_type(
+        cid,
+        asym_id[0],
+        batched_atom_input_dict['is_molecule_types'][0])
+
+    # only support protein for unresolved protein calculate
+    assert res_chem_index == IS_PROTEIN
+
+    unresolved_residue_mask = torch.randint(0, 2, asym_id.shape).bool()
+
+    compute_model_selection_score = ComputeModelSelectionScore()
+    unresolved_rasa = compute_model_selection_score.compute_unresolved_rasa(
+        unresolved_cid=[1],
+        unresolved_residue_mask=unresolved_residue_mask,
+        asym_id = asym_id,
+        molecule_ids=batched_atom_input_dict['molecule_ids'],
+        molecule_atom_lens=batched_atom_input_dict['molecule_atom_lens'],
+        atom_pos=batched_atom_input_dict['atom_pos'],
+        atom_mask=~batched_atom_input_dict['missing_atom_mask'])
