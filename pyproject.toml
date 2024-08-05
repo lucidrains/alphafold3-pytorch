@@ -1,9 +1,10 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.2.101"
+version = "0.2.102"
 description = "Alphafold 3 - Pytorch"
 authors = [
-    { name = "Phil Wang", email = "lucidrains@gmail.com" }
+    { name = "Phil Wang", email = "lucidrains@gmail.com" },
+    { name = "Alex Morehead", email = "alex.morehead@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
