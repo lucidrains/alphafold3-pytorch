@@ -1106,13 +1106,6 @@ def test_model_selection_score():
 
 def test_unresolved_protein_rasa():
 
-    # skip the test if dssp not installed
-
-    try:
-        subprocess.check_output(["which", "mkdssp"])
-    except:
-        pytest.skip("mkdssp not found, test_unresolved_protein_rasa skipped")
-
     # rest of the test
 
     mmcif_filepath = os.path.join('data', 'test', '7a4d-assembly1.cif')
@@ -1137,6 +1130,9 @@ def test_unresolved_protein_rasa():
     unresolved_residue_mask = torch.randint(0, 2, asym_id.shape).bool()
 
     compute_model_selection_score = ComputeModelSelectionScore()
+
+    if not compute_model_selection_score.can_calculate_unresolved_protein_rasa:
+        pytest.skip("mkdssp not available for calculating unresolved protein rasa")
 
     unresolved_rasa = compute_model_selection_score.compute_unresolved_rasa(
         unresolved_cid=[1],

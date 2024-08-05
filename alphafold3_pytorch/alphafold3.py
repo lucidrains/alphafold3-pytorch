@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sh
 from math import pi, sqrt
 from pathlib import Path
 from itertools import product
@@ -4083,6 +4084,14 @@ class ComputeModelSelectionScore(Module):
     
         self.dssp_path = dssp_path
 
+    @property
+    def can_calculate_unresolved_protein_rasa(self):
+        try:
+            sh.which('mkdssp')
+            return True
+        except:
+            return False
+
     @typecheck
     def compute_gpde(
         self,
@@ -4313,6 +4322,8 @@ class ComputeModelSelectionScore(Module):
         unresolved_residue_mask: True for unresolved resideu
         atom_mask: True for valid atom, False for missing/padding atom
         """
+
+        assert self.can_calculate_unresolved_protein_rasa, 'mkdssp needs to be installed'
 
         residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
 
