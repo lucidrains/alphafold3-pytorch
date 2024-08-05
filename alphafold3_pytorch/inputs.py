@@ -178,6 +178,7 @@ class AtomInput:
     plddt_labels:               Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Int[" 2"] | None = None
+    filepath:                   str | None = None
 
     def dict(self):
         return asdict(self)
@@ -211,6 +212,7 @@ class BatchedAtomInput:
     plddt_labels:               Int['b n'] | None = None
     resolved_labels:            Int['b n'] | None = None
     chains:                     Int["b 2"] | None = None
+    filepath:                   List[str] | None = None
 
     def dict(self):
         return asdict(self)
@@ -412,6 +414,7 @@ class MoleculeInput:
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
+    filepath:                   str | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     directed_bonds:             bool = False
@@ -692,6 +695,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
         chains=chains,
+        filepath=i.filepath,
     )
 
     return atom_input
@@ -729,6 +733,7 @@ class MoleculeLengthMoleculeInput:
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
+    filepath:                   str | None = None
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
     directed_bonds:             bool = False
@@ -1115,6 +1120,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         atom_ids = atom_ids,
         atompair_ids = atompair_ids,
         chains = chains,
+        filepath=i.filepath,
     )
 
     return atom_input
@@ -2582,6 +2588,7 @@ def pdb_input_to_molecule_input(
         template_mask=template_mask,
         msa_mask=msa_mask,
         chains=chains,
+        filepath=filepath,
         add_atom_ids=i.add_atom_ids,
         add_atompair_ids=i.add_atompair_ids,
         directed_bonds=i.directed_bonds,
