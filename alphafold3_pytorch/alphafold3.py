@@ -2524,11 +2524,9 @@ class ElucidatedAtomDiffusion(Module):
 
         padded_sigma = rearrange(sigma, 'b -> b 1 1')
 
-        maybe_c_noise = self.c_noise if self.karras_formulation else identity
-
         net_out = self.net(
             self.c_in(padded_sigma) * noised_atom_pos,
-            times = maybe_c_noise(sigma),
+            times = sigma,
             **network_condition_kwargs
         )
 
@@ -2615,7 +2613,7 @@ class ElucidatedAtomDiffusion(Module):
 
             # second order correction, if not the last timestep
 
-            if sigma_next != 0:
+            if self.karras_formulation and sigma_next != 0:
                 model_output_next = self.preconditioned_network_forward(atom_pos_next, sigma_next, clamp = clamp, network_condition_kwargs = network_condition_kwargs)
                 denoised_prime_over_sigma = (atom_pos_next - model_output_next) / sigma_next
                 atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma) * step_scale
@@ -2674,7 +2672,9 @@ class ElucidatedAtomDiffusion(Module):
 
         noise = torch.randn_like(atom_pos_ground_truth)
 
-        noised_atom_pos = atom_pos_ground_truth + padded_sigmas * noise  # alphas are 1. in the paper
+        maybe_c_noise = self.c_noise if not self.karras_formulation else identity # @wufandi claims the paper has a bug here https://github.com/lucidrains/alphafold3-pytorch/issues/124#issuecomment-2268374756
+
+        noised_atom_pos = atom_pos_ground_truth + padded_sigmas * maybe_c_noise(noise)  # alphas are 1. in the paper
 
         denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
@@ -3941,20 +3941,20 @@ def get_cid_molecule_type(
 
     return molecule_type
 
+@typecheck
 def _protein_structure_from_feature(
     asym_id: Int[' n'],
     molecule_ids: Int[' n'],
     molecule_atom_lens: Int[' n'],
     atom_pos: Float[' m 3'], 
-    atom_mask: Bool[' m'],):
+    atom_mask: Bool[' m'],
+) -> Bio.PDB.Structure.Structure:
+
     """
-    
     create structure for unresolved protein
 
     atom_mask: True for valid atom, False for missing/padding atom
-    return: Bio.PDB.Structure.Structure
     """
-
     num_atom = atom_pos.shape[0]
     num_res = molecule_ids.shape[0]
     
@@ -4326,16 +4326,13 @@ class ComputeModelSelectionScore(Module):
         chain_molecule_ids = molecule_ids[chain_mask]
         chain_molecule_atom_lens = molecule_atom_lens[chain_mask]
         
-        chain_mask_to_atom = repeat_consecutive_with_lens(
-            chain_mask.unsqueeze(0), molecule_atom_lens.unsqueeze(0)
-        ).squeeze(0)
+        chain_mask_to_atom = torch.repeat_interleave(chain_mask, molecule_atom_lens)
         
         # if there's padding in num atom
         num_pad = num_atom - molecule_atom_lens.sum()
         if num_pad > 0:
             chain_mask_to_atom = F.pad(
                 chain_mask_to_atom, (0, num_pad), value = False)
-
 
         chain_atom_pos = atom_pos[chain_mask_to_atom]
         chain_atom_mask = atom_mask[chain_mask_to_atom]

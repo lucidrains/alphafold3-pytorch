@@ -1137,6 +1137,7 @@ def test_unresolved_protein_rasa():
     unresolved_residue_mask = torch.randint(0, 2, asym_id.shape).bool()
 
     compute_model_selection_score = ComputeModelSelectionScore()
+
     unresolved_rasa = compute_model_selection_score.compute_unresolved_rasa(
         unresolved_cid=[1],
         unresolved_residue_mask=unresolved_residue_mask,
