@@ -31,6 +31,8 @@ from pydantic.types import (
     DirectoryPath
 )
 
+from lightning.fabric.loggers import TensorBoardLogger
+
 # functions
 
 def exists(v):
@@ -166,6 +168,9 @@ class TrainerConfig(BaseModelWithExtra):
     checkpoint_folder: str
     overwrite_checkpoints: bool
     dataset_config: DatasetConfig | None = None
+    use_tensorboard: bool = True
+    tensorboard_log_dir: str = './logs'
+    logger_kwargs: dict = dict()
 
     @classmethod
     @typecheck
@@ -193,7 +198,12 @@ class TrainerConfig(BaseModelWithExtra):
     ) -> Trainer:
 
         trainer_kwargs = self.model_dump(
-            exclude = {'dataset_config'}
+            exclude = {
+                'dataset_config',
+                'use_tensorboard',
+                'tensorboard_log_dir',
+                'logger_kwargs'
+            }
         )
 
         assert exists(self.model) ^ exists(model), 'either model is available on the trainer config, or passed in when creating the instance, but not both or neither'
@@ -261,6 +271,13 @@ class TrainerConfig(BaseModelWithExtra):
 
         assert 'dataset' in trainer_kwargs, 'dataset is absent - dataset_type must be specified along with train folders (pdb for now), or the Dataset instance must be passed in'
 
+        # handle loggers
+
+        loggers = []
+
+        if self.use_tensorboard:
+            loggers.append(TensorBoardLogger(self.tensorboard_log_dir, **self.logger_kwargs))
+
         # handle rest
 
         trainer_kwargs.update(dict(
@@ -270,7 +287,8 @@ class TrainerConfig(BaseModelWithExtra):
             optimizer = optimizer,
             scheduler = scheduler,
             valid_dataset = valid_dataset,
-            map_dataset_input_fn = map_dataset_input_fn
+            map_dataset_input_fn = map_dataset_input_fn,
+            loggers = loggers
         ))
 
         trainer = Trainer(**trainer_kwargs)

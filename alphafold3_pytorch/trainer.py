@@ -47,6 +47,7 @@ from adam_atan2_pytorch.foreach import AdamAtan2
 from ema_pytorch import EMA
 
 from lightning import Fabric
+from lightning.fabric.loggers import Logger
 from lightning.fabric.wrappers import _unwrap_objects
 
 from shortuuid import uuid
@@ -290,6 +291,7 @@ class Trainer:
         default_lambda_lr = default_lambda_lr_fn,
         train_sampler: Sampler | None = None,
         fabric: Fabric | None = None,
+        loggers: List[Logger] = [],
         accelerator = 'auto',
         checkpoint_prefix = 'af3.ckpt.',
         checkpoint_every: int = 1000,
@@ -317,7 +319,11 @@ class Trainer:
         # instantiate fabric
 
         if not exists(fabric):
-            fabric = Fabric(accelerator = accelerator, **fabric_kwargs)
+            fabric = Fabric(
+                accelerator = accelerator,
+                loggers = loggers,
+                **fabric_kwargs
+            )
 
         self.fabric = fabric
         fabric.launch()
