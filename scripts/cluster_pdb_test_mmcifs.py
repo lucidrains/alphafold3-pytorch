@@ -166,9 +166,15 @@ def filter_structure_chain_sequences(
                 # multimeric structure are kept only if the polymer chain is novel, and any
                 # ligand chains within the (polymer-)filtered structure are kept only if
                 # the ligand chain is novel as well.
-                if molecule_type == "ligand" and not is_novel_ligand(
-                    sequence, reference_ligand_fps, max_sim=max_ligand_similarity
-                ):
+                try:
+                    if molecule_type == "ligand" and not is_novel_ligand(
+                        sequence, reference_ligand_fps, max_sim=max_ligand_similarity
+                    ):
+                        continue
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to check if ligand is novel due to: {e}. Assuming it is not novel..."
+                    )
                     continue
                 filtered_structure_chain_sequences[chain_id] = sequence
 
@@ -177,9 +183,15 @@ def filter_structure_chain_sequences(
         ):
             # NOTE: For the evaluation dataset's monomers, sequence non-redundant polymers or
             # any novel ligand chains within the (polymer-)filtered structure are kept.
-            if molecule_type == "ligand" and not is_novel_ligand(
-                sequence, reference_ligand_fps, max_sim=max_ligand_similarity
-            ):
+            try:
+                if molecule_type == "ligand" and not is_novel_ligand(
+                    sequence, reference_ligand_fps, max_sim=max_ligand_similarity
+                ):
+                    continue
+            except Exception as e:
+                logger.warning(
+                    f"Failed to check if ligand is novel due to: {e}. Assuming it is not novel..."
+                )
                 continue
             filtered_structure_chain_sequences[chain_id] = sequence
 
