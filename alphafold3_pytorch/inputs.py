@@ -635,7 +635,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     molecule_atom_indices = i.molecule_atom_indices
     distogram_atom_indices = i.distogram_atom_indices
 
-    if exists(missing_token_indices):
+    if exists(missing_token_indices) and missing_token_indices.shape[-1]:
         is_missing_molecule_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, molecule_atom_indices
         ).any(dim=-1)
@@ -1064,7 +1064,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # mask out molecule atom indices and distogram atom indices where it is in the missing atom indices list
 
-    if exists(missing_token_indices):
+    if exists(missing_token_indices) and missing_token_indices.shape[-1]:
         missing_token_indices = repeat_interleave(missing_token_indices, token_repeats, dim = 0)
 
         is_missing_molecule_atom = einx.equal(
@@ -2500,26 +2500,23 @@ def pdb_input_to_molecule_input(
         for mol in molecules
     ]
 
-    if any(molecules_missing_atom_indices):
-        missing_atom_indices = []
-        missing_token_indices = []
+    missing_atom_indices = []
+    missing_token_indices = []
 
-        for mol_miss_atom_indices, mol, mol_type in zip(
-            molecules_missing_atom_indices, molecules, molecule_types
-        ):
-            mol_miss_atom_indices = default(mol_miss_atom_indices, [])
-            mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
+    for mol_miss_atom_indices, mol, mol_type in zip(
+        molecules_missing_atom_indices, molecules, molecule_types
+    ):
+        mol_miss_atom_indices = default(mol_miss_atom_indices, [])
+        mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
-            missing_atom_indices.append(mol_miss_atom_indices)
-            if is_atomized_residue(mol_type):
-                missing_token_indices.extend(
-                    [mol_miss_atom_indices for _ in range(mol.GetNumAtoms())]
-                )
-            else:
-                missing_token_indices.append(mol_miss_atom_indices)
+        missing_atom_indices.append(mol_miss_atom_indices)
+        if is_atomized_residue(mol_type):
+            missing_token_indices.extend([mol_miss_atom_indices for _ in range(mol.GetNumAtoms())])
+        else:
+            missing_token_indices.append(mol_miss_atom_indices)
 
-        assert len(molecules) == len(missing_atom_indices)
-        assert len(missing_token_indices) == num_tokens
+    assert len(molecules) == len(missing_atom_indices)
+    assert len(missing_token_indices) == num_tokens
 
     # TODO: install additional token features once MSAs are available
     # 0: f_profile
