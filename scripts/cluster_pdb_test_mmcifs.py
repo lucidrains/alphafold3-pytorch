@@ -8,14 +8,14 @@
 # that is filtered on homology to the training and validation sets.
 # Evaluation is done either on individual chains, or on specific interfaces extracted from the full complex prediction.
 # For intra-chain metrics, we keep polymers (or ligands) that have 30% or less sequence identity
-# (or 0.3 or less Tanimoto similarity) to the training or validation sets.
+# (or 0.5 or less Tanimoto similarity) to the training or validation sets.
 # Here we define sequence identity as the percent of residues in the evaluation set chain that are identical to the
 # training or validation set chain, and we define Tanimoto similarity using RDKit's Morgan fingerprint and Tanimoto
 # similarity functions, respectively. For interface metrics the following filters are applied:
 # • Polymer-polymer interfaces: If either polymer has greater than 30% sequence identity to a chain in the training or
 # validation sets, then this interface is filtered out.
 # • Polymer-ligand interfaces: If either the polymer (or the ligand) has greater than 30% sequence identity
-# (or 0.3 Tanimoto similarity) to a chain in the training or validation sets, then this interface is filtered out.
+# (or 0.5 Tanimoto similarity) to a chain in the training or validation sets, then this interface is filtered out.
 
 # %%
 
@@ -205,7 +205,7 @@ def filter_chains_by_sequence_names(
     interface_chain_ids: CHAIN_INTERFACES | None = None,
     reference_ligand_fps: List[DataStructs.cDataStructs.ExplicitBitVect] | None = None,
     max_polymer_similarity: float = 0.3,
-    max_ligand_similarity: float = 0.3,
+    max_ligand_similarity: float = 0.5,
     max_workers: int = 2,
 ) -> CHAIN_SEQUENCES | Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Return only chains (and potentially interfaces) with sequence names in the given set."""
@@ -283,7 +283,7 @@ def filter_to_low_homology_sequences(
     input_fasta_filepath: str,
     reference_fasta_filepath: str,
     max_polymer_similarity: float = 0.3,
-    max_ligand_similarity: float = 0.3,
+    max_ligand_similarity: float = 0.5,
     max_workers: int = 2,
 ) -> Tuple[CHAIN_SEQUENCES, CHAIN_INTERFACES]:
     """Filter targets to only low homology sequences."""
