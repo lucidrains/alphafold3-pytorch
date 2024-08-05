@@ -228,6 +228,7 @@ def test_msa_module(
     pairwise = torch.randn(2, 16, 16, 128).requires_grad_()
     msa = torch.randn(2, 7, 16, 64)
     mask = torch.randint(0, 2, (2, 16)).bool()
+    msa_mask = torch.randint(0, 2, (2, 7)).bool()
 
     msa_module = MSAModule(
         checkpoint = checkpoint,
@@ -238,7 +239,8 @@ def test_msa_module(
         msa = msa,
         single_repr = single,
         pairwise_repr = pairwise,
-        mask = mask
+        mask = mask,
+        msa_mask = msa_mask
     )
 
     assert pairwise.shape == pairwise_out.shape
