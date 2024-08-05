@@ -171,15 +171,3 @@ def deep_merge_dicts(
             # Otherwise, set/overwrite the key in dict1 with dict2's value
             dict1[key] = value
     return dict1
-
-
-@typecheck
-def remove_last_digit_character(string: str) -> str:
-    """Remove the last digit character from a string.
-
-    :param string: The string to remove the last digit character from.
-    :return: The string with the last digit character removed
-    """
-    if len(string) > 1 and string[-1].isdigit():
-        return string[:-1]
-    return string
