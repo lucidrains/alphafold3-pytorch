@@ -28,7 +28,7 @@ from joblib import Parallel, delayed
 
 from pdbeccdutils.core import ccd_reader
 
-from rdkit import Chem, RDLogger
+from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem, rdDetermineBonds
 from rdkit.Chem.rdchem import Atom, Mol
 from rdkit.Geometry import Point3D
@@ -65,10 +65,6 @@ from alphafold3_pytorch.utils.data_utils import (
 )
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 from alphafold3_pytorch.utils.utils import default, exists, first, identity
-
-# silence RDKit's warnings
-
-RDLogger.DisableLog("rdApp.*")
 
 # constants
 
@@ -1793,8 +1789,14 @@ def create_mol_from_atom_positions_and_types(
     for i, (x, y, z) in enumerate(atom_positions):
         conf.SetAtomPosition(i, Point3D(x, y, z))
 
+    # add the conformer to the molecule
+
     mol.AddConformer(conf)
     Chem.SanitizeMol(mol)
+
+    # block the RDKit logger
+
+    blocker = rdBase.BlockLogs()
 
     # finalize molecule by inferring bonds
 
@@ -1816,6 +1818,10 @@ def create_mol_from_atom_positions_and_types(
             logger.warning(
                 "Failed to determine bonds in the input molecule. Skipping bond assignment."
             )
+
+    # unblock the RDKit logger
+
+    del blocker
 
     mol = Chem.RemoveHs(mol)
     Chem.SanitizeMol(mol)
