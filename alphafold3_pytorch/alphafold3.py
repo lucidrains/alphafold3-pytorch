@@ -4518,6 +4518,7 @@ class Alphafold3(Module):
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
         checkpoint_diffusion_token_transformer = False,
+        detach_when_recycling = True
     ):
         super().__init__()
 
@@ -4641,6 +4642,8 @@ class Alphafold3(Module):
         )
 
         # recycling related
+
+        self.detach_when_recycling = detach_when_recycling
 
         self.recycle_single = nn.Sequential(
             nn.LayerNorm(dim_single),
@@ -4835,7 +4838,8 @@ class Alphafold3(Module):
         return_present_sampled_atoms: bool = False,
         return_confidence_head_logits: bool = False,
         num_rollout_steps: int | None = None,
-        rollout_show_tqdm_pbar: bool = False
+        rollout_show_tqdm_pbar: bool = False,
+        detach_when_recycling: bool = None
     ) -> (
         Float['b m 3'] |
         Float['l 3'] |
@@ -4995,6 +4999,9 @@ class Alphafold3(Module):
 
         # init recycled single and pairwise
 
+        detach_when_recycling = default(detach_when_recycling, self.detach_when_recycling)
+        maybe_recycling_detach = torch.detach if detach_when_recycling else identity
+
         recycled_pairwise = recycled_single = None
         single = pairwise = None
 
@@ -5007,9 +5014,11 @@ class Alphafold3(Module):
             recycled_single = recycled_pairwise = 0.
 
             if exists(single):
+                single = maybe_recycling_detach(single)
                 recycled_single = self.recycle_single(single)
 
             if exists(pairwise):
+                pairwise = maybe_recycling_detach(pairwise)
                 recycled_pairwise = self.recycle_pairwise(pairwise)
 
             single = single_init + recycled_single
