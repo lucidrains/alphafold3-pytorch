@@ -1920,7 +1920,7 @@ def extract_template_molecules_from_biomolecule_chains(
 
                 # manually construct an RDKit molecule from the atomized residue's atom positions and types
 
-                res_atom_type_indices = np.where(res_atom_positions.all(axis=-1))[1]
+                res_atom_type_indices = np.where(res_atom_positions.any(axis=-1))[1]
                 res_atom_elements = [
                     # NOTE: here, we treat the first character of each atom type as its element symbol
                     res_constants.element_types[idx].replace("ATM", "*")
