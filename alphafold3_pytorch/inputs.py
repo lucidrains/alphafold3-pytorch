@@ -28,7 +28,7 @@ from joblib import Parallel, delayed
 
 from pdbeccdutils.core import ccd_reader
 
-from rdkit import Chem, rdBase
+from rdkit import Chem, RDLogger, rdBase
 from rdkit.Chem import AllChem, rdDetermineBonds
 from rdkit.Chem.rdchem import Atom, Mol
 from rdkit.Geometry import Point3D
@@ -64,6 +64,10 @@ from alphafold3_pytorch.utils.data_utils import (
 )
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 from alphafold3_pytorch.utils.utils import default, exists, first, identity
+
+# silence RDKit's warnings
+
+RDLogger.DisableLog("rdApp.*")
 
 # constants
 
