@@ -4087,7 +4087,7 @@ class ComputeModelSelectionScore(Module):
     @property
     def can_calculate_unresolved_protein_rasa(self):
         try:
-            sh.which('mkdssp')
+            sh.which(self.dssp_path)
             return True
         except:
             return False
