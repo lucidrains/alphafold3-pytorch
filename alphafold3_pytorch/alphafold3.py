@@ -4833,6 +4833,7 @@ class Alphafold3(Module):
         plddt_labels: Int['b n'] | Int['b m'] | None = None,
         resolved_labels: Int['b n'] | Int['b m'] | None = None,
         chains: Int['b 2'] | None = None,
+        filepath: List[str] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_present_sampled_atoms: bool = False,
