@@ -2142,10 +2142,16 @@ def pdb_input_to_molecule_input(
             chain_id: chain_idx
             for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
         }
-        if exists(chain_id_1):
+        # NOTE: we have to manually nullify a chain ID value
+        # e.g., if an empty string is passed in as a "null" chain ID
+        if chain_id_1:
             chain_id_1 = chain_id_to_idx[chain_id_1]
-        if exists(chain_id_2):
+        else:
+            chain_id_1 = None
+        if chain_id_2:
             chain_id_2 = chain_id_to_idx[chain_id_2]
+        else:
+            chain_id_2 = None
         chains = (chain_id_1, chain_id_2)
 
     # crop the `Biomolecule` object during training only
