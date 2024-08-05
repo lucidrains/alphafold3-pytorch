@@ -374,7 +374,7 @@ def mean_pool_with_lens(
 
 
 @typecheck
-def repeat_consecutive_with_lens(
+def batch_repeat_interleave(
     feats: Float["b n ..."] | Bool["b n"] | Int["b n"],  # type: ignore
     lens: Int["b n"],  # type: ignore
 ) -> Float["b m ..."] | Bool["b m"] | Int["b m"]:  # type: ignore

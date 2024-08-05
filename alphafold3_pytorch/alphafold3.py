@@ -294,7 +294,7 @@ def mean_pool_with_lens(
     return avg
 
 @typecheck
-def repeat_consecutive_with_lens(
+def batch_repeat_interleave(
     feats: Float['b n ...'] | Bool['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
     mask_value: float | int | bool | None = None,
@@ -2280,7 +2280,7 @@ class DiffusionModule(Module):
 
         single_repr_cond = self.single_repr_to_atom_feat_cond(conditioned_single_repr)
 
-        single_repr_cond = repeat_consecutive_with_lens(single_repr_cond, molecule_atom_lens)
+        single_repr_cond = batch_repeat_interleave(single_repr_cond, molecule_atom_lens)
         single_repr_cond = pad_or_slice_to(single_repr_cond, length = atom_feats_cond.shape[1], dim = 1)
 
         atom_feats_cond = single_repr_cond + atom_feats_cond
@@ -2299,7 +2299,7 @@ class DiffusionModule(Module):
         indices = torch.arange(seq_len, device = device)
         indices = repeat(indices, 'n -> b n', b = batch_size)
 
-        indices = repeat_consecutive_with_lens(indices, molecule_atom_lens)
+        indices = batch_repeat_interleave(indices, molecule_atom_lens)
         indices = pad_or_slice_to(indices, atom_seq_len, dim = -1)
         indices = pad_and_window(indices, w)
 
@@ -2392,7 +2392,7 @@ class DiffusionModule(Module):
 
         atom_decoder_input = self.tokens_to_atom_decoder_input_cond(tokens)
 
-        atom_decoder_input = repeat_consecutive_with_lens(atom_decoder_input, molecule_atom_lens)
+        atom_decoder_input = batch_repeat_interleave(atom_decoder_input, molecule_atom_lens)
         atom_decoder_input = pad_or_slice_to(atom_decoder_input, length = atom_feats_skip.shape[1], dim = 1)
 
         atom_decoder_input = atom_decoder_input + atom_feats_skip
@@ -2707,7 +2707,7 @@ class ElucidatedAtomDiffusion(Module):
         if exists(is_molecule_types):
             is_nucleotide_or_ligand_fields = is_molecule_types.unbind(dim = -1)
 
-            is_nucleotide_or_ligand_fields = tuple(repeat_consecutive_with_lens(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
+            is_nucleotide_or_ligand_fields = tuple(batch_repeat_interleave(t, molecule_atom_lens) for t in is_nucleotide_or_ligand_fields)
             is_nucleotide_or_ligand_fields = tuple(pad_or_slice_to(t, length = align_weights.shape[-1], dim = -1) for t in is_nucleotide_or_ligand_fields)
 
             _, atom_is_dna, atom_is_rna, atom_is_ligand, _ = is_nucleotide_or_ligand_fields
@@ -3429,13 +3429,13 @@ class ConfidenceHead(Module):
         # handle maybe atom level resolution
 
         if self.atom_resolution:
-            single_repr = repeat_consecutive_with_lens(single_repr, molecule_atom_lens)
+            single_repr = batch_repeat_interleave(single_repr, molecule_atom_lens)
 
-            pairwise_repr = repeat_consecutive_with_lens(pairwise_repr, molecule_atom_lens)
+            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
 
             molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
             pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
-            pairwise_repr = repeat_consecutive_with_lens(pairwise_repr, molecule_atom_lens)
+            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
             pairwise_repr = unpack_one(pairwise_repr)
 
             interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
@@ -3744,8 +3744,8 @@ class ComputeClash(Module):
         valid_indices = torch.ones_like(indices).bool()
 
         # valid_indices at padding position has value False
-        indices = repeat_consecutive_with_lens(indices, molecule_atom_lens)
-        valid_indices = repeat_consecutive_with_lens(valid_indices, molecule_atom_lens)
+        indices = batch_repeat_interleave(indices, molecule_atom_lens)
+        valid_indices = batch_repeat_interleave(valid_indices, molecule_atom_lens)
 
         if exists(atom_mask):
             valid_indices = valid_indices * atom_mask
@@ -3811,8 +3811,8 @@ class ComputeRankingScore(Module):
         valid_indices = torch.ones_like(indices).bool()
 
         # valid_indices at padding position has value False
-        indices = repeat_consecutive_with_lens(indices, molecule_atom_lens)
-        valid_indices = repeat_consecutive_with_lens(valid_indices, molecule_atom_lens)
+        indices = batch_repeat_interleave(indices, molecule_atom_lens)
+        valid_indices = batch_repeat_interleave(valid_indices, molecule_atom_lens)
 
         # broadcast is_molecule_types to atom
 
@@ -4265,8 +4265,8 @@ class ComputeModelSelectionScore(Module):
         batch_size = pred_coords.shape[0]
 
         # broadcast asym_id and is_molecule_types to atom level
-        atom_asym_id = repeat_consecutive_with_lens(asym_id, molecule_atom_lens, mask_value=-1)
-        atom_is_molecule_types = repeat_consecutive_with_lens(is_molecule_types, molecule_atom_lens)
+        atom_asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens, mask_value=-1)
+        atom_is_molecule_types = batch_repeat_interleave(is_molecule_types, molecule_atom_lens)
 
         weighted_lddt = torch.zeros(batch_size, device=device)
 

@@ -43,7 +43,7 @@ from alphafold3_pytorch.configs import (
 
 from alphafold3_pytorch.alphafold3 import (
     mean_pool_with_lens,
-    repeat_consecutive_with_lens,
+    batch_repeat_interleave,
     full_pairwise_repr_to_windowed,
     get_cid_molecule_type,
 )
@@ -75,10 +75,10 @@ def test_mean_pool_with_lens():
 
     assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
 
-def test_repeat_consecutive_with_lens():
+def test_batch_repeat_interleave():
     seq = torch.tensor([[[1.], [2.], [4.]], [[1.], [2.], [4.]]])
     lens = torch.tensor([[3, 4, 2], [2, 5, 1]]).long()
-    repeated = repeat_consecutive_with_lens(seq, lens)
+    repeated = batch_repeat_interleave(seq, lens)
     assert torch.allclose(repeated, torch.tensor([[[1.], [1.], [1.], [2.], [2.], [2.], [2.], [4.], [4.]], [[1.], [1.], [2.], [2.], [2.], [2.], [2.], [4.], [0.]]]))
 
 def test_smooth_lddt_loss():
