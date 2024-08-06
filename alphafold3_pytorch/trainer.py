@@ -156,7 +156,7 @@ def collate_inputs_to_batched_atom_input(
             outputs.append(None)
             continue
 
-        # collate list of input filepath strings
+        # collate lists for uncollatable fields
 
         if key in UNCOLLATABLE_ATOM_INPUT_FIELDS:
             outputs.append(grouped)
