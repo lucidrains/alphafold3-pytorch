@@ -26,7 +26,8 @@ from alphafold3_pytorch.inputs import (
     BatchedAtomInput,
     Alphafold3Input,
     PDBInput,
-    maybe_transform_to_atom_inputs
+    maybe_transform_to_atom_inputs,
+    UNCOLLATABLE_ATOM_INPUT_FIELDS,
 )
 
 from alphafold3_pytorch.data import (
@@ -147,7 +148,7 @@ def collate_inputs_to_batched_atom_input(
 
     outputs = []
 
-    for group_index, grouped in enumerate(zip(*atom_inputs)):
+    for key, grouped in zip(keys, zip(*atom_inputs)):
         # if all None, just return None
 
         not_none_grouped = [*filter(exists, grouped)]
@@ -158,8 +159,8 @@ def collate_inputs_to_batched_atom_input(
 
         # collate list of input filepath strings
 
-        if keys[group_index] == "filepath":
-            outputs.append(not_none_grouped)
+        if key in UNCOLLATABLE_ATOM_INPUT_FIELDS:
+            outputs.append(grouped)
             continue
 
         # default to empty tensor for any Nones
@@ -640,7 +641,7 @@ class Trainer:
                     # model forwards
 
                     loss, loss_breakdown = self.model(
-                        **inputs.dict(),
+                        **inputs.model_forward_dict(),
                         return_loss_breakdown = True
                     )
 
@@ -702,7 +703,7 @@ class Trainer:
 
                     for valid_batch in self.valid_dataloader:
                         valid_loss, loss_breakdown = eval_model(
-                            **valid_batch.dict(),
+                            **valid_batch.model_forward_dict(),
                             return_loss_breakdown = True
                         )
 
@@ -742,7 +743,7 @@ class Trainer:
 
                 for test_batch in self.test_dataloader:
                     test_loss, loss_breakdown = eval_model(
-                        **test_batch.dict(),
+                        **test_batch.model_forward_dict(),
                         return_loss_breakdown = True
                     )
 

@@ -115,7 +115,7 @@ def test_alphafold3_input(directed_bonds):
         )
     )
 
-    alphafold3(**batched_atom_input.dict(), num_sample_steps = 1)
+    alphafold3(**batched_atom_input.model_forward_dict(), num_sample_steps = 1)
 
 def test_atompos_input():
 
@@ -168,7 +168,7 @@ def test_atompos_input():
         )
     )
 
-    loss = alphafold3(**batched_atom_input.dict())
+    loss = alphafold3(**batched_atom_input.model_forward_dict())
     loss.backward()
 
     # sampling
@@ -244,7 +244,7 @@ def test_pdbinput_input():
         ),
     )
 
-    loss = alphafold3(**batched_atom_input.dict())
+    loss = alphafold3(**batched_atom_input.model_forward_dict())
     loss.backward()
 
     # sampling
