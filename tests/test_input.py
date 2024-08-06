@@ -253,11 +253,16 @@ def test_pdbinput_input():
 
     alphafold3.eval()
 
+    batch_dict = batched_eval_atom_input.model_forward_dict()
     sampled_atom_pos = alphafold3(
-        **batched_eval_atom_input.model_forward_dict(), return_loss=False, return_present_sampled_atoms=True
+        **batch_dict,
+        return_loss=False,
     )
 
-    assert sampled_atom_pos.shape == (4155, 3)
+    atom_mask = batch_dict["atom_mask"]
+    sampled_atom_positions = sampled_atom_pos[atom_mask].cpu().numpy()
+
+    assert sampled_atom_positions.shape == (4155, 3)
 
     # visualizing
 
@@ -268,7 +273,7 @@ def test_pdbinput_input():
         gapless_poly_seq=True,
         insert_orig_atom_names=True,
         insert_alphafold_mmcif_metadata=True,
-        sampled_atom_positions=sampled_atom_pos.cpu().numpy(),
+        sampled_atom_positions=sampled_atom_positions,
     )
 
     assert os.path.exists(filepath.replace(".cif", "-sampled.cif"))
