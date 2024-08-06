@@ -246,6 +246,26 @@ def file_to_atom_input(path: str | Path) -> AtomInput:
     return AtomInput(**atom_input_dict)
 
 @typecheck
+def default_none_fields_atom_input(i: AtomInput) -> AtomInput:
+
+    # if templates given but template mask isn't given, default to all True
+
+    if exists(i.templates) and not exists(i.template_mask):
+        i.template_mask = torch.ones(i.templates.shape[0], dtype = torch.bool)
+
+    # if msa given but msa mask isn't given default to all True
+
+    if exists(i.msa) and not exists(i.msa_mask):
+        i.msa_mask = torch.ones(i.msa.shape[0], dtype = torch.bool)
+
+    # default missing atom mask should be all False
+
+    if not exists(i.missing_atom_mask):
+        i.missing_atom_mask = torch.zeros(i.atom_inputs.shape[0], dtype = torch.bool)
+
+    return i
+
+@typecheck
 def pdb_dataset_to_atom_inputs(
     pdb_dataset: PDBDataset,
     *,
@@ -2698,15 +2718,22 @@ class PDBDataset(Dataset):
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation
 
 INPUT_TO_ATOM_TRANSFORM = {
-    AtomInput: identity,
-    MoleculeInput: molecule_to_atom_input,
+    AtomInput: compose(
+        default_none_fields_atom_input
+    ),
+    MoleculeInput: compose(
+        molecule_to_atom_input,
+        default_none_fields_atom_input
+    ),
     Alphafold3Input: compose(
         alphafold3_input_to_molecule_lengthed_molecule_input,
-        molecule_lengthed_molecule_input_to_atom_input
+        molecule_lengthed_molecule_input_to_atom_input,
+        default_none_fields_atom_input
     ),
     PDBInput: compose(
         pdb_input_to_molecule_input,
-        molecule_to_atom_input
+        molecule_to_atom_input,
+        default_none_fields_atom_input
     ),
 }
 
