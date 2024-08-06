@@ -4834,7 +4834,6 @@ class Alphafold3(Module):
         resolved_labels: Int['b n'] | Int['b m'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
-        return_present_sampled_atoms: bool = False,
         return_confidence_head_logits: bool = False,
         num_rollout_steps: int | None = None,
         rollout_show_tqdm_pbar: bool = False,
@@ -5103,9 +5102,6 @@ class Alphafold3(Module):
 
             if return_confidence_head_logits:
                 confidence_head_atom_pos_input = sampled_atom_pos.clone()
-
-            if exists(missing_atom_mask) and return_present_sampled_atoms:
-                sampled_atom_pos = sampled_atom_pos[~missing_atom_mask]
 
             if not return_confidence_head_logits:
                 return sampled_atom_pos
