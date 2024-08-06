@@ -12,24 +12,15 @@ from alphafold3_pytorch.data.data_pipeline import get_assembly
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject, parse_mmcif_object
 from alphafold3_pytorch.utils.utils import exists
 
+
 def write_mmcif_from_filepath_and_id(
-    filepath: str,
-    file_id: str,
-    suffix: str = 'sampled',
-    **kwargs
+    input_filepath: str, output_filepath: str, file_id: str, **kwargs
 ):
-    mmcif_object = parse_mmcif_object(
-        filepath = filepath,
-        file_id = file_id
-    )
+    """Write an input mmCIF file to an output mmCIF filepath using the provided keyword arguments
+    (e.g., sampled coordinates)."""
+    mmcif_object = parse_mmcif_object(filepath=input_filepath, file_id=file_id)
+    return write_mmcif(mmcif_object, output_filepath=output_filepath, **kwargs)
 
-    output_filepath = filepath.replace(".cif", f"-{suffix}.cif")
-
-    return write_mmcif(
-        mmcif_object,
-        output_filepath = output_filepath,
-        **kwargs
-    )
 
 def write_mmcif(
     mmcif_object: MmcifObject,

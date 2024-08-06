@@ -142,18 +142,24 @@ def collate_inputs_to_batched_atom_input(
 
     # separate input dictionary into keys and values
 
-    keys = atom_inputs[0].dict().keys()
+    keys = list(atom_inputs[0].dict().keys())
     atom_inputs = [i.dict().values() for i in atom_inputs]
 
     outputs = []
 
-    for grouped in zip(*atom_inputs):
+    for group_index, grouped in enumerate(zip(*atom_inputs)):
         # if all None, just return None
 
         not_none_grouped = [*filter(exists, grouped)]
 
         if len(not_none_grouped) == 0:
             outputs.append(None)
+            continue
+
+        # collate list of input filepath strings
+
+        if keys[group_index] == "filepath":
+            outputs.append(not_none_grouped)
             continue
 
         # default to empty tensor for any Nones
