@@ -259,8 +259,8 @@ def test_pdbinput_input():
         return_loss=False,
     )
 
-    atom_mask = batch_dict["atom_mask"]
-    sampled_atom_positions = sampled_atom_pos[atom_mask].cpu().numpy()
+    batched_atom_mask = ~batch_dict["missing_atom_mask"]
+    sampled_atom_positions = sampled_atom_pos[batched_atom_mask].cpu().numpy()
 
     assert sampled_atom_positions.shape == (4155, 3)
 
