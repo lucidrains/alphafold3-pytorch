@@ -125,6 +125,9 @@ elif os.path.exists(CCD_COMPONENTS_FILEPATH):
 def flatten(arr):
     return [el for sub_arr in arr for el in sub_arr]
 
+def without_keys(d: dict, exclude: set):
+    return {k: v for k, v in d.items() if k not in exclude}
+
 def pad_to_len(t, length, value = 0, dim = -1):
     assert dim < 0
     zeros = (0, 0) * (-dim - 1)
@@ -148,6 +151,9 @@ def maybe(fn):
     return inner
 
 # atom level, what Alphafold3 accepts
+
+UNCOLLATABLE_ATOM_INPUT_FIELDS = {'filepath'}
+ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {'filepath', 'chains'}
 
 @typecheck
 @dataclass
@@ -216,6 +222,9 @@ class BatchedAtomInput:
 
     def dict(self):
         return asdict(self)
+
+    def model_forward_dict(self):
+        return without_keys(self.dict(), ATOM_INPUT_EXCLUDE_MODEL_FIELDS)
 
 # functions for saving an AtomInput to disk or loading from disk to AtomInput
 

@@ -203,7 +203,7 @@ alphafold3 = Alphafold3(
     )
 )
 
-loss = alphafold3(**batched_atom_input.dict())
+loss = alphafold3(**batched_atom_input.model_forward_dict())
 loss.backward()
 
 # sampling
@@ -211,7 +211,7 @@ loss.backward()
 batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
 
 alphafold3.eval()
-sampled_atom_pos = alphafold3(**batched_eval_atom_input.dict())
+sampled_atom_pos = alphafold3(**batched_eval_atom_input.model_forward_dict())
 
 assert sampled_atom_pos.shape == (1, (5 + 4), 3)
 ```

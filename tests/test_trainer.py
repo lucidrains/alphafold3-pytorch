@@ -3,7 +3,6 @@ os.environ['TYPECHECK'] = 'True'
 
 import shutil
 from pathlib import Path
-from dataclasses import asdict
 
 import pytest
 import torch
@@ -68,7 +67,7 @@ def test_trainer_with_mock_atom_input(remove_test_folders):
     inputs = next(iter(dataloader))
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    _, breakdown = alphafold3(**inputs.model_forward_dict(), return_loss_breakdown = True)
     before_distogram = breakdown.distogram
 
     path = './test-folder/nested/folder/af3'
@@ -79,7 +78,7 @@ def test_trainer_with_mock_atom_input(remove_test_folders):
     alphafold3 = Alphafold3.init_and_load(path)
 
     alphafold3.eval()
-    _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+    _, breakdown = alphafold3(**inputs.model_forward_dict(), return_loss_breakdown = True)
     after_distogram = breakdown.distogram
 
     assert torch.allclose(before_distogram, after_distogram)
@@ -214,7 +213,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
     alphafold3.eval()
     with torch.no_grad():
-        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+        _, breakdown = alphafold3(**inputs.model_forward_dict(), return_loss_breakdown = True)
 
     before_distogram = breakdown.distogram
 
@@ -227,7 +226,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 
     alphafold3.eval()
     with torch.no_grad():
-        _, breakdown = alphafold3(**asdict(inputs), return_loss_breakdown = True)
+        _, breakdown = alphafold3(**inputs.model_forward_dict(), return_loss_breakdown = True)
 
     after_distogram = breakdown.distogram
 
@@ -311,7 +310,7 @@ def test_collate_fn():
 
     batched_atom_inputs = collate_inputs_to_batched_atom_input([dataset[i] for i in range(3)])
 
-    _, breakdown = alphafold3(**asdict(batched_atom_inputs), return_loss_breakdown = True)
+    _, breakdown = alphafold3(**batched_atom_inputs.model_forward_dict(), return_loss_breakdown = True)
 
 # test creating trainer + alphafold3 from config
 
