@@ -2671,9 +2671,7 @@ class ElucidatedAtomDiffusion(Module):
 
         noise = torch.randn_like(atom_pos_ground_truth)
 
-        maybe_c_noise = self.c_noise if not self.karras_formulation else identity # @wufandi claims the paper has a bug here https://github.com/lucidrains/alphafold3-pytorch/issues/124#issuecomment-2268374756
-
-        noised_atom_pos = atom_pos_ground_truth + padded_sigmas * maybe_c_noise(noise)  # alphas are 1. in the paper
+        noised_atom_pos = atom_pos_ground_truth + padded_sigmas * noise  # alphas are 1. in the paper
 
         denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
