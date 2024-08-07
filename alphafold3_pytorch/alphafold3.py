@@ -2444,7 +2444,7 @@ class ElucidatedAtomDiffusion(Module):
         smooth_lddt_loss_kwargs: dict = dict(),
         weighted_rigid_align_kwargs: dict = dict(),
         centre_random_augmentation_kwargs: dict = dict(),
-        karras_formulation = False  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
+        karras_formulation = True,  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
     ):
         super().__init__()
         self.net = net
@@ -2552,8 +2552,7 @@ class ElucidatedAtomDiffusion(Module):
 
         sigmas = F.pad(sigmas, (0, 1), value = 0.) # last step is sigma value of 0.
 
-        scale = 1. if self.karras_formulation else self.sigma_data
-        return sigmas * scale
+        return sigmas * self.sigma_data
 
     @torch.no_grad()
     def sample(
@@ -2634,9 +2633,7 @@ class ElucidatedAtomDiffusion(Module):
         return (sigma ** 2 + self.sigma_data ** 2) * (sigma + self.sigma_data) ** -2
 
     def noise_distribution(self, batch_size):
-        scale = 1. if self.karras_formulation else self.sigma_data
-
-        return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp() * scale
+        return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp() * self.sigma_data
 
     def forward(
         self,
