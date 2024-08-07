@@ -2645,6 +2645,7 @@ class PDBDataset(Dataset):
         spatial_interface_weight: float = 0.4,
         crop_size: int = 384,
         training: bool | None = None,  # extra training flag placed by Alex on PDBInput
+        sample_only_pdb_ids: Set[str] | None = None,
         **pdb_input_kwargs,
     ):
         if isinstance(folder, str):
@@ -2660,6 +2661,7 @@ class PDBDataset(Dataset):
         self.sampler = sampler
         self.sample_type = sample_type
         self.training = training
+        self.sample_only_pdb_ids = sample_only_pdb_ids
         self.pdb_input_kwargs = pdb_input_kwargs
 
         self.cropping_config = {
@@ -2679,6 +2681,12 @@ class PDBDataset(Dataset):
                 if file in sampler_pdb_ids
             }
 
+        if exists(sample_only_pdb_ids):
+            assert exists(self.sampler), "A sampler must be provided to use `sample_only_pdb_ids`."
+            assert all(
+                pdb_id in sampler_pdb_ids for pdb_id in sample_only_pdb_ids
+            ), "Some PDB IDs in `sample_only_pdb_ids` are not present in the dataset's sampler mappings."
+
         assert len(self) > 0, f"No valid mmCIFs / PDBs found at {str(folder)}"
 
     def __len__(self):
@@ -2690,10 +2698,18 @@ class PDBDataset(Dataset):
         sampled_id = None
 
         if exists(self.sampler):
-            if self.sample_type == "clustered":
-                (sampled_id,) = self.sampler.cluster_based_sample(1)
-            else:
-                (sampled_id,) = self.sampler.sample(1)
+            sample_fn = (
+                self.sampler.cluster_based_sample
+                if self.sample_type == "clustered"
+                else self.sampler.sample
+            )
+            (sampled_id,) = sample_fn(1)
+
+            # ensure that the sampled PDB ID is in the specified set of PDB IDs from which to sample
+
+            if exists(self.sample_only_pdb_ids):
+                while sampled_id[0] not in self.sample_only_pdb_ids:
+                    (sampled_id,) = sample_fn(1)
 
         pdb_id, chain_id_1, chain_id_2 = None, None, None
 
