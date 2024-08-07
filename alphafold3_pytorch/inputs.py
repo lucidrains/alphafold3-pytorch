@@ -1793,7 +1793,7 @@ def create_mol_from_atom_positions_and_types(
     atom_positions: np.ndarray,
     element_types: List[str],
     missing_atom_indices: Set[int],
-    num_bond_attempts: int = 2,
+    neutral_stable_mol_hypothesis: bool = True,
     verbose: bool = False,
 ) -> Mol:
     """Create an RDKit molecule from a NumPy array of atom positions and a list of their element
@@ -1805,7 +1805,8 @@ def create_mol_from_atom_positions_and_types(
     :param element_types: A list of element symbols for each atom in the molecule.
     :param missing_atom_indices: A set of atom indices that are missing from the atom_positions
         array.
-    :param num_bond_attempts: The number of attempts to determine the bonds in the molecule.
+    :param neutral_stable_mol_hypothesis: Whether to convert radical electrons into explicit
+        hydrogens based on the `PDB neutral stable molecule` hypothesis.
     :param verbose: Whether to log warnings when bond determination fails.
     :return: An RDKit molecule with the specified atom positions and element types.
     """
@@ -1830,7 +1831,6 @@ def create_mol_from_atom_positions_and_types(
     # add the conformer to the molecule
 
     mol.AddConformer(conf)
-    Chem.SanitizeMol(mol)
 
     # block the RDKit logger
 
@@ -1838,33 +1838,36 @@ def create_mol_from_atom_positions_and_types(
 
     # finalize molecule by inferring bonds
 
-    determined_bonds = False
-    for i in range(num_bond_attempts):
-        try:
-            charge = Chem.GetFormalCharge(mol)
-            rdDetermineBonds.DetermineBonds(mol, charge=charge)
-            determined_bonds = True
-        except Exception as e:
-            if verbose:
-                logger.warning(
-                    f"Failed to determine bonds for the input molecule {name} due to: {e}. "
-                    f"{'Retrying once more.' if i < num_bond_attempts - 1 else 'Terminating bond assignment.'}"
-                )
-            continue
-    if not determined_bonds:
+    try:
+        with StringIO() as buf:
+            with redirect_stderr(buf):
+                # redirect RDKit's stderr to a buffer to suppress warnings
+                rdDetermineBonds.DetermineBonds(mol, allowChargedFragments=False)
+    except Exception as e:
         if verbose:
             logger.warning(
-                "Failed to determine bonds in the input molecule. Skipping bond assignment."
+                f"Failed to determine bonds for the input molecule {name} due to: {e}. Skipping bond determination."
             )
-
-    # unblock the RDKit logger
-
-    del blocker
 
     # clean up the molecule
 
     mol = Chem.RemoveHs(mol, sanitize=False)
     Chem.SanitizeMol(mol, catchErrors=True)
+
+    # based on the `PDB neutral stable molecule` hypothesis
+    # (see https://github.com/rdkit/rdkit/issues/2683#issuecomment-2273998084),
+    # convert radical electrons into explicit hydrogens
+
+    if neutral_stable_mol_hypothesis:
+        for a in mol.GetAtoms():
+            if a.GetNumRadicalElectrons():
+                a.SetNumExplicitHs(a.GetNumRadicalElectrons())
+                a.SetNumRadicalElectrons(0)
+            Chem.SanitizeMol(mol, catchErrors=True)
+
+    # unblock the RDKit logger
+
+    del blocker
 
     # set a property to indicate the atom positions that are missing
 
