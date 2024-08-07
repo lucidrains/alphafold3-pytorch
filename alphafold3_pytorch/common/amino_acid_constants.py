@@ -44,7 +44,8 @@ atom_types = [
     "CZ2",
     "CZ3",
     "NZ",
-    "OXT",
+    # "OXT",  # NOTE: This often appears in mmCIF files, but it will not be used for any amino acid type in AlphaFold.
+    "_",
     "_",
     "_",
     "_",
