@@ -56,7 +56,8 @@ from alphafold3_pytorch.inputs import (
     IS_METAL_ION,
     NUM_MOLECULE_IDS,
     DEFAULT_NUM_MOLECULE_MODS,
-    ADDITIONAL_MOLECULE_FEATS
+    ADDITIONAL_MOLECULE_FEATS,
+    BatchedAtomInput,
 )
 
 from alphafold3_pytorch.common.biomolecule import (
@@ -141,6 +142,8 @@ is_molecule_types: [*, 5]
 """
 
 # constants
+
+SCORED_SAMPLE = Tuple[int, Float["b m 3"], Float[" b"], Float[" b"]] # type: ignore
 
 LinearNoBias = partial(Linear, bias = False)
 
