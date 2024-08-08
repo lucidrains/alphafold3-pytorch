@@ -4431,7 +4431,6 @@ class ComputeModelSelectionScore(Module):
         chains_list: List[Tuple[int, int] | Tuple[int]],
         is_fine_tuning: bool = None,
         unweighted: bool = False,
-        missing_chain_index: int = -1,
         # RASA input
         compute_rasa: bool = False,
         unresolved_cid: List[int] | None = None,
@@ -4449,7 +4448,6 @@ class ComputeModelSelectionScore(Module):
         :param chains_list: List of chains
         :param is_fine_tuning: is fine tuning
         :param unweighted: unweighted lddt
-        :param missing_chain_index: missing chain index
         :param compute_rasa: compute RASA
         :param unresolved_cid: unresolved chain ids
         :param unresolved_residue_mask: unresolved residue mask
@@ -4468,7 +4466,7 @@ class ComputeModelSelectionScore(Module):
 
         for b in range(batch_size):
             chains = chains_list[b]
-            if len(chains) == 2 and chains[1] != missing_chain_index:
+            if len(chains) == 2:
                 asym_id_a = chains[0]
                 asym_id_b = chains[1]
                 lddt_type = "interface"
@@ -4668,6 +4666,7 @@ class ComputeModelSelectionScore(Module):
         compute_rasa: bool = False,
         unresolved_cid: List[int] | None = None,
         unresolved_residue_mask: Bool["b n"] | None = None,  
+        missing_chain_index: int = -1,
     ) -> Float[" b"] | Tuple[Float[" b"], SCORED_SAMPLE]:  
         """Compute the model selection score for an input batch and corresponding (sampled) atom
         positions.
@@ -4680,6 +4679,7 @@ class ComputeModelSelectionScore(Module):
         :param compute_rasa: compute the relative solvent accessible surface area (RASA) for unresolved proteins
         :param unresolved_cid: unresolved chain ids
         :param unresolved_residue_mask: unresolved residue mask
+        :param missing_chain_index: missing chain index
         :return: [b] model selection score and optionally the top model
         """
         is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
@@ -4701,7 +4701,10 @@ class ComputeModelSelectionScore(Module):
         asym_id = batch_dict["additional_molecule_feats"].unbind(dim=-1)[2]
         is_molecule_types = batch_dict["is_molecule_types"]
 
-        chains = [tuple(chains_list) for chains_list in batch_dict["chains"].tolist()]
+        chains = [
+            tuple(chain for chain in chains_list if chain != missing_chain_index)
+            for chains_list in batch_dict["chains"].tolist()
+        ]
         molecule_atom_lens = batch_dict["molecule_atom_lens"]
         molecule_ids = batch_dict["molecule_ids"]
 
