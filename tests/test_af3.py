@@ -43,6 +43,7 @@ from alphafold3_pytorch.configs import (
 
 from alphafold3_pytorch.alphafold3 import (
     mean_pool_with_lens,
+    mean_pool_fixed_windows_with_mask,
     batch_repeat_interleave,
     full_pairwise_repr_to_windowed,
     get_cid_molecule_type,
@@ -72,6 +73,14 @@ def test_mean_pool_with_lens():
     seq = torch.tensor([[[1.], [1.], [1.], [2.], [2.], [2.], [2.], [1.], [1.]]])
     lens = torch.tensor([[3, 4, 2]]).long()
     pooled = mean_pool_with_lens(seq, lens)
+
+    assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
+
+def test_mean_pool_with_mask():
+    seq = torch.tensor([[[1.], [100.], [1.], [2.], [2.], [100.], [1.], [1.], [100.]]])
+    mask = torch.tensor([[True, False, True, True, True, False, True, True, False]])
+
+    pooled = mean_pool_fixed_windows_with_mask(seq, mask, window_size = 3)
 
     assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
 

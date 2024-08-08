@@ -293,6 +293,30 @@ def mean_pool_with_lens(
     return avg
 
 @typecheck
+def mean_pool_fixed_windows_with_mask(
+    feats: Float['b m d'],
+    mask: Bool['b m'],
+    window_size: int,
+    return_pooled_mask: bool = False
+) -> Float['b n d'] | Tuple[Float['b n'], Bool['b n']]:
+
+    seq_len = feats.shape[-2]
+    assert divisible_by(seq_len, window_size)
+
+    feats = einx.where('b m, b m d, -> b m d', mask, feats, 0.)
+
+    num = reduce(feats, 'b (n w) d -> b n d', 'sum', w = window_size)
+    den = reduce(mask.float(), 'b (n w) -> b n 1', 'sum', w = window_size)
+
+    avg = num / den.clamp(min = 1.)
+
+    if not return_pooled_mask:
+        return avg
+
+    pooled_mask = reduce(mask, 'b (n w) -> b n', 'any', w = window_size)
+    return avg, pooled_mask
+
+@typecheck
 def batch_repeat_interleave(
     feats: Float['b n ...'] | Bool['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
