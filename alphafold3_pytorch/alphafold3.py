@@ -3493,45 +3493,45 @@ class ConfidenceHead(Module):
 # more confidence / clash calculations
 
 class ConfidenceScore(NamedTuple):
-    plddt: Float['b n']
-    ptm: Float[' b']
-    iptm: Float[' b'] | None
+    """The ConfidenceScore class."""
+
+    plddt: Float["b n"]  
+    ptm: Float[" b"]  
+    iptm: Float[" b"] | None  
+
 
 class ComputeConfidenceScore(Module):
+    """Compute confidence score."""
+
     @typecheck
     def __init__(
         self,
-        pae_breaks: Float[' pae_break'] = torch.arange(0, 31.5, 0.5),
-        pde_breaks: Float[' pde_break'] = torch.arange(0, 31.5, 0.5),
-        eps: float = 1e-8
+        pae_breaks: Float[" pae_break"] = torch.arange(0, 31.5, 0.5),  
+        pde_breaks: Float[" pde_break"] = torch.arange(0, 31.5, 0.5),  
+        eps: float = 1e-8,
     ):
-
         super().__init__()
         self.eps = eps
-        self.register_buffer('pae_breaks', pae_breaks)
-        self.register_buffer('pde_breaks', pde_breaks)
+        self.register_buffer("pae_breaks", pae_breaks)
+        self.register_buffer("pde_breaks", pde_breaks)
 
     @typecheck
     def _calculate_bin_centers(
         self,
-        breaks: Float[' breaks'],
-    ) -> Float[' breaks+1']:
-        """
-        Args:
-            breaks: [num_bins -1] bin edges
+        breaks: Float[" breaks"],  
+    ) -> Float[" breaks+1"]:  
+        """Calculate bin centers from bin edges.
 
-        Returns:
-            bin_centers: [num_bins] bin centers
+        :param breaks: [num_bins -1] bin edges
+        :return: bin_centers: [num_bins] bin centers
         """
 
         step = breaks[1] - breaks[0]
 
         bin_centers = breaks + step / 2
-        last_bin_center = breaks[-1:] + step
+        last_bin_center = breaks[-1] + step
 
-        bin_centers = torch.concat(
-            [bin_centers, last_bin_center]
-        )
+        bin_centers = torch.concat([bin_centers, last_bin_center.unsqueeze(0)])
 
         return bin_centers
 
@@ -3539,21 +3539,34 @@ class ComputeConfidenceScore(Module):
     def forward(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
-        asym_id: Int['b n'],
-        has_frame: Bool['b n'],
-        ptm_residue_weight: Float['b n'] | None = None,
-        multimer_mode: bool=True,
-    ):
+        asym_id: Int["b n"],  
+        has_frame: Bool["b n"],  
+        ptm_residue_weight: Float["b n"] | None = None,  
+        multimer_mode: bool = True,
+    ) -> ConfidenceScore:
+        """Main function to compute confidence score.
+
+        :param confidence_head_logits: ConfidenceHeadLogits
+        :param asym_id: [b n] asym_id of each residue
+        :param has_frame: [b n] has_frame of each residue
+        :param ptm_residue_weight: [b n] weight of each residue
+        :param multimer_mode: bool
+        :return: Confidence score
+        """
         plddt = self.compute_plddt(confidence_head_logits.plddt)
 
         # Section 5.9.1 equation 17
-        ptm = self.compute_ptm(confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False)
+        ptm = self.compute_ptm(
+            confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False
+        )
 
         iptm = None
 
         if multimer_mode:
             # Section 5.9.2 equation 18
-            iptm = self.compute_ptm(confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True)
+            iptm = self.compute_ptm(
+                confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True
+            )
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
         return confidence_score
@@ -3561,28 +3574,42 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_plddt(
         self,
-        logits: Float['b plddt m'],
-    )->Float['b m']:
+        logits: Float["b plddt m"],  
+    ) -> Float["b m"]:  
+        """Compute plDDT from logits.
 
-        logits = rearrange(logits, 'b plddt m -> b m plddt')
+        :param logits: [b c m] logits
+        :return: [b m] plDDT
+        """
+        logits = rearrange(logits, "b plddt m -> b m plddt")
         num_bins = logits.shape[-1]
         bin_width = 1.0 / num_bins
         bin_centers = torch.arange(0.5 * bin_width, 1.0, bin_width, device=logits.device)
         probs = F.softmax(logits, dim=-1)
 
-        predicted_lddt = einsum(probs, bin_centers, 'b m plddt, plddt -> b m')
+        predicted_lddt = einsum(probs, bin_centers, "b m plddt, plddt -> b m")
         return predicted_lddt * 100
 
     @typecheck
     def compute_ptm(
         self,
-        logits: Float['b pae n n '],
-        asym_id: Int['b n'],
-        has_frame: Bool['b n'],
-        residue_weights: Float['b n'] | None = None,
+        logits: Float["b pae n n"],  
+        asym_id: Int["b n"],  
+        has_frame: Bool["b n"],  
+        residue_weights: Float["b n"] | None = None,  
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
     ):
+        """Compute pTM from logits.
+
+        :param logits: [b c n n] logits
+        :param asym_id: [b n] asym_id of each residue
+        :param has_frame: [b n] has_frame of each residue
+        :param residue_weights: [b n] weight of each residue
+        :param interface: bool
+        :param compute_chain_wise_iptm: bool
+        :return: pTM
+        """
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
 
@@ -3590,7 +3617,7 @@ class ComputeConfidenceScore(Module):
 
         num_batch = logits.shape[0]
         num_res = logits.shape[-1]
-        logits = rearrange(logits, 'b c i j -> b i j c')
+        logits = rearrange(logits, "b c i j -> b i j c")
 
         bin_centers = self._calculate_bin_centers(self.pae_breaks)
 
@@ -3610,91 +3637,97 @@ class ComputeConfidenceScore(Module):
         probs = F.softmax(logits, dim=-1)
 
         # E_distances tm(distance).
-        predicted_tm_term = einsum(probs, tm_per_bin, 'b i j pae, b pae -> b i j ')
+        predicted_tm_term = einsum(probs, tm_per_bin, "b i j pae, b pae -> b i j ")
 
         if compute_chain_wise_iptm:
-
             # chain_wise_iptm[b, i, j]: iptm of chain i and chain j in batch b
 
             # get the max num_chains across batch
             unique_chains = [torch.unique(asym).tolist() for asym in asym_id]
             max_chains = max(len(chains) for chains in unique_chains)
 
-            chain_wise_iptm = torch.zeros((num_batch, max_chains, max_chains), device=logits.device)
+            chain_wise_iptm = torch.zeros(
+                (num_batch, max_chains, max_chains), device=logits.device
+            )
             chain_wise_iptm_mask = torch.zeros_like(chain_wise_iptm).bool()
 
             for b in range(num_batch):
-                enumerated_unique_chain = enumerate(unique_chains[b])
+                for i, chain_i in enumerate(unique_chains[b]):
+                    for j, chain_j in enumerate(unique_chains[b]):
+                        if chain_i != chain_j:
+                            mask_i = (asym_id[b] == chain_i)[:, None]
+                            mask_j = (asym_id[b] == chain_j)[None, :]
+                            pair_mask = mask_i * mask_j
+                            pair_residue_weights = pair_mask * einx.multiply(
+                                "... i, ... j -> ... i j", residue_weights[b], residue_weights[b]
+                            )
 
-                for (i, chain_i), (j, chain_j) in product(enumerated_unique_chain, enumerated_unique_chain):
-                    if chain_i == chain_j:
-                        continue
+                            if pair_residue_weights.sum() == 0:
+                                # chain i or chain j does not have any valid frame
+                                continue
+                            else:
+                                normed_residue_mask = pair_residue_weights / (
+                                    self.eps
+                                    + torch.sum(pair_residue_weights, dim=-1, keepdims=True)
+                                )
 
-                    mask_i = (asym_id[b] == chain_i)
-                    mask_j = (asym_id[b] == chain_j)
-                    pair_mask = einx.multiply('i, j -> i j', mask_i, mask_j)
+                                masked_predicted_tm_term = predicted_tm_term[b] * pair_mask
 
-                    pair_residue_weights = pair_mask * einx.multiply('... i, ... j -> ... i j', residue_weights[b], residue_weights[b])
-
-                    if pair_residue_weights.sum() == 0:
-                        # chain i or chain j does not have any valid frame
-                        continue
-
-                    normed_residue_mask = pair_residue_weights / (self.eps + torch.sum(
-                        pair_residue_weights, dim=-1, keepdims=True))
-
-                    masked_predicted_tm_term = predicted_tm_term[b] * pair_mask
-
-                    per_alignment = torch.sum(masked_predicted_tm_term * normed_residue_mask, dim=-1)
-                    weighted_argmax = (residue_weights[b] * per_alignment).argmax()
-                    chain_wise_iptm[b, i, j] = per_alignment[weighted_argmax]
-                    chain_wise_iptm_mask[b, i, j] = True
+                                per_alignment = torch.sum(
+                                    masked_predicted_tm_term * normed_residue_mask, dim=-1
+                                )
+                                weighted_argmax = (residue_weights[b] * per_alignment).argmax()
+                                chain_wise_iptm[b, i, j] = per_alignment[weighted_argmax]
+                                chain_wise_iptm_mask[b, i, j] = True
 
             return chain_wise_iptm, chain_wise_iptm_mask, unique_chains
 
         else:
-
             pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=logits.device).bool()
             if interface:
-                pair_mask *= einx.not_equal('... i, ... j -> ... i j', asym_id, asym_id)
+                pair_mask *= asym_id[:, :, None] != asym_id[:, None, :]
 
             predicted_tm_term *= pair_mask
 
-            pair_residue_weights = pair_mask * einx.multiply('... i, ... j -> ... i j', residue_weights, residue_weights)
-
-            normed_residue_mask = pair_residue_weights / (self.eps + torch.sum(
-                pair_residue_weights, dim=-1, keepdims=True))
+            pair_residue_weights = pair_mask * (
+                residue_weights[:, None, :] * residue_weights[:, :, None]
+            )
+            normed_residue_mask = pair_residue_weights / (
+                self.eps + torch.sum(pair_residue_weights, dim=-1, keepdims=True)
+            )
 
             per_alignment = torch.sum(predicted_tm_term * normed_residue_mask, dim=-1)
             weighted_argmax = (residue_weights * per_alignment).argmax(dim=-1)
-            return per_alignment[torch.arange(num_batch) , weighted_argmax]
+            return per_alignment[torch.arange(num_batch), weighted_argmax]
 
     @typecheck
     def compute_pde(
         self,
-        logits: Float['b pde n n'],
-        tok_repr_atm_mask: Bool[' b n'],
-    )-> Float[' b n n']:
-
-        logits = rearrange(logits, 'b pde i j -> b i j pde')
+        logits: Float["b pde n n"],  
+        tok_repr_atm_mask: Bool["b n"],  
+    ) -> Float["b n n"]:  
+        """Compute PDE from logits."""
+        logits = rearrange(logits, "b pde i j -> b i j pde")
         bin_centers = self._calculate_bin_centers(self.pde_breaks)
         probs = F.softmax(logits, dim=-1)
 
-        pde = einsum(probs, bin_centers, 'b i j pde, pde -> b i j ')
+        pde = einsum(probs, bin_centers, "b i j pde, pde -> b i j")
 
         mask = to_pairwise_mask(tok_repr_atm_mask)
 
         pde = pde * mask
         return pde
 
+
 class ComputeClash(Module):
+    """Compute clash score."""
+
     def __init__(
         self,
-        atom_clash_dist=1.1,
-        chain_clash_count=100,
-        chain_clash_ratio=0.5
+        atom_clash_dist: float = 1.1,
+        chain_clash_count: int = 100,
+        chain_clash_ratio: float = 0.5,
     ):
-
         super().__init__()
         self.atom_clash_dist = atom_clash_dist
         self.chain_clash_count = chain_clash_count
@@ -3702,11 +3735,19 @@ class ComputeClash(Module):
 
     def compute_has_clash(
         self,
-        atom_pos: Float['m 3'],
-        asym_id: Int[' n'],
-        indices: Int[' m'],
-        valid_indices: Int[' m'],
-    )-> Bool['']:
+        atom_pos: Float["m 3"],  
+        asym_id: Int[" n"],  
+        indices: Int[" m"],  
+        valid_indices: Int[" m"],  
+    ) -> Bool[""]:  
+        """Compute if there is a clash in the chain.
+
+        :param atom_pos: [m 3] atom positions
+        :param asym_id: [n] asym_id of each residue
+        :param indices: [m] indices
+        :param valid_indices: [m] valid indices
+        :return: [1] has_clash
+        """
 
         # Section 5.9.2
 
@@ -3714,77 +3755,85 @@ class ComputeClash(Module):
         atom_asym_id = asym_id[indices][valid_indices]
 
         unique_chains = atom_asym_id.unique()
-        len_unique_chains = len(unique_chains)
+        for i in range(len(unique_chains)):
+            for j in range(i + 1, len(unique_chains)):
+                chain_i, chain_j = unique_chains[i], unique_chains[j]
 
-        return_has_clash = False
-        for i, j in product(range(len_unique_chains), range(len_unique_chains)):
-            if j < (i + 1):
-                continue
+                mask_i = atom_asym_id == chain_i
+                mask_j = atom_asym_id == chain_j
 
-            chain_i, chain_j = unique_chains[i], unique_chains[j]
+                chain_i_len = mask_i.sum()
+                chain_j_len = mask_j.sum()
+                assert min(chain_i_len, chain_j_len) > 0
 
-            mask_i = atom_asym_id == chain_i
-            mask_j = atom_asym_id == chain_j
+                chain_pair_dist = torch.cdist(atom_pos[mask_i], atom_pos[mask_j])
+                chain_pair_clash = chain_pair_dist < self.atom_clash_dist
+                clashes = chain_pair_clash.sum()
+                has_clash = (clashes > self.chain_clash_count) or (
+                    clashes / min(chain_i_len, chain_j_len) > self.chain_clash_ratio
+                )
 
-            chain_i_len = mask_i.sum()
-            chain_j_len = mask_j.sum()
-            assert min(chain_i_len, chain_j_len) > 0
+                if has_clash:
+                    return torch.tensor(True, dtype=torch.bool, device=atom_pos.device)
 
-            chain_pair_dist  = torch.cdist(atom_pos[mask_i], atom_pos[mask_j])
-            chain_pair_clash = chain_pair_dist < self.atom_clash_dist
-            clashes = chain_pair_clash.sum()
+        return torch.tensor(False, dtype=torch.bool, device=atom_pos.device)
 
-            has_clash = (
-                (clashes > self.chain_clash_count) or
-                ( clashes / min(chain_i_len, chain_j_len) > self.chain_clash_ratio )
-            )
-
-            if has_clash:
-                return_has_clash = True
-                break
-    
-        return torch.tensor(return_has_clash, dtype=torch.bool, device=atom_pos.device)
-                
     def forward(
         self,
-        atom_pos: Float['b m 3'] | Float['m 3'],
-        atom_mask: Bool['b m'] | Bool[' m'],
-        molecule_atom_lens: Int['b n'] | Int[' n'],
-        asym_id: Int['b n']| Int[' n'],
-    )-> Bool:
+        atom_pos: Float["b m 3"] | Float["m 3"],  
+        atom_mask: Bool["b m"] | Bool[" m"],  
+        molecule_atom_lens: Int["b n"] | Int[" n"],  
+        asym_id: Int["b n"] | Int[" n"],  
+    ) -> Bool[""]:  
+        """Compute if there is a clash in the chain.
 
-        if atom_pos.ndim ==2:
+        :param atom_pos: [b m 3] atom positions
+        :param atom_mask: [b m] atom mask
+        :param molecule_atom_lens: [b n] molecule atom lens
+        :param asym_id: [b n] asym_id of each residue
+        :return: [b] has_clash
+        """
+
+        if atom_pos.ndim == 2:
             atom_pos = atom_pos.unsqueeze(0)
             molecule_atom_lens = molecule_atom_lens.unsqueeze(0)
             asym_id = asym_id.unsqueeze(0)
             atom_mask = atom_mask.unsqueeze(0)
 
         device = atom_pos.device
-        batch_size, seq_len= asym_id.shape
+        batch_size, seq_len = asym_id.shape
 
-        indices = torch.arange(seq_len, device = device)
+        indices = torch.arange(seq_len, device=device)
 
-        indices = repeat(indices, 'n -> b n', b = batch_size)
+        indices = repeat(indices, "n -> b n", b=batch_size)
         valid_indices = torch.ones_like(indices).bool()
 
         # valid_indices at padding position has value False
         indices = batch_repeat_interleave(indices, molecule_atom_lens)
         valid_indices = batch_repeat_interleave(valid_indices, molecule_atom_lens)
 
-        if exists(atom_mask):
+        if atom_mask is not None:
             valid_indices = valid_indices * atom_mask
-        
-        has_clash = [self.compute_has_clash(*compute_clash_args) for compute_clash_args in zip(atom_pos, asym_id, indices, valid_indices)]
-        return torch.stack(has_clash)
+
+        has_clash = []
+        for b in range(batch_size):
+            has_clash.append(
+                self.compute_has_clash(atom_pos[b], asym_id[b], indices[b], valid_indices[b])
+            )
+
+        has_clash = torch.stack(has_clash)
+        return has_clash
+
 
 class ComputeRankingScore(Module):
+    """Compute ranking score."""
 
     def __init__(
         self,
-        eps = 1e-8,
-        score_iptm_weight = 0.8,
-        score_ptm_weight = 0.2,
-        score_disorder_weight = 0.5
+        eps: float = 1e-8,
+        score_iptm_weight: float = 0.8,
+        score_ptm_weight: float = 0.2,
+        score_disorder_weight: float = 0.5,
     ):
         super().__init__()
         self.eps = eps
@@ -3795,43 +3844,58 @@ class ComputeRankingScore(Module):
         self.score_ptm_weight = score_ptm_weight
         self.score_disorder_weight = score_disorder_weight
 
-    @typecheck
     def compute_disorder(
         self,
-        plddt: Float['b m'],
-        atom_mask: Bool['b m'],
-        atom_is_molecule_types: Bool['b m 5'],
-    )-> Float[' b']:
-        
+        plddt: Float["b m"],  
+        atom_mask: Float["b m"],  
+        atom_is_molecule_types: Float["b m"],  
+    ) -> Float[" b"]:  
+        """Compute disorder score.
+
+        :param plddt: [b m] plddt
+        :param atom_mask: [b m] atom mask
+        :param atom_is_molecule_types: [b m 2] atom is molecule types
+        :return: [b] disorder
+        """
         is_protein_mask = atom_is_molecule_types[..., IS_PROTEIN_INDEX]
         mask = atom_mask * is_protein_mask
 
-        atom_rasa = 1. - plddt
+        atom_rasa = 1.0 - plddt
 
-        disorder = ( (atom_rasa > 0.581) * mask ).sum(dim=-1) / ( self.eps + mask.sum(dim=1)) 
+        disorder = ((atom_rasa > 0.581) * mask).sum(dim=-1) / (self.eps + mask.sum(dim=1))
         return disorder
 
-    @typecheck
     def compute_full_complex_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
-        asym_id: Int['b n'],
-        has_frame: Bool['b n'],
-        molecule_atom_lens: Int['b n'],
-        atom_pos: Float['b m 3'],
-        atom_mask: Bool['b m'],
-        is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
-        return_confidence_score: bool = False
-    ) -> Float[' b'] | Tuple[Float[' b'], Tuple[ConfidenceScore, Bool[' b']]]:
+        asym_id: Int["b n"],  
+        has_frame: Bool["b n"],  
+        molecule_atom_lens: Int["b n"],  
+        atom_pos: Float["b m 3"],  
+        atom_mask: Bool["b m"],  
+        is_molecule_types: Int[f"b n {IS_MOLECULE_TYPES}"],  
+        return_confidence_score: bool = False,
+    ) -> Float[" b"] | Tuple[Float[" b"], Tuple[ConfidenceScore, Bool[" b"]]]:  
+        """Compute full complex metric.
+
+        :param confidence_head_logits: ConfidenceHeadLogits
+        :param asym_id: [b n] asym_id of each residue
+        :param has_frame: [b n] has_frame of each residue
+        :param molecule_atom_lens: [b n] molecule atom lens
+        :param atom_pos: [b m 3] atom positions
+        :param atom_mask: [b m] atom mask
+        :param is_molecule_types: [b n 2] is_molecule_types
+        :return: [b] score
+        """
 
         # Section 5.9.3.1
-        
+
         device = atom_pos.device
-        batch_size, seq_len= asym_id.shape
+        batch_size, seq_len = asym_id.shape
 
-        indices = torch.arange(seq_len, device = device)
+        indices = torch.arange(seq_len, device=device)
 
-        indices = repeat(indices, 'n -> b n', b = batch_size)
+        indices = repeat(indices, "n -> b n", b=batch_size)
         valid_indices = torch.ones_like(indices).bool()
 
         # valid_indices at padding position has value False
@@ -3842,24 +3906,26 @@ class ComputeRankingScore(Module):
 
         # einx.get_at('b [n] is_type, b m -> b m is_type', is_molecule_types, indices)
 
-        indices = repeat(indices, 'b m -> b m is_type', is_type = is_molecule_types.shape[-1])
+        indices = repeat(indices, "b m -> b m is_type", is_type=is_molecule_types.shape[-1])
         atom_is_molecule_types = is_molecule_types.gather(1, indices) * valid_indices[..., None]
 
         confidence_score = self.compute_confidence_score(
             confidence_head_logits, asym_id, has_frame, multimer_mode=True
         )
         has_clash = self.compute_clash(
-            atom_pos, atom_mask, molecule_atom_lens, asym_id, 
+            atom_pos,
+            atom_mask,
+            molecule_atom_lens,
+            asym_id,
         )
 
         disorder = self.compute_disorder(confidence_score.plddt, atom_mask, atom_is_molecule_types)
 
         # Section 5.9.3 equation 19
-
         weighted_score = (
-            confidence_score.iptm * self.score_iptm_weight +
-            confidence_score.ptm * self.score_ptm_weight +
-            disorder * self.score_disorder_weight
+            confidence_score.iptm * self.score_iptm_weight
+            + confidence_score.ptm * self.score_ptm_weight
+            + disorder * self.score_disorder_weight
             - 100 * has_clash
         )
 
@@ -3868,16 +3934,22 @@ class ComputeRankingScore(Module):
 
         return weighted_score, (confidence_score, has_clash)
 
-    @typecheck
     def compute_single_chain_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
-        asym_id: Int['b n'],
-        has_frame: Bool['b n'],
-    ) -> Float[' b']:
+        asym_id: Int["b n"],  
+        has_frame: Bool["b n"],  
+    ) -> Float[" b"]:  
+        """Compute single chain metric.
+
+        :param confidence_head_logits: ConfidenceHeadLogits
+        :param asym_id: [b n] asym_id of each residue
+        :param has_frame: [b n] has_frame of each residue
+        :return: [b] score
+        """
 
         # Section 5.9.3.2
-  
+
         confidence_score = self.compute_confidence_score(
             confidence_head_logits, asym_id, has_frame, multimer_mode=False
         )
@@ -3885,26 +3957,37 @@ class ComputeRankingScore(Module):
         score = confidence_score.ptm
         return score
 
-    @typecheck
     def compute_interface_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
-        asym_id: Int['b n'],
-        has_frame: Bool['b n'],
+        asym_id: Int["b n"],  
+        has_frame: Bool["b n"],  
         interface_chains: List,
-    ) -> Float[' b']:
+    ) -> Float[" b"]:  
+        """Compute interface metric.
+
+        :param confidence_head_logits: ConfidenceHeadLogits
+        :param asym_id: [b n] asym_id of each residue
+        :param has_frame: [b n] has_frame of each residue
+        :param interface_chains: List
+        :return: [b] score
+        """
 
         batch = asym_id.shape[0]
 
         # Section 5.9.3.3
 
         # interface_chains: List[chain_id_tuple]
-        # chain_id_tuple: 
+        # chain_id_tuple:
         #  - correspond to the asym_id of one or two chain
         #  - compute R(C) for one chain
         #  - compute 1/2 [R(A) + R(b)] for two chain
 
-        chain_wise_iptm, chain_wise_iptm_mask, unique_chains = self.compute_confidence_score.compute_ptm(
+        (
+            chain_wise_iptm,
+            chain_wise_iptm_mask,
+            unique_chains,
+        ) = self.compute_confidence_score.compute_ptm(
             confidence_head_logits.pae, asym_id, has_frame, compute_chain_wise_iptm=True
         )
 
@@ -3913,190 +3996,213 @@ class ComputeRankingScore(Module):
 
         # R(c) = mean(Mij) restricted to i = c or j = c
         masked_chain_wise_iptm = chain_wise_iptm * chain_wise_iptm_mask
-        iptm_sum = masked_chain_wise_iptm + rearrange(masked_chain_wise_iptm, 'b i j -> b j i')
-        iptm_count = chain_wise_iptm_mask.int() + rearrange(chain_wise_iptm_mask.int(), 'b i j -> b j i')
+        iptm_sum = masked_chain_wise_iptm + rearrange(masked_chain_wise_iptm, "b i j -> b j i")
+        iptm_count = chain_wise_iptm_mask.int() + rearrange(
+            chain_wise_iptm_mask.int(), "b i j -> b j i"
+        )
 
         for b, chains in enumerate(interface_chains):
             for chain in chains:
                 idx = unique_chains[b].index(chain)
-                interface_metric[b] += iptm_sum[b, idx].sum() / iptm_count[b, idx].sum().clamp(min=1)
+                interface_metric[b] += iptm_sum[b, idx].sum() / iptm_count[b, idx].sum().clamp(
+                    min=1
+                )
             interface_metric[b] /= len(chains)
         return interface_metric
-            
-    @typecheck
+
     def compute_modified_residue_score(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
-        atom_mask: Bool['b m'],
-        atom_is_modified_residue: Int['b m'],
-    ) -> Float[' b']:
+        atom_mask: Bool["b m"],  
+        atom_is_modified_residue: Int["b m"],  
+    ) -> Float[" b"]:  
+        """Compute modified residue score.
+
+        :param confidence_head_logits: ConfidenceHeadLogits
+        :param atom_mask: [b m] atom mask
+        :param atom_is_modified_residue: [b m] atom is modified residue
+        :return: [b] score
+        """
 
         # Section 5.9.3.4
 
-        plddt = self.compute_confidence_score.compute_plddt(confidence_head_logits.plddt)
+        plddt = self.compute_confidence_score.compute_plddt(
+            confidence_head_logits.plddt,
+        )
 
         mask = atom_is_modified_residue * atom_mask
-        plddt_mean = masked_average(plddt, mask, dim = -1, eps = self.eps)
+        plddt_mean = masked_average(plddt, mask, dim=-1, eps=self.eps)
 
         return plddt_mean
 
+
 # model selection
+
 
 @typecheck
 def get_cid_molecule_type(
     cid: int,
-    asym_id: Int[' n'],
-    is_molecule_types: Bool[f'n {IS_MOLECULE_TYPES}'],
+    asym_id: Int[" n"],  
+    is_molecule_types: Bool[f"n {IS_MOLECULE_TYPES}"],  
     return_one_hot: bool = False,
-) -> int | Bool[f' {IS_MOLECULE_TYPES}']:
-    """
-    
-    get the molecule type for where asym_id == cid
+) -> int | Bool[f" {IS_MOLECULE_TYPES}"]:  
+    """Get the (majority) molecule type for where `asym_id == cid`.
+
+    NOTE: Several PDB chains contain multiple molecule types, so
+    we must choose a single molecule type for the chain. We choose
+    the molecule type that is most common (i.e., the mode) in the chain.
+
+    :param cid: chain id
+    :param asym_id: [n] asym_id of each residue
+    :param is_molecule_types: [n 2] is_molecule_types
+    :param return_one_hot: return one hot
+    :return: molecule type
     """
 
     cid_is_molecule_types = is_molecule_types[asym_id == cid]
-    molecule_type, rest_molecule_type = cid_is_molecule_types[0], cid_is_molecule_types[1:]
 
-    valid = einx.equal('b i, i -> b i', rest_molecule_type, molecule_type).all()
-
-    assert valid, f"Ambiguous molecule types for chain {cid}"
+    molecule_types = cid_is_molecule_types.int().argmax(1)
+    molecule_type_mode = molecule_types.mode()
+    molecule_type = cid_is_molecule_types[molecule_type_mode.indices.item()]
 
     if not return_one_hot:
-        molecule_type = molecule_type.int().argmax().item()
-
+        molecule_type = molecule_type_mode.values.item()
     return molecule_type
+
 
 @typecheck
 def _protein_structure_from_feature(
-    asym_id: Int[' n'],
-    molecule_ids: Int[' n'],
-    molecule_atom_lens: Int[' n'],
-    atom_pos: Float[' m 3'], 
-    atom_mask: Bool[' m'],
+    asym_id: Int[" n"],  
+    molecule_ids: Int[" n"],  
+    molecule_atom_lens: Int[" n"],  
+    atom_pos: Float["m 3"],  
+    atom_mask: Bool[" m"],  
 ) -> Bio.PDB.Structure.Structure:
+    """Create structure for unresolved proteins.
 
+    :param atom_mask: True for valid atoms, False for missing/padding atoms
+    return: A Biopython Structure object
     """
-    create structure for unresolved protein
 
-    atom_mask: True for valid atom, False for missing/padding atom
-    """
     num_atom = atom_pos.shape[0]
     num_res = molecule_ids.shape[0]
-    
+
     residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
-    
+
     molecule_atom_indices = exclusive_cumsum(molecule_atom_lens)
-    
+
     builder = StructureBuilder()
     builder.init_structure("structure")
     builder.init_model(0)
-    
+
     cur_cid = None
     cur_res_id = None
-    
+
     for res_idx in range(num_res):
         num_atom = molecule_atom_lens[res_idx]
         cid = str(asym_id[res_idx].detach().cpu().item())
-        
+
         if cid != cur_cid:
             builder.init_chain(cid)
-            builder.init_seg(segid = ' ')
+            builder.init_seg(segid=" ")
             cur_cid = cid
             cur_res_id = 0
-            
+
         restype = residue_constants.restypes[molecule_ids[res_idx]]
         resname = residue_constants.restype_1to3[restype]
         atom_names = residue_constants.restype_name_to_compact_atom_names[resname]
         atom_names = list(filter(lambda x: x, atom_names))
         # assume residues for unresolved protein are standard
-        assert len(atom_names) == num_atom, f"molecule atom lens {num_atom} doesn't match with residue constant {len(atom_names)}"
-        
+        assert (
+            len(atom_names) == num_atom
+        ), f"Molecule atom lens {num_atom} doesn't match with residue constant {len(atom_names)}"
+
         # skip if all atom of the residue is missing
         atom_idx_offset = molecule_atom_indices[res_idx]
-        if not torch.any(atom_mask[atom_idx_offset: atom_idx_offset + num_atom]):
+        if not torch.any(atom_mask[atom_idx_offset : atom_idx_offset + num_atom]):
             continue
-        
-        builder.init_residue(resname, " ", cur_res_id +1 , " ")
+
+        builder.init_residue(resname, " ", cur_res_id + 1, " ")
         cur_res_id += 1
-       
+
         for atom_idx in range(num_atom):
             if not atom_mask[atom_idx]:
                 continue
-                
+
             atom_coord = atom_pos[atom_idx + atom_idx_offset].detach().cpu().numpy()
             atom_name = atom_names[atom_idx]
             builder.init_atom(
-                name=atom_name, 
-                coord=atom_coord, 
-                b_factor=1.0, 
-                occupancy=1.0, 
-                fullname=atom_name, 
-                altloc=' ',
+                name=atom_name,
+                coord=atom_coord,
+                b_factor=1.0,
+                occupancy=1.0,
+                fullname=atom_name,
+                altloc=" ",
                 # only N, C, O in restype_name_to_compact_atom_names for protein
                 # so just take the first char
-                element=atom_name[0], 
+                element=atom_name[0],
             )
-            
+
     return builder.get_structure()
 
+
 class ComputeModelSelectionScore(Module):
+    """Compute model selection score."""
+
     INITIAL_TRAINING_DICT = {
-        'protein-protein': {'interface': 20, 'intra-chain': 20},
-        'DNA-protein': {'interface': 10},
-        'RNA-protein': {'interface': 10},
-
-        'ligand-protein': {'interface': 10},
-        'DNA-ligand': {'interface': 5},
-        'RNA-ligand': {'interface': 5},
-
-        'DNA-DNA': {'intra-chain': 4},
-        'RNA-RNA': {'intra-chain': 16},
-        'ligand-ligand': {'intra-chain': 20},
-        'metal_ion-metal_ion': {'intra-chain': 10},
-        'unresolved': {'unresolved': 10}
+        "protein-protein": {"interface": 20, "intra-chain": 20},
+        "DNA-protein": {"interface": 10},
+        "RNA-protein": {"interface": 10},
+        "ligand-protein": {"interface": 10},
+        "DNA-ligand": {"interface": 5},
+        "RNA-ligand": {"interface": 5},
+        "DNA-DNA": {"interface": 4, "intra-chain": 4},
+        "RNA-RNA": {"interface": 16, "intra-chain": 16},
+        "ligand-ligand": {"interface": 20, "intra-chain": 20},
+        "metal_ion-metal_ion": {"interface": 10, "intra-chain": 10},
+        "unresolved": {"unresolved": 10},
     }
 
     FINETUNING_DICT = {
-        'protein-protein': {'interface': 20, 'intra-chain': 20},
-        'DNA-protein': {'interface': 10},
-        'RNA-protein': {'interface': 2},
-
-        'ligand-protein': {'interface': 10},
-        'DNA-ligand': {'interface': 5},
-        'RNA-ligand': {'interface': 2},
-
-        'DNA-DNA': {'intra-chain': 4},
-        'RNA-RNA': {'intra-chain': 16},
-        'ligand-ligand': {'intra-chain': 20},
-        'metal_ion-metal_ion': {'intra-chain': 0},
-
-        'unresolved': {'unresolved': 10}
+        "protein-protein": {"interface": 20, "intra-chain": 20},
+        "DNA-protein": {"interface": 10},
+        "RNA-protein": {"interface": 2},
+        "ligand-protein": {"interface": 10},
+        "DNA-ligand": {"interface": 5},
+        "RNA-ligand": {"interface": 2},
+        "DNA-DNA": {"interface": 4, "intra-chain": 4},
+        "RNA-RNA": {"interface": 16, "intra-chain": 16},
+        "ligand-ligand": {"interface": 20, "intra-chain": 20},
+        "metal_ion-metal_ion": {"interface": 0, "intra-chain": 0},
+        "unresolved": {"unresolved": 10},
     }
 
     TYPE_MAPPING = {
-        IS_PROTEIN: 'protein',
-        IS_DNA: 'DNA',
-        IS_RNA: 'RNA',
-        IS_LIGAND: 'ligand',
-        IS_METAL_ION: 'metal_ion'
+        IS_PROTEIN: "protein",
+        IS_DNA: "DNA",
+        IS_RNA: "RNA",
+        IS_LIGAND: "ligand",
+        IS_METAL_ION: "metal_ion",
     }
 
     @typecheck
     def __init__(
         self,
         eps: float = 1e-8,
-        dist_breaks: Float[' dist_break'] = torch.linspace(2.3125,21.6875,63,),
+        dist_breaks: Float[" dist_break"] = torch.linspace(  
+            2.3125,
+            21.6875,
+            37,
+        ),
         nucleic_acid_cutoff: float = 30.0,
         other_cutoff: float = 15.0,
         contact_mask_threshold: float = 8.0,
         is_fine_tuning: bool = False,
         weight_dict_config: dict = None,
-        dssp_path: str = 'mkdssp',
+        dssp_path: str = "mkdssp",
     ):
-
         super().__init__()
         self.compute_confidence_score = ComputeConfidenceScore(eps=eps)
-
         self.eps = eps
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
@@ -4104,12 +4210,16 @@ class ComputeModelSelectionScore(Module):
         self.is_fine_tuning = is_fine_tuning
         self.weight_dict_config = weight_dict_config
 
-        self.register_buffer('dist_breaks', dist_breaks)
-    
+        self.register_buffer("dist_breaks", dist_breaks)
+
         self.dssp_path = dssp_path
 
     @property
     def can_calculate_unresolved_protein_rasa(self):
+        """Check if `mkdssp` is available.
+
+        :return: True if `mkdssp` is available
+        """
         try:
             sh.which(self.dssp_path)
             return True
@@ -4119,55 +4229,60 @@ class ComputeModelSelectionScore(Module):
     @typecheck
     def compute_gpde(
         self,
-        pde_logits: Float['b pde n n'],
-        dist_logits: Float['b dist n n '],
-        dist_breaks: Float[' dist_break'],
-        tok_repr_atm_mask: Bool[' b n'],
-    ):        
-        """
-        
-        Section 5.7
-        tok_repr_atm_mask: [b n] true if token representation atoms exists
+        pde_logits: Float["b pde n n"],  
+        dist_logits: Float["b dist n n"],  
+        dist_breaks: Float[" dist_break"],  
+        tok_repr_atm_mask: Bool["b n"],  
+    ) -> Float[" b"]:  
+        """Compute global PDE following Section 5.7 of the AF3 supplement.
+
+        :param pde_logits: [b pde n n] PDE logits
+        :param dist_logits: [b dist n n] distance logits
+        :param dist_breaks: [dist_break] distance breaks
+        :param tok_repr_atm_mask: [b n] true if token representation atoms exists
+        :return: [b] global PDE
         """
 
         pde = self.compute_confidence_score.compute_pde(pde_logits, tok_repr_atm_mask)
 
-        dist_logits = rearrange(dist_logits, 'b dist i j -> b i j dist')
+        dist_logits = rearrange(dist_logits, "b dist i j -> b i j dist")
         dist_probs = F.softmax(dist_logits, dim=-1)
 
         # for distances greater than the last breaks
-        dist_breaks = F.pad(dist_breaks, (0, 1), value = 1e6)
+        dist_breaks = F.pad(dist_breaks, (0, 1), value=1e6)
         contact_mask = dist_breaks < self.contact_mask_threshold
 
         contact_prob = einx.where(
-            ' dist, b i j dist, -> b i j dist',
-            contact_mask, dist_probs, 0.
+            " dist, b i j dist, -> b i j dist", contact_mask, dist_probs, 0.0
         ).sum(dim=-1)
 
         mask = to_pairwise_mask(tok_repr_atm_mask)
         contact_prob = contact_prob * mask
 
         # Section 5.7 equation 16
-        gpde = masked_average(pde, contact_prob, dim = (-1, -2))
+        gpde = masked_average(pde, contact_prob, dim=(-1, -2))
 
         return gpde
 
     @typecheck
     def compute_lddt(
         self,
-        pred_coords: Float['b m 3'],
-        true_coords: Float['b m 3'],
-        is_dna: Bool['b m'],
-        is_rna: Bool['b m'],
-        pairwise_mask: Bool['b m m'],
-        coords_mask: Bool['b m'] | None = None,
-    ) -> Float[' b']:
-        """
-        pred_coords: predicted coordinates
-        true_coords: true coordinates
-        is_dna: boolean tensor indicating DNA atoms
-        is_rna: boolean tensor indicating RNA atoms
-        pairwise_mask: boolean tensor indicating atompair for which LDDT is computed
+        pred_coords: Float["b m 3"],  
+        true_coords: Float["b m 3"],  
+        is_dna: Bool["b m"],  
+        is_rna: Bool["b m"],  
+        pairwise_mask: Bool["b m m"],  
+        coords_mask: Bool["b m"] | None = None,  
+    ) -> Float[" b"]:  
+        """Compute lDDT.
+
+        :param pred_coords: predicted coordinates
+        :param true_coords: true coordinates
+        :param is_dna: boolean tensor indicating DNA atoms
+        :param is_rna: boolean tensor indicating RNA atoms
+        :param pairwise_mask: boolean tensor indicating atompair for which LDDT is computed
+        :param coords_mask: boolean tensor indicating valid atoms
+        :return: lDDT
         """
 
         atom_seq_len, device = pred_coords.shape[1], pred_coords.device
@@ -4178,12 +4293,11 @@ class ComputeModelSelectionScore(Module):
 
         # Compute distance difference for all pairs of atoms
         dist_diff = torch.abs(true_dists - pred_dists)
-
         lddt = (
-            ((0.5 - dist_diff) >=0).float() +
-            ((1.0 - dist_diff) >=0).float() +
-            ((2.0 - dist_diff) >=0).float() +
-            ((4.0 - dist_diff) >=0).float()
+            ((0.5 - dist_diff) >= 0).float()
+            + ((1.0 - dist_diff) >= 0).float()
+            + ((2.0 - dist_diff) >= 0).float()
+            + ((4.0 - dist_diff) >= 0).float()
         ) / 4.0
 
         # Restrict to bespoke inclusion radius
@@ -4193,7 +4307,7 @@ class ComputeModelSelectionScore(Module):
         inclusion_radius = torch.where(
             is_nucleotide_pair,
             true_dists < self.nucleic_acid_cutoff,
-            true_dists < self.other_cutoff
+            true_dists < self.other_cutoff,
         )
 
         # Compute mean, avoiding self term
@@ -4207,33 +4321,52 @@ class ComputeModelSelectionScore(Module):
         mask = mask * pairwise_mask
 
         # Calculate masked averaging
-        lddt_mean = masked_average(lddt, mask, dim = (-1, -2))
+        lddt_mean = masked_average(lddt, mask, dim=(-1, -2))
 
         return lddt_mean
 
     @typecheck
     def compute_chain_pair_lddt(
         self,
-        asym_mask_a: Bool['b m'] | Bool [' m'],
-        asym_mask_b: Bool['b m'] | Bool [' m'],
-        pred_coords: Float['b m 3'] | Float['m 3'],
-        true_coords: Float['b m 3'] | Float['m 3'], 
-        is_molecule_types: Bool[f'b m {IS_MOLECULE_TYPES}'] | Bool[f'm {IS_MOLECULE_TYPES}'],
-        coords_mask: Bool['b m'] | Bool [' m'] | None = None,
-    ) -> Float[' b']:
-        """
-        
-        plddt between atoms maked by asym_mask_a and asym_mask_b
+        asym_mask_a: Bool["b m"] | Bool[" m"],  
+        asym_mask_b: Bool["b m"] | Bool[" m"],  
+        pred_coords: Float["b m 3"] | Float["m 3"],  
+        true_coords: Float["b m 3"] | Float["m 3"],  
+        is_molecule_types: Bool[f"b m {IS_MOLECULE_TYPES}"] | Bool[f"m {IS_MOLECULE_TYPES}"],  
+        coords_mask: Bool["b m"] | Bool[" m"] | None = None,  
+    ) -> Float[" b"]:  
+        """Compute the plDDT between atoms marked by `asym_mask_a` and `asym_mask_b`.
+
+        :param asym_mask_a: [b m] asym_mask_a
+        :param asym_mask_b: [b m] asym_mask_b
+        :param pred_coords: [b m 3] predicted coordinates
+        :param true_coords: [b m 3] true coordinates
+        :param is_molecule_types: [b m 2] is_molecule_types
+        :param coords_mask: [b m] coords_mask
+        :return: [b] lddt
         """
 
         if not exists(coords_mask):
             coords_mask = torch.ones_like(asym_mask_a)
 
         if asym_mask_a.ndim == 1:
-            args = [asym_mask_a, asym_mask_b, pred_coords, true_coords, is_molecule_types, coords_mask ]
+            args = [
+                asym_mask_a,
+                asym_mask_b,
+                pred_coords,
+                true_coords,
+                is_molecule_types,
+                coords_mask,
+            ]
             args = [x.unsqueeze(0) for x in args]
-            asym_mask_a, asym_mask_b, pred_coords, true_coords, is_molecule_types, coords_mask = args
-
+            (
+                asym_mask_a,
+                asym_mask_b,
+                pred_coords,
+                true_coords,
+                is_molecule_types,
+                coords_mask,
+            ) = args
 
         is_dna = is_molecule_types[..., IS_DNA_INDEX]
         is_rna = is_molecule_types[..., IS_RNA_INDEX]
@@ -4248,41 +4381,74 @@ class ComputeModelSelectionScore(Module):
     @typecheck
     def get_lddt_weight(
         self,
-        type_chain_a,
-        type_chain_b,
-        lddt_type: Literal['interface', 'intra-chain', 'unresolved'],
+        type_chain_a: int,
+        type_chain_b: int,
+        lddt_type: Literal["interface", "intra-chain", "unresolved"],
         is_fine_tuning: bool = None,
-    ):
+    ) -> int:
+        """Get a specified lDDT weight.
+
+        :param type_chain_a: type of chain a
+        :param type_chain_b: type of chain b
+        :param lddt_type: lDDT type
+        :param is_fine_tuning: is fine tuning
+        :return: lDDT weight
+        """
         is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
 
-        weight_dict = default(self.weight_dict_config, self.FINETUNING_DICT if is_fine_tuning else self.INITIAL_TRAINING_DICT)
+        weight_dict = default(
+            self.weight_dict_config,
+            self.FINETUNING_DICT if is_fine_tuning else self.INITIAL_TRAINING_DICT,
+        )
 
-        if lddt_type == 'unresolved':
-            weight =  weight_dict.get(lddt_type, {}).get(lddt_type, None)
+        if lddt_type == "unresolved":
+            weight = weight_dict.get(lddt_type, {}).get(lddt_type, None)
             assert weight
             return weight
 
         interface_type = sorted([self.TYPE_MAPPING[type_chain_a], self.TYPE_MAPPING[type_chain_b]])
-        interface_type = '-'.join(interface_type)
+        interface_type = "-".join(interface_type)
         weight = weight_dict.get(interface_type, {}).get(lddt_type, None)
         assert weight, f"Weight not found for {interface_type} {lddt_type}"
         return weight
-    
+
     @typecheck
     def compute_weighted_lddt(
         self,
         # atom level input
-        pred_coords: Float['b m 3'],
-        true_coords: Float['b m 3'],
-        atom_mask: Bool['b m'] | None,
+        pred_coords: Float["b m 3"],  
+        true_coords: Float["b m 3"],  
+        atom_mask: Bool["b m"] | None,  
         # token level input
-        asym_id: Int['b n'],
-        is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
-        molecule_atom_lens: Int['b n'],
+        asym_id: Int["b n"],  
+        is_molecule_types: Bool[f"b n {IS_MOLECULE_TYPES}"],  
+        molecule_atom_lens: Int["b n"],  
         # additional input
         chains_list: List[Tuple[int, int] | Tuple[int]],
         is_fine_tuning: bool = None,
-    ):
+        unweighted: bool = False,
+        # RASA input
+        compute_rasa: bool = False,
+        unresolved_cid: List[int] | None = None,
+        unresolved_residue_mask: Bool["b n"] | None = None,  
+        molecule_ids: Int["b n"] | None = None,  
+    ) -> Float[" b"]:  
+        """Compute the weighted lDDT.
+
+        :param pred_coords: [b m 3] predicted coordinates
+        :param true_coords: [b m 3] true coordinates
+        :param atom_mask: [b m] atom mask
+        :param asym_id: [b n] asym_id of each residue
+        :param is_molecule_types: [b n 2] is_molecule_types
+        :param molecule_atom_lens: [b n] molecule atom lens
+        :param chains_list: List of chains
+        :param is_fine_tuning: is fine tuning
+        :param unweighted: unweighted lddt
+        :param compute_rasa: compute RASA
+        :param unresolved_cid: unresolved chain ids
+        :param unresolved_residue_mask: unresolved residue mask
+        :return: [b] weighted lddt
+        """
         is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
 
         device = pred_coords.device
@@ -4298,11 +4464,11 @@ class ComputeModelSelectionScore(Module):
             chains = chains_list[b]
             if len(chains) == 2:
                 asym_id_a = chains[0]
-                asym_id_b = chains[0]
-                lddt_type = 'interface'
+                asym_id_b = chains[1]
+                lddt_type = "interface"
             elif len(chains) == 1:
-                asym_id_a =  asym_id_b = chains[0]
-                lddt_type = 'intra-chain'
+                asym_id_a = asym_id_b = chains[0]
+                lddt_type = "intra-chain"
             else:
                 raise Exception(f"Invalid chain list {chains}")
 
@@ -4321,12 +4487,33 @@ class ComputeModelSelectionScore(Module):
             asym_mask_b = atom_asym_id[b] == asym_id_b
 
             lddt = self.compute_chain_pair_lddt(
-                asym_mask_a, asym_mask_b, 
-                pred_coords[b], true_coords[b], 
-                atom_is_molecule_types[b], atom_mask[b],
+                asym_mask_a,
+                asym_mask_b,
+                pred_coords[b],
+                true_coords[b],
+                atom_is_molecule_types[b],
+                atom_mask[b],
             )
 
-            weighted_lddt[b] = lddt_weight * lddt
+            weighted_lddt[b] = (1.0 if unweighted else lddt_weight) * lddt
+
+        # Average the lDDT with the relative solvent accessible surface area (RASA) for unresolved proteins
+        # NOTE: This differs from the AF3 Section 5.7 slightly, as here we compute the algebraic mean of the (batched) lDDT and RASA
+        if compute_rasa:
+            assert (
+                exists(unresolved_cid) and exists(unresolved_residue_mask) and exists(molecule_ids)
+            ), "RASA computation requires `unresolved_cid`, `unresolved_residue_mask`, and `molecule_ids` to be provided."
+            weighted_rasa = self.compute_unresolved_rasa(
+                unresolved_cid,
+                unresolved_residue_mask,
+                asym_id,
+                molecule_ids,
+                molecule_atom_lens,
+                true_coords,
+                atom_mask,
+                is_fine_tuning=is_fine_tuning,
+            )
+            weighted_lddt = (weighted_lddt + weighted_rasa) / 2
 
         return weighted_lddt
 
@@ -4334,20 +4521,26 @@ class ComputeModelSelectionScore(Module):
     def _compute_unresolved_rasa(
         self,
         unresolved_cid: int,
-        unresolved_residue_mask: Bool[' n'], 
-        asym_id: Int[' n'],
-        molecule_ids: Int[' n'],
-        molecule_atom_lens: Int[' n'],
-        atom_pos: Float[' m 3'], 
-        atom_mask: Bool[' m'],
-    ) -> Float['']:
-        """
-        unresolved_cid: asym_id for protein chain with unresolved residues
-        unresolved_residue_mask: True for unresolved resideu
-        atom_mask: True for valid atom, False for missing/padding atom
+        unresolved_residue_mask: Bool[" n"],  
+        asym_id: Int[" n"],  
+        molecule_ids: Int[" n"],  
+        molecule_atom_lens: Int[" n"],  
+        atom_pos: Float["m 3"],  
+        atom_mask: Bool[" m"],  
+    ) -> Float[""]:  
+        """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
+
+        unresolved_cid: asym_id for protein chains with unresolved residues
+        unresolved_residue_mask: True for unresolved residues, False for resolved residues
+        asym_id: asym_id for each residue
+        molecule_ids: molecule_ids for each residue
+        molecule_atom_lens: number of atoms for each residue
+        atom_pos: [m 3] atom positions
+        atom_mask: True for valid atoms, False for missing/padding atoms
+        :return: unresolved RASA
         """
 
-        assert self.can_calculate_unresolved_protein_rasa, 'mkdssp needs to be installed'
+        assert self.can_calculate_unresolved_protein_rasa, "`mkdssp` needs to be installed"
 
         residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
 
@@ -4360,26 +4553,25 @@ class ComputeModelSelectionScore(Module):
         chain_asym_id = asym_id[chain_mask]
         chain_molecule_ids = molecule_ids[chain_mask]
         chain_molecule_atom_lens = molecule_atom_lens[chain_mask]
-        
+
         chain_mask_to_atom = torch.repeat_interleave(chain_mask, molecule_atom_lens)
-        
+
         # if there's padding in num atom
         num_pad = num_atom - molecule_atom_lens.sum()
         if num_pad > 0:
-            chain_mask_to_atom = F.pad(
-                chain_mask_to_atom, (0, num_pad), value = False)
+            chain_mask_to_atom = F.pad(chain_mask_to_atom, (0, num_pad), value=False)
 
         chain_atom_pos = atom_pos[chain_mask_to_atom]
         chain_atom_mask = atom_mask[chain_mask_to_atom]
-        
+
         structure = _protein_structure_from_feature(
-            chain_asym_id, 
+            chain_asym_id,
             chain_molecule_ids,
             chain_molecule_atom_lens,
             chain_atom_pos,
             chain_atom_mask,
         )
-        
+
         with tempfile.NamedTemporaryFile(suffix=".pdb", delete=True) as temp_file:
             temp_file_path = temp_file.name
 
@@ -4388,42 +4580,173 @@ class ComputeModelSelectionScore(Module):
             pdb_writer.save(temp_file_path)
             dssp = DSSP(structure[0], temp_file_path, dssp=self.dssp_path)
             dssp_dict = dict(dssp)
-        
+
         rasa = []
         aatypes = []
-        for i, residue in enumerate(structure.get_residues()):
-            rsa = float(dssp_dict.get((residue.get_full_id()[2], residue.id))[3])   
+        for residue in structure.get_residues():
+            rsa = float(dssp_dict.get((residue.get_full_id()[2], residue.id))[3])
             rasa.append(rsa)
-            
+
             aatype = dssp_dict.get((residue.get_full_id()[2], residue.id))[1]
             aatypes.append(residue_constants.restype_order[aatype])
-            
+
         rasa = torch.tensor(rasa, dtype=dtype, device=device)
         aatypes = torch.tensor(aatypes, device=device).int()
-        
+
         unresolved_aatypes = aatypes[chain_unresolved_residue_mask]
         unresolved_molecule_ids = chain_molecule_ids[chain_unresolved_residue_mask]
 
-        assert torch.equal(unresolved_aatypes, unresolved_molecule_ids), "aatype not match for input feature and structure"
+        assert torch.equal(
+            unresolved_aatypes, unresolved_molecule_ids
+        ), "aatype not match for input feature and structure"
         unresolved_rasa = rasa[chain_unresolved_residue_mask]
-        
+
         return unresolved_rasa.mean()
 
     @typecheck
     def compute_unresolved_rasa(
         self,
         unresolved_cid: List[int],
-        unresolved_residue_mask: Bool['b n'], 
-        asym_id: Int['b n'],
-        molecule_ids: Int['b n'],
-        molecule_atom_lens: Int['b n'],
-        atom_pos: Float['b m 3'], 
-        atom_mask: Bool['b m'],
-    ) -> Float[' b']:
+        unresolved_residue_mask: Bool["b n"],  
+        asym_id: Int["b n"],  
+        molecule_ids: Int["b n"],  
+        molecule_atom_lens: Int["b n"],  
+        atom_pos: Float["b m 3"],  
+        atom_mask: Bool["b m"],  
+        is_fine_tuning: bool = None,
+    ) -> Float[" b"]:  
+        """Compute the unresolved relative solvent accessible surface area (RASA) for (batched)
+        proteins.
 
-        unresolved_rasa = [self._compute_unresolved_rasa(*args) for args in 
-                           zip(unresolved_cid, unresolved_residue_mask, asym_id, molecule_ids, molecule_atom_lens, atom_pos, atom_mask)]
-        return torch.stack(unresolved_rasa)  
+        unresolved_cid: asym_id for protein chains with unresolved residues
+        unresolved_residue_mask: True for unresolved residues, False for resolved residues
+        asym_id: [b n] asym_id of each residue
+        molecule_ids: [b n] molecule_ids of each residue
+        molecule_atom_lens: [b n] molecule atom lens
+        atom_pos: [b m 3] atom positions
+        atom_mask: [b m] atom mask
+        :return: [b] unresolved RASA
+        """
+        is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
+
+        weight_dict = default(
+            self.weight_dict_config,
+            self.FINETUNING_DICT if is_fine_tuning else self.INITIAL_TRAINING_DICT,
+        )
+
+        weight = weight_dict.get("unresolved", {}).get("unresolved", None)
+        assert weight, f"Weight not found for unresolved"
+
+        unresolved_rasa = [
+            self._compute_unresolved_rasa(*args)
+            for args in zip(
+                unresolved_cid,
+                unresolved_residue_mask,
+                asym_id,
+                molecule_ids,
+                molecule_atom_lens,
+                atom_pos,
+                atom_mask,
+            )
+        ]
+        return torch.stack(unresolved_rasa) * weight
+
+    @typecheck
+    def compute_model_selection_score(
+        self,
+        batch: BatchedAtomInput,
+        samples: List[Tuple[Float["b m 3"], Float["b pde n n"], Float["b dist n n"]]],  
+        is_fine_tuning: bool = None,
+        return_top_model: bool = False,
+        return_unweighted_scores: bool = False,
+        compute_rasa: bool = False,
+        unresolved_cid: List[int] | None = None,
+        unresolved_residue_mask: Bool["b n"] | None = None,  
+    ) -> Float[" b"] | Tuple[Float[" b"], SCORED_SAMPLE]:  
+        """Compute the model selection score for an input batch and corresponding (sampled) atom
+        positions.
+
+        :param batch: A batch of `AtomInput` data.
+        :param samples: A list of sampled atom positions along with their predicted distance errors and labels.
+        :param is_fine_tuning: is fine tuning
+        :param return_top_model: return the top-ranked sample
+        :param return_unweighted_scores: return the unweighted scores (i.e., lDDT)
+        :param compute_rasa: compute the relative solvent accessible surface area (RASA) for unresolved proteins
+        :param unresolved_cid: unresolved chain ids
+        :param unresolved_residue_mask: unresolved residue mask
+        :return: [b] model selection score and optionally the top model
+        """
+        is_fine_tuning = default(is_fine_tuning, self.is_fine_tuning)
+
+        if compute_rasa:
+            if not (exists(unresolved_cid) and exists(unresolved_residue_mask)):
+                logger.warning(
+                    "RASA computation requires `unresolved_cid` and `unresolved_residue_mask` to be provided. Skipping RASA computation."
+                )
+                compute_rasa = False
+
+        # collect required features
+
+        batch_dict = batch.dict()
+
+        atom_pos_true = batch_dict["atom_pos"]
+        atom_mask = ~batch_dict["missing_atom_mask"]
+
+        asym_id = batch_dict["additional_molecule_feats"].unbind(dim=-1)[2]
+        is_molecule_types = batch_dict["is_molecule_types"]
+
+        chains = [tuple(chains_list) for chains_list in batch_dict["chains"].tolist()]
+        molecule_atom_lens = batch_dict["molecule_atom_lens"]
+        molecule_ids = batch_dict["molecule_ids"]
+
+        valid_atom_len_mask = batch_dict["molecule_atom_lens"] >= 0
+        tok_repr_atm_mask = batch_dict["distogram_atom_indices"] >= 0 & valid_atom_len_mask
+
+        # score samples
+
+        scored_samples: List[SCORED_SAMPLE] = []
+
+        for sample_idx, sample in enumerate(samples):
+            atom_pos_pred, pde_logits, dist_logits = sample
+
+            weighted_lddt = self.compute_weighted_lddt(
+                atom_pos_pred,
+                atom_pos_true,
+                atom_mask,
+                asym_id,
+                is_molecule_types,
+                molecule_atom_lens,
+                chains_list=chains,
+                is_fine_tuning=is_fine_tuning,
+                compute_rasa=compute_rasa,
+                unresolved_cid=unresolved_cid,
+                unresolved_residue_mask=unresolved_residue_mask,
+                molecule_ids=molecule_ids,
+                unweighted=return_unweighted_scores,
+            )
+
+            gpde = self.compute_gpde(
+                pde_logits,
+                dist_logits,
+                self.dist_breaks,
+                tok_repr_atm_mask,
+            )
+
+            scored_samples.append((sample_idx, atom_pos_pred, weighted_lddt, gpde))
+
+        top_ranked_sample = max(
+            scored_samples, key=lambda x: x[-1].mean()
+        )  # rank by batch-averaged gPDE
+        best_of_5_sample = max(
+            scored_samples, key=lambda x: x[-2].mean()
+        )  # rank by batch-averaged lDDT
+
+        model_selection_score = (top_ranked_sample[-2] + best_of_5_sample[-2]) / 2
+
+        if return_top_model:
+            return model_selection_score, top_ranked_sample
+
+        return model_selection_score
 
 # main class
 
