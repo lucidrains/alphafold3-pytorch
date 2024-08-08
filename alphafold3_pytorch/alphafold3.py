@@ -97,6 +97,7 @@ h - heads
 n - molecule sequence length
 i - molecule sequence length (source)
 j - molecule sequence length (target)
+l - number of distogram bins
 m - atom sequence length
 nw - windowed sequence length
 d - feature dimension
@@ -5186,12 +5187,14 @@ class Alphafold3(Module):
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_confidence_head_logits: bool = False,
+        return_distogram_head_logits: bool = False,
         num_rollout_steps: int | None = None,
         rollout_show_tqdm_pbar: bool = False,
         detach_when_recycling: bool = None
     ) -> (
         Float['b m 3'] |
-        Tuple[Float['b m 3'] | Float['l 3'], ConfidenceHeadLogits] |
+        Tuple[Float['b m 3'], ConfidenceHeadLogits] |
+        Tuple[Float['b m 3'], ConfidenceHeadLogits, Float['b l n n']] |
         Float[''] |
         Tuple[Float[''], LossBreakdown]
     ):
@@ -5467,7 +5470,13 @@ class Alphafold3(Module):
                 mask = mask,
                 return_pae_logits = True
             )
-
+            if return_distogram_head_logits:
+                distogram_head_logits = self.distogram_head(pairwise.clone().detach())
+                return (
+                    sampled_atom_pos,
+                    confidence_head_logits,
+                    distogram_head_logits,
+                )
             return sampled_atom_pos, confidence_head_logits
 
         # if being forced to return loss, but do not have sufficient information to return losses, just return 0
