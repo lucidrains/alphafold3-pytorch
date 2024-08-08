@@ -297,8 +297,8 @@ def mean_pool_fixed_windows_with_mask(
     feats: Float['b m d'],
     mask: Bool['b m'],
     window_size: int,
-    return_pooled_mask: bool = False
-) -> Float['b n d'] | Tuple[Float['b n'], Bool['b n']]:
+    return_mask_and_inverse: bool = False,
+) -> Float['b n d'] | Tuple[Float['b n d'], Bool['b n'], Callable[[Float['b m d']], Float['b n d']]]:
 
     seq_len = feats.shape[-2]
     assert divisible_by(seq_len, window_size)
@@ -310,11 +310,18 @@ def mean_pool_fixed_windows_with_mask(
 
     avg = num / den.clamp(min = 1.)
 
-    if not return_pooled_mask:
+    if not return_mask_and_inverse:
         return avg
 
     pooled_mask = reduce(mask, 'b (n w) -> b n', 'any', w = window_size)
-    return avg, pooled_mask
+
+    @typecheck
+    def inverse_fn(pooled: Float['b n d']) -> Float['b m d']:
+        unpooled = repeat(pooled, 'b n d -> b (n w) d', w = window_size)
+        unpooled = einx.where('b m, b m d, -> b m d', mask, unpooled, 0.)
+        return unpooled
+
+    return avg, pooled_mask, inverse_fn
 
 @typecheck
 def batch_repeat_interleave(

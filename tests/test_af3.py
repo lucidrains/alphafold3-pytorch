@@ -80,8 +80,9 @@ def test_mean_pool_with_mask():
     seq = torch.tensor([[[1.], [100.], [1.], [2.], [2.], [100.], [1.], [1.], [100.]]])
     mask = torch.tensor([[True, False, True, True, True, False, True, True, False]])
 
-    pooled = mean_pool_fixed_windows_with_mask(seq, mask, window_size = 3)
+    pooled, _, inverse_function = mean_pool_fixed_windows_with_mask(seq, mask, window_size = 3, return_mask_and_inverse = True)
 
+    assert inverse_function(pooled).shape == seq.shape
     assert torch.allclose(pooled, torch.tensor([[[1.], [2.], [1.]]]))
 
 def test_batch_repeat_interleave():
