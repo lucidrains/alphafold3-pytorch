@@ -4431,6 +4431,7 @@ class ComputeModelSelectionScore(Module):
         chains_list: List[Tuple[int, int] | Tuple[int]],
         is_fine_tuning: bool = None,
         unweighted: bool = False,
+        missing_chain_index: int = -1,
         # RASA input
         compute_rasa: bool = False,
         unresolved_cid: List[int] | None = None,
@@ -4448,6 +4449,7 @@ class ComputeModelSelectionScore(Module):
         :param chains_list: List of chains
         :param is_fine_tuning: is fine tuning
         :param unweighted: unweighted lddt
+        :param missing_chain_index: missing chain index
         :param compute_rasa: compute RASA
         :param unresolved_cid: unresolved chain ids
         :param unresolved_residue_mask: unresolved residue mask
@@ -4466,7 +4468,7 @@ class ComputeModelSelectionScore(Module):
 
         for b in range(batch_size):
             chains = chains_list[b]
-            if len(chains) == 2:
+            if len(chains) == 2 and chains[1] != missing_chain_index:
                 asym_id_a = chains[0]
                 asym_id_b = chains[1]
                 lddt_type = "interface"
