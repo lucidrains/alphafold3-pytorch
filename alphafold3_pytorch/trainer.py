@@ -27,6 +27,7 @@ from alphafold3_pytorch.inputs import (
     PDBInput,
     maybe_transform_to_atom_inputs,
     UNCOLLATABLE_ATOM_INPUT_FIELDS,
+    ATOM_DEFAULT_PAD_VALUES,
 )
 
 from alphafold3_pytorch.data import (
@@ -171,7 +172,9 @@ def collate_inputs_to_batched_atom_input(
 
         # use -1 for padding int values, for assuming int are labels - if not, handle within alphafold3
 
-        if dtype in (torch.int, torch.long):
+        if key in ATOM_DEFAULT_PAD_VALUES:
+            pad_value = ATOM_DEFAULT_PAD_VALUES[key]
+        elif dtype in (torch.int, torch.long):
             pad_value = int_pad_value
         elif dtype == torch.bool:
             pad_value = False

@@ -159,7 +159,15 @@ def maybe(fn):
 # atom level, what Alphafold3 accepts
 
 UNCOLLATABLE_ATOM_INPUT_FIELDS = {'filepath'}
-ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {'filepath', 'chains'}
+
+ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {
+    'filepath',
+    'chains'
+}
+
+ATOM_DEFAULT_PAD_VALUES = dict(
+    molecule_atom_lens = 0
+)
 
 @typecheck
 @dataclass
