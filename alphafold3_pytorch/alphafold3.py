@@ -4458,7 +4458,7 @@ class ComputeModelSelectionScore(Module):
         device = pred_coords.device
         batch_size = pred_coords.shape[0]
 
-        # broadcast asym_id and is_molecule_types to atom level
+        # Broadcast asym_id and is_molecule_types to atom level
         atom_asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens, mask_value=-1)
         atom_is_molecule_types = batch_repeat_interleave(is_molecule_types, molecule_atom_lens)
 
@@ -4477,6 +4477,8 @@ class ComputeModelSelectionScore(Module):
                 raise Exception(f"Invalid chain list {chains}")
 
             if (atom_asym_id[b] == -1).all():
+                # TODO: Remove this check after fixing the batching bug in `batch_repeat_interleave()`
+                # (see https://github.com/lucidrains/alphafold3-pytorch/issues/158)
                 log.warning(f"Found erroneous `atom_asym_id` element at index {b}. Returning null lDDT for this batch element.")
                 weighted_lddt[b] = torch.tensor(1e-6, device=device)
                 continue
