@@ -327,7 +327,7 @@ def mean_pool_fixed_windows_with_mask(
 def batch_repeat_interleave(
     feats: Float['b n ...'] | Bool['b n ...'] | Bool['b n'] | Int['b n'],
     lens: Int['b n'],
-    mask_value: float | int | bool | None = None,
+    output_padding_value: float | int | bool | None = None, # this value determines what the output padding value will be
 ) -> Float['b m ...'] | Bool['b m ...'] | Bool['b m'] | Int['b m']:
 
     device, dtype = feats.device, feats.dtype
@@ -348,7 +348,7 @@ def batch_repeat_interleave(
 
     # create output tensor + a sink position on the very right (index max_len)
 
-    total_lens = lens.sum(dim = -1)
+    total_lens = lens.clamp(min = 0).sum(dim = -1)
     output_mask = lens_to_mask(total_lens)
 
     max_len = total_lens.amax()
@@ -380,13 +380,13 @@ def batch_repeat_interleave(
     output = feats.gather(1, output_indices)
     output = unpack_one(output)
 
-    # final mask
+    # set output padding value
 
-    mask_value = default(mask_value, False if dtype == torch.bool else 0)
+    output_padding_value = default(output_padding_value, False if dtype == torch.bool else 0)
 
     output = einx.where(
         'b n, b n ..., -> b n ...',
-        output_mask, output, mask_value
+        output_mask, output, output_padding_value
     )
 
     return output
@@ -4289,7 +4289,7 @@ class ComputeModelSelectionScore(Module):
         batch_size = pred_coords.shape[0]
 
         # broadcast asym_id and is_molecule_types to atom level
-        atom_asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens, mask_value=-1)
+        atom_asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens, output_padding_value=-1)
         atom_is_molecule_types = batch_repeat_interleave(is_molecule_types, molecule_atom_lens)
 
         weighted_lddt = torch.zeros(batch_size, device=device)
