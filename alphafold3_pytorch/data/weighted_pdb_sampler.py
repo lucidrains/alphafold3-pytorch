@@ -193,7 +193,7 @@ class WeightedPDBSampler(Sampler[List[str]]):
         alpha_nuc: float = 3.0,
         alpha_ligand: float = 1.0,
         pdb_ids_to_skip: List[str] = [],
-        subset_to_ids: list[int] | None = None,
+        pdb_ids_to_keep: list[str] | None = None,
     ):
         # Load chain and interface mappings
         if not isinstance(chain_mapping_paths, list):
@@ -226,28 +226,24 @@ class WeightedPDBSampler(Sampler[List[str]]):
             "Precomputing chain and interface weights. This may take several minutes to complete."
         )
 
-        # Subset to specific indices if provided
-        if exists(subset_to_ids):
-            chain_mapping = (
-                chain_mapping.with_row_index()
-                .filter(pl.col("index").is_in(subset_to_ids))
-                .select(["pdb_id", "chain_id", "molecule_id", "cluster_id"])
+        # Subset to specific PDB IDs if provided
+        if exists(pdb_ids_to_keep):
+            chain_mapping = chain_mapping.filter(pl.col("pdb_id").is_in(pdb_ids_to_keep)).select(
+                ["pdb_id", "chain_id", "molecule_id", "cluster_id"]
             )
-            interface_mapping = (
-                interface_mapping.with_row_index()
-                .filter(pl.col("index").is_in(subset_to_ids))
-                .select(
-                    [
-                        "pdb_id",
-                        "interface_chain_id_1",
-                        "interface_chain_id_2",
-                        "interface_molecule_id_1",
-                        "interface_molecule_id_2",
-                        "interface_chain_cluster_id_1",
-                        "interface_chain_cluster_id_2",
-                        "interface_cluster_id",
-                    ]
-                )
+            interface_mapping = interface_mapping.filter(
+                pl.col("pdb_id").is_in(pdb_ids_to_keep)
+            ).select(
+                [
+                    "pdb_id",
+                    "interface_chain_id_1",
+                    "interface_chain_id_2",
+                    "interface_molecule_id_1",
+                    "interface_molecule_id_2",
+                    "interface_chain_cluster_id_1",
+                    "interface_chain_cluster_id_2",
+                    "interface_cluster_id",
+                ]
             )
 
         chain_mapping.insert_column(
