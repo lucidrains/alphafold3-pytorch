@@ -1160,7 +1160,7 @@ if __name__ == "__main__":
         filtered_interface_df = interface_clusters.filter(
             pl.col("interface_type") == interface_type
         )
-        if sample_size is not None:
+        if exists(sample_size):
             interface_chain_clusters_grouped = filtered_interface_df.group_by(
                 "interface_cluster_id"
             ).agg(pl.col("*").sample(1, seed=42))
