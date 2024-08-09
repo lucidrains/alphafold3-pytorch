@@ -63,7 +63,7 @@ from alphafold3_pytorch.utils.data_utils import (
     is_polymer,
 )
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
-from alphafold3_pytorch.utils.utils import default, exists, first, identity
+from alphafold3_pytorch.utils.utils import default, exists, first
 
 # silence RDKit's warnings
 
@@ -166,7 +166,8 @@ ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {
 }
 
 ATOM_DEFAULT_PAD_VALUES = dict(
-    molecule_atom_lens = 0
+    molecule_atom_lens = 0,
+    missing_atom_mask = True
 )
 
 @typecheck
