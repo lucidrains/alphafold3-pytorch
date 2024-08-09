@@ -4479,7 +4479,9 @@ class ComputeModelSelectionScore(Module):
             if (atom_asym_id[b] == -1).all():
                 # TODO: Remove this check after fixing the batching bug in `batch_repeat_interleave()`
                 # (see https://github.com/lucidrains/alphafold3-pytorch/issues/158)
-                log.warning(f"Found erroneous `atom_asym_id` element at index {b}. Returning null lDDT for this batch element.")
+                logger.warning(
+                    f"Found erroneous `atom_asym_id` element at index {b}. Returning null lDDT for this batch element."
+                )
                 weighted_lddt[b] = torch.tensor(1e-6, device=device)
                 continue
 
