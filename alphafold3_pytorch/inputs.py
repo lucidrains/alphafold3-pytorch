@@ -2679,10 +2679,6 @@ class PDBDataset(Dataset):
         assert folder.exists() and folder.is_dir(), f"{str(folder)} does not exist for PDBDataset"
         self.folder = folder
 
-        self.files = {
-            os.path.splitext(os.path.basename(file.name))[0]: file
-            for file in folder.glob(os.path.join("**", "*.cif"))
-        }
         self.sampler = sampler
         self.sample_type = sample_type
         self.training = training
@@ -2701,9 +2697,14 @@ class PDBDataset(Dataset):
         if exists(self.sampler):
             sampler_pdb_ids = set(self.sampler.mappings.get_column("pdb_id").to_list())
             self.files = {
-                file: filepath
-                for (file, filepath) in self.files.items()
-                if file in sampler_pdb_ids
+                os.path.splitext(os.path.basename(filepath.name))[0]: filepath
+                for filepath in folder.glob(os.path.join("**", "*.cif"))
+                if os.path.splitext(os.path.basename(filepath.name))[0] in sampler_pdb_ids
+            }
+        else:
+            self.files = {
+                os.path.splitext(os.path.basename(file.name))[0]: file
+                for file in folder.glob(os.path.join("**", "*.cif"))
             }
 
         if exists(sample_only_pdb_ids):
