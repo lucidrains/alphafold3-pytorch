@@ -3063,12 +3063,12 @@ class ComputeAlignmentError(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b n 3'] | Float['b m 3'],
-        true_coords: Float['b n 3'] | Float['b m 3'],
+        pred_coords: Float['b m_or_n 3'],
+        true_coords: Float['b m_or_n 3'],
         pred_frames: Float['b n 3 3'],
         true_frames: Float['b n 3 3'],
         molecule_atom_lens: Int['b n'] | None = None
-    ) -> Float['b n n'] | Float['b m m']:
+    ) -> Float['b m_or_n m_or_n']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
