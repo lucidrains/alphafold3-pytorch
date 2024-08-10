@@ -15,6 +15,7 @@ from alphafold3_pytorch import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
     ExpressCoordinatesInFrame,
+    RigidFrom3Points,
     ComputeAlignmentError,
     CentreRandomAugmentation,
     PairformerStack,
@@ -173,6 +174,13 @@ def test_express_coordinates_in_frame():
     transformed_coords = express_fn(coords, broadcastable_batch_and_seq_frame)
 
     assert transformed_coords.shape == (batch_size, num_coords, 3)
+
+def test_rigid_from_three_points():
+    rigid_from_3_points = RigidFrom3Points()
+
+    points = torch.randn(7, 11, 23, 3)
+    rotation, _ = rigid_from_3_points((points, points, points))
+    assert rotation.shape == (7, 11, 23, 3, 3)
 
 def test_compute_alignment_error():
     pred_coords = torch.randn(2, 100, 3)

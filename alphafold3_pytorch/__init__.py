@@ -9,6 +9,7 @@ from alphafold3_pytorch.alphafold3 import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
     ExpressCoordinatesInFrame,
+    RigidFrom3Points,
     ComputeAlignmentError,
     CentreRandomAugmentation,
     TemplateEmbedder,

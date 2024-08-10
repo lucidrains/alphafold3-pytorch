@@ -170,6 +170,9 @@ def compact(*args):
 
 # tensor helpers
 
+def l2norm(t, eps = 1e-20, dim = -1):
+    return F.normalize(t, p = 2, eps = eps, dim = dim)
+
 def max_neg_value(t: Tensor):
     return -torch.finfo(t.dtype).max
 
@@ -2986,12 +2989,12 @@ class ExpressCoordinatesInFrame(Module):
 
         # Extract frame atoms
         a, b, c = frame.unbind(dim=-1)
-        w1 = F.normalize(a - b, dim=-1, eps=self.eps)
-        w2 = F.normalize(c - b, dim=-1, eps=self.eps)
+        w1 = l2norm(a - b, eps=self.eps)
+        w2 = l2norm(c - b, eps=self.eps)
 
         # Build orthonormal basis
-        e1 = F.normalize(w1 + w2, dim=-1, eps=self.eps)
-        e2 = F.normalize(w2 - w1, dim=-1, eps=self.eps)
+        e1 = l2norm(w1 + w2, eps=self.eps)
+        e2 = l2norm(w2 - w1, eps=self.eps)
         e3 = torch.cross(e1, e2, dim=-1)
 
         # Project onto frame basis
@@ -3004,6 +3007,46 @@ class ExpressCoordinatesInFrame(Module):
         ), dim=-1)
 
         return transformed_coords
+
+class RigidFrom3Points(Module):
+    """
+    Algorithm 21 in Section 1.8.1 in Alphafold2 paper
+    https://www.nature.com/articles/s41586-021-03819-2
+    """
+
+    @typecheck
+    def forward(
+        self,
+        three_points: Tuple[Float['... 3'], Float['... 3'], Float['... 3']] | Float['3 ... 3']
+    ) -> Tuple[Float['... 3 3'], Float['... 3']]:
+
+        if isinstance(three_points, tuple):
+            three_points = torch.stack(three_points)
+
+        # allow for any number of leading dimensions
+
+        (x1, x2, x3), unpack_one = pack_one(three_points, 'three * d')
+
+        # main algorithm
+
+        v1 = x3 - x2
+        v2 = x1 - x2
+
+        e1 = l2norm(v1)
+        u2 = v2 - e1 @ (e1.t() @ v2)
+        e2 = l2norm(u2)
+
+        e3 = torch.cross(e1, e2, dim = -1)
+
+        R = torch.stack((e1, e2, e3), dim = -1)
+        t = x2
+
+        # unpack
+
+        R = unpack_one(R, '* r1 r2')
+        t = unpack_one(t, '* c')
+
+        return R, t
 
 class ComputeAlignmentError(Module):
     """ Algorithm 30 """
