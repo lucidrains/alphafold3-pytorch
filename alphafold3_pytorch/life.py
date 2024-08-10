@@ -202,6 +202,7 @@ DNA_NUCLEOTIDES = dict(
         complement="T",
         distogram_atom_idx=21,
         token_center_atom_idx=11,
+        three_atom_for_frame = (8, 19, 20)
     ),
     C=dict(
         resname="DC",
@@ -211,6 +212,7 @@ DNA_NUCLEOTIDES = dict(
         complement="G",
         distogram_atom_idx=13,
         token_center_atom_idx=11,
+        three_atom_for_frame = (6, 18, 17)
     ),
     G=dict(
         resname="DG",
@@ -220,6 +222,7 @@ DNA_NUCLEOTIDES = dict(
         complement="C",
         distogram_atom_idx=22,
         token_center_atom_idx=11,
+        three_atom_for_frame = (8, 9, 10)
     ),
     T=dict(
         resname="DT",
@@ -229,6 +232,7 @@ DNA_NUCLEOTIDES = dict(
         complement="A",
         distogram_atom_idx=13,
         token_center_atom_idx=11,
+        three_atom_for_frame = (6, 19, 18)
     ),
     X=dict(
         resname="DN",
@@ -238,6 +242,7 @@ DNA_NUCLEOTIDES = dict(
         complement="N",
         distogram_atom_idx=21,
         token_center_atom_idx=11,
+        three_atom_for_frame = None
     ),
 )
 
@@ -250,6 +255,7 @@ RNA_NUCLEOTIDES = dict(
         complement="U",
         distogram_atom_idx=22,
         token_center_atom_idx=12,
+        three_atom_for_frame = (8, 19, 21)
     ),
     C=dict(
         resname="C",
@@ -259,6 +265,7 @@ RNA_NUCLEOTIDES = dict(
         complement="G",
         distogram_atom_idx=14,
         token_center_atom_idx=12,
+        three_atom_for_frame = (8, 19, 21)
     ),
     G=dict(
         resname="G",
@@ -268,6 +275,7 @@ RNA_NUCLEOTIDES = dict(
         complement="C",
         distogram_atom_idx=23,
         token_center_atom_idx=12,
+        three_atom_for_frame = (8, 20, 22)
     ),
     U=dict(
         resname="U",
@@ -277,6 +285,7 @@ RNA_NUCLEOTIDES = dict(
         complement="A",
         distogram_atom_idx=14,
         token_center_atom_idx=12,
+        three_atom_for_frame = (8, 17, 19)
     ),
     X=dict(
         resname="N",
@@ -286,6 +295,7 @@ RNA_NUCLEOTIDES = dict(
         complement="N",
         distogram_atom_idx=22,
         token_center_atom_idx=12,
+        three_atom_for_frame = None
     ),
 )
 
