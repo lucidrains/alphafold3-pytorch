@@ -3067,6 +3067,7 @@ class ComputeAlignmentError(Module):
         true_coords: Float['b m_or_n 3'],
         pred_frames: Float['b n 3 3'],
         true_frames: Float['b n 3 3'],
+        mask: Bool['b m_or_n'] | None = None,
         molecule_atom_lens: Int['b n'] | None = None
     ) -> Float['b m_or_n m_or_n']:
         """
@@ -3085,17 +3086,20 @@ class ComputeAlignmentError(Module):
             pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
             true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
 
+            if not exists(mask) and exists(molecule_atom_lens):
+                mask = batch_repeat_interleave(molecule_atom_lens > 0, molecule_atom_lens)
+
         # to pairs
 
-        num_res = pred_coords.shape[1]
+        seq = pred_coords.shape[1]
         
         pair2seq = partial(rearrange, pattern='b n m ... -> b (n m) ...')
-        seq2pair = partial(rearrange, pattern='b (n m) ... -> b n m ...', n = num_res, m = num_res)
+        seq2pair = partial(rearrange, pattern='b (n m) ... -> b n m ...', n = seq, m = seq)
         
-        pair_pred_coords = pair2seq(repeat(pred_coords, 'b n d -> b n m d', m = num_res))
-        pair_true_coords = pair2seq(repeat(true_coords, 'b n d -> b n m d', m = num_res))
-        pair_pred_frames = pair2seq(repeat(pred_frames, 'b n d e -> b m n d e', m = num_res))
-        pair_true_frames = pair2seq(repeat(true_frames, 'b n d e -> b m n d e', m = num_res))
+        pair_pred_coords = pair2seq(repeat(pred_coords, 'b n d -> b n m d', m = seq))
+        pair_true_coords = pair2seq(repeat(true_coords, 'b n d -> b n m d', m = seq))
+        pair_pred_frames = pair2seq(repeat(pred_frames, 'b n d e -> b m n d e', m = seq))
+        pair_true_frames = pair2seq(repeat(true_frames, 'b n d e -> b m n d e', m = seq))
         
         # Express predicted coordinates in predicted frames
         pred_coords_transformed = self.express_coordinates_in_frame(pair_pred_coords, pair_pred_frames)
@@ -3107,8 +3111,13 @@ class ComputeAlignmentError(Module):
         alignment_errors = torch.sqrt(
             torch.sum((pred_coords_transformed - true_coords_transformed) ** 2, dim=-1) + self.eps
         )
-        
+
         alignment_errors = seq2pair(alignment_errors)
+
+        # Masking
+        if exists(mask):
+            pair_mask = to_pairwise_mask(mask)
+            alignment_errors = einx.where('b i j, b i j, -> b i j', pair_mask, alignment_errors, 0.)
 
         return alignment_errors
 
