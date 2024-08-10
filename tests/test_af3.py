@@ -186,6 +186,22 @@ def test_compute_alignment_error():
     assert alignment_errors.shape == (2, 100, 100)
     assert (alignment_errors.mean(-1) < 1e-3).all()
 
+def test_compute_alignment_error_atom_resolution():
+    seq_len = 100
+    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    pred_coords = torch.randn(2, atom_seq_len, 3)
+    pred_frames = torch.randn(2, seq_len, 3, 3)
+
+    # `pred_coords` should match itself in frame basis
+
+    error_fn = ComputeAlignmentError()
+    alignment_errors = error_fn(pred_coords, pred_coords, pred_frames, pred_frames, molecule_atom_lens = molecule_atom_lens)
+
+    assert alignment_errors.shape == (2, atom_seq_len, atom_seq_len)
+    assert (alignment_errors.mean(-1) < 1e-3).all()
+
 def test_centre_random_augmentation():
     coords = torch.randn(2, 100, 3)
 

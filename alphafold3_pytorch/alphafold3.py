@@ -2943,8 +2943,12 @@ class WeightedRigidAlign(Module):
             )
 
         det = torch.det(einsum(V, U_T, 'b i j, b j k -> b i k'))
+
         # Ensure proper rotation matrix with determinant 1
-        diag = torch.eye(dim, dtype=det.dtype, device=det.device)[None].repeat(batch_size, 1, 1)
+
+        diag = torch.eye(dim, dtype=det.dtype, device=det.device)
+        diag = repeat(diag, 'i j -> b i j', b = batch_size).clone()
+
         diag[:, -1, -1] = det
         rot_matrix = einsum(V, diag, U_T, "b i j, b j k, b k l -> b i l")
 
@@ -2992,14 +2996,12 @@ class ExpressCoordinatesInFrame(Module):
 
         # Project onto frame basis
         d = coords - b
-        transformed_coords = torch.stack(
-            [
-                einsum(d, e1, '... i, ... i -> ...'),
-                einsum(d, e2, '... i, ... i -> ...'),
-                einsum(d, e3, '... i, ... i -> ...'),
-            ],
-            dim=-1,
-        )
+
+        transformed_coords = torch.stack((
+            einsum(d, e1, '... i, ... i -> ...'),
+            einsum(d, e2, '... i, ... i -> ...'),
+            einsum(d, e3, '... i, ... i -> ...'),
+        ), dim=-1)
 
         return transformed_coords
 
@@ -3018,17 +3020,30 @@ class ComputeAlignmentError(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b n 3'],
-        true_coords: Float['b n 3'],
+        pred_coords: Float['b n 3'] | Float['b m 3'],
+        true_coords: Float['b n 3'] | Float['b m 3'],
         pred_frames: Float['b n 3 3'],
-        true_frames: Float['b n 3 3']
-    ) -> Float['b n n']:
+        true_frames: Float['b n 3 3'],
+        molecule_atom_lens: Int['b n'] | None = None
+    ) -> Float['b n n'] | Float['b m m']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
         pred_frames: predicted frames
         true_frames: true frames
         """
+
+        # detect whether using atom or residue resolution
+
+        is_atom_resolution = pred_coords.shape[1] != pred_frames.shape[1]
+        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution alignment error'
+
+        if is_atom_resolution:
+            pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
+            true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
+
+        # to pairs
+
         num_res = pred_coords.shape[1]
         
         pair2seq = partial(rearrange, pattern='b n m ... -> b (n m) ...')
