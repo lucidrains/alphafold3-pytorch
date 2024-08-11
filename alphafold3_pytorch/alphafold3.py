@@ -3624,6 +3624,7 @@ class ComputeConfidenceScore(Module):
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
         ptm_residue_weight: Float["b n"] | None = None,  
+        molecule_atom_lens: Int["b n"] | None = None,
         multimer_mode: bool = True,
     ) -> ConfidenceScore:
         """Main function to compute confidence score.
@@ -3639,7 +3640,8 @@ class ComputeConfidenceScore(Module):
 
         # Section 5.9.1 equation 17
         ptm = self.compute_ptm(
-            confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False
+            confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False,
+            molecule_atom_lens=molecule_atom_lens,
         )
 
         iptm = None
@@ -3647,7 +3649,8 @@ class ComputeConfidenceScore(Module):
         if multimer_mode:
             # Section 5.9.2 equation 18
             iptm = self.compute_ptm(
-                confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True
+                confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True,
+                molecule_atom_lens=molecule_atom_lens,
             )
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
@@ -3675,10 +3678,11 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_ptm(
         self,
-        logits: Float["b pae n n"],  
+        logits: Float["b pae m_or_n m_or_n"],  
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
-        residue_weights: Float["b n"] | None = None,  
+        residue_weights: Float["b n"] | None = None,
+        molecule_atom_lens: Int["b n"] | None = None,  
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
     ):
@@ -3692,6 +3696,16 @@ class ComputeConfidenceScore(Module):
         :param compute_chain_wise_iptm: bool
         :return: pTM
         """
+
+        is_atom_resolution = logits.shape[-1] != asym_id.shape[-1]
+        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution pTM'
+
+        if is_atom_resolution:
+            asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
+            has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
+            if exists(residue_weights):
+                residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
+                
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
 
