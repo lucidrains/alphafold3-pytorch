@@ -28,7 +28,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=4,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 4)
+        three_atom_indices_for_frame = (0, 1, 4)
     ),
     R=dict(
         resname="ARG",
@@ -37,7 +37,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=10,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 10)
+        three_atom_indices_for_frame = (0, 1, 10)
     ),
     N=dict(
         resname="ASN",
@@ -46,7 +46,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=7,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 7)
+        three_atom_indices_for_frame = (0, 1, 7)
     ),
     D=dict(
         resname="ASP",
@@ -55,7 +55,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=7,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 7)
+        three_atom_indices_for_frame = (0, 1, 7)
     ),
     C=dict(
         resname="CYS",
@@ -64,7 +64,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=5,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 5)
+        three_atom_indices_for_frame = (0, 1, 5)
     ),
     Q=dict(
         resname="GLN",
@@ -73,7 +73,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=8,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 8)
+        three_atom_indices_for_frame = (0, 1, 8)
     ),
     E=dict(
         resname="GLU",
@@ -82,7 +82,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=8,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 8)
+        three_atom_indices_for_frame = (0, 1, 8)
     ),
     G=dict(
         resname="GLY",
@@ -91,7 +91,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=3,
         distogram_atom_idx=1,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 3)
+        three_atom_indices_for_frame = (0, 1, 3)
     ),
     H=dict(
         resname="HIS",
@@ -100,7 +100,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=9,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 9)
+        three_atom_indices_for_frame = (0, 1, 9)
     ),
     I=dict(
         resname="ILE",
@@ -109,7 +109,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=7,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 7)
+        three_atom_indices_for_frame = (0, 1, 7)
     ),
     L=dict(
         resname="LEU",
@@ -118,7 +118,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=7,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 7)
+        three_atom_indices_for_frame = (0, 1, 7)
     ),
     K=dict(
         resname="LYS",
@@ -127,7 +127,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=8,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 8)
+        three_atom_indices_for_frame = (0, 1, 8)
     ),
     M=dict(
         resname="MET",
@@ -136,7 +136,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=7,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 7)
+        three_atom_indices_for_frame = (0, 1, 7)
     ),
     F=dict(
         resname="PHE",
@@ -145,7 +145,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=10,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 10)
+        three_atom_indices_for_frame = (0, 1, 10)
     ),
     P=dict(
         resname="PRO",
@@ -154,7 +154,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=6,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 6)
+        three_atom_indices_for_frame = (0, 1, 6)
     ),
     S=dict(
         resname="SER",
@@ -163,7 +163,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=5,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 5)
+        three_atom_indices_for_frame = (0, 1, 5)
     ),
     T=dict(
         resname="THR",
@@ -172,7 +172,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=6,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 6)
+        three_atom_indices_for_frame = (0, 1, 6)
     ),
     W=dict(
         resname="TRP",
@@ -181,7 +181,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=13,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 13)
+        three_atom_indices_for_frame = (0, 1, 13)
     ),
     Y=dict(
         resname="TYR",
@@ -190,7 +190,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=11,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 11)
+        three_atom_indices_for_frame = (0, 1, 11)
     ),
     V=dict(
         resname="VAL",
@@ -199,7 +199,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=6,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 6)
+        three_atom_indices_for_frame = (0, 1, 6)
     ),
     X=dict(
         resname="UNK",
@@ -208,7 +208,7 @@ HUMAN_AMINO_ACIDS = dict(
         last_atom_idx=4,
         distogram_atom_idx=4,
         token_center_atom_idx=1,
-        three_atom_for_frame = (0, 1, 4)
+        three_atom_indices_for_frame = None
     ),
 )
 
@@ -223,7 +223,7 @@ DNA_NUCLEOTIDES = dict(
         complement="T",
         distogram_atom_idx=21,
         token_center_atom_idx=11,
-        three_atom_for_frame = (8, 19, 20)
+        three_atom_indices_for_frame = (8, 19, 20)
     ),
     C=dict(
         resname="DC",
@@ -233,7 +233,7 @@ DNA_NUCLEOTIDES = dict(
         complement="G",
         distogram_atom_idx=13,
         token_center_atom_idx=11,
-        three_atom_for_frame = (6, 18, 17)
+        three_atom_indices_for_frame = (6, 18, 17)
     ),
     G=dict(
         resname="DG",
@@ -243,7 +243,7 @@ DNA_NUCLEOTIDES = dict(
         complement="C",
         distogram_atom_idx=22,
         token_center_atom_idx=11,
-        three_atom_for_frame = (8, 9, 10)
+        three_atom_indices_for_frame = (8, 9, 10)
     ),
     T=dict(
         resname="DT",
@@ -253,7 +253,7 @@ DNA_NUCLEOTIDES = dict(
         complement="A",
         distogram_atom_idx=13,
         token_center_atom_idx=11,
-        three_atom_for_frame = (6, 19, 18)
+        three_atom_indices_for_frame = (6, 19, 18)
     ),
     X=dict(
         resname="DN",
@@ -263,7 +263,7 @@ DNA_NUCLEOTIDES = dict(
         complement="N",
         distogram_atom_idx=21,
         token_center_atom_idx=11,
-        three_atom_for_frame = None
+        three_atom_indices_for_frame = None
     ),
 )
 
@@ -276,7 +276,7 @@ RNA_NUCLEOTIDES = dict(
         complement="U",
         distogram_atom_idx=22,
         token_center_atom_idx=12,
-        three_atom_for_frame = (8, 19, 21)
+        three_atom_indices_for_frame = (8, 19, 21)
     ),
     C=dict(
         resname="C",
@@ -286,7 +286,7 @@ RNA_NUCLEOTIDES = dict(
         complement="G",
         distogram_atom_idx=14,
         token_center_atom_idx=12,
-        three_atom_for_frame = (8, 19, 21)
+        three_atom_indices_for_frame = (8, 19, 21)
     ),
     G=dict(
         resname="G",
@@ -296,7 +296,7 @@ RNA_NUCLEOTIDES = dict(
         complement="C",
         distogram_atom_idx=23,
         token_center_atom_idx=12,
-        three_atom_for_frame = (8, 20, 22)
+        three_atom_indices_for_frame = (8, 20, 22)
     ),
     U=dict(
         resname="U",
@@ -306,7 +306,7 @@ RNA_NUCLEOTIDES = dict(
         complement="A",
         distogram_atom_idx=14,
         token_center_atom_idx=12,
-        three_atom_for_frame = (8, 17, 19)
+        three_atom_indices_for_frame = (8, 17, 19)
     ),
     X=dict(
         resname="N",
@@ -316,7 +316,7 @@ RNA_NUCLEOTIDES = dict(
         complement="N",
         distogram_atom_idx=22,
         token_center_atom_idx=12,
-        three_atom_for_frame = None
+        three_atom_indices_for_frame = None
     ),
 )
 
