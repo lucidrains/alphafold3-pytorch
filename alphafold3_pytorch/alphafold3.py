@@ -5142,13 +5142,18 @@ class Alphafold3(Module):
             num_dist_bins = num_dist_bins
         )
 
-        # pae bins
+        # pae related bins and modules
 
         pae_bins_tensor = Tensor(pae_bins)
         self.register_buffer('pae_bins', pae_bins_tensor)
         num_pae_bins = len(pae_bins)
 
+        self.rigid_from_three_points = RigidFrom3Points()
+        self.compute_alignment_error = ComputeAlignmentError()
+
         # confidence head
+
+        self.confidence_head_atom_resolution = confidence_head_atom_resolution
 
         self.confidence_head = ConfidenceHead(
             dim_single_inputs = dim_single_inputs,
@@ -5286,7 +5291,6 @@ class Alphafold3(Module):
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
         distance_labels: Int['b n n'] | Int['b m m'] | None = None,
-        pae_labels: Int['b n n'] | Int['b m m'] | None = None,
         pde_labels: Int['b n n'] | Int['b m m'] | None = None,
         plddt_labels: Int['b n'] | Int['b m'] | None = None,
         resolved_labels: Int['b n'] | Int['b m'] | None = None,
@@ -5544,7 +5548,7 @@ class Alphafold3(Module):
 
         atom_pos_given = exists(atom_pos)
 
-        confidence_head_labels = (pae_labels, pde_labels, plddt_labels, resolved_labels)
+        confidence_head_labels = (atom_indices_for_frame, pde_labels, plddt_labels, resolved_labels)
         all_labels = (distance_labels, *confidence_head_labels)
 
         has_labels = any([*map(exists, all_labels)])
@@ -5592,14 +5596,17 @@ class Alphafold3(Module):
                 mask = mask,
                 return_pae_logits = True
             )
-            if return_distogram_head_logits:
-                distogram_head_logits = self.distogram_head(pairwise.clone().detach())
-                return (
-                    sampled_atom_pos,
-                    confidence_head_logits,
-                    distogram_head_logits,
-                )
-            return sampled_atom_pos, confidence_head_logits
+
+            if not return_distogram_head_logits:
+                return sampled_atom_pos, confidence_head_logits
+
+            distogram_head_logits = self.distogram_head(pairwise.clone().detach())
+
+            return (
+                sampled_atom_pos,
+                confidence_head_logits,
+                distogram_head_logits,
+            )
 
         # if being forced to return loss, but do not have sufficient information to return losses, just return 0
 
@@ -5620,6 +5627,8 @@ class Alphafold3(Module):
         ignore = self.ignore_index
 
         # distogram head
+
+        molecule_pos = None
 
         if not exists(distance_labels) and atom_pos_given and exists(distogram_atom_indices):
             # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
@@ -5668,8 +5677,10 @@ class Alphafold3(Module):
                     additional_molecule_feats,
                     is_molecule_types,
                     molecule_atom_indices,
+                    molecule_pos,
+                    distogram_atom_indices,
+                    atom_indices_for_frame,
                     molecule_atom_lens,
-                    pae_labels,
                     pde_labels,
                     plddt_labels,
                     resolved_labels,
@@ -5692,8 +5703,10 @@ class Alphafold3(Module):
                         additional_molecule_feats,
                         is_molecule_types,
                         molecule_atom_indices,
+                        molecule_pos,
+                        distogram_atom_indices,
+                        atom_indices_for_frame,
                         molecule_atom_lens,
-                        pae_labels,
                         pde_labels,
                         plddt_labels,
                         resolved_labels
@@ -5741,6 +5754,41 @@ class Alphafold3(Module):
                 molecule_atom_lens = molecule_atom_lens,
                 return_denoised_pos = True,
             )
+
+        # determine pae labels if possible
+
+        pae_labels = None
+        ch_atom_res = self.confidence_head_atom_resolution
+
+        if atom_pos_given and exists(atom_indices_for_frame):
+
+            denoised_molecule_pos = None
+
+            if not ch_atom_res:
+                assert exists(molecule_pos), '`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels'
+                denoised_molecule_pos = denoised_atom_pos.gather(1, distogram_atom_indices)
+
+            three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
+            pred_three_atoms = einx.get_at('b [m] c, b n three -> three b n c', denoised_atom_pos, atom_indices_for_frame)
+
+            # compute frames
+
+            frames, _ = self.rigid_from_three_points(three_atoms)
+            pred_frames, _ = self.rigid_from_three_points(pred_three_atoms)
+
+            # align error
+
+            align_error = self.compute_alignment_error(
+                denoised_atom_pos if ch_atom_res else denoised_molecule_pos,
+                atom_pos if ch_atom_res else molecule_pos,
+                pred_frames,
+                frames,
+                molecule_atom_lens = molecule_atom_lens
+            )
+
+            # calculate pae labels as alignment error binned to 64 (0 - 32A)
+
+            pae_labels = distance_to_bins(align_error, self.pae_bins)
 
         # confidence head
 

@@ -193,8 +193,8 @@ class AtomInput:
     missing_atom_mask:          Bool[' m'] | None = None
     molecule_atom_indices:      Int[' n'] | None = None
     distogram_atom_indices:     Int[' n'] | None = None
+    atom_indices_for_frame:     Int['n 3'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int['n n'] | None = None
     plddt_labels:               Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
@@ -227,8 +227,8 @@ class BatchedAtomInput:
     missing_atom_mask:          Bool['b m'] | None = None
     molecule_atom_indices:      Int['b n'] | None = None
     distogram_atom_indices:     Int['b n'] | None = None
+    atom_indices_for_frame:     Int['b n 3'] | None = None
     distance_labels:            Int['b n n'] | None = None
-    pae_labels:                 Int['b n n'] | None = None
     pde_labels:                 Int['b n n'] | None = None
     plddt_labels:               Int['b n'] | None = None
     resolved_labels:            Int['b n'] | None = None
@@ -444,6 +444,7 @@ class MoleculeInput:
     is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
+    atom_indices_for_frame:     List[Tuple[int, int, int] | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
     missing_token_indices:      List[Int[' _'] | None] | None = None
     atom_parent_ids:            Int[' m'] | None = None
@@ -454,7 +455,6 @@ class MoleculeInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
@@ -715,6 +715,14 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     if is_molecule_mod.ndim == 1:
         is_molecule_mod = rearrange(is_molecule_mod, 'n -> n 1')
 
+    # handle `atom_indices_for_frame` for the PAE
+
+    atom_indices_for_frame = i.atom_indices_for_frame
+
+    if exists(atom_indices_for_frame):
+        atom_indices_for_frame = [default(indices, (-1, -1, -1)) for indices in i.atom_indices_for_frame]
+        atom_indices_for_frame = tensor(atom_indices_for_frame)
+
     # atom input
 
     atom_input = AtomInput(
@@ -724,6 +732,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         molecule_ids=i.molecule_ids,
         molecule_atom_indices=i.molecule_atom_indices,
         distogram_atom_indices=i.distogram_atom_indices,
+        atom_indices_for_frame=atom_indices_for_frame,
         is_molecule_mod=is_molecule_mod,
         msa=i.msa,
         templates=i.templates,
@@ -773,7 +782,6 @@ class MoleculeLengthMoleculeInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
@@ -1194,7 +1202,6 @@ class Alphafold3Input:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pae_labels:                 Int['n n'] | None = None
     pde_labels:                 Int[' n'] | None = None
     resolved_labels:            Int[' n'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
