@@ -5277,6 +5277,7 @@ class Alphafold3(Module):
         atom_mask: Bool['b m'] | None = None,
         missing_atom_mask: Bool['b m'] | None = None,
         atom_indices_for_frame: Int['b n 3'] | None = None,
+        valid_atom_indices_for_frame: Bool['b n'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -5330,9 +5331,10 @@ class Alphafold3(Module):
             valid_distogram_mask = distogram_atom_indices >= 0 & valid_atom_len_mask
             distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_distogram_mask, 0)
 
-        valid_atom_indices_for_frame = None
         if exists(atom_indices_for_frame):
-            valid_atom_indices_for_frame = (atom_indices_for_frame >= 0).all(dim = -1) & valid_atom_len_mask
+            valid_atom_indices_for_frame = default(valid_atom_indices_for_frame, torch.ones_like(molecule_atom_lens).bool())
+
+            valid_atom_indices_for_frame = valid_atom_indices_for_frame & (atom_indices_for_frame >= 0).all(dim = -1) & valid_atom_len_mask
             atom_indices_for_frame = einx.where('b n, b n three, -> b n three', valid_atom_indices_for_frame, atom_indices_for_frame, 0)
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
