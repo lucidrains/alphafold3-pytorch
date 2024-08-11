@@ -10,6 +10,9 @@ from rdkit.Chem.rdchem import Mol
 from alphafold3_pytorch.tensor_typing import Int, typecheck
 
 
+def exists(v):
+    return v is not None
+
 def is_unique(arr):
     """Check if all elements in an array are unique."""
     return len(arr) == len({*arr})
@@ -286,7 +289,7 @@ RNA_NUCLEOTIDES = dict(
         complement="G",
         distogram_atom_idx=14,
         token_center_atom_idx=12,
-        three_atom_indices_for_frame = (8, 19, 21)
+        three_atom_indices_for_frame = (8, 17, 19)
     ),
     G=dict(
         resname="G",
@@ -541,10 +544,16 @@ for entries in [*CHAINABLE_BIOMOLECULES, *METALS_AND_MISC]:
 for entries in CHAINABLE_BIOMOLECULES:
     for rescode in entries:
         entry = entries[rescode]
+        mol = entry['rdchem_mol']
         num_atoms = mol.GetNumAtoms()
 
         assert 0 <= entry["first_atom_idx"] < num_atoms
         assert 0 <= entry["last_atom_idx"] < num_atoms
         assert 0 <= entry["distogram_atom_idx"] < num_atoms
         assert 0 <= entry["token_center_atom_idx"] < num_atoms
+
+        if exists(entry.get('three_atom_indices_for_frame', None)):
+            print(num_atoms, entry, entry['three_atom_indices_for_frame'])
+            assert all([(0 <= i < num_atoms) for i in entry["three_atom_indices_for_frame"]])
+
         assert entry["first_atom_idx"] != entry["last_atom_idx"]

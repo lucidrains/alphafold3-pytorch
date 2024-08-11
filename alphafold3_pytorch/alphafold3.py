@@ -5344,15 +5344,6 @@ class Alphafold3(Module):
         if IS_DEBUGGING:
             assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
 
-            if exists(distogram_atom_indices):
-                assert (distogram_atom_indices < molecule_atom_lens)[valid_distogram_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
-
-            if exists(molecule_atom_indices):
-                assert (molecule_atom_indices < molecule_atom_lens)[valid_molecule_atom_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
-
-            if exists(atom_indices_for_frame):
-                assert einx.less('b n three, b n -> b n three', atom_indices_for_frame, molecule_atom_lens).all(), '`atom_indices_for_frame` must have indices that are all less than the corresponding `molecule_atom_lens`'
-
         # if atompair inputs are not windowed, window it
 
         is_atompair_inputs_windowed = atompair_inputs.ndim == 5
@@ -5773,8 +5764,15 @@ class Alphafold3(Module):
                 assert exists(molecule_pos), '`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels'
                 denoised_molecule_pos = denoised_atom_pos.gather(1, distogram_atom_indices)
 
-            three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
-            pred_three_atoms = einx.get_at('b [m] c, b n three -> three b n c', denoised_atom_pos, atom_indices_for_frame)
+            # three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
+            # pred_three_atoms = einx.get_at('b [m] c, b n three -> three b n c', denoised_atom_pos, atom_indices_for_frame)
+
+            atom_indices_for_frame = repeat(atom_indices_for_frame, 'b n three -> three b n c', c = 3)
+            three_atom_pos = repeat(atom_pos, 'b m c -> three b m c', three = 3)
+            three_denoised_atom_pos = repeat(denoised_atom_pos, 'b m c -> three b m c', three = 3)
+
+            three_atoms = three_atom_pos.gather(2, atom_indices_for_frame)
+            pred_three_atoms = three_denoised_atom_pos.gather(2, atom_indices_for_frame)
 
             # compute frames
 
@@ -5862,22 +5860,23 @@ class Alphafold3(Module):
 
             # cross entropy losses
 
-            assert len(set([t.shape[-1] for t in compact(pde_labels, plddt_labels, resolved_labels)])) == 1
-            assert pde_labels.shape[-1] == ch_logits.pde.shape[-1]
-
             if exists(pae_labels):
+                assert pae_labels.shape[-1] == ch_logits.pae.shape[-1]
                 pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
                 pae_loss = F.cross_entropy(ch_logits.pae, pae_labels, ignore_index = ignore)
 
             if exists(pde_labels):
+                assert pde_labels.shape[-1] == ch_logits.pde.shape[-1]
                 pde_labels = torch.where(label_pairwise_mask, pde_labels, ignore)
                 pde_loss = F.cross_entropy(ch_logits.pde, pde_labels, ignore_index = ignore)
 
             if exists(plddt_labels):
+                assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1]
                 plddt_labels = torch.where(label_mask, plddt_labels, ignore)
                 plddt_loss = F.cross_entropy(ch_logits.plddt, plddt_labels, ignore_index = ignore)
 
             if exists(resolved_labels):
+                assert resolved_labels.shape[-1] == ch_logits.resolved.shape[-1]
                 resolved_labels = torch.where(label_mask, resolved_labels, ignore)
                 resolved_loss = F.cross_entropy(ch_logits.resolved, resolved_labels, ignore_index = ignore)
 

@@ -772,6 +772,7 @@ class MoleculeLengthMoleculeInput:
     is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
     molecule_atom_indices:      List[int | None] | None = None
     distogram_atom_indices:     List[int | None] | None = None
+    atom_indices_for_frame:     List[Tuple[int, int, int] | None] | None = None
     missing_atom_indices:       List[Int[' _'] | None] | None = None
     missing_token_indices:      List[Int[' _'] | None] | None = None
     atom_parent_ids:            Int[' m'] | None = None
@@ -869,6 +870,10 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
     molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
+
+    atom_indices_offsets = exclusive_cumsum(atoms_per_molecule)
+    distogram_atom_indices = i.distogram_atom_indices + atom_indices_offsets
+    molecule_atom_indices = i.molecule_atom_indices + atom_indices_offsets
 
     distogram_atom_indices = repeat_interleave(i.distogram_atom_indices, token_repeats)
     molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
@@ -1004,6 +1009,20 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
             batch_first=True,
             padding_value=-2,
         )
+
+    # handle `atom_indices_for_frame` for the PAE
+
+    atom_indices_for_frame = i.atom_indices_for_frame
+
+    if exists(atom_indices_for_frame):
+        atom_indices_for_frame = [default(indices, (-1, -1, -1)) for indices in i.atom_indices_for_frame]
+        atom_indices_for_frame = tensor(atom_indices_for_frame)
+
+    atom_indices_for_frame = atom_indices_for_frame + atom_indices_offsets[..., None]
+    valid_atom_indices_for_frame = (atom_indices_for_frame >= 0).all(dim = -1)
+
+    atom_indices_for_frame = einx.where('n, n c, -> n c', valid_atom_indices_for_frame, atom_indices_for_frame, -1)
+    atom_indices_for_frame = repeat_interleave(atom_indices_for_frame, token_repeats, dim = 0)
 
     # handle maybe atompair embeds
 
@@ -1159,6 +1178,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         molecule_ids = molecule_ids,
         molecule_atom_indices = molecule_atom_indices,
         distogram_atom_indices = distogram_atom_indices,
+        atom_indices_for_frame = atom_indices_for_frame,
         missing_atom_mask = missing_atom_mask,
         additional_token_feats = additional_token_feats,
         additional_molecule_feats = additional_molecule_feats,
@@ -1302,6 +1322,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     mol_proteins = []
     protein_entries = []
 
+    atom_indices_for_frame = []
     distogram_atom_indices = []
     molecule_atom_indices = []
     src_tgt_atom_indices = []
@@ -1319,6 +1340,10 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
         src_tgt_atom_indices.extend(
             [[entry["first_atom_idx"], entry["last_atom_idx"]] for entry in protein_entries]
+        )
+
+        atom_indices_for_frame.extend(
+            [entry["three_atom_indices_for_frame"] for entry in protein_entries]
         )
 
         protein_ids = maybe_string_to_int(HUMAN_AMINO_ACIDS, protein)
@@ -1344,6 +1369,10 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
             [[entry["first_atom_idx"], entry["last_atom_idx"]] for entry in ss_rna_entries]
         )
 
+        atom_indices_for_frame.extend(
+            [entry["three_atom_indices_for_frame"] for entry in ss_rna_entries]
+        )
+
         rna_ids = maybe_string_to_int(RNA_NUCLEOTIDES, seq) + rna_offset
         molecule_ids.append(rna_ids)
 
@@ -1360,6 +1389,10 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
         src_tgt_atom_indices.extend(
             [[entry["first_atom_idx"], entry["last_atom_idx"]] for entry in ss_dna_entries]
+        )
+
+        atom_indices_for_frame.extend(
+            [entry["three_atom_indices_for_frame"] for entry in ss_dna_entries]
         )
 
         dna_ids = maybe_string_to_int(DNA_NUCLEOTIDES, seq) + dna_offset
@@ -1435,6 +1468,12 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     for mol in molecules:
         Chem.SanitizeMol(mol)
+
+    # handle rest of non-biomolecules for atom_indices_for_frame
+
+    atom_indices_for_frame = [*atom_indices_for_frame, *([None] * (len(molecules) - len(atom_indices_for_frame)))]
+
+    assert len(atom_indices_for_frame) == len(molecules)
 
     # handle molecule ids
 
@@ -1594,6 +1633,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         missing_atom_indices=missing_atom_indices,
         missing_token_indices=missing_token_indices,
         src_tgt_atom_indices=src_tgt_atom_indices,
+        atom_indices_for_frame=atom_indices_for_frame,
         atom_pos=atom_pos,
         templates=i.templates,
         msa=i.msa,

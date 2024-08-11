@@ -120,22 +120,27 @@ def test_alphafold3_input(directed_bonds):
 def test_atompos_input():
 
     contrived_protein = 'AG'
+    contrived_nucleic_acid = 'C'
 
     mock_atompos = [
         torch.randn(5, 3),   # alanine has 5 non-hydrogen atoms
         torch.randn(4, 3),   # glycine has 4 non-hydrogen atoms
+        torch.randn(21, 3),  # cytosine has 21 atoms
         torch.randn(3, 3)    # ligand has 3 carbons
     ]
 
     train_alphafold3_input = Alphafold3Input(
         proteins = [contrived_protein],
-        missing_atom_indices = [[1, 2], None, [0, 1]],
+        ss_rna = [contrived_nucleic_acid],
+        missing_atom_indices = [[1, 2], None, [0, 1], None, None],
         ligands = ['CCC'],
         atom_pos = mock_atompos
     )
 
     eval_alphafold3_input = Alphafold3Input(
-        proteins = [contrived_protein]
+        proteins = [contrived_protein],
+        ss_rna = [contrived_nucleic_acid],
+        ligands = ['CCC'],
     )
 
     batched_atom_input = alphafold3_inputs_to_batched_atom_input(train_alphafold3_input, atoms_per_window = 27)
@@ -178,7 +183,7 @@ def test_atompos_input():
     alphafold3.eval()
     sampled_atom_pos = alphafold3(**batched_eval_atom_input.model_forward_dict(), return_loss=False)
 
-    assert sampled_atom_pos.shape == (1, (5 + 4), 3)
+    assert sampled_atom_pos.shape == (1, (5 + 4 + 21 + 3), 3)
 
 def test_pdbinput_input():
     filepath = os.path.join("data", "test", "7a4d-assembly1.cif")
