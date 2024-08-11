@@ -3520,8 +3520,7 @@ class ConfidenceHead(Module):
 
         intermolecule_dist = torch.cdist(pred_molecule_pos, pred_molecule_pos, p = 2)
 
-        dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', intermolecule_dist, self.atompair_dist_bins).abs()
-        dist_bin_indices = dist_from_dist_bins.argmin(dim = -1)
+        dist_bin_indices = distance_to_bins(intermolecule_dist, self.atompair_dist_bins)
         pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
 
         # pairformer stack
@@ -3546,8 +3545,7 @@ class ConfidenceHead(Module):
 
             interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
 
-            dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', interatomic_dist, self.atompair_dist_bins).abs()
-            dist_bin_indices = dist_from_dist_bins.argmin(dim = -1)
+            dist_bin_indices = distance_to_bins(interatomic_dist, self.atompair_dist_bins)
             pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
 
             single_repr = single_repr + self.atom_feats_to_single(atom_feats)
@@ -4889,11 +4887,12 @@ class Alphafold3(Module):
         num_atompair_embeds: int | None = None,
         num_molecule_mods: int | None = DEFAULT_NUM_MOLECULE_MODS,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
+        pae_bins: List[float] = torch.linspace(0.5, 32, 64).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
         num_plddt_bins = 50,
         num_pde_bins = 64,
-        num_pae_bins = 64,
+        num_pae_bins: int | None = None,
         sigma_data = 16,
         num_rollout_steps = 20,
         diffusion_num_augmentations = 4,
@@ -5126,12 +5125,15 @@ class Alphafold3(Module):
             **edm_kwargs
         )
 
+        self.num_rollout_steps = num_rollout_steps
+
         # logit heads
 
         distance_bins_tensor = Tensor(distance_bins)
 
         self.register_buffer('distance_bins', distance_bins_tensor)
         num_dist_bins = default(num_dist_bins, len(distance_bins_tensor))
+
 
         assert len(distance_bins_tensor) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
 
@@ -5140,7 +5142,13 @@ class Alphafold3(Module):
             num_dist_bins = num_dist_bins
         )
 
-        self.num_rollout_steps = num_rollout_steps
+        # pae bins
+
+        pae_bins_tensor = Tensor(pae_bins)
+        self.register_buffer('pae_bins', pae_bins_tensor)
+        num_pae_bins = len(pae_bins)
+
+        # confidence head
 
         self.confidence_head = ConfidenceHead(
             dim_single_inputs = dim_single_inputs,
