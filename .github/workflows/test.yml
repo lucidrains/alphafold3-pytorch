@@ -3,6 +3,7 @@ on: [push, pull_request]
 
 env:
   TYPECHECK: True
+  DEBUG: True
 
 jobs:
   build:

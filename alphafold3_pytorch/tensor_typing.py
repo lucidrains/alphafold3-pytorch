@@ -59,6 +59,7 @@ TokenType = AtomType | ResidueType
 # use env variable TYPECHECK to control whether to use beartype + jaxtyping
 
 should_typecheck = env.bool('TYPECHECK', False)
+IS_DEBUGGING = env.bool('DEBUG', False)
 
 typecheck = jaxtyped(typechecker = beartype) if should_typecheck else identity
 
@@ -71,5 +72,6 @@ __all__ = [
     Bool,
     typecheck,
     should_typecheck,
-    beartype_isinstance
+    beartype_isinstance,
+    IS_DEBUGGING
 ]

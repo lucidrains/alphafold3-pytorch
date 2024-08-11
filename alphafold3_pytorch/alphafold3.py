@@ -27,7 +27,8 @@ from alphafold3_pytorch.tensor_typing import (
     Int,
     Bool,
     Shaped,
-    typecheck
+    typecheck,
+    IS_DEBUGGING
 )
 
 from alphafold3_pytorch.attention import (
@@ -397,6 +398,18 @@ def batch_repeat_interleave(
     )
 
     return output
+
+@typecheck
+def distance_to_bins(
+    distance: Float['... dist'],
+    bins: Float[' bins']
+) -> Int['... dist']:
+    """
+    converting from distance to discrete bins, for distance_labels and pae_labels
+    """
+
+    dist_from_dist_bins = einx.subtract('... dist, dist_bins -> ... dist dist_bins', distance, bins).abs()
+    return dist_from_dist_bins.argmin(dim = -1)
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -3108,9 +3121,7 @@ class ComputeAlignmentError(Module):
         true_coords_transformed = self.express_coordinates_in_frame(pair_true_coords, pair_true_frames)
 
         # Compute alignment errors
-        alignment_errors = torch.sqrt(
-            torch.sum((pred_coords_transformed - true_coords_transformed) ** 2, dim=-1) + self.eps
-        )
+        alignment_errors = F.pairwise_distance(pred_coords_transformed, true_coords_transformed, eps = self.eps)
 
         alignment_errors = seq2pair(alignment_errors)
 
@@ -5278,6 +5289,11 @@ class Alphafold3(Module):
         assert atom_inputs.shape[-1] == self.dim_atom_inputs, f'expected {self.dim_atom_inputs} for atom_inputs feature dimension, but received {atom_inputs.shape[-1]}'
         assert atompair_inputs.shape[-1] == self.dim_atompair_inputs, f'expected {self.dim_atompair_inputs} for atompair_inputs feature dimension, but received {atompair_inputs.shape[-1]}'
 
+        # debug
+
+        if IS_DEBUGGING:
+            assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
+
         # soft validate
 
         valid_atom_len_mask = molecule_atom_lens >= 0
@@ -5578,8 +5594,7 @@ class Alphafold3(Module):
             molecule_pos = atom_pos.gather(1, distogram_atom_indices)
 
             molecule_dist = torch.cdist(molecule_pos, molecule_pos, p = 2)
-            dist_from_dist_bins = einx.subtract('b m dist, dist_bins -> b m dist dist_bins', molecule_dist, self.distance_bins).abs()
-            distance_labels = dist_from_dist_bins.argmin(dim = -1)
+            distance_labels = distance_to_bins(molecule_dist, self.distance_bins)
 
             # account for representative distogram atom missing from residue (-1 set on distogram_atom_indices field)
 
