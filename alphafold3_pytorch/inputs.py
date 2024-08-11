@@ -139,6 +139,11 @@ def pad_to_len(t, length, value = 0, dim = -1):
     zeros = (0, 0) * (-dim - 1)
     return F.pad(t, (*zeros, 0, max(0, length - t.shape[dim])), value = value)
 
+def offset_only_positive(t, offset):
+    is_positive = t >= 0
+    t_offsetted = t + offset
+    return torch.where(is_positive, t_offsetted, t)
+
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
 
@@ -871,9 +876,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
     molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
 
-    atom_indices_offsets = exclusive_cumsum(atoms_per_molecule)
-    distogram_atom_indices = i.distogram_atom_indices + atom_indices_offsets
-    molecule_atom_indices = i.molecule_atom_indices + atom_indices_offsets
+    atom_indices_offsets = repeat_interleave(exclusive_cumsum(atoms_per_molecule), token_repeats, dim = 0)
 
     distogram_atom_indices = repeat_interleave(i.distogram_atom_indices, token_repeats)
     molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
@@ -1018,10 +1021,6 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         atom_indices_for_frame = [default(indices, (-1, -1, -1)) for indices in i.atom_indices_for_frame]
         atom_indices_for_frame = tensor(atom_indices_for_frame)
 
-    atom_indices_for_frame = atom_indices_for_frame + atom_indices_offsets[..., None]
-    valid_atom_indices_for_frame = (atom_indices_for_frame >= 0).all(dim = -1)
-
-    atom_indices_for_frame = einx.where('n, n c, -> n c', valid_atom_indices_for_frame, atom_indices_for_frame, -1)
     atom_indices_for_frame = repeat_interleave(atom_indices_for_frame, token_repeats, dim = 0)
 
     # handle maybe atompair embeds
@@ -1155,8 +1154,19 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
             "n missing, n -> n missing", missing_token_indices, distogram_atom_indices
         ).any(dim=-1)
 
+        is_missing_atom_indices_for_frame = einx.equal(
+            "n missing, n c -> n c missing", missing_token_indices, atom_indices_for_frame
+        ).any(dim=(-1, -2))
+
         molecule_atom_indices = molecule_atom_indices.masked_fill(is_missing_molecule_atom, -1)
         distogram_atom_indices = distogram_atom_indices.masked_fill(is_missing_distogram_atom, -1)
+        atom_indices_for_frame = atom_indices_for_frame.masked_fill(is_missing_atom_indices_for_frame[..., None], -1)
+
+    # offsets for all indices
+
+    distogram_atom_indices = offset_only_positive(distogram_atom_indices, atom_indices_offsets)
+    molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
+    atom_indices_for_frame = offset_only_positive(atom_indices_for_frame, atom_indices_offsets[..., None])
 
     # handle atom positions
 

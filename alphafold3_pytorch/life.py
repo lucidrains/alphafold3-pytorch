@@ -553,7 +553,6 @@ for entries in CHAINABLE_BIOMOLECULES:
         assert 0 <= entry["token_center_atom_idx"] < num_atoms
 
         if exists(entry.get('three_atom_indices_for_frame', None)):
-            print(num_atoms, entry, entry['three_atom_indices_for_frame'])
             assert all([(0 <= i < num_atoms) for i in entry["three_atom_indices_for_frame"]])
 
         assert entry["first_atom_idx"] != entry["last_atom_idx"]
