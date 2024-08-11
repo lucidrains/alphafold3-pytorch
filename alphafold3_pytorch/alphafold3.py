@@ -5330,6 +5330,7 @@ class Alphafold3(Module):
             valid_distogram_mask = distogram_atom_indices >= 0 & valid_atom_len_mask
             distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_distogram_mask, 0)
 
+        valid_atom_indices_for_frame = None
         if exists(atom_indices_for_frame):
             valid_atom_indices_for_frame = (atom_indices_for_frame >= 0).all(dim = -1) & valid_atom_len_mask
             atom_indices_for_frame = einx.where('b n, b n three, -> b n three', valid_atom_indices_for_frame, atom_indices_for_frame, 0)
@@ -5679,6 +5680,7 @@ class Alphafold3(Module):
                     molecule_atom_indices,
                     molecule_pos,
                     distogram_atom_indices,
+                    valid_atom_indices_for_frame,
                     atom_indices_for_frame,
                     molecule_atom_lens,
                     pde_labels,
@@ -5705,6 +5707,7 @@ class Alphafold3(Module):
                         molecule_atom_indices,
                         molecule_pos,
                         distogram_atom_indices,
+                        valid_atom_indices_for_frame,
                         atom_indices_for_frame,
                         molecule_atom_lens,
                         pde_labels,
@@ -5776,6 +5779,17 @@ class Alphafold3(Module):
             frames, _ = self.rigid_from_three_points(three_atoms)
             pred_frames, _ = self.rigid_from_three_points(pred_three_atoms)
 
+            # determine mask
+            # must be residue or nucleotide with greater than 0 atoms
+
+            align_error_mask = (
+                is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim = -1) &
+                valid_atom_indices_for_frame
+            )
+
+            if ch_atom_res:
+                align_error_mask = batch_repeat_interleave(align_error_mask, molecule_atom_lens)
+
             # align error
 
             align_error = self.compute_alignment_error(
@@ -5783,12 +5797,19 @@ class Alphafold3(Module):
                 atom_pos if ch_atom_res else molecule_pos,
                 pred_frames,
                 frames,
+                mask = align_error_mask,
                 molecule_atom_lens = molecule_atom_lens
             )
 
             # calculate pae labels as alignment error binned to 64 (0 - 32A)
 
             pae_labels = distance_to_bins(align_error, self.pae_bins)
+
+            # set ignore index for invalid molecules or frames (todo: figure out what is meant by invalid frame)
+
+            pair_align_error_mask = to_pairwise_mask(align_error_mask)
+
+            pae_labels = einx.where('b i j, b i j, -> b i j', pair_align_error_mask, pae_labels, ignore)
 
         # confidence head
 
