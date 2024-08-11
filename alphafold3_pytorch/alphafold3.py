@@ -5263,6 +5263,7 @@ class Alphafold3(Module):
         is_molecule_mod: Bool['b n {self.num_mods}'] | None = None,
         atom_mask: Bool['b m'] | None = None,
         missing_atom_mask: Bool['b m'] | None = None,
+        atom_indices_for_frame: Int['b n 3'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,
         msa: Float['b s n d'] | None = None,
@@ -5303,11 +5304,6 @@ class Alphafold3(Module):
         assert atom_inputs.shape[-1] == self.dim_atom_inputs, f'expected {self.dim_atom_inputs} for atom_inputs feature dimension, but received {atom_inputs.shape[-1]}'
         assert atompair_inputs.shape[-1] == self.dim_atompair_inputs, f'expected {self.dim_atompair_inputs} for atompair_inputs feature dimension, but received {atompair_inputs.shape[-1]}'
 
-        # debug
-
-        if IS_DEBUGGING:
-            assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
-
         # soft validate
 
         valid_atom_len_mask = molecule_atom_lens >= 0
@@ -5317,14 +5313,30 @@ class Alphafold3(Module):
         if exists(molecule_atom_indices):
             valid_molecule_atom_mask = molecule_atom_indices >= 0 & valid_atom_len_mask
             molecule_atom_indices = molecule_atom_indices.masked_fill(~valid_molecule_atom_mask, 0)
-            assert (molecule_atom_indices < molecule_atom_lens)[valid_molecule_atom_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
 
         if exists(distogram_atom_indices):
             valid_distogram_mask = distogram_atom_indices >= 0 & valid_atom_len_mask
             distogram_atom_indices = distogram_atom_indices.masked_fill(~valid_distogram_mask, 0)
-            assert (distogram_atom_indices < molecule_atom_lens)[valid_distogram_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+
+        if exists(atom_indices_for_frame):
+            valid_atom_indices_for_frame = (atom_indices_for_frame >= 0).all(dim = -1) & valid_atom_len_mask
+            atom_indices_for_frame = einx.where('b n, b n three, -> b n three', valid_atom_indices_for_frame, atom_indices_for_frame, 0)
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
+
+        # hard validate when debug env variable is turned on
+
+        if IS_DEBUGGING:
+            assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
+
+            if exists(distogram_atom_indices):
+                assert (distogram_atom_indices < molecule_atom_lens)[valid_distogram_mask].all(), 'distogram_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+
+            if exists(molecule_atom_indices):
+                assert (molecule_atom_indices < molecule_atom_lens)[valid_molecule_atom_mask].all(), 'molecule_atom_indices cannot have an index that exceeds the length of the atoms for that molecule as given by molecule_atom_lens'
+
+            if exists(atom_indices_for_frame):
+                assert einx.less('b n three, b n -> b n three', atom_indices_for_frame, molecule_atom_lens).all(), '`atom_indices_for_frame` must have indices that are all less than the corresponding `molecule_atom_lens`'
 
         # if atompair inputs are not windowed, window it
 

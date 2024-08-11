@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from einops import repeat
 from collections import namedtuple
 
 from alphafold3_pytorch import (
@@ -549,6 +550,7 @@ def test_distogram_head():
 @pytest.mark.parametrize('window_atompair_inputs', (True, False))
 @pytest.mark.parametrize('stochastic_frame_average', (True, False))
 @pytest.mark.parametrize('missing_atoms', (True, False))
+@pytest.mark.parametrize('calculate_pae', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 @pytest.mark.parametrize('num_molecule_mods', (0, 4))
 @pytest.mark.parametrize('confidence_head_atom_resolution', (True, False))
@@ -556,6 +558,7 @@ def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool,
     missing_atoms: bool,
+    calculate_pae: bool,
     atom_transformer_intramolecular_attn: bool,
     num_molecule_mods: int,
     confidence_head_atom_resolution: bool
@@ -563,7 +566,7 @@ def test_alphafold3(
     seq_len = 16
     atoms_per_window = 27
 
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    molecule_atom_lens = torch.randint(3, 5, (2, seq_len))
     atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
 
     token_bonds = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
@@ -583,6 +586,10 @@ def test_alphafold3(
     is_molecule_mod = None
     if num_molecule_mods > 0:
         is_molecule_mod = torch.zeros(2, seq_len, num_molecule_mods).uniform_(0, 1) < 0.1
+
+    atom_indices_for_frame = None
+    if calculate_pae:
+        atom_indices_for_frame = repeat(torch.arange(3), 'c -> b n c', b = 2, n = seq_len)
 
     missing_atom_mask = None
     if missing_atoms:
@@ -660,6 +667,7 @@ def test_alphafold3(
         atom_parent_ids = atom_parent_ids,
         atompair_inputs = atompair_inputs,
         missing_atom_mask = missing_atom_mask,
+        atom_indices_for_frame = atom_indices_for_frame,
         is_molecule_types = is_molecule_types,
         is_molecule_mod = is_molecule_mod,
         additional_molecule_feats = additional_molecule_feats,
