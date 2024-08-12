@@ -652,8 +652,7 @@ def test_alphafold3(
                 )
             )
         ),
-        stochastic_frame_average = stochastic_frame_average,
-        confidence_head_atom_resolution = confidence_head_atom_resolution
+        stochastic_frame_average = stochastic_frame_average
     )
 
     loss, breakdown = alphafold3(
