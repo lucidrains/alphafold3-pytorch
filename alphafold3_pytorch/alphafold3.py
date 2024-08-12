@@ -3076,13 +3076,13 @@ class ComputeAlignmentError(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b m_or_n 3'],
-        true_coords: Float['b m_or_n 3'],
+        pred_coords: Float['b m 3'],
+        true_coords: Float['b m 3'],
         pred_frames: Float['b n 3 3'],
         true_frames: Float['b n 3 3'],
-        mask: Bool['b m_or_n'] | None = None,
-        molecule_atom_lens: Int['b n'] | None = None
-    ) -> Float['b m_or_n m_or_n']:
+        molecule_atom_lens: Int['b n'],
+        mask: Bool['b m'] | None = None,
+    ) -> Float['b m m']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
@@ -3090,17 +3090,13 @@ class ComputeAlignmentError(Module):
         true_frames: true frames
         """
 
-        # detect whether using atom or residue resolution
+        # handle atom resolution
 
-        is_atom_resolution = pred_coords.shape[1] != pred_frames.shape[1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution alignment error'
+        pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
+        true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
 
-        if is_atom_resolution:
-            pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
-            true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
-
-            if not exists(mask) and exists(molecule_atom_lens):
-                mask = batch_repeat_interleave(molecule_atom_lens > 0, molecule_atom_lens)
+        if not exists(mask) and exists(molecule_atom_lens):
+            mask = batch_repeat_interleave(molecule_atom_lens > 0, molecule_atom_lens)
 
         # to pairs
 
@@ -3410,7 +3406,6 @@ class ConfidenceHead(Module):
         self,
         *,
         dim_single_inputs,
-        atom_resolution = False,  # @amorehead discovers that the public api has per-atom resolution confidences. improvise a solution
         dim_atom = 128,
         atompair_dist_bins: List[float],
         dim_single = 384,
@@ -3465,13 +3460,9 @@ class ConfidenceHead(Module):
         )
 
         # atom resolution
-        # for now, just embed per atom distances, sum to atom features, project to pairwise dimension
 
-        self.atom_resolution = atom_resolution
-
-        if atom_resolution:
-            self.atom_feats_to_single = LinearNoBias(dim_atom, dim_single)
-            self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
+        self.atom_feats_to_single = LinearNoBias(dim_atom, dim_single)
+        self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
 
         # tensor typing
 
@@ -3484,11 +3475,11 @@ class ConfidenceHead(Module):
         single_inputs_repr: Float['b n dsi'],
         single_repr: Float['b n ds'],
         pairwise_repr: Float['b n n dp'],
-        pred_atom_pos: Float['b n 3'] | Float['b m 3'],
+        pred_atom_pos: Float['b m 3'],
+        molecule_atom_lens: Int['b n'],
+        atom_feats: Float['b m {self.da}'],
         molecule_atom_indices: Int['b n'] | None = None,
-        molecule_atom_lens: Int['b n'] | None = None,
         mask: Bool['b n'] | None = None,
-        atom_feats: Float['b m {self.da}'] | None = None,
         return_pae_logits = True
 
     ) -> ConfidenceHeadLogits:
@@ -3501,20 +3492,13 @@ class ConfidenceHead(Module):
 
         # handle atom resolution vs not
 
-        if self.atom_resolution:
-            assert exists(atom_feats), 'atom_feats must be passed in if atom_resolution is turned on for ConfidenceHead'
-            assert is_atom_seq, '`pred_atom_pos` must be passed in with atomic length'
-            assert exists(molecule_atom_lens)
+        assert is_atom_seq, '`pred_atom_pos` must be passed in with atomic length'
 
-        if is_atom_seq:
-            assert exists(molecule_atom_indices), 'molecule_atom_indices must be passed into ConfidenceHead if pred_atom_pos is atomic length'
-            # pred_molecule_pos = einx.get_at('b [m] c, b n -> b n c', pred_atom_pos, molecule_atom_indices)
+        assert exists(molecule_atom_indices), 'molecule_atom_indices must be passed into ConfidenceHead if pred_atom_pos is atomic length'
+        # pred_molecule_pos = einx.get_at('b [m] c, b n -> b n c', pred_atom_pos, molecule_atom_indices)
 
-            molecule_atom_indices = repeat(molecule_atom_indices, 'b n -> b n c', c = pred_atom_pos.shape[-1])
-            pred_molecule_pos = pred_atom_pos.gather(1, molecule_atom_indices)
-
-        else:
-            pred_molecule_pos = pred_atom_pos
+        molecule_atom_indices = repeat(molecule_atom_indices, 'b n -> b n c', c = pred_atom_pos.shape[-1])
+        pred_molecule_pos = pred_atom_pos.gather(1, molecule_atom_indices)
 
         # interatomic distances - embed and add to pairwise
 
@@ -3531,25 +3515,24 @@ class ConfidenceHead(Module):
             mask = mask
         )
 
-        # handle maybe atom level resolution
+        # handle atom level resolution
 
-        if self.atom_resolution:
-            single_repr = batch_repeat_interleave(single_repr, molecule_atom_lens)
+        single_repr = batch_repeat_interleave(single_repr, molecule_atom_lens)
 
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
+        pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
 
-            molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
-            pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
-            pairwise_repr = unpack_one(pairwise_repr)
+        molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
+        pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
+        pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
+        pairwise_repr = unpack_one(pairwise_repr)
 
-            interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
+        interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
 
-            dist_bin_indices = distance_to_bins(interatomic_dist, self.atompair_dist_bins)
-            pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
+        dist_bin_indices = distance_to_bins(interatomic_dist, self.atompair_dist_bins)
+        pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
 
-            single_repr = single_repr + self.atom_feats_to_single(atom_feats)
-            pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
+        single_repr = single_repr + self.atom_feats_to_single(atom_feats)
+        pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
         # to logits
 
@@ -3676,7 +3659,7 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_ptm(
         self,
-        logits: Float["b pae m_or_n m_or_n"],  
+        logits: Float["b pae m m"],  
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
         residue_weights: Float["b n"] | None = None,
@@ -3695,14 +3678,12 @@ class ComputeConfidenceScore(Module):
         :return: pTM
         """
 
-        is_atom_resolution = logits.shape[-1] != asym_id.shape[-1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution pTM'
+        # handle atom resolution
 
-        if is_atom_resolution:
-            asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
-            has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
-            if exists(residue_weights):
-                residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
+        asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
+        has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
+        if exists(residue_weights):
+            residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
                 
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
@@ -4962,7 +4943,6 @@ class Alphafold3(Module):
         ),
         augment_kwargs: dict = dict(),
         stochastic_frame_average = False,
-        confidence_head_atom_resolution = False,
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
         checkpoint_diffusion_token_transformer = False,
@@ -5153,8 +5133,6 @@ class Alphafold3(Module):
 
         # confidence head
 
-        self.confidence_head_atom_resolution = confidence_head_atom_resolution
-
         self.confidence_head = ConfidenceHead(
             dim_single_inputs = dim_single_inputs,
             atompair_dist_bins = distance_bins,
@@ -5163,7 +5141,6 @@ class Alphafold3(Module):
             num_plddt_bins = num_plddt_bins,
             num_pde_bins = num_pde_bins,
             num_pae_bins = num_pae_bins,
-            atom_resolution = confidence_head_atom_resolution,
             **confidence_head_kwargs
         )
 
@@ -5754,15 +5731,10 @@ class Alphafold3(Module):
         # determine pae labels if possible
 
         pae_labels = None
-        ch_atom_res = self.confidence_head_atom_resolution
 
         if atom_pos_given and exists(atom_indices_for_frame):
 
             denoised_molecule_pos = None
-
-            if not ch_atom_res:
-                assert exists(molecule_pos), '`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels'
-                denoised_molecule_pos = denoised_atom_pos.gather(1, distogram_atom_indices)
 
             # three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
             # pred_three_atoms = einx.get_at('b [m] c, b n three -> three b n c', denoised_atom_pos, atom_indices_for_frame)
@@ -5851,10 +5823,7 @@ class Alphafold3(Module):
 
             # determine which mask to use for labels depending on atom resolution or not for confidence head
 
-            label_mask = mask
-
-            if self.confidence_head.atom_resolution:
-                label_mask = atom_mask
+            label_mask = atom_mask
 
             label_pairwise_mask = to_pairwise_mask(label_mask)
 
