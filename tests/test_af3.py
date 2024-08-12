@@ -460,14 +460,20 @@ def test_template_embed(
         loss.backward()
 
 def test_confidence_head():
+    molecule_atom_lens = torch.randint(2, 4, (2, 16))
+    molecule_atom_indices = torch.zeros(2, 16).long()
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_feats = torch.randn(2, atom_seq_len, 64)
+    pred_atom_pos = torch.randn(2, atom_seq_len, 3)
+
     single_inputs_repr = torch.randn(2, 16, 77)
     single_repr = torch.randn(2, 16, 384)
     pairwise_repr = torch.randn(2, 16, 16, 128)
-    pred_atom_pos = torch.randn(2, 16, 3)
     mask = torch.ones((2, 16)).bool()
 
     confidence_head = ConfidenceHead(
         dim_single_inputs = 77,
+        dim_atom = 64,
         atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
         dim_single = 384,
         dim_pairwise = 128,
@@ -478,6 +484,9 @@ def test_confidence_head():
         single_repr = single_repr,
         pairwise_repr = pairwise_repr,
         pred_atom_pos = pred_atom_pos,
+        molecule_atom_lens = molecule_atom_lens,
+        molecule_atom_indices = molecule_atom_indices,
+        atom_feats = atom_feats,
         mask = mask
     )
 

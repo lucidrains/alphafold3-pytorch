@@ -5759,14 +5759,13 @@ class Alphafold3(Module):
                 valid_atom_indices_for_frame
             )
 
-            if ch_atom_res:
-                align_error_mask = batch_repeat_interleave(align_error_mask, molecule_atom_lens)
+            align_error_mask = batch_repeat_interleave(align_error_mask, molecule_atom_lens)
 
             # align error
 
             align_error = self.compute_alignment_error(
-                denoised_atom_pos if ch_atom_res else denoised_molecule_pos,
-                atom_pos if ch_atom_res else molecule_pos,
+                denoised_atom_pos,
+                atom_pos,
                 pred_frames,
                 frames,
                 mask = align_error_mask,
