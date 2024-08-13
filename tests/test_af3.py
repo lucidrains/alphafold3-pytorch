@@ -554,6 +554,7 @@ def test_distogram_head():
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 @pytest.mark.parametrize('num_molecule_mods', (0, 4))
 @pytest.mark.parametrize('confidence_head_atom_resolution', (True, False))
+@pytest.mark.parametrize('distogram_atom_resolution', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool,
@@ -561,7 +562,8 @@ def test_alphafold3(
     calculate_pae: bool,
     atom_transformer_intramolecular_attn: bool,
     num_molecule_mods: int,
-    confidence_head_atom_resolution: bool
+    confidence_head_atom_resolution: bool,
+    distogram_atom_resolution: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -655,7 +657,8 @@ def test_alphafold3(
             )
         ),
         stochastic_frame_average = stochastic_frame_average,
-        confidence_head_atom_resolution = confidence_head_atom_resolution
+        confidence_head_atom_resolution = confidence_head_atom_resolution,
+        distogram_atom_resolution = distogram_atom_resolution
     )
 
     loss, breakdown = alphafold3(

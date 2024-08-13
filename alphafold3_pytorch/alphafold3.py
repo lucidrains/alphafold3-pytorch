@@ -3376,7 +3376,9 @@ class DistogramHead(Module):
         self,
         *,
         dim_pairwise = 128,
-        num_dist_bins = 38,   # think it is 38?
+        num_dist_bins = 38,
+        dim_atom = 128,
+        atom_resolution = False
     ):
         super().__init__()
 
@@ -3385,13 +3387,42 @@ class DistogramHead(Module):
             Rearrange('b ... l -> b l ...')
         )
 
+        # atom resolution
+        # for now, just embed per atom distances, sum to atom features, project to pairwise dimension
+
+        self.atom_resolution = atom_resolution
+
+        if atom_resolution:
+            self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
+
+        # tensor typing
+
+        self.da = dim_atom
+
     @typecheck
     def forward(
         self,
-        pairwise_repr: Float['b n n d']
-    ) -> Float['b l n n']:
+        pairwise_repr: Float['b n n d'],
+        molecule_atom_lens: Int['b n'] | None = None,
+        atom_feats: Float['b m {self.da}'] | None = None,
+    ) -> Float['b l n n'] | Float['b l m m']:
 
-        logits = self.to_distogram_logits(pairwise_repr)
+        if self.atom_resolution:
+            assert exists(molecule_atom_lens)
+            assert exists(atom_feats)
+
+            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
+
+            molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
+            pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
+            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
+            pairwise_repr = unpack_one(pairwise_repr)
+
+            pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
+
+        symmetrized_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
+        logits = self.to_distogram_logits(symmetrized_pairwise_repr)
+
         return logits
 
 # confidence head
@@ -4973,6 +5004,7 @@ class Alphafold3(Module):
         augment_kwargs: dict = dict(),
         stochastic_frame_average = False,
         confidence_head_atom_resolution = False,
+        distogram_atom_resolution = False,
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
         checkpoint_diffusion_token_transformer = False,
@@ -5147,9 +5179,13 @@ class Alphafold3(Module):
 
         assert len(distance_bins_tensor) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
 
+        self.distogram_atom_resolution = distogram_atom_resolution
+
         self.distogram_head = DistogramHead(
             dim_pairwise = dim_pairwise,
-            num_dist_bins = num_dist_bins
+            dim_atom = dim_atom,
+            num_dist_bins = num_dist_bins,
+            atom_resolution = distogram_atom_resolution,
         )
 
         # pae related bins and modules
@@ -5635,22 +5671,41 @@ class Alphafold3(Module):
         molecule_pos = None
 
         if not exists(distance_labels) and atom_pos_given and exists(distogram_atom_indices):
-            # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
 
-            distogram_atom_indices = repeat(distogram_atom_indices, 'b n -> b n c', c = atom_pos.shape[-1])
-            molecule_pos = atom_pos.gather(1, distogram_atom_indices)
+            distogram_pos = atom_pos
 
-            molecule_dist = torch.cdist(molecule_pos, molecule_pos, p = 2)
-            distance_labels = distance_to_bins(molecule_dist, self.distance_bins)
+            if not self.distogram_atom_resolution:
+                # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
+
+                distogram_atom_indices = repeat(distogram_atom_indices, 'b n -> b n c', c = distogram_pos.shape[-1])
+                molecule_pos = distogram_pos = distogram_pos.gather(1, distogram_atom_indices)
+                distogram_mask = valid_distogram_mask
+            else:
+                distogram_mask = atom_mask
+
+            distogram_dist = torch.cdist(distogram_pos, distogram_pos, p = 2)
+            distance_labels = distance_to_bins(distogram_dist, self.distance_bins)
 
             # account for representative distogram atom missing from residue (-1 set on distogram_atom_indices field)
 
-            valid_distogram_mask = to_pairwise_mask(valid_distogram_mask)
-            distance_labels.masked_fill_(~valid_distogram_mask, ignore)
+            distogram_mask = to_pairwise_mask(distogram_mask)
+            distance_labels.masked_fill_(~distogram_mask, ignore)
 
         if exists(distance_labels):
-            distance_labels = torch.where(pairwise_mask, distance_labels, ignore)
-            distogram_logits = self.distogram_head(pairwise)
+
+            distogram_mask = pairwise_mask
+
+            if self.distogram_atom_resolution:
+                distogram_mask = to_pairwise_mask(atom_mask)
+
+            distance_labels = torch.where(distogram_mask, distance_labels, ignore)
+
+            distogram_logits = self.distogram_head(
+                pairwise,
+                molecule_atom_lens = molecule_atom_lens,
+                atom_feats = atom_feats
+            )
+
             distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
 
         # otherwise, noise and make it learn to denoise
@@ -5771,7 +5826,12 @@ class Alphafold3(Module):
             denoised_molecule_pos = None
 
             if not ch_atom_res:
-                assert exists(molecule_pos), '`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels'
+                if not exists(molecule_pos):
+                    assert exists(distogram_atom_indices), '`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels'
+
+                    distogram_atom_indices = repeat(distogram_atom_indices, 'b n -> b n c', c = distogram_pos.shape[-1])
+                    molecule_pos = atom_pos.gather(1, distogram_atom_indices)
+
                 denoised_molecule_pos = denoised_atom_pos.gather(1, distogram_atom_indices)
 
             # three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
