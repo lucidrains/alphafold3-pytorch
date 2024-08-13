@@ -400,6 +400,19 @@ def batch_repeat_interleave(
     return output
 
 @typecheck
+def batch_repeat_interleave_pairwise(
+    pairwise: Float['b n n d'],
+    molecule_atom_lens: Int['b n']
+) -> Float['b m m d']:
+
+    pairwise = batch_repeat_interleave(pairwise, molecule_atom_lens)
+
+    molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise.shape[1])
+    pairwise, unpack_one = pack_one(pairwise, '* n d')
+    pairwise = batch_repeat_interleave(pairwise, molecule_atom_lens)
+    return unpack_one(pairwise)
+
+@typecheck
 def distance_to_bins(
     distance: Float['... dist'],
     bins: Float[' bins']
@@ -3411,13 +3424,7 @@ class DistogramHead(Module):
             assert exists(molecule_atom_lens)
             assert exists(atom_feats)
 
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
-
-            molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
-            pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
-            pairwise_repr = unpack_one(pairwise_repr)
-
+            pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
             pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
         symmetrized_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
@@ -3567,12 +3574,7 @@ class ConfidenceHead(Module):
         if self.atom_resolution:
             single_repr = batch_repeat_interleave(single_repr, molecule_atom_lens)
 
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
-
-            molecule_atom_lens = repeat(molecule_atom_lens, 'b ... -> (b r) ...', r = pairwise_repr.shape[1])
-            pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
-            pairwise_repr = batch_repeat_interleave(pairwise_repr, molecule_atom_lens)
-            pairwise_repr = unpack_one(pairwise_repr)
+            pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
 
             interatomic_dist = torch.cdist(pred_atom_pos, pred_atom_pos, p = 2)
 
