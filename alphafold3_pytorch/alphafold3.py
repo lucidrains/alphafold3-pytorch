@@ -3827,12 +3827,13 @@ class ComputeClash(Module):
         self.chain_clash_count = chain_clash_count
         self.chain_clash_ratio = chain_clash_ratio
 
+    @typecheck
     def compute_has_clash(
         self,
         atom_pos: Float["m 3"],  
         asym_id: Int[" n"],  
         indices: Int[" m"],  
-        valid_indices: Int[" m"],  
+        valid_indices: Bool[" m"],
     ) -> Bool[""]:  
         """Compute if there is a clash in the chain.
 
@@ -3872,13 +3873,15 @@ class ComputeClash(Module):
 
         return torch.tensor(False, dtype=torch.bool, device=atom_pos.device)
 
+    @typecheck
     def forward(
         self,
         atom_pos: Float["b m 3"] | Float["m 3"],  
-        atom_mask: Bool["b m"] | Bool[" m"],  
+        atom_mask: Bool["b m"] | Bool[" m"],
         molecule_atom_lens: Int["b n"] | Int[" n"],  
         asym_id: Int["b n"] | Int[" n"],  
-    ) -> Bool[""]:  
+    ) -> Bool[" b"]:
+
         """Compute if there is a clash in the chain.
 
         :param atom_pos: [b m 3] atom positions
@@ -3938,11 +3941,12 @@ class ComputeRankingScore(Module):
         self.score_ptm_weight = score_ptm_weight
         self.score_disorder_weight = score_disorder_weight
 
+    @typecheck
     def compute_disorder(
         self,
         plddt: Float["b m"],  
-        atom_mask: Float["b m"],  
-        atom_is_molecule_types: Float["b m"],  
+        atom_mask: Bool["b m"],
+        atom_is_molecule_types: Bool[f"b m {IS_MOLECULE_TYPES}"],
     ) -> Float[" b"]:  
         """Compute disorder score.
 
@@ -3959,6 +3963,7 @@ class ComputeRankingScore(Module):
         disorder = ((atom_rasa > 0.581) * mask).sum(dim=-1) / (self.eps + mask.sum(dim=1))
         return disorder
 
+    @typecheck
     def compute_full_complex_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
@@ -3967,7 +3972,7 @@ class ComputeRankingScore(Module):
         molecule_atom_lens: Int["b n"],  
         atom_pos: Float["b m 3"],  
         atom_mask: Bool["b m"],  
-        is_molecule_types: Int[f"b n {IS_MOLECULE_TYPES}"],  
+        is_molecule_types: Bool[f"b n {IS_MOLECULE_TYPES}"],
         return_confidence_score: bool = False,
     ) -> Float[" b"] | Tuple[Float[" b"], Tuple[ConfidenceScore, Bool[" b"]]]:  
         """Compute full complex metric.
@@ -4028,12 +4033,14 @@ class ComputeRankingScore(Module):
 
         return weighted_score, (confidence_score, has_clash)
 
+    @typecheck
     def compute_single_chain_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
-    ) -> Float[" b"]:  
+    ) -> Float[" b"]:
+
         """Compute single chain metric.
 
         :param confidence_head_logits: ConfidenceHeadLogits
@@ -4051,6 +4058,7 @@ class ComputeRankingScore(Module):
         score = confidence_score.ptm
         return score
 
+    @typecheck
     def compute_interface_metric(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
@@ -4104,6 +4112,7 @@ class ComputeRankingScore(Module):
             interface_metric[b] /= len(chains)
         return interface_metric
 
+    @typecheck
     def compute_modified_residue_score(
         self,
         confidence_head_logits: ConfidenceHeadLogits,
@@ -4131,7 +4140,6 @@ class ComputeRankingScore(Module):
 
 
 # model selection
-
 
 @typecheck
 def get_cid_molecule_type(

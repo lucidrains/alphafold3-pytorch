@@ -1036,9 +1036,6 @@ def test_alphafold3_config():
 # test compute ranking score
 
 def test_compute_ranking_score():
-    
-    import random 
-    import itertools
 
     # mock inputs
     
