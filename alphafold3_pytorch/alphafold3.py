@@ -5353,7 +5353,7 @@ class Alphafold3(Module):
     ) -> (
         Float['b m 3'] |
         Tuple[Float['b m 3'], ConfidenceHeadLogits] |
-        Tuple[Float['b m 3'], ConfidenceHeadLogits, Float['b l n n']] |
+        Tuple[Float['b m 3'], ConfidenceHeadLogits, Float['b l n n'] | Float['b l m m']] |
         Float[''] |
         Tuple[Float[''], LossBreakdown]
     ):
