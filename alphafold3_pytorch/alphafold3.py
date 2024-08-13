@@ -3683,7 +3683,8 @@ class ComputeConfidenceScore(Module):
         molecule_atom_lens: Int["b n"] | None = None,  
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
-    ):
+    ) -> Float[" b"] | Tuple[Float["b chains chains"], Bool["b chains chains"], Int["b chains"]]:
+
         """Compute pTM from logits.
 
         :param logits: [b c n n] logits
@@ -3759,22 +3760,22 @@ class ComputeConfidenceScore(Module):
                             if pair_residue_weights.sum() == 0:
                                 # chain i or chain j does not have any valid frame
                                 continue
-                            else:
-                                normed_residue_mask = pair_residue_weights / (
-                                    self.eps
-                                    + torch.sum(pair_residue_weights, dim=-1, keepdims=True)
-                                )
 
-                                masked_predicted_tm_term = predicted_tm_term[b] * pair_mask
+                            normed_residue_mask = pair_residue_weights / (
+                                self.eps
+                                + torch.sum(pair_residue_weights, dim=-1, keepdims=True)
+                            )
 
-                                per_alignment = torch.sum(
-                                    masked_predicted_tm_term * normed_residue_mask, dim=-1
-                                )
-                                weighted_argmax = (residue_weights[b] * per_alignment).argmax()
-                                chain_wise_iptm[b, i, j] = per_alignment[weighted_argmax]
-                                chain_wise_iptm_mask[b, i, j] = True
+                            masked_predicted_tm_term = predicted_tm_term[b] * pair_mask
 
-            return chain_wise_iptm, chain_wise_iptm_mask, unique_chains
+                            per_alignment = torch.sum(
+                                masked_predicted_tm_term * normed_residue_mask, dim=-1
+                            )
+                            weighted_argmax = (residue_weights[b] * per_alignment).argmax()
+                            chain_wise_iptm[b, i, j] = per_alignment[weighted_argmax]
+                            chain_wise_iptm_mask[b, i, j] = True
+
+            return chain_wise_iptm, chain_wise_iptm_mask, torch.tensor(unique_chains)
 
         else:
             pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=logits.device).bool()
@@ -3974,7 +3975,8 @@ class ComputeRankingScore(Module):
         atom_mask: Bool["b m"],  
         is_molecule_types: Bool[f"b n {IS_MOLECULE_TYPES}"],
         return_confidence_score: bool = False,
-    ) -> Float[" b"] | Tuple[Float[" b"], Tuple[ConfidenceScore, Bool[" b"]]]:  
+    ) -> Float[" b"] | Tuple[Float[" b"], Tuple[ConfidenceScore, Bool[" b"]]]:
+
         """Compute full complex metric.
 
         :param confidence_head_logits: ConfidenceHeadLogits
@@ -4105,7 +4107,7 @@ class ComputeRankingScore(Module):
 
         for b, chains in enumerate(interface_chains):
             for chain in chains:
-                idx = unique_chains[b].index(chain)
+                idx = unique_chains[b].tolist().index(chain)
                 interface_metric[b] += iptm_sum[b, idx].sum() / iptm_count[b, idx].sum().clamp(
                     min=1
                 )
