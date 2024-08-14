@@ -190,6 +190,10 @@ def exclusive_cumsum(t, dim = -1):
     return t.cumsum(dim = dim) - t
 
 @typecheck
+def symmetrize(t: Float['b n n ...']) -> Float['b n n ...']:
+    return t + rearrange(t, 'b i j ... -> b j i ...')
+
+@typecheck
 def masked_average(
     t: Shaped['...'],
     mask: Shaped['...'],
@@ -3427,8 +3431,7 @@ class DistogramHead(Module):
             pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
             pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
-        symmetrized_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
-        logits = self.to_distogram_logits(symmetrized_pairwise_repr)
+        logits = self.to_distogram_logits(symmetrize(pairwise_repr))
 
         return logits
 
@@ -3586,8 +3589,7 @@ class ConfidenceHead(Module):
 
         # to logits
 
-        symmetric_pairwise_repr = pairwise_repr + rearrange(pairwise_repr, 'b i j d -> b j i d')
-        pde_logits = self.to_pde_logits(symmetric_pairwise_repr)
+        pde_logits = self.to_pde_logits(symmetrize(pairwise_repr))
 
         plddt_logits = self.to_plddt_logits(single_repr)
         resolved_logits = self.to_resolved_logits(single_repr)
