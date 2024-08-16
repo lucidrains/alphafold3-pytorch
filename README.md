@@ -4,7 +4,7 @@
 
 Implementation of <a href="https://www.nature.com/articles/s41586-024-07487-w">Alphafold 3</a> in Pytorch
 
-You can chat with other researchers about this work <a href="https://discord.gg/x6FuzQPQXY">here</a>
+You can chat with other researchers about this work [here](https://discord.gg/Xsq4WaBR9S)
 
 <a href="https://www.youtube.com/watch?v=qjFgthkKxcA">Review of the paper</a> by <a href="https://x.com/sokrypton">Sergey</a>
 
