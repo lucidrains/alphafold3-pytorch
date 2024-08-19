@@ -5013,6 +5013,7 @@ class Alphafold3(Module):
         checkpoint_trunk_pairformer = False,
         checkpoint_diffusion_token_transformer = False,
         detach_when_recycling = True
+        pdb_training_set=True,
     ):
         super().__init__()
 
@@ -5225,6 +5226,7 @@ class Alphafold3(Module):
         # loss related
 
         self.ignore_index = ignore_index
+        self.pdb_training_set = pdb_training_set
         self.loss_distogram_weight = loss_distogram_weight
         self.loss_confidence_weight = loss_confidence_weight
         self.loss_diffusion_weight = loss_diffusion_weight
@@ -5345,13 +5347,16 @@ class Alphafold3(Module):
         pde_labels: Int['b n n'] | Int['b m m'] | None = None,
         plddt_labels: Int['b n'] | Int['b m'] | None = None,
         resolved_labels: Int['b n'] | Int['b m'] | None = None,
+        resolution: Float[' b'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_confidence_head_logits: bool = False,
         return_distogram_head_logits: bool = False,
         num_rollout_steps: int | None = None,
         rollout_show_tqdm_pbar: bool = False,
-        detach_when_recycling: bool = None
+        detach_when_recycling: bool = None,
+        min_conf_resolution: float = 0.1,
+        max_conf_resolution: float = 4.0
     ) -> (
         Float['b m 3'] |
         Tuple[Float['b m 3'], ConfidenceHeadLogits] |
@@ -5360,6 +5365,7 @@ class Alphafold3(Module):
         Tuple[Float[''], LossBreakdown]
     ):
 
+        batch_size = atom_inputs.shape[0]
         atom_seq_len = atom_inputs.shape[-2]
 
         # validate atom and atompair input dimensions
@@ -5934,25 +5940,51 @@ class Alphafold3(Module):
 
             # cross entropy losses
 
+            confidence_mask = (
+                (resolution >= min_conf_resolution)
+                & (resolution <= max_conf_resolution) * self.pdb_training_set
+                if exists(resolution)
+                else torch.full((batch_size,), False, device=self.device)
+            )
+
+            confidence_weight = torch.full((batch_size,), 1.0, device=self.device)
+            confidence_weight = torch.where(confidence_mask, confidence_weight, 0.0)
+
             if exists(pae_labels):
                 assert pae_labels.shape[-1] == ch_logits.pae.shape[-1]
                 pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
-                pae_loss = F.cross_entropy(ch_logits.pae, pae_labels, ignore_index = ignore)
+                pae_loss = F.cross_entropy(
+                    ch_logits.pae * confidence_weight,
+                    pae_labels * confidence_weight,
+                    ignore_index=ignore,
+                )
 
             if exists(pde_labels):
                 assert pde_labels.shape[-1] == ch_logits.pde.shape[-1]
                 pde_labels = torch.where(label_pairwise_mask, pde_labels, ignore)
-                pde_loss = F.cross_entropy(ch_logits.pde, pde_labels, ignore_index = ignore)
+                pde_loss = F.cross_entropy(
+                    ch_logits.pde * confidence_weight,
+                    pde_labels * confidence_weight,
+                    ignore_index=ignore,
+                )
 
             if exists(plddt_labels):
                 assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1]
                 plddt_labels = torch.where(label_mask, plddt_labels, ignore)
-                plddt_loss = F.cross_entropy(ch_logits.plddt, plddt_labels, ignore_index = ignore)
+                plddt_loss = F.cross_entropy(
+                    ch_logits.plddt * confidence_weight,
+                    plddt_labels * confidence_weight,
+                    ignore_index=ignore,
+                )
 
             if exists(resolved_labels):
                 assert resolved_labels.shape[-1] == ch_logits.resolved.shape[-1]
                 resolved_labels = torch.where(label_mask, resolved_labels, ignore)
-                resolved_loss = F.cross_entropy(ch_logits.resolved, resolved_labels, ignore_index = ignore)
+                resolved_loss = F.cross_entropy(
+                    ch_logits.resolved * confidence_weight,
+                    resolved_labels * confidence_weight,
+                    ignore_index=ignore,
+                )
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
 
