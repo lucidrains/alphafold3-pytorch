@@ -205,9 +205,7 @@ class AtomInput:
     distogram_atom_indices:     Int[' n'] | None = None
     atom_indices_for_frame:     Int['n 3'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pde_labels:                 Int['n n'] | None = None
-    plddt_labels:               Int[' n'] | None = None
-    resolved_labels:            Int[' n'] | None = None
+    resolved_labels:            Int[' m'] | None = None
     resolution:                 Float[''] | None = None
     chains:                     Int[' 2'] | None = None
     filepath:                   str | None = None
@@ -240,9 +238,7 @@ class BatchedAtomInput:
     distogram_atom_indices:     Int['b n'] | None = None
     atom_indices_for_frame:     Int['b n 3'] | None = None
     distance_labels:            Int['b n n'] | None = None
-    pde_labels:                 Int['b n n'] | None = None
-    plddt_labels:               Int['b n'] | None = None
-    resolved_labels:            Int['b n'] | None = None
+    resolved_labels:            Int['b m'] | None = None
     resolution:                 Float[' b'] | None = None
     chains:                     Int['b 2'] | None = None
     filepath:                   List[str] | None = None
@@ -467,8 +463,7 @@ class MoleculeInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pde_labels:                 Int[' n'] | None = None
-    resolved_labels:            Int[' n'] | None = None
+    resolved_labels:            Int[' m'] | None = None
     resolution:                 Float[''] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
     filepath:                   str | None = None
@@ -797,8 +792,7 @@ class MoleculeLengthMoleculeInput:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pde_labels:                 Int[' n'] | None = None
-    resolved_labels:            Int[' n'] | None = None
+    resolved_labels:            Int[' m'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
     filepath:                   str | None = None
     add_atom_ids:               bool = False
@@ -1241,8 +1235,7 @@ class Alphafold3Input:
     template_mask:              Bool[' t'] | None = None
     msa_mask:                   Bool[' s'] | None = None
     distance_labels:            Int['n n'] | None = None
-    pde_labels:                 Int[' n'] | None = None
-    resolved_labels:            Int[' n'] | None = None
+    resolved_labels:            Int[' m'] | None = None
     chains:                     Tuple[int | None, int | None] | None = (None, None)
     add_atom_ids:               bool = False
     add_atompair_ids:           bool = False
@@ -2290,6 +2283,10 @@ def pdb_input_to_molecule_input(
         if not exists(resolution) and exists(mmcif_resolution):
             resolution = mmcif_resolution
 
+    # record PDB resolution value if available
+
+    resolution = tensor(resolution) if exists(resolution) else None
+
     # map (sampled) chain IDs to indices prior to cropping
 
     chains = None
@@ -2720,6 +2717,14 @@ def pdb_input_to_molecule_input(
         ]
     )
 
+    # craft experimentally resolved labels per the AF2 supplement's Section 1.9.10
+
+    resolved_labels = None
+
+    if exists(resolution):
+        is_resolved_label = ((resolution >= 0.1) & (resolution <= 3.0)).item()
+        resolved_labels = torch.full((num_atoms,), is_resolved_label, dtype=torch.long)
+
     # create molecule input
 
     molecule_input = MoleculeInput(
@@ -2742,7 +2747,8 @@ def pdb_input_to_molecule_input(
         atom_pos=atom_pos,
         template_mask=template_mask,
         msa_mask=msa_mask,
-        resolution=tensor(resolution),
+        resolved_labels=resolved_labels,
+        resolution=resolution,
         chains=chains,
         filepath=filepath,
         add_atom_ids=i.add_atom_ids,
