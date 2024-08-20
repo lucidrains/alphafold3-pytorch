@@ -5191,6 +5191,10 @@ class Alphafold3(Module):
         self.register_buffer('pde_bins', pde_bins_tensor)
         num_pde_bins = len(pde_bins)
 
+        # plddt related bins
+
+        self.num_plddt_bins = num_plddt_bins
+
         # confidence head
 
         self.confidence_head = ConfidenceHead(
@@ -5900,11 +5904,11 @@ class Alphafold3(Module):
                     molecule_atom_lens=molecule_atom_lens,
                 )
 
-                # calculate pae labels as alignment error binned to 64 (0 - 32A)
+                # calculate pae labels as alignment error binned to 64 (0 - 32A) (TODO: double-check correctness of `distance_to_bins`'s bin assignments)
 
                 pae_labels = distance_to_bins(align_error, self.pae_bins)
 
-                # set ignore index for invalid molecules or frames (todo: figure out what is meant by invalid frame)
+                # set ignore index for invalid molecules or frames (TODO: figure out what is meant by invalid frame)
 
                 pair_align_error_mask = to_pairwise_mask(align_error_mask)
 
@@ -5951,12 +5955,69 @@ class Alphafold3(Module):
                 molecule_mask = to_pairwise_mask(molecule_mask)
                 pde_labels.masked_fill_(~molecule_mask, ignore)
 
-            # TODO: determine pde labels if possible
+            # determine plddt labels if possible
 
-            plddt_labels = None
+            if atom_pos_given:
 
-            if atom_pos_given and not exists(plddt_labels):
-                pass
+                # gather metadata
+
+                pred_coords, true_coords = denoised_atom_pos, atom_pos
+
+                # compute distances between all pairs of atoms
+
+                pred_dists = torch.cdist(pred_coords, pred_coords, p=2)
+                true_dists = torch.cdist(true_coords, true_coords, p=2)
+
+                # restrict to bespoke interaction types and inclusion radius on the atom level (Section 4.3.1)
+
+                is_protein = batch_repeat_interleave(is_molecule_types[..., IS_PROTEIN_INDEX], molecule_atom_lens)
+                is_rna = batch_repeat_interleave(is_molecule_types[..., IS_RNA_INDEX], molecule_atom_lens)
+                is_dna = batch_repeat_interleave(is_molecule_types[..., IS_DNA_INDEX], molecule_atom_lens)
+
+                is_nucleotide = is_rna | is_dna
+                is_polymer = is_protein | is_rna | is_dna
+
+                is_any_nucleotide_pair = einx.logical_and(
+                    "... i, ... j -> ... i j", torch.ones_like(is_nucleotide), is_nucleotide
+                )
+                is_any_polymer_pair = einx.logical_and(
+                    "... i, ... j -> ... i j", torch.ones_like(is_polymer), is_polymer
+                )
+
+                inclusion_radius = torch.where(
+                    is_any_nucleotide_pair,
+                    true_dists < 30.0,
+                    true_dists < 15.0,
+                )
+
+                is_token_center_atom = torch.zeros_like(atom_pos[..., 0], dtype=torch.bool)
+                is_token_center_atom[torch.arange(batch_size).unsqueeze(1), molecule_atom_indices] = True
+                is_any_token_center_atom_pair = einx.logical_and(
+                    "... i, ... j -> ... i j", torch.ones_like(is_token_center_atom), is_token_center_atom
+                )
+
+                # compute masks, avoiding self term
+
+                plddt_mask = inclusion_radius & is_any_polymer_pair & is_any_token_center_atom_pair & ~torch.eye(atom_seq_len, dtype=torch.bool, device=self.device)
+
+                plddt_mask = plddt_mask * to_pairwise_mask(atom_mask)
+
+                # compute distance difference for all pairs of atoms
+
+                dist_diff = torch.abs(true_dists - pred_dists)
+                lddt = (
+                    ((0.5 - dist_diff) >= 0).float()
+                    + ((1.0 - dist_diff) >= 0).float()
+                    + ((2.0 - dist_diff) >= 0).float()
+                    + ((4.0 - dist_diff) >= 0).float()
+                ) / 4.0
+
+                # calculate masked averaging,
+                # after which we assign each value to one of 50 equally sized bins
+
+                lddt_mean = masked_average(lddt, plddt_mask, dim=-1)
+
+                plddt_labels = torch.clamp(torch.floor(lddt_mean * self.num_plddt_bins).int(), max=self.num_plddt_bins - 1)
 
             return_pae_logits = exists(pae_labels)
 
