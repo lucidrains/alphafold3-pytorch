@@ -5754,7 +5754,7 @@ class Alphafold3(Module):
                     pde_labels,
                     plddt_labels,
                     resolved_labels,
-
+                    resolution
                 ) = tuple(
                     maybe(repeat)(t, 'b ... -> (b a) ...', a = num_augs)
                     for t in (
@@ -5780,7 +5780,8 @@ class Alphafold3(Module):
                         molecule_atom_lens,
                         pde_labels,
                         plddt_labels,
-                        resolved_labels
+                        resolved_labels,
+                        resolution
                     )
                 )
 
