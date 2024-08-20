@@ -5344,9 +5344,8 @@ class Alphafold3(Module):
         num_sample_steps: int | None = None,
         atom_pos: Float['b m 3'] | None = None,
         distance_labels: Int['b n n'] | Int['b m m'] | None = None,
-        pde_labels: Int['b n n'] | Int['b m m'] | None = None,
-        plddt_labels: Int['b n'] | Int['b m'] | None = None,
-        resolved_labels: Int['b n'] | Int['b m'] | None = None,
+        pde_labels: Int['b n n'] | None = None,
+        resolved_labels: Int['b m'] | None = None,
         resolution: Float[' b'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
@@ -5598,7 +5597,7 @@ class Alphafold3(Module):
 
         atom_pos_given = exists(atom_pos)
 
-        confidence_head_labels = (atom_indices_for_frame, pde_labels, plddt_labels, resolved_labels)
+        confidence_head_labels = (atom_indices_for_frame, pde_labels, resolved_labels)
         all_labels = (distance_labels, *confidence_head_labels)
 
         has_labels = any([*map(exists, all_labels)])
@@ -5752,7 +5751,6 @@ class Alphafold3(Module):
                     atom_indices_for_frame,
                     molecule_atom_lens,
                     pde_labels,
-                    plddt_labels,
                     resolved_labels,
                     resolution
                 ) = tuple(
@@ -5779,7 +5777,6 @@ class Alphafold3(Module):
                         atom_indices_for_frame,
                         molecule_atom_lens,
                         pde_labels,
-                        plddt_labels,
                         resolved_labels,
                         resolution
                     )
@@ -5929,6 +5926,10 @@ class Alphafold3(Module):
                 atom_feats = atom_feats.detach(),
                 return_pae_logits = return_pae_logits
             )
+
+            # determine plddt labels if possible
+
+            plddt_labels = None
 
             # determine which mask to use for labels depending on atom resolution or not for confidence head
 
