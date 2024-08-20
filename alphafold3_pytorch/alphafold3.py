@@ -5359,7 +5359,7 @@ class Alphafold3(Module):
 
         # soft validate
 
-        valid_atom_len_mask = molecule_atom_lens >= 0
+        valid_molecule_atom_mask = valid_atom_len_mask = molecule_atom_lens >= 0
 
         molecule_atom_lens = molecule_atom_lens.masked_fill(~valid_atom_len_mask, 0)
 
