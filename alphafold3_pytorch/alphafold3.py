@@ -4916,11 +4916,12 @@ class Alphafold3(Module):
         num_molecule_mods: int | None = DEFAULT_NUM_MOLECULE_MODS,
         distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
         pae_bins: List[float] = torch.linspace(0.5, 32, 64).float().tolist(),
+        pde_bins: List[float] = torch.linspace(0.5, 32, 64).float().tolist(),
         ignore_index = -1,
         num_dist_bins: int | None = None,
         num_plddt_bins = 50,
-        num_pde_bins = 64,
         num_pae_bins: int | None = None,
+        num_pde_bins: int | None = None,
         sigma_data = 16,
         num_rollout_steps = 20,
         diffusion_num_augmentations = 4,
@@ -5183,6 +5184,12 @@ class Alphafold3(Module):
 
         self.rigid_from_three_points = RigidFrom3Points()
         self.compute_alignment_error = ComputeAlignmentError()
+
+        # pde related bins
+
+        pde_bins_tensor = Tensor(pde_bins)
+        self.register_buffer('pde_bins', pde_bins_tensor)
+        num_pde_bins = len(pde_bins)
 
         # confidence head
 
