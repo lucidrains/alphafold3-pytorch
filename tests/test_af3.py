@@ -340,9 +340,9 @@ def test_diffusion_module(
 ):
 
     seq_len = 16
+    atom_seq_len = 32
 
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     noised_atom_pos = torch.randn(2, atom_seq_len, 3)
     atom_feats = torch.randn(2, atom_seq_len, 128)
@@ -460,61 +460,44 @@ def test_template_embed(
         loss.backward()
 
 def test_confidence_head():
-    single_inputs_repr = torch.randn(2, 16, 77)
-    single_repr = torch.randn(2, 16, 384)
-    pairwise_repr = torch.randn(2, 16, 16, 128)
-    pred_atom_pos = torch.randn(2, 16, 3)
-    mask = torch.ones((2, 16)).bool()
-
-    confidence_head = ConfidenceHead(
-        dim_single_inputs = 77,
-        atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
-        dim_single = 384,
-        dim_pairwise = 128,
-    )
-
-    confidence_head(
-        single_inputs_repr = single_inputs_repr,
-        single_repr = single_repr,
-        pairwise_repr = pairwise_repr,
-        pred_atom_pos = pred_atom_pos,
-        mask = mask
-    )
-
-def test_atom_resolution_confidence_head():
-    single_inputs_repr = torch.randn(2, 16, 77)
-    single_repr = torch.randn(2, 16, 384)
-    pairwise_repr = torch.randn(2, 16, 16, 128)
-    mask = torch.ones((2, 16)).bool()
-
+    seq_len = 16
     atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+    single_inputs_repr = torch.randn(2, seq_len, 77)
+    single_repr = torch.randn(2, seq_len, 384)
+    pairwise_repr = torch.randn(2, seq_len, seq_len, 128)
+    mask = torch.ones((2, seq_len)).bool()
+
     atom_feats = torch.randn(2, atom_seq_len, 64)
     pred_atom_pos = torch.randn(2, atom_seq_len, 3)
 
-    molecule_atom_indices = torch.randint(0, atom_seq_len, (2, 16)).long()
-    molecule_atom_lens = torch.full((2, 16), 2).long()
-
     confidence_head = ConfidenceHead(
-        dim_single_inputs = 77,
-        atom_resolution = True,
-        dim_atom = 64,
-        atompair_dist_bins = torch.linspace(3, 20, 37).tolist(),
-        dim_single = 384,
-        dim_pairwise = 128,
+        dim_single_inputs=77,
+        dim_atom=64,
+        atompair_dist_bins=torch.linspace(3, 20, 37).tolist(),
+        dim_single=384,
+        dim_pairwise=128,
     )
 
     logits = confidence_head(
-        single_inputs_repr = single_inputs_repr,
-        single_repr = single_repr,
-        atom_feats = atom_feats,
-        molecule_atom_indices = molecule_atom_indices,
-        molecule_atom_lens = molecule_atom_lens,
-        pairwise_repr = pairwise_repr,
-        pred_atom_pos = pred_atom_pos,
-        mask = mask
+        single_inputs_repr=single_inputs_repr,
+        single_repr=single_repr,
+        pairwise_repr=pairwise_repr,
+        pred_atom_pos=pred_atom_pos,
+        atom_feats=atom_feats,
+        molecule_atom_indices=molecule_atom_indices,
+        molecule_atom_lens=molecule_atom_lens,
+        mask=mask,
     )
 
-    assert logits.pde.shape[-1] == atom_seq_len
+    assert logits.pae.shape[-1] == seq_len
+    assert logits.pde.shape[-1] == seq_len
+
+    assert logits.plddt.shape[-1] == atom_seq_len
+    assert logits.resolved.shape[-1] == atom_seq_len
 
 def test_input_embedder():
 
@@ -553,7 +536,6 @@ def test_distogram_head():
 @pytest.mark.parametrize('calculate_pae', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 @pytest.mark.parametrize('num_molecule_mods', (0, 4))
-@pytest.mark.parametrize('confidence_head_atom_resolution', (True, False))
 @pytest.mark.parametrize('distogram_atom_resolution', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
@@ -562,14 +544,14 @@ def test_alphafold3(
     calculate_pae: bool,
     atom_transformer_intramolecular_attn: bool,
     num_molecule_mods: int,
-    confidence_head_atom_resolution: bool,
     distogram_atom_resolution: bool
 ):
     seq_len = 16
+    atom_seq_len = 32
     atoms_per_window = 27
 
-    molecule_atom_lens = torch.randint(3, 5, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     token_bonds = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
@@ -610,12 +592,8 @@ def test_alphafold3(
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
-    molecule_atom_indices = molecule_atom_lens - 1
 
-    label_len = atom_seq_len if confidence_head_atom_resolution else seq_len
-    pde_labels = torch.randint(0, 64, (2, label_len, label_len))
-    plddt_labels = torch.randint(0, 50, (2, label_len))
-    resolved_labels = torch.randint(0, 2, (2, label_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -657,7 +635,6 @@ def test_alphafold3(
             )
         ),
         stochastic_frame_average = stochastic_frame_average,
-        confidence_head_atom_resolution = confidence_head_atom_resolution,
         distogram_atom_resolution = distogram_atom_resolution
     )
 
@@ -682,8 +659,6 @@ def test_alphafold3(
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
         molecule_atom_indices = molecule_atom_indices,
-        pde_labels = pde_labels,
-        plddt_labels = plddt_labels,
         resolved_labels = resolved_labels,
         num_rollout_steps = 1,
         diffusion_add_smooth_lddt_loss = True,
@@ -711,8 +686,10 @@ def test_alphafold3(
 
 def test_alphafold3_without_msa_and_templates():
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -724,10 +701,7 @@ def test_alphafold3_without_msa_and_templates():
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
 
-    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
-    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    plddt_labels = torch.randint(0, 50, (2, seq_len))
-    resolved_labels = torch.randint(0, 2, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -776,9 +750,6 @@ def test_alphafold3_without_msa_and_templates():
         additional_token_feats = additional_token_feats,
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
-        distance_labels = distance_labels,
-        pde_labels = pde_labels,
-        plddt_labels = plddt_labels,
         resolved_labels = resolved_labels,
         return_loss_breakdown = True
     )
@@ -787,8 +758,10 @@ def test_alphafold3_without_msa_and_templates():
 
 def test_alphafold3_force_return_loss():
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -799,12 +772,8 @@ def test_alphafold3_force_return_loss():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
-    molecule_atom_indices = molecule_atom_lens - 1
 
-    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
-    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    plddt_labels = torch.randint(0, 50, (2, seq_len))
-    resolved_labels = torch.randint(0, 2, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -842,9 +811,6 @@ def test_alphafold3_force_return_loss():
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
         molecule_atom_indices = molecule_atom_indices,
-        distance_labels = distance_labels,
-        pde_labels = pde_labels,
-        plddt_labels = plddt_labels,
         resolved_labels = resolved_labels,
         return_loss_breakdown = True,
         return_loss = False # force sampling even if labels are given
@@ -870,8 +836,10 @@ def test_alphafold3_force_return_loss():
 
 def test_alphafold3_force_return_loss_with_confidence_logits():
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -882,12 +850,8 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
-    molecule_atom_indices = molecule_atom_lens - 1
 
-    distance_labels = torch.randint(0, 38, (2, seq_len, seq_len))
-    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    plddt_labels = torch.randint(0, 50, (2, seq_len))
-    resolved_labels = torch.randint(0, 2, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -925,9 +889,6 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
         molecule_atom_indices = molecule_atom_indices,
-        distance_labels = distance_labels,
-        pde_labels = pde_labels,
-        plddt_labels = plddt_labels,
         resolved_labels = resolved_labels,
         return_loss_breakdown = True,
         return_loss = False, # force sampling even if labels are given
@@ -963,9 +924,10 @@ def test_alphafold3_with_atom_and_bond_embeddings():
     # mock inputs
 
     seq_len = 16
+    atom_seq_len = 32
 
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     atom_ids = torch.randint(0, 7, (2, atom_seq_len))
     atompair_ids = torch.randint(0, 3, (2, atom_seq_len, atom_seq_len))
@@ -988,12 +950,8 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1 # last atom, as an example
-    molecule_atom_indices = molecule_atom_lens - 1
 
-    distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
-    pde_labels = torch.randint(0, 64, (2, seq_len, seq_len))
-    plddt_labels = torch.randint(0, 50, (2, seq_len))
-    resolved_labels = torch.randint(0, 2, (2, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
     # train
 
@@ -1015,9 +973,6 @@ def test_alphafold3_with_atom_and_bond_embeddings():
         atom_pos = atom_pos,
         distogram_atom_indices = distogram_atom_indices,
         molecule_atom_indices = molecule_atom_indices,
-        distance_labels = distance_labels,
-        pde_labels = pde_labels,
-        plddt_labels = plddt_labels,
         resolved_labels = resolved_labels
     )
 
@@ -1044,8 +999,10 @@ def test_compute_ranking_score():
     
     batch_size = 2
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (batch_size, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_seq_len = 32
+
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
     is_molecule_types = torch.randint(0, 2, (batch_size, seq_len, 5)).bool()
     atom_pos = torch.randn(batch_size, atom_seq_len, 3) * 5
     atom_mask = torch.randint(0, 2, (atom_pos.shape[:-1])).type_as(atom_pos).bool()
@@ -1106,8 +1063,9 @@ def test_model_selection_score():
     
     batch_size = 2
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (batch_size, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_seq_len = 32
+
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
 
     atom_pos_true = torch.randn(batch_size, atom_seq_len, 3) * 5
     atom_pos_pred = torch.randn(batch_size, atom_seq_len, 3) * 5
