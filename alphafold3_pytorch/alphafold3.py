@@ -5012,7 +5012,7 @@ class Alphafold3(Module):
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
         checkpoint_diffusion_token_transformer = False,
-        detach_when_recycling = True
+        detach_when_recycling = True,
         pdb_training_set=True,
     ):
         super().__init__()
