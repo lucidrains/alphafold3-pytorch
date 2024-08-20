@@ -2,7 +2,7 @@ from typing import Any, Dict, Literal, Set
 
 import numpy as np
 
-from alphafold3_pytorch.utils.tensor_typing import ChainType, ResidueType, typecheck
+from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
 from alphafold3_pytorch.utils.utils import exists
 
 # constants
