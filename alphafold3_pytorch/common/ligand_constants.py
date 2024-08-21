@@ -125,6 +125,11 @@ restype_num = len(amino_acid_constants.restypes)  # := 20.
 
 restype_1to3 = {"X": "UNL"}
 
+MSA_CHAR_TO_ID = {
+    "X": 20,
+    "-": 31,
+}
+
 BIOMOLECULE_CHAIN: Final[str] = "other"
 POLYMER_CHAIN: Final[str] = "non-polymer"
 
