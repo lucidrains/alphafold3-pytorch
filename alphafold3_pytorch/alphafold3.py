@@ -3428,7 +3428,7 @@ class DistogramHead(Module):
 
 class ConfidenceHeadLogits(NamedTuple):
     pae: Float['b pae m m'] |  None
-    pde: Float['b pde n n']
+    pde: Float['b pde m m']
     plddt: Float['b plddt m']
     resolved: Float['b 2 m']
 
@@ -3567,7 +3567,7 @@ class ConfidenceHead(Module):
 
         # to logits
 
-        pde_logits = self.to_pde_logits(symmetrize(pairwise_repr))
+        pde_logits = self.to_pde_logits(symmetrize(atom_pairwise_repr))
 
         plddt_logits = self.to_plddt_logits(atom_single_repr)
         resolved_logits = self.to_resolved_logits(atom_single_repr)
@@ -4344,7 +4344,7 @@ class ComputeModelSelectionScore(Module):
     @typecheck
     def compute_gpde(
         self,
-        pde_logits: Float["b pde n n"],  
+        pde_logits: Float["b pde n n"],
         dist_logits: Float["b dist n n"],  
         dist_breaks: Float[" dist_break"],  
         tok_repr_atm_mask: Bool["b n"],  
@@ -4852,6 +4852,7 @@ class ComputeModelSelectionScore(Module):
         top_ranked_sample = max(
             scored_samples, key=lambda x: x[-1].mean()
         )  # rank by batch-averaged gPDE
+
         best_of_5_sample = max(
             scored_samples, key=lambda x: x[-2].mean()
         )  # rank by batch-averaged lDDT
@@ -5898,29 +5899,11 @@ class Alphafold3(Module):
             pde_labels = None
 
             if atom_pos_given:
-                denoised_molecule_pos = None
 
-                assert exists(
-                    molecule_atom_indices
-                ), "`molecule_atom_indices` must be passed in for calculating non-atomic PDE labels"
+                pde_atom_mask = batch_repeat_interleave(valid_molecule_atom_mask, molecule_atom_lens)
 
-                # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, molecule_atom_indices)
-
-                mol_atom_indices = repeat(
-                    molecule_atom_indices, "b n -> b n c", c=atom_pos.shape[-1]
-                )
-
-                molecule_pos = atom_pos.gather(1, mol_atom_indices)
-                denoised_molecule_pos = denoised_atom_pos.gather(1, mol_atom_indices)
-
-                molecule_mask = valid_molecule_atom_mask
-
-                pde_gt_dist = torch.cdist(molecule_pos, molecule_pos, p=2)
-                pde_pred_dist = torch.cdist(
-                    denoised_molecule_pos,
-                    denoised_molecule_pos,
-                    p=2,
-                )
+                pde_gt_dist = torch.cdist(atom_pos, atom_pos)
+                pde_pred_dist = torch.cdist(denoised_atom_pos, denoised_atom_pos)
 
                 # calculate pde labels as distance error binned to 64 (0 - 32A)
 
@@ -5929,8 +5912,8 @@ class Alphafold3(Module):
 
                 # account for representative molecule atom missing from residue (-1 set on molecule_atom_indices field)
 
-                molecule_mask = to_pairwise_mask(molecule_mask)
-                pde_labels.masked_fill_(~molecule_mask, ignore)
+                pde_pairwise_atom_mask = to_pairwise_mask(pde_atom_mask)
+                pde_labels.masked_fill_(~pde_pairwise_atom_mask, ignore)
 
             # determine plddt labels if possible
 
@@ -6016,7 +5999,17 @@ class Alphafold3(Module):
 
             confidence_weight = confidence_mask.float()
 
-            def cross_entropy_with_weight(logits, labels, weight, ignore_index: int):
+            @typecheck
+            def cross_entropy_with_weight(
+                logits: Float['b l ...'],
+                labels: Int['b ...'],
+                weight: Float[' b'],
+                mask: Bool['b ...'],
+                ignore_index: int
+            ) -> Float['']:
+
+                labels = torch.where(mask, labels, ignore_index)
+
                 return F.cross_entropy(
                     einx.multiply('b ..., b -> b ...', logits, weight),
                     einx.multiply('b ..., b -> b ...', labels, weight.long()),
@@ -6028,32 +6021,28 @@ class Alphafold3(Module):
                     f"pae_labels shape {pae_labels.shape[-1]} does not match "
                     f"ch_logits.pae shape {ch_logits.pae.shape[-1]}"
                 )
-                pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
-                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, ignore)
+                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, label_pairwise_mask, ignore)
 
             if exists(pde_labels):
                 assert pde_labels.shape[-1] == ch_logits.pde.shape[-1], (
                     f"pde_labels shape {pde_labels.shape[-1]} does not match "
                     f"ch_logits.pde shape {ch_logits.pde.shape[-1]}"
                 )
-                pde_labels = torch.where(to_pairwise_mask(mask), pde_labels, ignore)
-                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, ignore)
+                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, label_pairwise_mask, ignore)
 
             if exists(plddt_labels):
                 assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1], (
                     f"plddt_labels shape {plddt_labels.shape[-1]} does not match "
                     f"ch_logits.plddt shape {ch_logits.plddt.shape[-1]}"
                 )
-                plddt_labels = torch.where(label_mask, plddt_labels, ignore)
-                plddt_loss = cross_entropy_with_weight(ch_logits.plddt, plddt_labels, confidence_weight, ignore)
+                plddt_loss = cross_entropy_with_weight(ch_logits.plddt, plddt_labels, confidence_weight, label_mask, ignore)
 
             if exists(resolved_labels):
                 assert resolved_labels.shape[-1] == ch_logits.resolved.shape[-1], (
                     f"resolved_labels shape {resolved_labels.shape[-1]} does not match "
                     f"ch_logits.resolved shape {ch_logits.resolved.shape[-1]}"
                 )
-                resolved_labels = torch.where(label_mask, resolved_labels, ignore)
-                resolved_loss = cross_entropy_with_weight(ch_logits.resolved, resolved_labels, confidence_weight, ignore)
+                resolved_loss = cross_entropy_with_weight(ch_logits.resolved, resolved_labels, confidence_weight, label_mask, ignore)
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
 
