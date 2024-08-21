@@ -5862,19 +5862,6 @@ class Alphafold3(Module):
             pae_labels = None
 
             if atom_pos_given and exists(atom_indices_for_frame):
-                denoised_molecule_pos = None
-
-                if not exists(molecule_pos):
-                    assert exists(
-                        distogram_atom_indices
-                    ), "`distogram_atom_indices` must be passed in for calculating non-atomic PAE labels"
-
-                    distogram_atom_indices = repeat(
-                        distogram_atom_indices, "b n -> b n c", c=distogram_pos.shape[-1]
-                    )
-                    molecule_pos = atom_pos.gather(1, distogram_atom_indices)
-
-                denoised_molecule_pos = denoised_atom_pos.gather(1, distogram_atom_indices)
 
                 # three_atoms = einx.get_at('b [m] c, b n three -> three b n c', atom_pos, atom_indices_for_frame)
                 # pred_three_atoms = einx.get_at('b [m] c, b n three -> three b n c', denoised_atom_pos, atom_indices_for_frame)
