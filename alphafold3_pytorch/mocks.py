@@ -78,9 +78,7 @@ class MockAtomDataset(Dataset):
         distogram_atom_indices = molecule_atom_lens - 1
 
         distance_labels = torch.randint(0, 37, (seq_len, seq_len))
-        pde_labels = torch.randint(0, 64, (seq_len, seq_len))
-        plddt_labels = torch.randint(0, 50, (seq_len,))
-        resolved_labels = torch.randint(0, 2, (seq_len,))
+        resolved_labels = torch.randint(0, 2, (atom_seq_len,))
 
         majority_asym_id = asym_id.mode().values.item()
         chains = torch.tensor([majority_asym_id, -1]).long()
@@ -103,8 +101,6 @@ class MockAtomDataset(Dataset):
             molecule_atom_indices = molecule_atom_indices,
             distogram_atom_indices = distogram_atom_indices,
             distance_labels = distance_labels,
-            pde_labels = pde_labels,
-            plddt_labels = plddt_labels,
             resolved_labels = resolved_labels,
             chains = chains
         )

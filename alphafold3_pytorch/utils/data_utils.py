@@ -3,6 +3,7 @@ from typing import Any, Dict, Literal, Set
 import numpy as np
 
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
+from alphafold3_pytorch.utils.utils import exists
 
 # constants
 
@@ -10,14 +11,16 @@ RESIDUE_MOLECULE_TYPE = Literal["protein", "rna", "dna", "ligand"]
 PDB_INPUT_RESIDUE_MOLECULE_TYPE = Literal[
     "protein", "rna", "dna", "mod_protein", "mod_rna", "mod_dna", "ligand"
 ]
+MMCIF_METADATA_FIELD = Literal[
+    "structure_method", "release_date", "resolution", "structure_connectivity"
+]
 
 
 @typecheck
 def is_polymer(
     res_chem_type: str, polymer_chem_types: Set[str] = {"peptide", "dna", "rna"}
 ) -> bool:
-    """
-    Check if a residue is polymeric using its chemical type string.
+    """Check if a residue is polymeric using its chemical type string.
 
     :param res_chem_type: The chemical type of the residue as a descriptive string.
     :param polymer_chem_types: The set of polymer chemical types.
@@ -28,8 +31,7 @@ def is_polymer(
 
 @typecheck
 def is_water(res_name: str, water_res_names: Set[str] = {"HOH", "WAT"}) -> bool:
-    """
-    Check if a residue is a water residue using its residue name string.
+    """Check if a residue is a water residue using its residue name string.
 
     :param res_name: The name of the residue as a descriptive string.
     :param water_res_names: The set of water residue names.
@@ -83,9 +85,8 @@ def get_pdb_input_residue_molecule_type(
 def get_biopython_chain_residue_by_composite_id(
     chain: ChainType, res_name: str, res_id: int
 ) -> ResidueType:
-    """
-    Get a Biopython `Residue` or `DisorderedResidue` object
-    by its residue name-residue index composite ID.
+    """Get a Biopython `Residue` or `DisorderedResidue` object by its residue name-residue index
+    composite ID.
 
     :param chain: Biopython `Chain` object
     :param res_name: Residue name
@@ -126,8 +127,7 @@ def get_biopython_chain_residue_by_composite_id(
 
 @typecheck
 def matrix_rotate(v: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-    """
-    Perform a rotation using a rotation matrix.
+    """Perform a rotation using a rotation matrix.
 
     :param v: The coordinates to rotate.
     :param matrix: The rotation matrix.
@@ -150,8 +150,7 @@ def matrix_rotate(v: np.ndarray, matrix: np.ndarray) -> np.ndarray:
 def deep_merge_dicts(
     dict1: Dict[Any, Any], dict2: Dict[Any, Any], value_op: Literal["union", "concat"]
 ) -> Dict[Any, Any]:
-    """
-    Deeply merge two dictionaries, merging values where possible.
+    """Deeply merge two dictionaries, merging values where possible.
 
     :param dict1: The first dictionary to merge.
     :param dict2: The second dictionary to merge.
@@ -171,3 +170,63 @@ def deep_merge_dicts(
             # Otherwise, set/overwrite the key in dict1 with dict2's value
             dict1[key] = value
     return dict1
+
+
+@typecheck
+def coerce_to_float(obj: Any) -> float | None:
+    """Coerce an object to a float, returning `None` if the object is not coercible.
+
+    :param obj: The object to coerce to a float.
+    :return: The object coerced to a float if possible, otherwise `None`.
+    """
+    try:
+        if isinstance(obj, (int, float, str)):
+            return float(obj)
+        elif isinstance(obj, list):
+            return float(obj[0])
+        else:
+            return None
+    except (ValueError, TypeError):
+        return None
+
+
+@typecheck
+def extract_mmcif_metadata_field(
+    mmcif_object: Any,
+    metadata_field: MMCIF_METADATA_FIELD,
+    min_resolution: float = 0.0,
+    max_resolution: float = 1000.0,
+) -> str | float | None:
+    """Extract a metadata field from an mmCIF object. If the field is not found, return `None`.
+
+    :param mmcif_object: The mmCIF object to extract the metadata field from.
+    :param metadata_field: The metadata field to extract.
+    :return: The extracted metadata field.
+    """
+    # Extract structure method
+    if metadata_field == "structure_method" and "_exptl.method" in mmcif_object.raw_string:
+        return mmcif_object.raw_string["_exptl.method"]
+
+    # Extract release date
+    if (
+        metadata_field == "release_date"
+        and "_pdbx_audit_revision_history.revision_date" in mmcif_object.raw_string
+    ):
+        return mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
+
+    # Extract resolution
+    if metadata_field == "resolution" and "_refine.ls_d_res_high" in mmcif_object.raw_string:
+        resolution = coerce_to_float(mmcif_object.raw_string["_refine.ls_d_res_high"])
+        if exists(resolution) and min_resolution <= resolution <= max_resolution:
+            return resolution
+    elif (
+        metadata_field == "resolution"
+        and "_em_3d_reconstruction.resolution" in mmcif_object.raw_string
+    ):
+        resolution = coerce_to_float(mmcif_object.raw_string["_em_3d_reconstruction.resolution"])
+        if exists(resolution) and min_resolution <= resolution <= max_resolution:
+            return resolution
+    elif metadata_field == "resolution" and "_reflns.d_resolution_high" in mmcif_object.raw_string:
+        resolution = coerce_to_float(mmcif_object.raw_string["_reflns.d_resolution_high"])
+        if exists(resolution) and min_resolution <= resolution <= max_resolution:
+            return resolution
