@@ -251,7 +251,7 @@ def test_msa_module(
 ):
     single = torch.randn(2, 16, 384).requires_grad_()
     pairwise = torch.randn(2, 16, 16, 128).requires_grad_()
-    msa = torch.randn(2, 7, 16, 64)
+    msa = torch.randn(2, 7, 16, 32)
     mask = torch.randint(0, 2, (2, 16)).bool()
     msa_mask = torch.randint(0, 2, (2, 7)).bool()
     additional_msa_feats = torch.randn(2, 7, 16, 2)
@@ -586,8 +586,10 @@ def test_alphafold3(
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
     template_mask = torch.ones((2, 2)).bool()
 
-    msa = torch.randn(2, 7, seq_len, 8)
+    msa = torch.randn(2, 7, seq_len, 32)
     msa_mask = torch.ones((2, 7)).bool()
+
+    additional_msa_feats = torch.randn(2, 7, seq_len, 2)
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
@@ -655,6 +657,7 @@ def test_alphafold3(
         is_molecule_types = is_molecule_types,
         is_molecule_mod = is_molecule_mod,
         additional_molecule_feats = additional_molecule_feats,
+        additional_msa_feats = additional_msa_feats,
         additional_token_feats = additional_token_feats,
         token_bonds = token_bonds,
         msa = msa,
@@ -960,8 +963,10 @@ def test_alphafold3_with_atom_and_bond_embeddings():
     template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
     template_mask = torch.ones((2, 2)).bool()
 
-    msa = torch.randn(2, 7, seq_len, 64)
+    msa = torch.randn(2, 7, seq_len, 32)
     msa_mask = torch.ones((2, 7)).bool()
+
+    additional_msa_feats = torch.randn(2, 7, seq_len, 2)
 
     # required for training, but omitted on inference
 
@@ -983,6 +988,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
         molecule_atom_lens = molecule_atom_lens,
         is_molecule_types = is_molecule_types,
         additional_molecule_feats = additional_molecule_feats,
+        additional_msa_feats = additional_msa_feats,
         additional_token_feats = additional_token_feats,
         msa = msa,
         msa_mask = msa_mask,
