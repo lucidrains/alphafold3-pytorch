@@ -1061,11 +1061,11 @@ class MSAModule(Module):
     ):
         super().__init__()
 
-        self.max_num_msa = default(max_num_msa, float('inf'))  # cap the number of MSAs, will do sample without replacement if exceeds
+        self.max_num_msa = default(
+            max_num_msa, float('inf')
+        )  # cap the number of MSAs, will do sample without replacement if exceeds
 
-        dim_msa_input += dim_additional_msa_feats
-
-        self.msa_init_proj = LinearNoBias(dim_msa_input, dim_msa)
+        self.msa_init_proj = LinearNoBias(dim_msa_input + dim_additional_msa_feats, dim_msa)
 
         self.single_to_msa_feats = LinearNoBias(dim_single, dim_msa)
 
@@ -4970,7 +4970,6 @@ class Alphafold3(Module):
         msa_module_kwargs: dict = dict(
             depth = 4,
             dim_msa = 64,
-            dim_msa_input = None,
             outer_product_mean_dim_hidden = 32,
             msa_pwa_dropout_row_prob = 0.15,
             msa_pwa_heads = 8,
