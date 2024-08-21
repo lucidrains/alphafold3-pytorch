@@ -3,10 +3,18 @@
 # From: https://github.com/google-deepmind/alphafold/blob/f251de6613cb478207c732bf9627b1e853c99c2f/alphafold/data/parsers.py#L157
 
 import dataclasses
+import random
 import re
-from typing import Optional, Sequence, Tuple
+import string
+from typing import Literal, Optional, Sequence, Tuple
+
+from alphafold3_pytorch.tensor_typing import typecheck
 
 DeletionMatrix = Sequence[Sequence[int]]
+
+# Constants
+
+MSA_TYPE = Literal["protein", "dna", "rna"]
 
 # Utilities for extracting identifiers from MSA sequence descriptions.
 
@@ -44,6 +52,7 @@ class Identifiers:
     species_id: str = ""
 
 
+@typecheck
 def _parse_sequence_identifier(msa_sequence_identifier: str) -> Identifiers:
     """Gets species from an msa sequence identifier.
 
@@ -64,6 +73,7 @@ def _parse_sequence_identifier(msa_sequence_identifier: str) -> Identifiers:
     return Identifiers()
 
 
+@typecheck
 def _extract_sequence_identifier(description: str) -> Optional[str]:
     """Extracts sequence identifier from description.
 
@@ -76,6 +86,7 @@ def _extract_sequence_identifier(description: str) -> Optional[str]:
         return None
 
 
+@typecheck
 def get_identifiers(description: str) -> Identifiers:
     """Computes extra MSA features from the description."""
     sequence_identifier = _extract_sequence_identifier(description)
@@ -92,27 +103,43 @@ class Msa:
     sequences: Sequence[str]
     deletion_matrix: DeletionMatrix
     descriptions: Sequence[str]
+    msa_type: MSA_TYPE
 
     def __post_init__(self):
+        """Checks that all fields have the same length."""
         if not (len(self.sequences) == len(self.deletion_matrix) == len(self.descriptions)):
             raise ValueError(
                 "All fields for an MSA must have the same length. "
                 f"Got {len(self.sequences)} sequences, "
-                f"{len(self.deletion_matrix)} rows in the deletion matrix and "
+                f"{len(self.deletion_matrix)} rows in the deletion matrix, and "
                 f"{len(self.descriptions)} descriptions."
             )
 
     def __len__(self):
+        """Returns the number of sequences in the MSA."""
         return len(self.sequences)
 
     def truncate(self, max_seqs: int):
+        """Truncates the MSA to the first `max_seqs` sequences."""
         return Msa(
             sequences=self.sequences[:max_seqs],
             deletion_matrix=self.deletion_matrix[:max_seqs],
             descriptions=self.descriptions[:max_seqs],
+            msa_type=self.msa_type,
+        )
+
+    def random_truncate(self, max_seqs: int):
+        """Truncates the MSA to a random range of `max_seqs` sequences."""
+        start = random.randint(0, len(self.sequences) - max_seqs)  # nosec
+        return Msa(
+            sequences=self.sequences[start : start + max_seqs],
+            deletion_matrix=self.deletion_matrix[start : start + max_seqs],
+            descriptions=self.descriptions[start : start + max_seqs],
+            msa_type=self.msa_type,
         )
 
 
+@typecheck
 def parse_fasta(fasta_string: str) -> Tuple[Sequence[str], Sequence[str]]:
     """Parses FASTA string and returns list of strings with amino-acid sequences.
 
@@ -142,12 +169,15 @@ def parse_fasta(fasta_string: str) -> Tuple[Sequence[str], Sequence[str]]:
     return sequences, descriptions
 
 
-def parse_a3m(a3m_string: str) -> Msa:
+@typecheck
+def parse_a3m(a3m_string: str, msa_type: MSA_TYPE) -> Msa:
     """Parses sequences and deletion matrix from a3m format alignment.
 
     Args:
       a3m_string: The string contents of a a3m file. The first sequence in the
         file should be the query sequence.
+      msa_type: The type of the sequences in the MSA. This can be 'protein',
+        'dna', or 'rna'.
 
     Returns:
       A tuple of:
@@ -157,6 +187,7 @@ def parse_a3m(a3m_string: str) -> Msa:
           at `deletion_matrix[i][j]` is the number of residues deleted from
           the aligned sequence i at residue position j.
         * A list of descriptions, one per sequence, from the a3m file.
+        * The type of the sequences in the MSA.
     """
 
     sequences, descriptions = parse_fasta(a3m_string)
@@ -171,7 +202,6 @@ def parse_a3m(a3m_string: str) -> Msa:
                 deletion_vec.append(deletion_count)
                 deletion_count = 0
         deletion_matrix.append(deletion_vec)
-    import string
 
     # Make the MSA matrix out of aligned (deletion-free) sequences.
     deletion_table = str.maketrans("", "", string.ascii_lowercase)
@@ -180,4 +210,5 @@ def parse_a3m(a3m_string: str) -> Msa:
         sequences=aligned_sequences,
         deletion_matrix=deletion_matrix,
         descriptions=descriptions,
+        msa_type=msa_type,
     )
