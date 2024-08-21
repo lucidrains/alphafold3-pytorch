@@ -584,7 +584,7 @@ class Trainer:
 
         # load optimizer and scheduler states
 
-        package = torch.load(str(path))
+        package = torch.load(str(path), weights_only = True)
 
         unwrapped_optimizer = _unwrap_objects(self.optimizer)
 

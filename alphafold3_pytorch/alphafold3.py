@@ -5270,7 +5270,7 @@ class Alphafold3(Module):
 
         assert path.exists() and path.is_file()
 
-        package = torch.load(str(path), map_location = map_location)
+        package = torch.load(str(path), map_location = map_location, weights_only = True)
 
         model_package = package['model']
         current_version = version('alphafold3_pytorch')
@@ -5293,7 +5293,7 @@ class Alphafold3(Module):
 
         assert path.is_file()
 
-        package = torch.load(str(path), map_location = map_location)
+        package = torch.load(str(path), map_location = map_location, weights_only = True)
 
         model_package = package['model']
 
