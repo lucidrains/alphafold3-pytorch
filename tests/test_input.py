@@ -26,7 +26,7 @@ from alphafold3_pytorch.life import (
 
 from alphafold3_pytorch.mocks import MockAtomDataset
 
-DATA_TEST_PDB_ID = '721p'
+DATA_TEST_PDB_ID = '7a4d'
 
 # reverse complements
 
