@@ -15,6 +15,8 @@ from alphafold3_pytorch import (
     create_trainer_from_yaml
 )
 
+DATA_TEST_PDB_ID = '209d'
+
 TEST_FOLDER = Path('./data/test')
 
 INTERFACE_MAPPING_PATH = str(TEST_FOLDER / "interface_cluster_mapping.csv")
@@ -54,7 +56,7 @@ def test_cluster_based_sample(sampler: Sampler):
 @pytest.fixture()
 def populate_mock_pdb_and_remove_test_folders():
     proj_root = Path('.')
-    working_cif_file = proj_root / 'data' / 'test' / '7a4d-assembly1.cif'
+    working_cif_file = proj_root / 'data' / 'test' / f'{DATA_TEST_PDB_ID}-assembly1.cif'
 
     pytest_root_folder = Path('./test-folder')
     data_folder = pytest_root_folder / 'data'
