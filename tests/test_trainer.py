@@ -316,7 +316,7 @@ def test_collate_fn():
 
 # test creating trainer + alphafold3 from config
 
-def test_trainer_config():
+def test_trainer_config(remove_test_folders):
     curr_dir = Path(__file__).parents[0]
     trainer_yaml_path = curr_dir / 'configs/trainer.yaml'
 
@@ -347,13 +347,15 @@ def test_trainer_config_with_pdb_dataset(populate_mock_pdb_and_remove_test_folde
 
 # test creating trainer + alphafold3 along with atom dataset from config
 
-def test_trainer_config_with_atom_dataset():
+def test_trainer_config_with_atom_dataset(remove_test_folders):
 
     curr_dir = Path(__file__).parents[0]
 
     # setup atom dataset
 
-    atom_folder = './test-atom-folder'
+    atom_folder = './test-folder/test-atom-folder'
+    Path(atom_folder).mkdir(exist_ok = True, parents = True)
+
     mock_atom_dataset = MockAtomDataset(10)
 
     for i in range(10):
@@ -372,10 +374,6 @@ def test_trainer_config_with_atom_dataset():
 
     trainer()
 
-    # cleanup
-
-    shutil.rmtree(atom_folder, ignore_errors = True)
-
 # test creating trainer + alphafold3 with atom dataset that is precomputed from a pdb dataset
 
 def test_trainer_config_with_atom_dataset_from_pdb_dataset(populate_mock_pdb_and_remove_test_folders):
@@ -393,7 +391,7 @@ def test_trainer_config_with_atom_dataset_from_pdb_dataset(populate_mock_pdb_and
 
 # test creating trainer without model, given when creating instance
 
-def test_trainer_config_without_model():
+def test_trainer_config_without_model(remove_test_folders):
     curr_dir = Path(__file__).parents[0]
 
     af3_yaml_path = curr_dir / 'configs/alphafold3.yaml'
@@ -423,7 +421,7 @@ def test_conductor_config():
 
     assert isinstance(trainer, Trainer)
 
-    assert str(trainer.checkpoint_folder) == 'main-and-finetuning/main'
+    assert str(trainer.checkpoint_folder) == 'test-folder/main-and-finetuning/main'
     assert str(trainer.checkpoint_prefix) == 'af3.main.ckpt.'
 
 # test creating trainer from training config yaml + pdb datasets
@@ -439,5 +437,5 @@ def test_conductor_config_with_pdb_datasets(populate_mock_pdb_and_remove_test_fo
 
     assert isinstance(trainer, Trainer)
 
-    assert str(trainer.checkpoint_folder) == 'main-and-finetuning/main'
+    assert str(trainer.checkpoint_folder) == 'test-folder/main-and-finetuning/main'
     assert str(trainer.checkpoint_prefix) == 'af3.main.ckpt.'

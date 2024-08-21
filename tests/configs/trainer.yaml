@@ -31,5 +31,5 @@ clip_grad_norm: 10.
 accelerator: cpu
 checkpoint_prefix: af3.ckpt.
 checkpoint_every: 1
-checkpoint_folder: ./checkpoints
+checkpoint_folder: ./test-folder/checkpoints
 overwrite_checkpoints: false

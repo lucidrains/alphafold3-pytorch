@@ -2515,6 +2515,7 @@ class ElucidatedAtomDiffusion(Module):
         S_noise = 1.003,
         step_scale = 1.5,
         augment_during_sampling = True,
+        lddt_mask_kwargs: dict = dict(),
         smooth_lddt_loss_kwargs: dict = dict(),
         weighted_rigid_align_kwargs: dict = dict(),
         centre_random_augmentation_kwargs: dict = dict(),
@@ -2874,6 +2875,8 @@ class SmoothLDDTLoss(Module):
         self.nucleic_acid_cutoff = nucleic_acid_cutoff
         self.other_cutoff = other_cutoff
 
+        self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
+
     @typecheck
     def forward(
         self,
@@ -2890,6 +2893,8 @@ class SmoothLDDTLoss(Module):
         is_rna: boolean tensor indicating RNA atoms
         """
         # Compute distances between all pairs of atoms
+        device = pred_coords.device
+
         pred_dists = torch.cdist(pred_coords, pred_coords)
         true_dists = torch.cdist(true_coords, true_coords)
 
@@ -2897,12 +2902,9 @@ class SmoothLDDTLoss(Module):
         dist_diff = torch.abs(true_dists - pred_dists)
 
         # Compute epsilon values
-        eps = (
-            F.sigmoid(0.5 - dist_diff) +
-            F.sigmoid(1.0 - dist_diff) +
-            F.sigmoid(2.0 - dist_diff) +
-            F.sigmoid(4.0 - dist_diff)
-        ) / 4.0
+
+        eps = einx.subtract('thresholds, ... -> ... thresholds', self.lddt_thresholds, dist_diff)
+        eps = eps.sigmoid().mean(dim = -1)
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
@@ -3442,8 +3444,8 @@ class DistogramHead(Module):
 # confidence head
 
 class ConfidenceHeadLogits(NamedTuple):
-    pae: Float['b pae n n'] |  None
-    pde: Float['b pde n n']
+    pae: Float['b pae m m'] |  None
+    pde: Float['b pde m m']
     plddt: Float['b plddt m']
     resolved: Float['b 2 m']
 
@@ -3597,7 +3599,7 @@ class ConfidenceHead(Module):
 class ConfidenceScore(NamedTuple):
     """The ConfidenceScore class."""
 
-    plddt: Float["b n"]  
+    plddt: Float["b m"]
     ptm: Float[" b"]  
     iptm: Float[" b"] | None  
 
@@ -4337,6 +4339,7 @@ class ComputeModelSelectionScore(Module):
         self.weight_dict_config = weight_dict_config
 
         self.register_buffer("dist_breaks", dist_breaks)
+        self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
 
         self.dssp_path = dssp_path
 
@@ -4419,12 +4422,9 @@ class ComputeModelSelectionScore(Module):
 
         # Compute distance difference for all pairs of atoms
         dist_diff = torch.abs(true_dists - pred_dists)
-        lddt = (
-            ((0.5 - dist_diff) >= 0).float()
-            + ((1.0 - dist_diff) >= 0).float()
-            + ((2.0 - dist_diff) >= 0).float()
-            + ((4.0 - dist_diff) >= 0).float()
-        ) / 4.0
+
+        lddt = einx.subtract('thresholds, ... -> ... thresholds', self.lddt_thresholds, dist_diff)
+        lddt = (lddt >= 0).float().mean(dim = -1)
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
@@ -4476,15 +4476,6 @@ class ComputeModelSelectionScore(Module):
             coords_mask = torch.ones_like(asym_mask_a)
 
         if asym_mask_a.ndim == 1:
-            args = [
-                asym_mask_a,
-                asym_mask_b,
-                pred_coords,
-                true_coords,
-                is_molecule_types,
-                coords_mask,
-            ]
-            args = [x.unsqueeze(0) for x in args]
             (
                 asym_mask_a,
                 asym_mask_b,
@@ -4492,7 +4483,14 @@ class ComputeModelSelectionScore(Module):
                 true_coords,
                 is_molecule_types,
                 coords_mask,
-            ) = args
+            ) = map(lambda t: rearrange(t, '... -> 1 ...'), (
+                asym_mask_a,
+                asym_mask_b,
+                pred_coords,
+                true_coords,
+                is_molecule_types,
+                coords_mask,
+            ))
 
         is_dna = is_molecule_types[..., IS_DNA_INDEX]
         is_rna = is_molecule_types[..., IS_RNA_INDEX]
@@ -4993,12 +4991,15 @@ class Alphafold3(Module):
             S_tmax = 50,
             S_noise = 1.003,
         ),
+        lddt_mask_nucleic_acid_cutoff = 30.,
+        lddt_mask_other_cutoff = 15.,
         augment_kwargs: dict = dict(),
         stochastic_frame_average = False,
         distogram_atom_resolution = False,
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
-        checkpoint_distogram_head = True,
+        checkpoint_distogram_head = False,
+        checkpoint_confidence_head = False,
         checkpoint_diffusion_token_transformer = False,
         detach_when_recycling = True,
         pdb_training_set=True,
@@ -5157,6 +5158,10 @@ class Alphafold3(Module):
         self.edm = ElucidatedAtomDiffusion(
             self.diffusion_module,
             sigma_data = sigma_data,
+            smooth_lddt_loss_kwargs = dict(
+                nucleic_acid_cutoff = lddt_mask_nucleic_acid_cutoff,
+                other_cutoff = lddt_mask_other_cutoff,
+            ),
             **edm_kwargs
         )
 
@@ -5180,6 +5185,11 @@ class Alphafold3(Module):
             num_dist_bins = num_dist_bins,
             atom_resolution = distogram_atom_resolution,
         )
+
+        # lddt related
+
+        self.lddt_mask_nucleic_acid_cutoff = lddt_mask_nucleic_acid_cutoff
+        self.lddt_mask_other_cutoff = lddt_mask_other_cutoff
 
         # pae related bins and modules
 
@@ -5214,11 +5224,14 @@ class Alphafold3(Module):
             **confidence_head_kwargs
         )
 
+        self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
+
         # checkpointing related
 
         self.checkpoint_trunk_pairformer = checkpoint_trunk_pairformer
         self.checkpoint_diffusion_token_transformer = checkpoint_diffusion_token_transformer
         self.checkpoint_distogram_head = checkpoint_distogram_head
+        self.checkpoint_confidence_head = checkpoint_confidence_head
 
         # loss related
 
@@ -5980,24 +5993,18 @@ class Alphafold3(Module):
                 is_nucleotide = is_rna | is_dna
                 is_polymer = is_protein | is_rna | is_dna
 
-                is_any_nucleotide_pair = einx.logical_and(
-                    "... i, ... j -> ... i j", torch.ones_like(is_nucleotide), is_nucleotide
-                )
-                is_any_polymer_pair = einx.logical_and(
-                    "... i, ... j -> ... i j", torch.ones_like(is_polymer), is_polymer
-                )
+                is_any_nucleotide_pair = to_pairwise_mask(is_nucleotide)
+                is_any_polymer_pair = to_pairwise_mask(is_polymer)
 
                 inclusion_radius = torch.where(
                     is_any_nucleotide_pair,
-                    true_dists < 30.0,
-                    true_dists < 15.0,
+                    true_dists < self.lddt_mask_nucleic_acid_cutoff,
+                    true_dists < self.lddt_mask_other_cutoff,
                 )
 
                 is_token_center_atom = torch.zeros_like(atom_pos[..., 0], dtype=torch.bool)
                 is_token_center_atom[torch.arange(batch_size).unsqueeze(1), molecule_atom_indices] = True
-                is_any_token_center_atom_pair = einx.logical_and(
-                    "... i, ... j -> ... i j", torch.ones_like(is_token_center_atom), is_token_center_atom
-                )
+                is_any_token_center_atom_pair = to_pairwise_mask(is_token_center_atom)
 
                 # compute masks, avoiding self term
 
@@ -6008,12 +6015,9 @@ class Alphafold3(Module):
                 # compute distance difference for all pairs of atoms
 
                 dist_diff = torch.abs(true_dists - pred_dists)
-                lddt = (
-                    ((0.5 - dist_diff) >= 0).float()
-                    + ((1.0 - dist_diff) >= 0).float()
-                    + ((2.0 - dist_diff) >= 0).float()
-                    + ((4.0 - dist_diff) >= 0).float()
-                ) / 4.0
+
+                lddt = einx.subtract('thresholds, ... -> ... thresholds', self.lddt_thresholds, dist_diff)
+                lddt = (lddt >= 0).float().mean(dim = -1)
 
                 # calculate masked averaging,
                 # after which we assign each value to one of 50 equally sized bins
@@ -6050,8 +6054,14 @@ class Alphafold3(Module):
                 else torch.full((batch_size,), False, device=self.device)
             )
 
-            confidence_weight = torch.full((batch_size,), 1.0, device=self.device)
-            confidence_weight = torch.where(confidence_mask, confidence_weight, 0.0)
+            confidence_weight = confidence_mask.float()
+
+            def cross_entropy_with_weight(logits, labels, weight, ignore_index: int):
+                return F.cross_entropy(
+                    einx.multiply('b ..., b -> b ...', logits, weight),
+                    einx.multiply('b ..., b -> b ...', labels, weight.long()),
+                    ignore_index = ignore_index
+                )
 
             if exists(pae_labels):
                 assert pae_labels.shape[-1] == ch_logits.pae.shape[-1], (
@@ -6059,11 +6069,7 @@ class Alphafold3(Module):
                     f"ch_logits.pae shape {ch_logits.pae.shape[-1]}"
                 )
                 pae_labels = torch.where(label_pairwise_mask, pae_labels, ignore)
-                pae_loss = F.cross_entropy(
-                    ch_logits.pae * confidence_weight[..., None, None, None],
-                    pae_labels * confidence_weight[..., None, None].long(),
-                    ignore_index=ignore,
-                )
+                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, ignore)
 
             if exists(pde_labels):
                 assert pde_labels.shape[-1] == ch_logits.pde.shape[-1], (
@@ -6071,11 +6077,7 @@ class Alphafold3(Module):
                     f"ch_logits.pde shape {ch_logits.pde.shape[-1]}"
                 )
                 pde_labels = torch.where(label_pairwise_mask, pde_labels, ignore)
-                pde_loss = F.cross_entropy(
-                    ch_logits.pde * confidence_weight[..., None, None, None],
-                    pde_labels * confidence_weight[..., None, None].long(),
-                    ignore_index=ignore,
-                )
+                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, ignore)
 
             if exists(plddt_labels):
                 assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1], (
@@ -6083,11 +6085,7 @@ class Alphafold3(Module):
                     f"ch_logits.plddt shape {ch_logits.plddt.shape[-1]}"
                 )
                 plddt_labels = torch.where(label_mask, plddt_labels, ignore)
-                plddt_loss = F.cross_entropy(
-                    ch_logits.plddt * confidence_weight[..., None, None],
-                    plddt_labels * confidence_weight[..., None].long(),
-                    ignore_index=ignore,
-                )
+                plddt_loss = cross_entropy_with_weight(ch_logits.plddt, plddt_labels, confidence_weight, ignore)
 
             if exists(resolved_labels):
                 assert resolved_labels.shape[-1] == ch_logits.resolved.shape[-1], (
@@ -6095,11 +6093,7 @@ class Alphafold3(Module):
                     f"ch_logits.resolved shape {ch_logits.resolved.shape[-1]}"
                 )
                 resolved_labels = torch.where(label_mask, resolved_labels, ignore)
-                resolved_loss = F.cross_entropy(
-                    ch_logits.resolved * confidence_weight[..., None, None],
-                    resolved_labels * confidence_weight[..., None].long(),
-                    ignore_index=ignore,
-                )
+                resolved_loss = cross_entropy_with_weight(ch_logits.resolved, resolved_labels, confidence_weight, ignore)
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
 

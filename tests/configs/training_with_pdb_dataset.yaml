@@ -1,5 +1,5 @@
 ---
-checkpoint_folder: ./main-and-finetuning
+checkpoint_folder: ./test-folder/main-and-finetuning
 checkpoint_prefix: af3.
 training_order:
     - main
