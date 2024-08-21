@@ -5348,7 +5348,8 @@ class Alphafold3(Module):
         rollout_show_tqdm_pbar: bool = False,
         detach_when_recycling: bool = None,
         min_conf_resolution: float = 0.1,
-        max_conf_resolution: float = 4.0
+        max_conf_resolution: float = 4.0,
+        hard_validate: bool = False
     ) -> (
         Float['b m 3'] |
         Tuple[Float['b m 3'], ConfidenceHeadLogits] |
@@ -5366,7 +5367,7 @@ class Alphafold3(Module):
 
         # hard validate when debug env variable is turned on
 
-        if IS_DEBUGGING:
+        if hard_validate or IS_DEBUGGING:
             maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
