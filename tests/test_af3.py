@@ -1,5 +1,6 @@
 import os
 os.environ['TYPECHECK'] = 'True'
+os.environ['DEBUG'] = 'True'
 
 import pytest
 import random
@@ -62,6 +63,8 @@ from alphafold3_pytorch.inputs import (
     default_extract_atom_feats_fn,
     default_extract_atompair_feats_fn
 )
+
+from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 
 DATA_TEST_PDB_ID = '721p'
 
@@ -538,11 +541,13 @@ def test_alphafold3(
     num_molecule_mods: int,
 ):
     seq_len = 16
-    atom_seq_len = 32
     atoms_per_window = 27
 
     molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
-    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+    molecule_atom_lens = torch.full((2, seq_len), 3).long()
+
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+    atom_offset = exclusive_cumsum(molecule_atom_lens)
 
     token_bonds = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
@@ -564,7 +569,8 @@ def test_alphafold3(
 
     atom_indices_for_frame = None
     if calculate_pae:
-        atom_indices_for_frame = repeat(torch.arange(3), 'c -> b n c', b = 2, n = seq_len)
+        atom_indices_for_frame = repeat(torch.arange(3), 'c -> b n c', b = 2, n = seq_len).clone()
+        atom_indices_for_frame += atom_offset[..., None]
 
     missing_atom_mask = None
     if missing_atoms:
@@ -585,6 +591,13 @@ def test_alphafold3(
     distogram_atom_indices = molecule_atom_lens - 1
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+    # offset indices correctly
+
+    distogram_atom_indices += atom_offset
+    molecule_atom_indices += atom_offset
+
+    # alphafold3
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
@@ -750,8 +763,11 @@ def test_alphafold3_force_return_loss():
     seq_len = 16
     atom_seq_len = 32
 
-    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_indices += atom_offsets
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -761,7 +777,9 @@ def test_alphafold3_force_return_loss():
     molecule_ids = torch.randint(0, 32, (2, seq_len))
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
+
     distogram_atom_indices = molecule_atom_lens - 1
+    distogram_atom_indices += atom_offsets
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
@@ -828,8 +846,11 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
     seq_len = 16
     atom_seq_len = 32
 
-    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_indices += atom_offsets
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -840,6 +861,7 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1
+    distogram_atom_indices += atom_offsets
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
@@ -916,8 +938,11 @@ def test_alphafold3_with_atom_and_bond_embeddings():
     seq_len = 16
     atom_seq_len = 32
 
-    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
+    atom_offset = exclusive_cumsum(molecule_atom_lens)
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_indices += atom_offset
 
     atom_ids = torch.randint(0, 7, (2, atom_seq_len))
     atompair_ids = torch.randint(0, 3, (2, atom_seq_len, atom_seq_len))
@@ -940,6 +965,7 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
     distogram_atom_indices = molecule_atom_lens - 1 # last atom, as an example
+    distogram_atom_indices += atom_offset
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 

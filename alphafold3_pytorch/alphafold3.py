@@ -59,6 +59,7 @@ from alphafold3_pytorch.inputs import (
     DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS,
     BatchedAtomInput,
+    hard_validate_atom_indices_ascending
 )
 
 from alphafold3_pytorch.common.biomolecule import (
@@ -5347,7 +5348,8 @@ class Alphafold3(Module):
         rollout_show_tqdm_pbar: bool = False,
         detach_when_recycling: bool = None,
         min_conf_resolution: float = 0.1,
-        max_conf_resolution: float = 4.0
+        max_conf_resolution: float = 4.0,
+        hard_validate: bool = False
     ) -> (
         Float['b m 3'] |
         Tuple[Float['b m 3'], ConfidenceHeadLogits] |
@@ -5362,6 +5364,13 @@ class Alphafold3(Module):
 
         assert atom_inputs.shape[-1] == self.dim_atom_inputs, f'expected {self.dim_atom_inputs} for atom_inputs feature dimension, but received {atom_inputs.shape[-1]}'
         assert atompair_inputs.shape[-1] == self.dim_atompair_inputs, f'expected {self.dim_atompair_inputs} for atompair_inputs feature dimension, but received {atompair_inputs.shape[-1]}'
+
+        # hard validate when debug env variable is turned on
+
+        if hard_validate or IS_DEBUGGING:
+            maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
+            maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
+            maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
 
         # soft validate
 
@@ -5384,8 +5393,6 @@ class Alphafold3(Module):
             atom_indices_for_frame = einx.where('b n, b n three, -> b n three', valid_atom_indices_for_frame, atom_indices_for_frame, 0)
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
-
-        # hard validate when debug env variable is turned on
 
         if IS_DEBUGGING:
             assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'

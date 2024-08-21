@@ -166,6 +166,33 @@ def maybe(fn):
         return fn(x, *args, **kwargs)
     return inner
 
+# validation functions
+
+def hard_validate_atom_indices_ascending(
+    indices: Int['b n'] | Int['b n 3'],
+    error_msg_field: str = 'indices'
+):
+    # will do a hard validate
+    # asserting if any of the indices that are not -1 (missing) are identical or descending
+    # this will cover 'distogram_atom_indices', 'molecule_atom_indices', and 'atom_indices_for_frame'
+
+    if indices.ndim == 2:
+        indices = rearrange(indices, '... -> ... 1')
+
+    for batch_index, sample_indices in enumerate(indices):
+
+        all_present = (sample_indices >= 0).all(dim = -1)
+        present_indices = sample_indices[all_present]
+
+        # relaxed assumption that if all -1 or only one molecule, it passes the test
+
+        if present_indices.numel() <= 1:
+            continue
+
+        difference = einx.subtract('n i, n j -> n (i j)', present_indices[1:], present_indices[:-1])
+
+        assert (difference >= 0).all(), f'detected invalid {error_msg_field} for in a batch: {present_indices}'
+
 # atom level, what Alphafold3 accepts
 
 UNCOLLATABLE_ATOM_INPUT_FIELDS = {'filepath'}
