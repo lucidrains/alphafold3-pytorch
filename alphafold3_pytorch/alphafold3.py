@@ -3099,13 +3099,13 @@ class ComputeAlignmentError(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b m_or_n 3'],
-        true_coords: Float['b m_or_n 3'],
+        pred_coords: Float['b m 3'],
+        true_coords: Float['b m 3'],
         pred_frames: Float['b n 3 3'],
         true_frames: Float['b n 3 3'],
-        mask: Bool['b m_or_n'] | None = None,
-        molecule_atom_lens: Int['b n'] | None = None
-    ) -> Float['b m_or_n m_or_n']:
+        molecule_atom_lens: Int['b n'],
+        mask: Bool['b m'] | None = None,
+    ) -> Float['b m m']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
@@ -3113,17 +3113,8 @@ class ComputeAlignmentError(Module):
         true_frames: true frames
         """
 
-        # detect whether using atom or residue resolution
-
-        is_atom_resolution = pred_coords.shape[1] != pred_frames.shape[1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution alignment error'
-
-        if is_atom_resolution:
-            pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
-            true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
-
-            if not exists(mask) and exists(molecule_atom_lens):
-                mask = batch_repeat_interleave(molecule_atom_lens > 0, molecule_atom_lens)
+        pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
+        true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
 
         # to pairs
 
@@ -3445,7 +3436,7 @@ class DistogramHead(Module):
 
 class ConfidenceHeadLogits(NamedTuple):
     pae: Float['b pae m m'] |  None
-    pde: Float['b pde m m']
+    pde: Float['b pde n n']
     plddt: Float['b plddt m']
     resolved: Float['b 2 m']
 
@@ -3514,6 +3505,8 @@ class ConfidenceHead(Module):
 
         self.atom_feats_to_single = LinearNoBias(dim_atom, dim_single)
 
+        self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
+
         # tensor typing
 
         self.da = dim_atom
@@ -3570,11 +3563,15 @@ class ConfidenceHead(Module):
             single_repr=single_repr, pairwise_repr=pairwise_repr, mask=mask
         )
 
-        # handle atom level resolution
+        # handle atom level resolution for single and pairwise
 
         atom_single_repr = batch_repeat_interleave(single_repr, molecule_atom_lens)
 
         atom_single_repr = atom_single_repr + self.atom_feats_to_single(atom_feats)
+
+        atom_pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
+
+        atom_pairwise_repr = atom_pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
         # to logits
 
@@ -3588,7 +3585,7 @@ class ConfidenceHead(Module):
         pae_logits = None
 
         if return_pae_logits:
-            pae_logits = self.to_pae_logits(pairwise_repr)
+            pae_logits = self.to_pae_logits(atom_pairwise_repr)
 
         # return all logits
 
@@ -3642,11 +3639,12 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def forward(
         self,
-        confidence_head_logits: ConfidenceHeadLogits,
+        pae_logits: Float["b pae m m"],
+        plddt_logits: Float["b plddt m"],
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
+        molecule_atom_lens: Int["b n"],
         ptm_residue_weight: Float["b n"] | None = None,  
-        molecule_atom_lens: Int["b n"] | None = None,
         multimer_mode: bool = True,
     ) -> ConfidenceScore:
         """Main function to compute confidence score.
@@ -3658,12 +3656,11 @@ class ComputeConfidenceScore(Module):
         :param multimer_mode: bool
         :return: Confidence score
         """
-        plddt = self.compute_plddt(confidence_head_logits.plddt)
+        plddt = self.compute_plddt(plddt_logits)
 
         # Section 5.9.1 equation 17
         ptm = self.compute_ptm(
-            confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False,
-            molecule_atom_lens=molecule_atom_lens,
+            pae_logits, asym_id, has_frame, molecule_atom_lens, ptm_residue_weight, interface=False
         )
 
         iptm = None
@@ -3671,8 +3668,7 @@ class ComputeConfidenceScore(Module):
         if multimer_mode:
             # Section 5.9.2 equation 18
             iptm = self.compute_ptm(
-                confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True,
-                molecule_atom_lens=molecule_atom_lens,
+                pae_logits, asym_id, has_frame, molecule_atom_lens, ptm_residue_weight, interface=True
             )
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
@@ -3700,11 +3696,11 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_ptm(
         self,
-        logits: Float["b pae m_or_n m_or_n"],  
+        logits: Float["b pae m m"],
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
+        molecule_atom_lens: Int["b n"],
         residue_weights: Float["b n"] | None = None,
-        molecule_atom_lens: Int["b n"] | None = None,  
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
     ) -> Float[" b"] | Tuple[Float["b chains chains"], Bool["b chains chains"], Int["b chains"]]:
@@ -3720,14 +3716,11 @@ class ComputeConfidenceScore(Module):
         :return: pTM
         """
 
-        is_atom_resolution = logits.shape[-1] != asym_id.shape[-1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution pTM'
 
-        if is_atom_resolution:
-            asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
-            has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
-            if exists(residue_weights):
-                residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
+        asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
+        has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
+        if exists(residue_weights):
+            residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
                 
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
@@ -3988,10 +3981,10 @@ class ComputeRankingScore(Module):
         disorder = ((atom_rasa > 0.581) * mask).sum(dim=-1) / (self.eps + mask.sum(dim=1))
         return disorder
 
-    @typecheck
     def compute_full_complex_metric(
         self,
-        confidence_head_logits: ConfidenceHeadLogits,
+        pae_logits: Float['b pae m m'],
+        plddt_logits: Float['b plddt m'],
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
         molecule_atom_lens: Int["b n"],  
@@ -4003,7 +3996,8 @@ class ComputeRankingScore(Module):
 
         """Compute full complex metric.
 
-        :param confidence_head_logits: ConfidenceHeadLogits
+        :param pae_logits: pae logits from confidence head
+        :param plddt_logits: plddt logits from confidence head
         :param asym_id: [b n] asym_id of each residue
         :param has_frame: [b n] has_frame of each residue
         :param molecule_atom_lens: [b n] molecule atom lens
@@ -4035,7 +4029,7 @@ class ComputeRankingScore(Module):
         atom_is_molecule_types = is_molecule_types.gather(1, indices) * valid_indices[..., None]
 
         confidence_score = self.compute_confidence_score(
-            confidence_head_logits, asym_id, has_frame, multimer_mode=True
+            pae_logits, plddt_logits, asym_id, has_frame, molecule_atom_lens, multimer_mode=True
         )
         has_clash = self.compute_clash(
             atom_pos,
@@ -4062,9 +4056,11 @@ class ComputeRankingScore(Module):
     @typecheck
     def compute_single_chain_metric(
         self,
-        confidence_head_logits: ConfidenceHeadLogits,
+        pae_logits: Float['b pae m m'],
+        plddt_logits: Float['b plddt m'],
         asym_id: Int["b n"],  
-        has_frame: Bool["b n"],  
+        has_frame: Bool["b n"],
+        molecule_atom_lens: Int["b n"]
     ) -> Float[" b"]:
 
         """Compute single chain metric.
@@ -4078,18 +4074,18 @@ class ComputeRankingScore(Module):
         # Section 5.9.3.2
 
         confidence_score = self.compute_confidence_score(
-            confidence_head_logits, asym_id, has_frame, multimer_mode=False
+            pae_logits, plddt_logits, asym_id, has_frame, molecule_atom_lens, multimer_mode=False
         )
 
-        score = confidence_score.ptm
-        return score
+        return confidence_score.ptm
 
     @typecheck
     def compute_interface_metric(
         self,
-        confidence_head_logits: ConfidenceHeadLogits,
+        pae_logits: Float['b pae m m'],
         asym_id: Int["b n"],  
-        has_frame: Bool["b n"],  
+        has_frame: Bool["b n"],
+        molecule_atom_lens: Int['b n'],
         interface_chains: List,
     ) -> Float[" b"]:  
         """Compute interface metric.
@@ -4116,7 +4112,7 @@ class ComputeRankingScore(Module):
             chain_wise_iptm_mask,
             unique_chains,
         ) = self.compute_confidence_score.compute_ptm(
-            confidence_head_logits.pae, asym_id, has_frame, compute_chain_wise_iptm=True
+            pae_logits, asym_id, has_frame, molecule_atom_lens, compute_chain_wise_iptm=True
         )
 
         # Section 5.9.3 equation 20
@@ -4141,7 +4137,7 @@ class ComputeRankingScore(Module):
     @typecheck
     def compute_modified_residue_score(
         self,
-        confidence_head_logits: ConfidenceHeadLogits,
+        plddt_logits: Float['b plddt m'],
         atom_mask: Bool["b m"],  
         atom_is_modified_residue: Int["b m"],  
     ) -> Float[" b"]:  
@@ -4155,9 +4151,7 @@ class ComputeRankingScore(Module):
 
         # Section 5.9.3.4
 
-        plddt = self.compute_confidence_score.compute_plddt(
-            confidence_head_logits.plddt,
-        )
+        plddt = self.compute_confidence_score.compute_plddt(plddt_logits)
 
         mask = atom_is_modified_residue * atom_mask
         plddt_mean = masked_average(plddt, mask, dim=-1, eps=self.eps)
@@ -5909,11 +5903,13 @@ class Alphafold3(Module):
                     & valid_atom_indices_for_frame
                 )
 
+                align_error_mask = batch_repeat_interleave(align_error_mask, molecule_atom_lens)
+
                 # align error
 
                 align_error = self.compute_alignment_error(
-                    denoised_molecule_pos,
-                    molecule_pos,
+                    denoised_atom_pos,
+                    atom_pos,
                     pred_frames,
                     frames,
                     mask=align_error_mask,
@@ -6043,8 +6039,7 @@ class Alphafold3(Module):
             # determine which mask to use for confidence head labels
 
             label_mask = atom_mask
-
-            label_pairwise_mask = to_pairwise_mask(mask)
+            label_pairwise_mask = to_pairwise_mask(atom_mask)
 
             # cross entropy losses
 
@@ -6076,7 +6071,7 @@ class Alphafold3(Module):
                     f"pde_labels shape {pde_labels.shape[-1]} does not match "
                     f"ch_logits.pde shape {ch_logits.pde.shape[-1]}"
                 )
-                pde_labels = torch.where(label_pairwise_mask, pde_labels, ignore)
+                pde_labels = torch.where(to_pairwise_mask(mask), pde_labels, ignore)
                 pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, ignore)
 
             if exists(plddt_labels):
