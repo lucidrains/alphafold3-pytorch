@@ -2249,7 +2249,7 @@ def pdb_input_to_molecule_input(
     i = pdb_input
 
     filepath = i.mmcif_filepath
-    file_id = os.path.splitext(os.path.basename(filepath))[0]
+    file_id = os.path.splitext(os.path.basename(filepath))[0] if exists(filepath) else None
     resolution = i.resolution
 
     # acquire a `Biomolecule` object for the given `PDBInput`
@@ -2413,7 +2413,8 @@ def pdb_input_to_molecule_input(
             is_molecule_mod.append(is_mol_mod_type)
             molecule_idx += 1
 
-    # collect token center, distogram, and source-target atom indices for each token
+    # collect frame, token center, distogram, and source-target atom indices for each token
+    atom_indices_for_frame = []
     molecule_atom_indices = []
     distogram_atom_indices = []
     src_tgt_atom_indices = []
@@ -2435,11 +2436,13 @@ def pdb_input_to_molecule_input(
 
         if is_atomized_residue(mol_type):
             # collect indices for each ligand and modified polymer residue token (i.e., atom)
+            atom_indices_for_frame.append(None)
             molecule_atom_indices.append(-1)
             distogram_atom_indices.append(-1)
             # NOTE: ligand and modified polymer residue tokens do not have source-target atom indices
         else:
             # collect indices for each polymer residue token
+            atom_indices_for_frame.append(entry["three_atom_indices_for_frame"])
             molecule_atom_indices.append(entry["token_center_atom_idx"])
             distogram_atom_indices.append(entry["distogram_atom_idx"])
             src_tgt_atom_indices.append([entry["first_atom_idx"], entry["last_atom_idx"]])
@@ -2696,6 +2699,7 @@ def pdb_input_to_molecule_input(
     atom_pos = torch.from_numpy(
         np.concatenate([mol.GetConformer().GetPositions() for mol in molecules]).astype(np.float32)
     )
+    num_atoms = atom_pos.shape[0]
 
     # create atom_parent_ids using the `Biomolecule` object, which governs in the atom
     # encoder / decoder which atom attends to which, where a design choice is made such
@@ -2719,9 +2723,9 @@ def pdb_input_to_molecule_input(
 
     # handle `atom_indices_for_frame` for the PAE
 
-    atom_indices_for_frame = tensor([
-        default(indices, (-1, -1, -1)) for indices in atom_indices_for_frame
-    ])
+    atom_indices_for_frame = tensor(
+        [default(indices, (-1, -1, -1)) for indices in atom_indices_for_frame]
+    )
 
     # build offsets for all indices
 
