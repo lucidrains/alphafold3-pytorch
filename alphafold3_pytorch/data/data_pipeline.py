@@ -1,26 +1,31 @@
 """General-purpose data pipeline."""
 
 import os
-
-from loguru import logger
-from typing import MutableMapping, Optional, Tuple
+from typing import Dict, List, MutableMapping, Optional, Tuple
 
 import numpy as np
 import torch
+from loguru import logger
 from torch import Tensor
 
-from alphafold3_pytorch.common import amino_acid_constants
 from alphafold3_pytorch.common.biomolecule import (
     Biomolecule,
     _from_mmcif_object,
+    get_residue_constants,
     to_mmcif,
 )
 from alphafold3_pytorch.data import mmcif_parsing, msa_parsing
+from alphafold3_pytorch.tensor_typing import typecheck
 from alphafold3_pytorch.utils.utils import exists
+
+# Constants
+
+GAP_ID = get_residue_constants("peptide").MSA_CHAR_TO_ID["-"]
 
 FeatureDict = MutableMapping[str, np.ndarray | Tensor]
 
 
+@typecheck
 def make_sequence_features(sequence: str, description: str) -> FeatureDict:
     """Construct a feature dict of sequence features."""
     features = {}
@@ -29,59 +34,144 @@ def make_sequence_features(sequence: str, description: str) -> FeatureDict:
     return features
 
 
-def make_msa_mask(protein: FeatureDict) -> FeatureDict:
+@typecheck
+def make_msa_mask(features: FeatureDict) -> FeatureDict:
     """
     Make MSA mask features.
     From: https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/data_transforms.py#L379
     NOTE: Openfold Mask features are all ones, but will later be zero-padded.
 
-    :param protein: The protein dictionary.
-    :return: The protein dictionary with MSA mask features.
+    :param features: The features dictionary.
+    :return: The features dictionary with new MSA mask features.
     """
-    # get a sequence-length mask
-    protein["msa_mask"] = torch.ones(protein["msa"].shape[1], dtype=torch.float32)
-    protein["msa_row_mask"] = torch.ones((protein["msa"].shape[0]), dtype=torch.float32)
-    return protein
+    features["msa_mask"] = torch.ones(features["msa"].shape[1], dtype=torch.float32)
+    features["msa_row_mask"] = torch.ones((features["msa"].shape[0]), dtype=torch.float32)
+    return features
 
 
-def make_msa_features(msas: dict) -> FeatureDict:
+@typecheck
+def make_msa_features(
+    msas: Dict[str, msa_parsing.Msa | None],
+    chain_id_to_chem_types: Dict[str, List[int]],
+    raise_missing_exception: bool = False,
+) -> FeatureDict:
     """
     Construct a feature dictionary of MSA features.
     From: https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/data_pipeline.py#L224
 
-    :param msas: The MSA dictionary.
-    :return: The MSA feature dictionary
+    :param msas: The mapping of chain IDs to lists of (optional) MSAs for each chain.
+    :param chain_id_to_chem_types: The mapping of chain IDs to residue (integer) chemical types.
+    :param raise_missing_exception: Whether to raise an exception if no MSAs are provided for any chain.
+    :return: The MSA feature dictionary.
     """
     if not msas:
-        raise ValueError("At least one MSA must be provided.")
+        raise ValueError("At least one chain's MSA must be provided.")
 
-    int_msa = []
-    deletion_matrix = []
-    species_ids = []
-    seen_sequences = set()
-    for msa_index, msa in enumerate(msas):
-        if not msa:
-            raise ValueError(f"MSA {msa_index} must contain at least one sequence.")
+    # Infer MSA metadata.
+    max_alignments = 1
+    for msa in msas.values():
+        if exists(msa.sequences) and exists(msa.sequences[0]):
+            max_alignments = max(max_alignments, len(msa.sequences) if msa else 1)
+
+    # Collect MSAs.
+    int_msa_list = []
+    deletion_matrix_list = []
+    species_ids_list = []
+
+    for chain_id, msa in msas.items():
+        int_msa = []
+        deletion_matrix = []
+        species_ids = []
+        seen_sequences = set()
+
+        chain_chem_types = chain_id_to_chem_types[chain_id]
+        num_res = len(chain_chem_types)
+
+        msa_residue_constants = get_residue_constants(msa.msa_type.replace("protein", "peptide"))
+
+        gap_ids = [[GAP_ID] * num_res]
+        deletion_values = [[0] * num_res]
+        species = ["".encode("utf-8")]
+
+        if not msa and raise_missing_exception:
+            raise ValueError(f"MSA for chain {chain_id} must contain at least one sequence.")
+        elif not msa:
+            # Pad the MSA to the maximum number of alignments
+            # if the chain does not have any associated alignments.
+            int_msa_list.append(gap_ids * max_alignments)
+            deletion_matrix_list.append(deletion_values * max_alignments)
+            species_ids_list.append(species * max_alignments)
+            continue
+
         for sequence_index, sequence in enumerate(msa.sequences):
             if sequence in seen_sequences:
                 continue
             seen_sequences.add(sequence)
-            int_msa.append([amino_acid_constants.HHBLITS_AA_TO_ID[res] for res in sequence])
 
-            deletion_matrix.append(msa.deletion_matrix[sequence_index])
+            # Convert the MSA to integers while handling
+            # ligands and (unmappable) modified polymer residues.
+            msa_res_types = []
+            msa_deletion_values = []
+
+            polymer_res_index = 0
+
+            for chem_type in chain_chem_types:
+                is_ligand = chem_type == 3
+                chem_residue_constants = get_residue_constants(res_chem_index=chem_type)
+
+                if is_ligand:
+                    # NOTE: For ligands, we use the unknown amino acid type.
+                    msa_res_type = chem_residue_constants.restype_num
+                    msa_deletion_value = 0
+                else:
+                    # NOTE: For polymer residues of a different chemical type than the chain's MSA,
+                    # we use the unknown residue type of the corresponding chemical type
+                    # (e.g., `DN` for DNA residues in a protein chain's MSA). This should
+                    # provide the model with partial information about the residue's identity.
+                    if chem_residue_constants != msa_residue_constants:
+                        msa_res_type = chem_residue_constants.restype_num
+                    else:
+                        res = sequence[polymer_res_index]
+                        msa_res_type = msa_residue_constants.MSA_CHAR_TO_ID.get(
+                            res, msa_residue_constants.restype_num
+                        )
+
+                    msa_deletion_value = msa.deletion_matrix[sequence_index][polymer_res_index]
+
+                    polymer_res_index += 1
+
+                msa_res_types.append(msa_res_type)
+                msa_deletion_values.append(msa_deletion_value)
+
+            int_msa.append(msa_res_types)
+            deletion_matrix.append(msa_deletion_values)
+
             identifiers = msa_parsing.get_identifiers(msa.descriptions[sequence_index])
             species_ids.append(identifiers.species_id.encode("utf-8"))
 
-    num_res = len(msas[0].sequences[0])
-    num_alignments = len(int_msa)
-    features = {}
-    features["deletion_matrix_int"] = np.array(deletion_matrix, dtype=np.int32)
-    features["msa"] = torch.tensor(int_msa, dtype=np.int32)
-    features["num_alignments"] = np.array([num_alignments] * num_res, dtype=np.int32)
-    features["msa_species_identifiers"] = np.array(species_ids, dtype=object)
+        # Pad the MSA to the maximum number of alignments.
+        num_padding_alignments = max_alignments - len(int_msa)
+
+        padding_msa = gap_ids * num_padding_alignments
+        padding_deletion_matrix = deletion_values * num_padding_alignments
+        padding_species_ids = species * num_padding_alignments
+
+        int_msa_list.append(torch.tensor(int_msa + padding_msa, dtype=torch.long))
+        deletion_matrix_list.append(
+            torch.tensor(deletion_matrix + padding_deletion_matrix, dtype=torch.float32)
+        )
+        species_ids_list.append(np.array(species_ids + padding_species_ids, dtype=object))
+
+    features = {
+        "msa": torch.cat(int_msa_list, dim=-1),
+        "deletion_matrix": torch.cat(deletion_matrix_list, dim=-1),
+        "msa_species_identifiers": np.stack(species_ids_list),
+        "num_alignments": max_alignments,
+    }
     return features
 
 
+@typecheck
 def get_assembly(biomol: Biomolecule, assembly_id: Optional[str] = None) -> Biomolecule:
     """Get a specified (Biomolecule) assembly of a given Biomolecule.
 
@@ -150,6 +240,7 @@ def get_assembly(biomol: Biomolecule, assembly_id: Optional[str] = None) -> Biom
     return assembly
 
 
+@typecheck
 def make_mmcif_features(
     mmcif_object: mmcif_parsing.MmcifObject,
 ) -> Tuple[FeatureDict, Biomolecule]:
