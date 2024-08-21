@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.3.8"
+version = "0.3.10"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
@@ -50,6 +50,7 @@ dependencies = [
     "shortuuid",
     "tensorboard",
     "taylor-series-linear-attention>=0.1.11",
+    "torchtyping>=0.1.5",
     "timeout_decorator>=0.5.0",
     'torch_geometric',
     "torch>=2.1",
