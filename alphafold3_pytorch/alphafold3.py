@@ -1049,7 +1049,6 @@ class MSAModule(Module):
         dim_msa = 64,
         dim_msa_input=NUM_MSA_ONE_HOT,
         dim_additional_msa_feats=2,
-        dim_msa_input = None,
         outer_product_mean_dim_hidden = 32,
         msa_pwa_dropout_row_prob = 0.15,
         msa_pwa_heads = 8,
