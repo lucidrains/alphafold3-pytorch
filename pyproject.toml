@@ -42,7 +42,7 @@ dependencies = [
     "numpy",
     "polars>=1.1.0",
     "pdbeccdutils>=0.8.5",
-    "pydantic>=2.7.2",
+    "pydantic>=2.8.2",
     "pyyaml",
     "rdkit>=2023.9.6",
     "scikit-learn>=1.5.0",
