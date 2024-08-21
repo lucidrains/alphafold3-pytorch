@@ -200,7 +200,7 @@ def test_pdbinput_input():
             "contiguous_weight": 0.2,
             "spatial_weight": 0.4,
             "spatial_interface_weight": 0.4,
-            "n_res": 384,
+            "n_res": 64,
         },
         training=True,
     )
