@@ -276,7 +276,7 @@ def file_to_atom_input(path: str | Path) -> AtomInput:
 
     assert path.is_file()
 
-    atom_input_dict = torch.load(str(path))
+    atom_input_dict = torch.load(str(path), weights_only = True)
     return AtomInput(**atom_input_dict)
 
 @typecheck
