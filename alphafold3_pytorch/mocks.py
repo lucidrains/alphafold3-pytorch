@@ -75,6 +75,8 @@ class MockAtomDataset(Dataset):
         if random.random() > 0.5:
             msa_mask = torch.ones((7,)).bool()
 
+        additional_msa_feats = torch.randn(7, seq_len, 2)
+
         # required for training, but omitted on inference
 
         atom_pos = torch.randn(atom_seq_len, 3)
@@ -97,6 +99,7 @@ class MockAtomDataset(Dataset):
             token_bonds = token_bonds,
             molecule_atom_lens = molecule_atom_lens,
             additional_molecule_feats = additional_molecule_feats,
+            additional_msa_feats = additional_msa_feats,
             additional_token_feats = additional_token_feats,
             is_molecule_types = is_molecule_types,
             is_molecule_mod = is_molecule_mod,
