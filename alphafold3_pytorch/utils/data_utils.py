@@ -1,6 +1,8 @@
 from typing import Any, Dict, Literal, Set
 
 import numpy as np
+import torch
+from torch import Tensor
 
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
 from alphafold3_pytorch.utils.utils import exists
@@ -230,3 +232,16 @@ def extract_mmcif_metadata_field(
         resolution = coerce_to_float(mmcif_object.raw_string["_reflns.d_resolution_high"])
         if exists(resolution) and min_resolution <= resolution <= max_resolution:
             return resolution
+
+
+@typecheck
+def make_one_hot(x: Tensor, num_classes: int) -> Tensor:
+    """Convert a tensor of indices to a one-hot tensor.
+
+    :param x: A tensor of indices.
+    :param num_classes: The number of classes.
+    :return: A one-hot tensor.
+    """
+    x_one_hot = torch.zeros(*x.shape, num_classes, device=x.device)
+    x_one_hot.scatter_(-1, x.unsqueeze(-1), 1)
+    return x_one_hot
