@@ -24,6 +24,8 @@ from alphafold3_pytorch import (
 
 from alphafold3_pytorch.mocks import MockAtomDataset
 
+DATA_TEST_PDB_ID = '209d'
+
 def exists(v):
     return v is not None
 
@@ -135,7 +137,7 @@ def test_trainer_with_mock_atom_input(remove_test_folders):
 @pytest.fixture()
 def populate_mock_pdb_and_remove_test_folders():
     proj_root = Path('.')
-    working_cif_file = proj_root / 'data' / 'test' / '7a4d-assembly1.cif'
+    working_cif_file = proj_root / 'data' / 'test' / f'{DATA_TEST_PDB_ID}-assembly1.cif'
 
     pytest_root_folder = Path('./test-folder')
     data_folder = pytest_root_folder / 'data'

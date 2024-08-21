@@ -63,6 +63,8 @@ from alphafold3_pytorch.inputs import (
     default_extract_atompair_feats_fn
 )
 
+DATA_TEST_PDB_ID = '721p'
+
 def test_atom_ref_pos_to_atompair_inputs():
     atom_ref_pos = torch.randn(16, 3)
     atom_ref_space_uid = torch.ones(16).long()
@@ -1095,7 +1097,7 @@ def test_unresolved_protein_rasa():
 
     # rest of the test
 
-    mmcif_filepath = os.path.join('data', 'test', '7a4d-assembly1.cif')
+    mmcif_filepath = os.path.join('data', 'test', f'{DATA_TEST_PDB_ID}-assembly1.cif')
     pdb_input = PDBInput(mmcif_filepath)
 
     mol_input = pdb_input_to_molecule_input(pdb_input)
