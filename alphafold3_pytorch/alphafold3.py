@@ -59,6 +59,7 @@ from alphafold3_pytorch.inputs import (
     DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS,
     BatchedAtomInput,
+    hard_validate_atom_indices_ascending
 )
 
 from alphafold3_pytorch.common.biomolecule import (
@@ -5389,6 +5390,10 @@ class Alphafold3(Module):
 
         if IS_DEBUGGING:
             assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
+
+            maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
+            maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
+            maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
 
         # if atompair inputs are not windowed, window it
 
