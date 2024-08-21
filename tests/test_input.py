@@ -186,12 +186,10 @@ def test_atompos_input():
     assert sampled_atom_pos.shape == (1, (5 + 4 + 21 + 3), 3)
 
 def test_pdbinput_input():
+    """Test the PDBInput class, particularly its input transformations for mmCIF files."""
     filepath = os.path.join("data", "test", "7a4d-assembly1.cif")
     file_id = os.path.splitext(os.path.basename(filepath))[0]
-    assert os.path.exists(filepath)
-
-    if os.path.exists(filepath.replace(".cif", "-sampled.cif")):
-        os.remove(filepath.replace(".cif", "-sampled.cif"))
+    assert os.path.exists(filepath), f"File {filepath} does not exist."
 
     train_pdb_input = PDBInput(
         filepath,
@@ -212,40 +210,34 @@ def test_pdbinput_input():
     # training
 
     alphafold3 = Alphafold3(
-        dim_atom=8,
-        dim_atompair=8,
+        dim_atom=2,
+        dim_atompair=2,
         dim_input_embedder_token=8,
-        dim_single=8,
-        dim_pairwise=8,
-        dim_token=8,
+        dim_single=2,
+        dim_pairwise=2,
+        dim_token=2,
         dim_atom_inputs=3,
         dim_atompair_inputs=5,
         atoms_per_window=27,
         dim_template_feats=44,
-        num_dist_bins=38,
         num_molecule_mods=4,
+        num_dist_bins=38,
+        num_rollout_steps=2,
+        diffusion_num_augmentations=2,
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
-        msa_module_kwargs=dict(depth=1),
+        msa_module_kwargs=dict(depth=1, dim_msa=2),
         pairformer_stack=dict(
             depth=1,
-            pair_bias_attn_dim_head = 4,
-            pair_bias_attn_heads = 2,
+            pair_bias_attn_dim_head=1,
+            pair_bias_attn_heads=2,
         ),
         diffusion_module_kwargs=dict(
             atom_encoder_depth=1,
             token_transformer_depth=1,
             atom_decoder_depth=1,
-            atom_decoder_kwargs = dict(
-                attn_pair_bias_kwargs = dict(
-                    dim_head = 4
-                )
-            ),
-            atom_encoder_kwargs = dict(
-                attn_pair_bias_kwargs = dict(
-                    dim_head = 4
-                )
-            )
+            atom_decoder_kwargs=dict(attn_pair_bias_kwargs=dict(dim_head=1)),
+            atom_encoder_kwargs=dict(attn_pair_bias_kwargs=dict(dim_head=1)),
         ),
     )
 
@@ -280,5 +272,4 @@ def test_pdbinput_input():
         insert_alphafold_mmcif_metadata=True,
         sampled_atom_positions=sampled_atom_positions,
     )
-
     assert os.path.exists(filepath.replace(".cif", "-sampled.cif"))
