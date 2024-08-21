@@ -5400,14 +5400,6 @@ class Alphafold3(Module):
         total_atoms = molecule_atom_lens.sum(dim = -1)
         atom_mask = lens_to_mask(total_atoms, max_len = atom_seq_len)
 
-        # handle offsets for molecule and distogram atom indices
-
-        if exists(molecule_atom_indices):
-            molecule_atom_indices = molecule_atom_indices + exclusive_cumsum(molecule_atom_lens)
-
-        if exists(distogram_atom_indices):
-            distogram_atom_indices = distogram_atom_indices + exclusive_cumsum(molecule_atom_lens)
-
         # get atom sequence length and molecule sequence length depending on whether using packed atomic seq
 
         seq_len = molecule_atom_lens.shape[-1]
