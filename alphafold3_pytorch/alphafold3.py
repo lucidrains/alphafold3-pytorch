@@ -3392,7 +3392,6 @@ class DistogramHead(Module):
         dim_pairwise = 128,
         num_dist_bins = 38,
         dim_atom = 128,
-        atom_resolution = False
     ):
         super().__init__()
 
@@ -3404,10 +3403,7 @@ class DistogramHead(Module):
         # atom resolution
         # for now, just embed per atom distances, sum to atom features, project to pairwise dimension
 
-        self.atom_resolution = atom_resolution
-
-        if atom_resolution:
-            self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
+        self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
 
         # tensor typing
 
@@ -3417,16 +3413,12 @@ class DistogramHead(Module):
     def forward(
         self,
         pairwise_repr: Float['b n n d'],
-        molecule_atom_lens: Int['b n'] | None = None,
-        atom_feats: Float['b m {self.da}'] | None = None,
+        molecule_atom_lens: Int['b n'],
+        atom_feats: Float['b m {self.da}'],
     ) -> Float['b l n n'] | Float['b l m m']:
 
-        if self.atom_resolution:
-            assert exists(molecule_atom_lens)
-            assert exists(atom_feats)
-
-            pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
-            pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
+        pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
+        pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
         logits = self.to_distogram_logits(symmetrize(pairwise_repr))
 
@@ -4989,7 +4981,6 @@ class Alphafold3(Module):
         lddt_mask_other_cutoff = 15.,
         augment_kwargs: dict = dict(),
         stochastic_frame_average = False,
-        distogram_atom_resolution = False,
         checkpoint_input_embedding = False,
         checkpoint_trunk_pairformer = False,
         checkpoint_distogram_head = False,
@@ -5171,13 +5162,10 @@ class Alphafold3(Module):
 
         assert len(distance_bins_tensor) == num_dist_bins, '`distance_bins` must have a length equal to the `num_dist_bins` passed in'
 
-        self.distogram_atom_resolution = distogram_atom_resolution
-
         self.distogram_head = DistogramHead(
             dim_pairwise = dim_pairwise,
             dim_atom = dim_atom,
             num_dist_bins = num_dist_bins,
-            atom_resolution = distogram_atom_resolution,
         )
 
         # lddt related
@@ -5679,15 +5667,7 @@ class Alphafold3(Module):
         if not exists(distance_labels) and atom_pos_given and exists(distogram_atom_indices):
 
             distogram_pos = atom_pos
-
-            if not self.distogram_atom_resolution:
-                # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
-
-                distogram_atom_indices = repeat(distogram_atom_indices, 'b n -> b n c', c = distogram_pos.shape[-1])
-                molecule_pos = distogram_pos = distogram_pos.gather(1, distogram_atom_indices)
-                distogram_mask = valid_distogram_mask
-            else:
-                distogram_mask = atom_mask
+            distogram_mask = atom_mask
 
             distogram_dist = torch.cdist(distogram_pos, distogram_pos, p = 2)
             distance_labels = distance_to_bins(distogram_dist, self.distance_bins)
@@ -5700,9 +5680,7 @@ class Alphafold3(Module):
         if exists(distance_labels):
 
             distogram_mask = pairwise_mask
-
-            if self.distogram_atom_resolution:
-                distogram_mask = to_pairwise_mask(atom_mask)
+            distogram_mask = to_pairwise_mask(atom_mask)
 
             distance_labels = torch.where(distogram_mask, distance_labels, ignore)
 
