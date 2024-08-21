@@ -81,7 +81,7 @@ atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
 
 additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
-additional_token_feats = torch.randn(2, seq_len, 2)
+additional_token_feats = torch.randn(2, seq_len, 33)
 is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
 is_molecule_mod = torch.randint(0, 2, (2, seq_len, 4)).bool()
 molecule_ids = torch.randint(0, 32, (2, seq_len))
