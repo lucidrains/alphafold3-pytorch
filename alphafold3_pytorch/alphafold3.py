@@ -56,6 +56,7 @@ from alphafold3_pytorch.inputs import (
     IS_LIGAND,
     IS_METAL_ION,
     NUM_MOLECULE_IDS,
+    NUM_MSA_ONE_HOT,
     DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS,
     BatchedAtomInput,
@@ -109,18 +110,28 @@ dap - feature dimension (atompair)
 dapi - feature dimension (atompair input)
 da - feature dimension (atom)
 dai - feature dimension (atom input)
-dtf - additional token feats derived from msa (f_profile and f_deletion_mean)
+dmi - feature dimension (msa input)
+dmf - additional msa feats derived from msa (has_deletion and deletion_value)
+dtf - additional token feats derived from msa (profile and deletion_mean)
 t - templates
 s - msa
 r - registers
 """
 
 """
-additional_token_feats: [*]
+additional_msa_feats: [*, 2]:
+- concatted to the msa single rep
+
+0: has_deletion
+1: deletion_value
+"""
+
+"""
+additional_token_feats: [*, 33]:
 - concatted to the single rep
 
-0: f_profile
-1: f_deletion_mean
+0: profile
+1: deletion_mean
 """
 
 """
@@ -1036,6 +1047,8 @@ class MSAModule(Module):
         dim_pairwise = 128,
         depth = 4,
         dim_msa = 64,
+        dim_msa_input=NUM_MSA_ONE_HOT,
+        dim_additional_msa_feats=2,
         dim_msa_input = None,
         outer_product_mean_dim_hidden = 32,
         msa_pwa_dropout_row_prob = 0.15,
@@ -1051,7 +1064,9 @@ class MSAModule(Module):
 
         self.max_num_msa = default(max_num_msa, float('inf'))  # cap the number of MSAs, will do sample without replacement if exceeds
 
-        self.msa_init_proj = LinearNoBias(dim_msa_input, dim_msa) if exists(dim_msa_input) else nn.Identity()
+        dim_msa_input += dim_additional_msa_feats
+
+        self.msa_init_proj = LinearNoBias(dim_msa_input, dim_msa)
 
         self.single_to_msa_feats = LinearNoBias(dim_single, dim_msa)
 
@@ -1096,6 +1111,10 @@ class MSAModule(Module):
         self.layers = layers
 
         self.layerscale_output = nn.Parameter(torch.zeros(dim_pairwise)) if layerscale_output else 1.
+
+        # msa related
+
+        self.dmi = dim_additional_msa_feats
 
     @typecheck
     def to_layers(
@@ -1198,6 +1217,7 @@ class MSAModule(Module):
         msa: Float['b s n dm'],
         mask: Bool['b n'] | None = None,
         msa_mask: Bool['b s'] | None = None,
+        additional_msa_feats: Float['b s n {self.dmi}'] | None = None,
     ) -> Float['b n n dp']:
 
         batch, num_msa, device = *msa.shape[:2], msa.device
@@ -1223,10 +1243,25 @@ class MSAModule(Module):
                 # msa_mask = einx.get_at('b [s], b sampled -> b sampled', msa_mask, indices)
                 msa_mask = msa_mask.gather(1, indices)
 
+            if exists(additional_msa_feats):
+                # additional_msa_feats = einx.get_at('b s 2, b sampled -> b sampled 2', additional_msa_feats, indices)
+
+                additional_msa_feats, unpack_one = pack_one(additional_msa_feats, 'b s *')
+                additional_msa_indices = repeat(
+                    indices, 'b sampled -> b sampled d', d=additional_msa_feats.shape[-1]
+                )
+                additional_msa_feats = additional_msa_feats.gather(1, additional_msa_indices)
+                additional_msa_feats = unpack_one(additional_msa_feats)
+
         # account for no msa
 
         if exists(msa_mask):
             has_msa = reduce(msa_mask, 'b s -> b', 'any')
+
+        # account for additional msa features
+
+        if exists(additional_msa_feats):
+            msa = torch.cat((msa, additional_msa_feats), dim=-1)
 
         # process msa
 
@@ -3250,7 +3285,7 @@ class InputFeatureEmbedder(Module):
         dim_token = 384,
         dim_single = 384,
         dim_pairwise = 128,
-        dim_additional_token_feats = 2,
+        dim_additional_token_feats = 33,
         num_molecule_types = NUM_MOLECULE_IDS,
         atom_transformer_blocks = 3,
         atom_transformer_heads = 4,
@@ -4899,7 +4934,9 @@ class Alphafold3(Module):
         dim_single = 384,
         dim_pairwise = 128,
         dim_token = 768,
-        dim_additional_token_feats = 2,                 # in paper, they include two meta information per token (f_profile, f_deletion_mean)
+        dim_msa_inputs = NUM_MSA_ONE_HOT,
+        dim_additional_msa_feats = 2,                   # in paper, they include two meta information per msa-token pair (has_deletion w/ dim=1, deletion_value w/ dim=1)
+        dim_additional_token_feats = 33,                # in paper, they include two meta information per token (profile w/ dim=32, deletion_mean w/ dim=1)
         num_molecule_types: int = NUM_MOLECULE_IDS,     # restype in additional residue information, apparently 32. will do 33 to account for metal ions
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
@@ -5062,13 +5099,11 @@ class Alphafold3(Module):
             **input_embedder_kwargs
         )
 
-        # they concat some MSA related information per token (`f_profile`, `f_deletion_mean`)
+        # they concat some MSA related information per token (`profile` w/ dim=32, `deletion_mean` w/ dim=1)
         # line 2 of Algorithm 2
         # the `f_restypes` is handled elsewhere
 
         dim_single_inputs = dim_input_embedder_token + dim_additional_token_feats
-
-        self.dim_additional_token_feats = dim_additional_token_feats
 
         # relative positional encoding
         # used by pairwise in main alphafold2 trunk
@@ -5098,10 +5133,14 @@ class Alphafold3(Module):
 
         # msa
 
+        # they concat some MSA related information per MSA-token pair (`has_deletion` w/ dim=1, `deletion_value` w/ dim=1)
+
         self.msa_module = MSAModule(
             dim_single = dim_single,
             dim_pairwise = dim_pairwise,
-            **msa_module_kwargs
+            dim_msa_input = dim_msa_inputs,
+            dim_additional_msa_feats = dim_additional_msa_feats,
+            **msa_module_kwargs,
         )
 
         # main pairformer trunk, 48 layers
@@ -5232,6 +5271,9 @@ class Alphafold3(Module):
         self.w = atoms_per_window
         self.dapi = self.dim_atompair_inputs
         self.dai = self.dim_atom_inputs
+        self.dmf = dim_additional_msa_feats
+        self.dtf = dim_additional_token_feats
+        self.dmi = dim_msa_inputs
         self.num_mods = num_molecule_mods
 
     @property
@@ -5316,7 +5358,8 @@ class Alphafold3(Module):
         is_molecule_types: Bool[f'b n {IS_MOLECULE_TYPES}'],
         molecule_atom_lens: Int['b n'],
         molecule_ids: Int['b n'],
-        additional_token_feats: Float['b n {self.dim_additional_token_feats}'] | None = None,
+        additional_msa_feats: Float['b s n {self.dmf}'] | None = None,
+        additional_token_feats: Float['b n {self.dtf}'] | None = None,
         atom_ids: Int['b m'] | None = None,
         atompair_ids: Int['b m m'] | Int['b nw {self.w} {self.w*2}'] | None = None,
         is_molecule_mod: Bool['b n {self.num_mods}'] | None = None,
@@ -5326,7 +5369,7 @@ class Alphafold3(Module):
         valid_atom_indices_for_frame: Bool['b n'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         token_bonds: Bool['b n n'] | None = None,
-        msa: Float['b s n d'] | None = None,
+        msa: Float['b s n {self.dmi}'] | None = None,
         msa_mask: Bool['b s'] | None = None,
         templates: Float['b t n n dt'] | None = None,
         template_mask: Bool['b t'] | None = None,
@@ -5565,7 +5608,8 @@ class Alphafold3(Module):
                     single_repr = single,
                     pairwise_repr = pairwise,
                     mask = is_protein_mask,
-                    msa_mask = msa_mask
+                    msa_mask = msa_mask,
+                    additional_msa_feats = additional_msa_feats
                 )
 
                 pairwise = embedded_msa + pairwise
