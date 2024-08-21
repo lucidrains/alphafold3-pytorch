@@ -5367,8 +5367,6 @@ class Alphafold3(Module):
         # hard validate when debug env variable is turned on
 
         if IS_DEBUGGING:
-            assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
-
             maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
@@ -5394,6 +5392,9 @@ class Alphafold3(Module):
             atom_indices_for_frame = einx.where('b n, b n three, -> b n three', valid_atom_indices_for_frame, atom_indices_for_frame, 0)
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
+
+        if IS_DEBUGGING:
+            assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
 
         # if atompair inputs are not windowed, window it
 
