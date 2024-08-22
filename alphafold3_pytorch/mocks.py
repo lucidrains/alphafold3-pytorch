@@ -69,7 +69,7 @@ class MockAtomDataset(Dataset):
         templates = torch.randn(2, seq_len, seq_len, 44)
         template_mask = torch.ones((2,)).bool()
 
-        msa = torch.randn(7, seq_len, 64)
+        msa = torch.randn(7, seq_len, 32)
 
         msa_mask = None
         if random.random() > 0.5:
