@@ -486,7 +486,7 @@ def test_confidence_head():
     )
 
     assert logits.pae.shape[-1] == atom_seq_len
-    assert logits.pde.shape[-1] == atom_seq_len
+    assert logits.pde.shape[-1] == seq_len
 
     assert logits.plddt.shape[-1] == atom_seq_len
     assert logits.resolved.shape[-1] == atom_seq_len
@@ -1032,7 +1032,7 @@ def test_compute_ranking_score():
     is_modified_residue = torch.randint(0, 2, (batch_size, atom_seq_len))
 
     pae_logits = torch.randn(batch_size, 64, atom_seq_len, atom_seq_len)
-    pde_logits = torch.randn(batch_size, 64, atom_seq_len, atom_seq_len)
+    pde_logits = torch.randn(batch_size, 64, seq_len, seq_len)
     plddt_logits = torch.randn(batch_size, 50, atom_seq_len)
     resolved_logits = torch.randint(0, 2, (batch_size, 2, atom_seq_len))
 
@@ -1075,6 +1075,7 @@ def test_compute_ranking_score():
     assert atom_level_ptm_score.numel() == batch_size
 
 def test_model_selection_score():
+
     # mock inputs
     
     batch_size = 2
@@ -1093,10 +1094,12 @@ def test_model_selection_score():
 
     chain_length = [random.randint(seq_len // 4, seq_len //2) 
                     for _ in range(batch_size)]
+
     asym_id = torch.tensor([
         [item for val, count in enumerate([chain_len, seq_len - chain_len]) for item in itertools.repeat(val, count)]
         for chain_len in chain_length
     ]).long()
+
 
     is_molecule_types = torch.zeros_like(asym_id)
     is_molecule_types = torch.nn.functional.one_hot(is_molecule_types, 5).bool()

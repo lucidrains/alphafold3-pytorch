@@ -3471,7 +3471,7 @@ class DistogramHead(Module):
 
 class ConfidenceHeadLogits(NamedTuple):
     pae: Float['b pae m m'] |  None
-    pde: Float['b pde m m']
+    pde: Float['b pde n n']
     plddt: Float['b plddt m']
     resolved: Float['b 2 m']
 
@@ -3610,7 +3610,7 @@ class ConfidenceHead(Module):
 
         # to logits
 
-        pde_logits = self.to_pde_logits(symmetrize(atom_pairwise_repr))
+        pde_logits = self.to_pde_logits(symmetrize(pairwise_repr))
 
         plddt_logits = self.to_plddt_logits(atom_single_repr)
         resolved_logits = self.to_resolved_logits(atom_single_repr)
@@ -4387,7 +4387,7 @@ class ComputeModelSelectionScore(Module):
     @typecheck
     def compute_gpde(
         self,
-        pde_logits: Float["b pde n n"],
+        pde_logits: Float["b pde n n"],  
         dist_logits: Float["b dist n n"],  
         dist_breaks: Float[" dist_break"],  
         tok_repr_atm_mask: Bool["b n"],  
@@ -4895,7 +4895,6 @@ class ComputeModelSelectionScore(Module):
         top_ranked_sample = max(
             scored_samples, key=lambda x: x[-1].mean()
         )  # rank by batch-averaged gPDE
-
         best_of_5_sample = max(
             scored_samples, key=lambda x: x[-2].mean()
         )  # rank by batch-averaged lDDT
@@ -5420,7 +5419,9 @@ class Alphafold3(Module):
 
         # hard validate when debug env variable is turned on
 
-        if hard_validate or IS_DEBUGGING:
+        hard_debug = hard_validate or IS_DEBUGGING
+
+        if hard_debug:
             maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
@@ -5447,7 +5448,7 @@ class Alphafold3(Module):
 
         assert exists(molecule_atom_lens) or exists(atom_mask)
 
-        if IS_DEBUGGING:
+        if hard_debug:
             assert (molecule_atom_lens >= 0).all(), 'molecule_atom_lens must be greater or equal to 0'
 
         # if atompair inputs are not windowed, window it
@@ -5970,11 +5971,25 @@ class Alphafold3(Module):
             pde_labels = None
 
             if atom_pos_given:
+                denoised_molecule_pos = None
 
-                pde_atom_mask = batch_repeat_interleave(valid_molecule_atom_mask, molecule_atom_lens)
+                assert exists(
+                    molecule_atom_indices
+                ), "`molecule_atom_indices` must be passed in for calculating non-atomic PDE labels"
 
-                pde_gt_dist = torch.cdist(atom_pos, atom_pos)
-                pde_pred_dist = torch.cdist(denoised_atom_pos, denoised_atom_pos)
+                # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, molecule_atom_indices)
+
+                mol_atom_indices = repeat(
+                    molecule_atom_indices, "b n -> b n c", c=atom_pos.shape[-1]
+                )
+
+                molecule_pos = atom_pos.gather(1, mol_atom_indices)
+                denoised_molecule_pos = denoised_atom_pos.gather(1, mol_atom_indices)
+
+                molecule_mask = valid_molecule_atom_mask
+
+                pde_gt_dist = torch.cdist(molecule_pos, molecule_pos)
+                pde_pred_dist = torch.cdist(denoised_molecule_pos, denoised_molecule_pos)
 
                 # calculate pde labels as distance error binned to 64 (0 - 32A)
 
@@ -5983,8 +5998,8 @@ class Alphafold3(Module):
 
                 # account for representative molecule atom missing from residue (-1 set on molecule_atom_indices field)
 
-                pde_pairwise_atom_mask = to_pairwise_mask(pde_atom_mask)
-                pde_labels.masked_fill_(~pde_pairwise_atom_mask, ignore)
+                molecule_mask = to_pairwise_mask(molecule_mask)
+                pde_labels.masked_fill_(~molecule_mask, ignore)
 
             # determine plddt labels if possible
 
@@ -5996,8 +6011,8 @@ class Alphafold3(Module):
 
                 # compute distances between all pairs of atoms
 
-                pred_dists = torch.cdist(pred_coords, pred_coords, p=2)
-                true_dists = torch.cdist(true_coords, true_coords, p=2)
+                pred_dists = torch.cdist(pred_coords, pred_coords)
+                true_dists = torch.cdist(true_coords, true_coords)
 
                 # restrict to bespoke interaction types and inclusion radius on the atom level (Section 4.3.1)
 
@@ -6058,7 +6073,7 @@ class Alphafold3(Module):
             # determine which mask to use for confidence head labels
 
             label_mask = atom_mask
-            label_pairwise_mask = to_pairwise_mask(atom_mask)
+            label_pairwise_mask = pairwise_mask
 
             # cross entropy losses
 
@@ -6078,7 +6093,6 @@ class Alphafold3(Module):
                 mask: Bool['b ...'],
                 ignore_index: int
             ) -> Float['']:
-
                 labels = torch.where(mask, labels, ignore_index)
 
                 return F.cross_entropy(
@@ -6092,14 +6106,14 @@ class Alphafold3(Module):
                     f"pae_labels shape {pae_labels.shape[-1]} does not match "
                     f"ch_logits.pae shape {ch_logits.pae.shape[-1]}"
                 )
-                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, label_pairwise_mask, ignore)
+                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, to_pairwise_mask(atom_mask), ignore)
 
             if exists(pde_labels):
                 assert pde_labels.shape[-1] == ch_logits.pde.shape[-1], (
                     f"pde_labels shape {pde_labels.shape[-1]} does not match "
                     f"ch_logits.pde shape {ch_logits.pde.shape[-1]}"
                 )
-                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, label_pairwise_mask, ignore)
+                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, pairwise_mask, ignore)
 
             if exists(plddt_labels):
                 assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1], (
