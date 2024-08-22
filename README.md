@@ -89,8 +89,10 @@ molecule_ids = torch.randint(0, 32, (2, seq_len))
 template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
 template_mask = torch.ones((2, 2)).bool()
 
-msa = torch.randn(2, 7, seq_len, 64)
+msa = torch.randn(2, 7, seq_len, 32)
 msa_mask = torch.ones((2, 7)).bool()
+
+additional_msa_feats = torch.randn(2, 7, seq_len, 2)
 
 # required for training, but omitted on inference
 
@@ -109,6 +111,7 @@ loss = alphafold3(
     molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_msa_feats = additional_msa_feats,
     additional_token_feats = additional_token_feats,
     is_molecule_types = is_molecule_types,
     is_molecule_mod = is_molecule_mod,
@@ -134,6 +137,7 @@ sampled_atom_pos = alphafold3(
     molecule_ids = molecule_ids,
     molecule_atom_lens = molecule_atom_lens,
     additional_molecule_feats = additional_molecule_feats,
+    additional_msa_feats = additional_msa_feats,
     additional_token_feats = additional_token_feats,
     is_molecule_types = is_molecule_types,
     is_molecule_mod = is_molecule_mod,
