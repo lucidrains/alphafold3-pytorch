@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [0, 1, 2, 3, 4]
+        group: [0, 1, 2, 3, 4, 5, 6, 7]
 
     steps:
     - uses: actions/checkout@v4
@@ -28,4 +28,4 @@ jobs:
         python -m pip install --default-timeout=100 -e .[test]
     - name: Test with pytest
       run: |
-        python -m pytest --num-shards 5 --shard-id ${{ matrix.group }} tests/
+        python -m pytest --num-shards 8 --shard-id ${{ matrix.group }} tests/

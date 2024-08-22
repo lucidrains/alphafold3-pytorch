@@ -36,7 +36,8 @@ from alphafold3_pytorch import (
     ConfidenceHeadLogits,
     ComputeModelSelectionScore,
     ComputeModelSelectionScore,
-    collate_inputs_to_batched_atom_input
+    collate_inputs_to_batched_atom_input,
+    alphafold3_inputs_to_batched_atom_input,
 )
 
 from alphafold3_pytorch.mocks import MockAtomDataset
@@ -61,6 +62,7 @@ from alphafold3_pytorch.inputs import (
     molecule_to_atom_input,
     pdb_input_to_molecule_input,
     PDBInput,
+    Alphafold3Input,
     PDBDataset,
     default_extract_atom_feats_fn,
     default_extract_atompair_feats_fn,
@@ -1226,3 +1228,149 @@ def test_unresolved_protein_rasa():
         molecule_atom_lens=batched_atom_input_dict['molecule_atom_lens'],
         atom_pos=batched_atom_input_dict['atom_pos'],
         atom_mask=~batched_atom_input_dict['missing_atom_mask'])
+
+def test_readme1():
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 77,
+        dim_template_feats = 44
+    )
+
+    # mock inputs
+
+    seq_len = 16
+    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
+    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
+    additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+    additional_token_feats = torch.randn(2, seq_len, 33)
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, 5)).bool()
+    is_molecule_mod = torch.randint(0, 2, (2, seq_len, 4)).bool()
+    molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    template_feats = torch.randn(2, 2, seq_len, seq_len, 44)
+    template_mask = torch.ones((2, 2)).bool()
+
+    msa = torch.randn(2, 7, seq_len, 32)
+    msa_mask = torch.ones((2, 7)).bool()
+
+    additional_msa_feats = torch.randn(2, 7, seq_len, 2)
+
+    # required for training, but omitted on inference
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+
+    molecule_atom_indices = molecule_atom_lens - 1 # last atom, as an example
+    molecule_atom_indices += (molecule_atom_lens.cumsum(dim = -1) - molecule_atom_lens)
+
+    distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+    # train
+
+    loss = alphafold3(
+        num_recycling_steps = 2,
+        atom_inputs = atom_inputs,
+        atompair_inputs = atompair_inputs,
+        molecule_ids = molecule_ids,
+        molecule_atom_lens = molecule_atom_lens,
+        additional_molecule_feats = additional_molecule_feats,
+        additional_msa_feats = additional_msa_feats,
+        additional_token_feats = additional_token_feats,
+        is_molecule_types = is_molecule_types,
+        is_molecule_mod = is_molecule_mod,
+        msa = msa,
+        msa_mask = msa_mask,
+        templates = template_feats,
+        template_mask = template_mask,
+        atom_pos = atom_pos,
+        molecule_atom_indices = molecule_atom_indices,
+        distance_labels = distance_labels,
+        resolved_labels = resolved_labels
+    )
+
+    loss.backward()
+
+    # after much training ...
+
+    sampled_atom_pos = alphafold3(
+        num_recycling_steps = 4,
+        num_sample_steps = 16,
+        atom_inputs = atom_inputs,
+        atompair_inputs = atompair_inputs,
+        molecule_ids = molecule_ids,
+        molecule_atom_lens = molecule_atom_lens,
+        additional_molecule_feats = additional_molecule_feats,
+        additional_msa_feats = additional_msa_feats,
+        additional_token_feats = additional_token_feats,
+        is_molecule_types = is_molecule_types,
+        is_molecule_mod = is_molecule_mod,
+        msa = msa,
+        msa_mask = msa_mask,
+        templates = template_feats,
+        template_mask = template_mask
+    )
+
+    sampled_atom_pos.shape # (2, <atom_seqlen>, 3)
+    assert sampled_atom_pos.ndim == 3
+
+def test_readme2():
+    contrived_protein = 'AG'
+
+    mock_atompos = [
+        torch.randn(5, 3),   # alanine has 5 non-hydrogen atoms
+        torch.randn(4, 3)    # glycine has 4 non-hydrogen atoms
+    ]
+
+    train_alphafold3_input = Alphafold3Input(
+        proteins = [contrived_protein],
+        atom_pos = mock_atompos
+    )
+
+    eval_alphafold3_input = Alphafold3Input(
+        proteins = [contrived_protein]
+    )
+
+    batched_atom_input = alphafold3_inputs_to_batched_atom_input(train_alphafold3_input, atoms_per_window = 27)
+
+    # training
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 3,
+        dim_atompair_inputs = 5,
+        atoms_per_window = 27,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        num_molecule_mods = 0,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        )
+    )
+
+    loss = alphafold3(**batched_atom_input.model_forward_dict())
+    loss.backward()
+
+    # sampling
+
+    batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
+
+    alphafold3.eval()
+    sampled_atom_pos = alphafold3(**batched_eval_atom_input.model_forward_dict())
+
+    assert sampled_atom_pos.shape == (1, (5 + 4), 3)

@@ -97,7 +97,9 @@ additional_msa_feats = torch.randn(2, 7, seq_len, 2)
 # required for training, but omitted on inference
 
 atom_pos = torch.randn(2, atom_seq_len, 3)
+
 molecule_atom_indices = molecule_atom_lens - 1 # last atom, as an example
+molecule_atom_indices += (molecule_atom_lens.cumsum(dim = -1) - molecule_atom_lens)
 
 distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
 resolved_labels = torch.randint(0, 2, (2, atom_seq_len))

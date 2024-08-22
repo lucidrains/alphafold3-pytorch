@@ -5692,7 +5692,12 @@ class Alphafold3(Module):
 
         has_labels = any([*map(exists, all_labels)])
 
-        can_return_loss = atom_pos_given or has_labels
+        can_return_loss = (
+            atom_pos_given or
+            exists(resolved_labels) or
+            exists(distance_labels) or
+            (atom_pos_given and exists(atom_indices_for_frame))
+        )
 
         # default whether to return loss by whether labels or atom positions are given
 
