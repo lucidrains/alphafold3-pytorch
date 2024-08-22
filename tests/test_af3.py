@@ -684,6 +684,7 @@ def test_alphafold3(
         atompair_inputs = atompair_inputs,
         is_molecule_types = is_molecule_types,
         additional_molecule_feats = additional_molecule_feats,
+        additional_msa_feats = additional_msa_feats,
         additional_token_feats = additional_token_feats,
         msa = msa,
         templates = template_feats,
