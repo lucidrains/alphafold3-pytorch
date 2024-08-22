@@ -4286,7 +4286,8 @@ def _protein_structure_from_feature(
 
     return builder.get_structure()
 
-ScoredSample = Tuple[int, Float["b m 3"], Float[" b"], Float[" b"]] # type: ignore
+Sample = Tuple[Float["b m 3"], Float["b pde n n"], Float["b dist n n"]]
+ScoredSample = Tuple[int, Float["b m 3"], Float["b m"], Float[" b"], Float[" b"]]
 
 class ScoreDetails(NamedTuple):
     best_gpde_index: int
@@ -4799,27 +4800,22 @@ class ComputeModelSelectionScore(Module):
     def compute_model_selection_score(
         self,
         batch: BatchedAtomInput,
-        samples: List[Tuple[
-            Float["b m 3"],
-            Float["b pde n n"],
-            Float["b dist n n"]
-        ]],
+        samples: List[Sample],
         is_fine_tuning: bool = None,
         return_details: bool = False,
         return_unweighted_scores: bool = False,
         compute_rasa: bool = False,
         unresolved_cid: List[int] | None = None,
-        unresolved_residue_mask: Bool["b n"] | None = None,  
+        unresolved_residue_mask: Bool["b n"] | None = None,
         missing_chain_index: int = -1,
     ) -> Float[" b"] | ScoreDetails:
-
         """Compute the model selection score for an input batch and corresponding (sampled) atom
         positions.
 
         :param batch: A batch of `AtomInput` data.
         :param samples: A list of sampled atom positions along with their predicted distance errors and labels.
         :param is_fine_tuning: is fine tuning
-        :param return_top_model: return the top-ranked sample
+        :param return_details: return the top model and its score
         :param return_unweighted_scores: return the unweighted scores (i.e., lDDT)
         :param compute_rasa: compute the relative solvent accessible surface area (RASA) for unresolved proteins
         :param unresolved_cid: unresolved chain ids
@@ -4861,7 +4857,7 @@ class ComputeModelSelectionScore(Module):
         scored_samples: List[ScoredSample] = []
 
         for sample_idx, sample in enumerate(samples):
-            atom_pos_pred, pde_logits, dist_logits = sample
+            atom_pos_pred, pde_logits, plddt, dist_logits = sample
 
             weighted_lddt = self.compute_weighted_lddt(
                 atom_pos_pred,
@@ -4886,7 +4882,7 @@ class ComputeModelSelectionScore(Module):
                 tok_repr_atm_mask,
             )
 
-            scored_samples.append((sample_idx, atom_pos_pred, weighted_lddt, gpde))
+            scored_samples.append((sample_idx, atom_pos_pred, plddt, weighted_lddt, gpde))
 
         # quick collate
 
@@ -4894,42 +4890,43 @@ class ComputeModelSelectionScore(Module):
 
         # rank by batch-averaged gPDE
 
-        best_gpde_index = torch.stack(all_gpde).mean(dim = -1).argmax().item()
+        best_gpde_index = torch.stack(all_gpde).mean(dim=-1).argmax().item()
 
         # rank by batch-averaged lDDT
 
-        best_lddt_index = torch.stack(all_weighted_lddt).mean(dim = -1).argmax().item()
+        best_lddt_index = torch.stack(all_weighted_lddt).mean(dim=-1).argmax().item()
 
         # some weighted score
 
         model_selection_score = (
-            scored_samples[best_gpde_index][-2] +
-            scored_samples[best_lddt_index][-2]
+            scored_samples[best_gpde_index][-2] + scored_samples[best_lddt_index][-2]
         ) / 2
 
         if not return_details:
             return model_selection_score
 
         score_details = ScoreDetails(
-            best_gpde_index = best_gpde_index,
-            best_lddt_index = best_lddt_index,
-            score = model_selection_score,
-            scored_samples = scored_samples
+            best_gpde_index=best_gpde_index,
+            best_lddt_index=best_lddt_index,
+            score=model_selection_score,
+            scored_samples=scored_samples,
         )
 
         return score_details
 
     @typecheck
     def forward(
-        self,
-        alphafolds: Tuple[Alphafold3],
-        batched_atom_inputs: BatchedAtomInput,
-        **kwargs
+        self, alphafolds: Tuple[Alphafold3], batched_atom_inputs: BatchedAtomInput, **kwargs
     ) -> Float[" b"] | ScoreDetails:
+        """Make model selections by computing the model selection score.
 
-        """
-        give this a tuple of all the Alphafolds and a batch of atomic inputs
-        it will select the best one by the model selection score by returning the index of the Tuple
+        NOTE: Give this function a tuple of all `Alphafold3` logits and a batch of atomic inputs, and it will
+        select the best one via the model selection score by returning the index of the corresponding tuple.
+
+        :param alphafolds: Tuple of `Alphafold3` models
+        :param batched_atom_inputs: A batch of `AtomInput` data
+        :param kwargs: Additional keyword arguments
+        :return: Model selection score
         """
 
         samples = []
@@ -4940,19 +4937,14 @@ class ComputeModelSelectionScore(Module):
 
                 pred_atom_pos, logits = alphafold(
                     **batched_atom_inputs.model_forward_dict(),
-                    return_loss = False,
-                    return_confidence_head_logits = True,
-                    return_distogram_head_logits = True
+                    return_loss=False,
+                    return_confidence_head_logits=True,
+                    return_distogram_head_logits=True,
                 )
 
-                samples.append((pred_atom_pos, logits.pde, logits.distance))
+                samples.append((pred_atom_pos, logits.pde, logits.plddt, logits.distance))
 
-
-        scores = self.compute_model_selection_score(
-            batched_atom_inputs,
-            samples = samples,
-            **kwargs
-        )
+        scores = self.compute_model_selection_score(batched_atom_inputs, samples=samples, **kwargs)
 
         return scores
 
