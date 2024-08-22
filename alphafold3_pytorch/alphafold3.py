@@ -4286,7 +4286,7 @@ def _protein_structure_from_feature(
 
     return builder.get_structure()
 
-Sample = Tuple[Float["b m 3"], Float["b pde n n"], Float["b dist n n"]]
+Sample = Tuple[Float["b m 3"], Float["b pde n n"], Float["b m"], Float["b dist n n"]]
 ScoredSample = Tuple[int, Float["b m 3"], Float["b m"], Float[" b"], Float[" b"]]
 
 class ScoreDetails(NamedTuple):
@@ -4888,11 +4888,11 @@ class ComputeModelSelectionScore(Module):
 
         *_, all_weighted_lddt, all_gpde = zip(*scored_samples)
 
-        # rank by batch-averaged gPDE
+        # rank by batch-averaged minimum gPDE
 
-        best_gpde_index = torch.stack(all_gpde).mean(dim=-1).argmax().item()
+        best_gpde_index = torch.stack(all_gpde).mean(dim=-1).argmin().item()
 
-        # rank by batch-averaged lDDT
+        # rank by batch-averaged maximum lDDT
 
         best_lddt_index = torch.stack(all_weighted_lddt).mean(dim=-1).argmax().item()
 
@@ -4920,10 +4920,10 @@ class ComputeModelSelectionScore(Module):
     ) -> Float[" b"] | ScoreDetails:
         """Make model selections by computing the model selection score.
 
-        NOTE: Give this function a tuple of all `Alphafold3` logits and a batch of atomic inputs, and it will
-        select the best one via the model selection score by returning the index of the corresponding tuple.
+        NOTE: Give this function a tuple of `Alphafold3` modules and a batch of atomic inputs, and it will
+        select the best module via the model selection score by returning the index of the corresponding tuple.
 
-        :param alphafolds: Tuple of `Alphafold3` models
+        :param alphafolds: Tuple of `Alphafold3` modules
         :param batched_atom_inputs: A batch of `AtomInput` data
         :param kwargs: Additional keyword arguments
         :return: Model selection score
@@ -6075,11 +6075,11 @@ class Alphafold3(Module):
                 is_nucleotide = is_rna | is_dna
                 is_polymer = is_protein | is_rna | is_dna
 
-                is_any_nucleotide_pair = einx.logical_and(
-                    '... i, ... j -> ... i j', torch.ones_like(is_nucleotide), is_nucleotide
+                is_any_nucleotide_pair = repeat(
+                    is_nucleotide, '... j -> ... i j', i=is_nucleotide.shape[-1]
                 )
-                is_any_polymer_pair = einx.logical_and(
-                    '... i, ... j -> ... i j', torch.ones_like(is_polymer), is_polymer
+                is_any_polymer_pair = repeat(
+                    is_polymer, '... j -> ... i j', i=is_polymer.shape[-1]
                 )
 
                 inclusion_radius = torch.where(
@@ -6090,10 +6090,8 @@ class Alphafold3(Module):
 
                 is_token_center_atom = torch.zeros_like(atom_pos[..., 0], dtype=torch.bool)
                 is_token_center_atom[torch.arange(batch_size).unsqueeze(1), molecule_atom_indices] = True
-                is_any_token_center_atom_pair = einx.logical_and(
-                    '... i, ... j -> ... i j',
-                    torch.ones_like(is_token_center_atom),
-                    is_token_center_atom,
+                is_any_token_center_atom_pair = repeat(
+                    is_token_center_atom, '... j -> ... i j', i=is_token_center_atom.shape[-1]
                 )
 
                 # compute masks, avoiding self term
