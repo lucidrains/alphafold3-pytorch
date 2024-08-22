@@ -4941,8 +4941,9 @@ class ComputeModelSelectionScore(Module):
                     return_confidence_head_logits=True,
                     return_distogram_head_logits=True,
                 )
+                plddt = self.compute_confidence_score.compute_plddt(logits.plddt)
 
-                samples.append((pred_atom_pos, logits.pde, logits.plddt, logits.distance))
+                samples.append((pred_atom_pos, logits.pde, plddt, logits.distance))
 
         scores = self.compute_model_selection_score(batched_atom_inputs, samples=samples, **kwargs)
 
