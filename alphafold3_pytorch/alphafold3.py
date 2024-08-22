@@ -4292,7 +4292,7 @@ class ScoreDetails(NamedTuple):
     best_gpde_index: int
     best_lddt_index: int
     score: Float[' b']
-    scored_samples: ScoredSample
+    scored_samples: List[ScoredSample]
 
 class ComputeModelSelectionScore(Module):
     """Compute model selection score."""
@@ -4894,11 +4894,11 @@ class ComputeModelSelectionScore(Module):
 
         # rank by batch-averaged gPDE
 
-        best_gpde_index = torch.stack(all_gpde).mean(dim = -1).topk(1).indices.item()
+        best_gpde_index = torch.stack(all_gpde).mean(dim = -1).argmax().item()
 
         # rank by batch-averaged lDDT
 
-        best_lddt_index = torch.stack(all_weighted_lddt).mean(dim = -1).topk(1).indices.item()
+        best_lddt_index = torch.stack(all_weighted_lddt).mean(dim = -1).argmax().item()
 
         # some weighted score
 
