@@ -516,17 +516,11 @@ def test_input_embedder():
     )
 
 def test_distogram_head():
-    molecule_atom_lens = torch.ones((2, 16)).long()
-    atom_feats = torch.randn(2, 16, 128)
     pairwise_repr = torch.randn(2, 16, 16, 128)
 
     distogram_head = DistogramHead(dim_pairwise = 128)
 
-    logits = distogram_head(
-        pairwise_repr,
-        atom_feats = atom_feats,
-        molecule_atom_lens = molecule_atom_lens
-    )
+    logits = distogram_head(pairwise_repr)
 
 @pytest.mark.parametrize('window_atompair_inputs', (True, False))
 @pytest.mark.parametrize('stochastic_frame_average', (True, False))
@@ -534,6 +528,7 @@ def test_distogram_head():
 @pytest.mark.parametrize('calculate_pae', (True, False))
 @pytest.mark.parametrize('atom_transformer_intramolecular_attn', (True, False))
 @pytest.mark.parametrize('num_molecule_mods', (0, 4))
+@pytest.mark.parametrize('distogram_atom_resolution', (True, False))
 def test_alphafold3(
     window_atompair_inputs: bool,
     stochastic_frame_average: bool,
@@ -541,6 +536,7 @@ def test_alphafold3(
     calculate_pae: bool,
     atom_transformer_intramolecular_attn: bool,
     num_molecule_mods: int,
+    distogram_atom_resolution: bool
 ):
     seq_len = 16
     atoms_per_window = 27
@@ -643,6 +639,7 @@ def test_alphafold3(
             )
         ),
         stochastic_frame_average = stochastic_frame_average,
+        distogram_atom_resolution = distogram_atom_resolution
     )
 
     loss, breakdown = alphafold3(
