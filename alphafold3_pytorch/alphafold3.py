@@ -116,6 +116,7 @@ dtf - additional token feats derived from msa (profile and deletion_mean)
 t - templates
 s - msa
 r - registers
+ts - diffusion timesteps
 """
 
 """
@@ -2670,8 +2671,10 @@ class ElucidatedAtomDiffusion(Module):
         clamp = False,
         use_tqdm_pbar = True,
         tqdm_pbar_title = 'sampling time step',
+        return_all_timesteps = False,
         **network_condition_kwargs
-    ):
+    ) -> Float['b m 3'] | Float['ts b m 3']:
+
         step_scale, num_sample_steps = self.step_scale, default(num_sample_steps, self.num_sample_steps)
 
         shape = (*atom_mask.shape, 3)
@@ -2702,6 +2705,8 @@ class ElucidatedAtomDiffusion(Module):
 
         maybe_augment_fn = self.centre_random_augmenter if self.augment_during_sampling else identity
 
+        all_atom_pos = [atom_pos]
+
         for sigma, sigma_next, gamma in maybe_tqdm_wrapper(sigmas_and_gammas, desc = tqdm_pbar_title):
             sigma, sigma_next, gamma = tuple(t.item() for t in (sigma, sigma_next, gamma))
 
@@ -2725,6 +2730,14 @@ class ElucidatedAtomDiffusion(Module):
                 atom_pos_next = atom_pos_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma) * step_scale
 
             atom_pos = atom_pos_next
+
+            all_atom_pos.append(atom_pos)
+
+        # if returning atom positions across all timesteps for visualization
+        # then stack the `all_atom_pos`
+
+        if return_all_timesteps:
+            atom_pos = torch.stack(all_atom_pos)
 
         if clamp:
             atom_pos = atom_pos.clamp(-1., 1.)
@@ -5437,6 +5450,7 @@ class Alphafold3(Module):
         resolution: Float[' b'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
+        return_all_diffused_atom_pos: bool = False,
         return_confidence_head_logits: bool = False,
         return_distogram_head_logits: bool = False,
         num_rollout_steps: int | None = None,
@@ -5447,7 +5461,8 @@ class Alphafold3(Module):
         hard_validate: bool = False
     ) -> (
         Float['b m 3'] |
-        Tuple[Float['b m 3'], ConfidenceHeadLogits | Alphafold3Logits] |
+        Float['ts b m 3'] |
+        Tuple[Float['b m 3'] | Float['ts b m 3'], ConfidenceHeadLogits | Alphafold3Logits] |
         Float[''] |
         Tuple[Float[''], LossBreakdown]
     ):
@@ -5717,11 +5732,12 @@ class Alphafold3(Module):
                 single_inputs_repr = single_inputs,
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
-                molecule_atom_lens = molecule_atom_lens
+                molecule_atom_lens = molecule_atom_lens,
+                return_all_timesteps = return_all_diffused_atom_pos
             )
 
             if exists(atom_mask):
-                sampled_atom_pos = einx.where('b m, b m c, -> b m c', atom_mask, sampled_atom_pos, 0.)
+                sampled_atom_pos = einx.where('b m, ... b m c, -> ... b m c', atom_mask, sampled_atom_pos, 0.)
 
             if return_confidence_head_logits:
                 confidence_head_atom_pos_input = sampled_atom_pos.clone()
