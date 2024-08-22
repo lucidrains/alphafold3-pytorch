@@ -6083,8 +6083,12 @@ class Alphafold3(Module):
                 is_nucleotide = is_rna | is_dna
                 is_polymer = is_protein | is_rna | is_dna
 
-                is_any_nucleotide_pair = to_pairwise_mask(is_nucleotide)
-                is_any_polymer_pair = to_pairwise_mask(is_polymer)
+                is_any_nucleotide_pair = einx.logical_and(
+                    '... i, ... j -> ... i j', torch.ones_like(is_nucleotide), is_nucleotide
+                )
+                is_any_polymer_pair = einx.logical_and(
+                    '... i, ... j -> ... i j', torch.ones_like(is_polymer), is_polymer
+                )
 
                 inclusion_radius = torch.where(
                     is_any_nucleotide_pair,
@@ -6094,7 +6098,11 @@ class Alphafold3(Module):
 
                 is_token_center_atom = torch.zeros_like(atom_pos[..., 0], dtype=torch.bool)
                 is_token_center_atom[torch.arange(batch_size).unsqueeze(1), molecule_atom_indices] = True
-                is_any_token_center_atom_pair = to_pairwise_mask(is_token_center_atom)
+                is_any_token_center_atom_pair = einx.logical_and(
+                    '... i, ... j -> ... i j',
+                    torch.ones_like(is_token_center_atom),
+                    is_token_center_atom,
+                )
 
                 # compute masks, avoiding self term
 
