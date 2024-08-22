@@ -1066,17 +1066,11 @@ def test_compute_ranking_score():
         pae_logits, asym_id, has_frame
     )
 
-    atom_level_ptm_score = compute_ranking_score.compute_confidence_score.compute_ptm(
-        atom_level_pae_logits, asym_id, has_frame, 
-        molecule_atom_lens=molecule_atom_lens
-    )
-
     assert full_complex_metric.numel() == batch_size
     assert single_chain_metric.numel() == batch_size
     assert interface_metric.numel() == batch_size
     assert modified_residue_score.numel() == batch_size
     assert residue_level_ptm_score.numel() == batch_size
-    assert atom_level_ptm_score.numel() == batch_size
 
 def test_model_selection_score():
 

@@ -3134,32 +3134,18 @@ class ComputeAlignmentError(Module):
     @typecheck
     def forward(
         self,
-        pred_coords: Float['b m_or_n 3'],
-        true_coords: Float['b m_or_n 3'],
+        pred_coords: Float['b n 3'],
+        true_coords: Float['b n 3'],
         pred_frames: Float['b n 3 3'],
         true_frames: Float['b n 3 3'],
-        mask: Bool['b m_or_n'] | None = None,
-        molecule_atom_lens: Int['b n'] | None = None
-    ) -> Float['b m_or_n m_or_n']:
+        mask: Bool['b n'] | None = None,
+    ) -> Float['b n n']:
         """
         pred_coords: predicted coordinates
         true_coords: true coordinates
         pred_frames: predicted frames
         true_frames: true frames
         """
-
-        # detect whether using atom or residue resolution
-
-        is_atom_resolution = pred_coords.shape[1] != pred_frames.shape[1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution alignment error'
-
-        if is_atom_resolution:
-            pred_frames = batch_repeat_interleave(pred_frames, molecule_atom_lens)
-            true_frames = batch_repeat_interleave(true_frames, molecule_atom_lens)
-
-            if not exists(mask) and exists(molecule_atom_lens):
-                mask = batch_repeat_interleave(molecule_atom_lens > 0, molecule_atom_lens)
-
         # to pairs
 
         seq = pred_coords.shape[1]
@@ -3681,7 +3667,6 @@ class ComputeConfidenceScore(Module):
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
         ptm_residue_weight: Float["b n"] | None = None,  
-        molecule_atom_lens: Int["b n"] | None = None,
         multimer_mode: bool = True,
     ) -> ConfidenceScore:
         """Main function to compute confidence score.
@@ -3698,7 +3683,6 @@ class ComputeConfidenceScore(Module):
         # Section 5.9.1 equation 17
         ptm = self.compute_ptm(
             confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=False,
-            molecule_atom_lens=molecule_atom_lens,
         )
 
         iptm = None
@@ -3707,7 +3691,6 @@ class ComputeConfidenceScore(Module):
             # Section 5.9.2 equation 18
             iptm = self.compute_ptm(
                 confidence_head_logits.pae, asym_id, has_frame, ptm_residue_weight, interface=True,
-                molecule_atom_lens=molecule_atom_lens,
             )
 
         confidence_score = ConfidenceScore(plddt=plddt, ptm=ptm, iptm=iptm)
@@ -3735,11 +3718,10 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_ptm(
         self,
-        logits: Float["b pae m_or_n m_or_n"],  
+        pae_logits: Float["b pae n n"],  
         asym_id: Int["b n"],  
         has_frame: Bool["b n"],  
         residue_weights: Float["b n"] | None = None,
-        molecule_atom_lens: Int["b n"] | None = None,  
         interface: bool = False,
         compute_chain_wise_iptm: bool = False,
     ) -> Float[" b"] | Tuple[Float["b chains chains"], Bool["b chains chains"], Int["b chains"]]:
@@ -3753,25 +3735,15 @@ class ComputeConfidenceScore(Module):
         :param interface: bool
         :param compute_chain_wise_iptm: bool
         :return: pTM
-        """
-
-        is_atom_resolution = logits.shape[-1] != asym_id.shape[-1]
-        assert not is_atom_resolution or exists(molecule_atom_lens), '`molecule_atom_lens` must be passed in for atom resolution pTM'
-
-        if is_atom_resolution:
-            asym_id = batch_repeat_interleave(asym_id, molecule_atom_lens)
-            has_frame = batch_repeat_interleave(has_frame, molecule_atom_lens)
-            if exists(residue_weights):
-                residue_weights = batch_repeat_interleave(residue_weights, molecule_atom_lens)
-                
+        """        
         if not exists(residue_weights):
             residue_weights = torch.ones_like(has_frame)
 
         residue_weights = residue_weights * has_frame
 
-        num_batch = logits.shape[0]
-        num_res = logits.shape[-1]
-        logits = rearrange(logits, "b c i j -> b i j c")
+        num_batch, *_, num_res, device = *pae_logits.shape, pae_logits.device
+
+        pae_logits = rearrange(pae_logits, "b c i j -> b i j c")
 
         bin_centers = self._calculate_bin_centers(self.pae_breaks)
 
@@ -3788,7 +3760,7 @@ class ComputeConfidenceScore(Module):
         tm_per_bin = 1.0 / (1 + torch.square(bin_centers[None, :]) / torch.square(d0[..., None]))
 
         # Convert logits to probs.
-        probs = F.softmax(logits, dim=-1)
+        probs = F.softmax(pae_logits, dim=-1)
 
         # E_distances tm(distance).
         predicted_tm_term = einsum(probs, tm_per_bin, "b i j pae, b pae -> b i j ")
@@ -3801,7 +3773,7 @@ class ComputeConfidenceScore(Module):
             max_chains = max(len(chains) for chains in unique_chains)
 
             chain_wise_iptm = torch.zeros(
-                (num_batch, max_chains, max_chains), device=logits.device
+                (num_batch, max_chains, max_chains), device=device
             )
             chain_wise_iptm_mask = torch.zeros_like(chain_wise_iptm).bool()
 
@@ -3837,7 +3809,7 @@ class ComputeConfidenceScore(Module):
             return chain_wise_iptm, chain_wise_iptm_mask, torch.tensor(unique_chains)
 
         else:
-            pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=logits.device).bool()
+            pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=device).bool()
             if interface:
                 pair_mask *= asym_id[:, :, None] != asym_id[:, None, :]
 
@@ -3857,13 +3829,14 @@ class ComputeConfidenceScore(Module):
     @typecheck
     def compute_pde(
         self,
-        logits: Float["b pde n n"],  
+        pde_logits: Float["b pde n n"],  
         tok_repr_atm_mask: Bool["b n"],  
     ) -> Float["b n n"]:  
         """Compute PDE from logits."""
-        logits = rearrange(logits, "b pde i j -> b i j pde")
+
+        pde_logits = rearrange(pde_logits, "b pde i j -> b i j pde")
         bin_centers = self._calculate_bin_centers(self.pde_breaks)
-        probs = F.softmax(logits, dim=-1)
+        probs = F.softmax(pde_logits, dim=-1)
 
         pde = einsum(probs, bin_centers, "b i j pde, pde -> b i j")
 
@@ -5968,7 +5941,6 @@ class Alphafold3(Module):
                     pred_frames,
                     frames,
                     mask=align_error_mask,
-                    molecule_atom_lens=molecule_atom_lens,
                 )
 
                 # calculate pae labels as alignment error binned to 64 (0 - 32A) (TODO: double-check correctness of `distance_to_bins`'s bin assignments)
