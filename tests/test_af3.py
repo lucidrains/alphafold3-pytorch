@@ -189,14 +189,13 @@ def test_rigid_from_three_points():
     assert rotation.shape == (7, 11, 23, 3, 3)
 
 def test_compute_alignment_error():
-    molecule_atom_lens = torch.ones(2, 100).long()
     pred_coords = torch.randn(2, 100, 3)
     pred_frames = torch.randn(2, 100, 3, 3)
 
     # `pred_coords` should match itself in frame basis
 
     error_fn = ComputeAlignmentError()
-    alignment_errors = error_fn(pred_coords, pred_coords, pred_frames, pred_frames, molecule_atom_lens = molecule_atom_lens)
+    alignment_errors = error_fn(pred_coords, pred_coords, pred_frames, pred_frames)
 
     assert alignment_errors.shape == (2, 100, 100)
     assert (alignment_errors.mean(-1) < 1e-3).all()
@@ -485,7 +484,7 @@ def test_confidence_head():
         mask=mask,
     )
 
-    assert logits.pae.shape[-1] == atom_seq_len
+    assert logits.pae.shape[-1] == seq_len
     assert logits.pde.shape[-1] == seq_len
 
     assert logits.plddt.shape[-1] == atom_seq_len
@@ -1031,12 +1030,12 @@ def test_compute_ranking_score():
     has_frame = torch.randint(0, 2, (batch_size, seq_len)).bool()
     is_modified_residue = torch.randint(0, 2, (batch_size, atom_seq_len))
 
-    pae_logits = torch.randn(batch_size, 64, atom_seq_len, atom_seq_len)
+    pae_logits = torch.randn(batch_size, 64, seq_len, seq_len)
     pde_logits = torch.randn(batch_size, 64, seq_len, seq_len)
     plddt_logits = torch.randn(batch_size, 50, atom_seq_len)
-    resolved_logits = torch.randint(0, 2, (batch_size, 2, atom_seq_len))
-
+    resolved_logits = torch.randint(0, 2, (batch_size, 2, seq_len))
     confidence_head_logits = ConfidenceHeadLogits(pae_logits, pde_logits, plddt_logits, resolved_logits)
+    atom_level_pae_logits = torch.randn(batch_size, 64, atom_seq_len, atom_seq_len)
 
     chain_length = [random.randint(seq_len // 4, seq_len //2) 
                     for _ in range(batch_size)]
@@ -1046,25 +1045,29 @@ def test_compute_ranking_score():
         for chain_len in chain_length
     ]).long()
 
+
     compute_ranking_score = ComputeRankingScore()
 
     full_complex_metric = compute_ranking_score.compute_full_complex_metric(
-        pae_logits, plddt_logits, asym_id, has_frame, molecule_atom_lens,
-        atom_pos, atom_mask, is_molecule_types
-    )
+        confidence_head_logits, asym_id, has_frame, molecule_atom_lens,
+        atom_pos, atom_mask, is_molecule_types)
 
     single_chain_metric = compute_ranking_score.compute_single_chain_metric(
-        pae_logits, plddt_logits, asym_id, has_frame, molecule_atom_lens)
+        confidence_head_logits, asym_id, has_frame,)
 
     interface_metric = compute_ranking_score.compute_interface_metric(
-        pae_logits, asym_id, has_frame, molecule_atom_lens,
+        confidence_head_logits, asym_id, has_frame,
         interface_chains=[(0, 1), (1,)])
 
     modified_residue_score = compute_ranking_score.compute_modified_residue_score(
-        plddt_logits, atom_mask, is_modified_residue)
+        confidence_head_logits, atom_mask, is_modified_residue)
+    
+    residue_level_ptm_score = compute_ranking_score.compute_confidence_score.compute_ptm(
+        pae_logits, asym_id, has_frame
+    )
 
     atom_level_ptm_score = compute_ranking_score.compute_confidence_score.compute_ptm(
-        pae_logits, asym_id, has_frame, 
+        atom_level_pae_logits, asym_id, has_frame, 
         molecule_atom_lens=molecule_atom_lens
     )
 
@@ -1072,6 +1075,7 @@ def test_compute_ranking_score():
     assert single_chain_metric.numel() == batch_size
     assert interface_metric.numel() == batch_size
     assert modified_residue_score.numel() == batch_size
+    assert residue_level_ptm_score.numel() == batch_size
     assert atom_level_ptm_score.numel() == batch_size
 
 def test_model_selection_score():
