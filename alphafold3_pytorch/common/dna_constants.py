@@ -84,6 +84,15 @@ restype_1to3 = {
     "X": "DN",
 }
 
+MSA_CHAR_TO_ID = {
+    "A": 26,
+    "C": 27,
+    "G": 28,
+    "T": 29,
+    "X": 30,
+    "-": 31,
+}
+
 BIOMOLECULE_CHAIN: Final[str] = "polydeoxyribonucleotide"
 POLYMER_CHAIN: Final[str] = "polymer"
 

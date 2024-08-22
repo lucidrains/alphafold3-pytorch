@@ -76,6 +76,15 @@ restype_num = min_restype_num + len(restypes)  # := 21 + 4 := 25.
 
 restype_1to3 = {"A": "A", "C": "C", "G": "G", "U": "U", "X": "N"}
 
+MSA_CHAR_TO_ID = {
+    "A": 21,
+    "C": 22,
+    "G": 23,
+    "U": 24,
+    "X": 25,
+    "-": 31,
+}
+
 BIOMOLECULE_CHAIN: Final[str] = "polyribonucleotide"
 POLYMER_CHAIN: Final[str] = "polymer"
 

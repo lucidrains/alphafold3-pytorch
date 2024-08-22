@@ -42,7 +42,7 @@ class MockAtomDataset(Dataset):
         atom_offsets = exclusive_cumsum(molecule_atom_lens)
 
         additional_molecule_feats = torch.randint(0, 2, (seq_len, 5))
-        additional_token_feats = torch.randn(seq_len, 2)
+        additional_token_feats = torch.randn(seq_len, 33)
         is_molecule_types = torch.randint(0, 2, (seq_len, IS_MOLECULE_TYPES)).bool()
 
         # ensure the molecule-atom length mappings match the randomly-sampled atom sequence length
@@ -69,11 +69,13 @@ class MockAtomDataset(Dataset):
         templates = torch.randn(2, seq_len, seq_len, 44)
         template_mask = torch.ones((2,)).bool()
 
-        msa = torch.randn(7, seq_len, 64)
+        msa = torch.randn(7, seq_len, 32)
 
         msa_mask = None
         if random.random() > 0.5:
             msa_mask = torch.ones((7,)).bool()
+
+        additional_msa_feats = torch.randn(7, seq_len, 2)
 
         # required for training, but omitted on inference
 
@@ -97,6 +99,7 @@ class MockAtomDataset(Dataset):
             token_bonds = token_bonds,
             molecule_atom_lens = molecule_atom_lens,
             additional_molecule_feats = additional_molecule_feats,
+            additional_msa_feats = additional_msa_feats,
             additional_token_feats = additional_token_feats,
             is_molecule_types = is_molecule_types,
             is_molecule_mod = is_molecule_mod,
