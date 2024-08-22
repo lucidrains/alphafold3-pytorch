@@ -39,6 +39,8 @@ from alphafold3_pytorch import (
     collate_inputs_to_batched_atom_input
 )
 
+from alphafold3_pytorch.mocks import MockAtomDataset
+
 from alphafold3_pytorch.configs import (
     Alphafold3Config,
     create_alphafold3_from_yaml
@@ -61,7 +63,7 @@ from alphafold3_pytorch.inputs import (
     PDBInput,
     PDBDataset,
     default_extract_atom_feats_fn,
-    default_extract_atompair_feats_fn
+    default_extract_atompair_feats_fn,
 )
 
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
@@ -1098,7 +1100,6 @@ def test_model_selection_score():
         for chain_len in chain_length
     ]).long()
 
-
     is_molecule_types = torch.zeros_like(asym_id)
     is_molecule_types = torch.nn.functional.one_hot(is_molecule_types, 5).bool()
     
@@ -1121,6 +1122,71 @@ def test_model_selection_score():
         chains_list = [(0, 1), (1,)],
         is_fine_tuning=False
     )
+
+def test_model_selection_score_end_to_end():
+
+    # prepare two atom inputs for evaluating model selection
+
+    mock_atom_dataset = MockAtomDataset(10)
+
+    atom_inputs = [mock_atom_dataset[0], mock_atom_dataset[1]]
+    batched_atom_input = collate_inputs_to_batched_atom_input(atom_inputs, atoms_per_window=27)
+
+    # two models to be selected
+
+    alphafold3_kwargs = dict(
+        dim_atom_inputs = 77,
+        dim_pairwise = 8,
+        dim_single = 8,
+        dim_token = 8,
+        atoms_per_window = 27,
+        dim_template_feats = 44,
+        num_dist_bins = 38,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1,
+            dim_msa = 8,
+        ),
+        pairformer_stack=dict(
+            depth=1,
+            pair_bias_attn_dim_head = 4,
+            pair_bias_attn_heads = 2,
+        ),
+        diffusion_module_kwargs=dict(
+            atom_encoder_depth=1,
+            token_transformer_depth=1,
+            atom_decoder_depth=1,
+            atom_decoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            ),
+            atom_encoder_kwargs = dict(
+                attn_pair_bias_kwargs = dict(
+                    dim_head = 4
+                )
+            )
+        ),
+    )
+
+    alphafold3_one = Alphafold3(**alphafold3_kwargs)
+    alphafold3_two = Alphafold3(**alphafold3_kwargs)
+
+    alphafolds = (alphafold3_one, alphafold3_two)
+
+    # evaluate
+
+    compute_model_selection_score = ComputeModelSelectionScore()
+
+    details = compute_model_selection_score(alphafolds, batched_atom_input, return_details = True)
+
+    best_alphafold_by_lddt = alphafolds[details.best_lddt_index]
+    assert isinstance(best_alphafold_by_lddt, Alphafold3)
 
 def test_unresolved_protein_rasa():
 
