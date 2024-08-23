@@ -52,7 +52,8 @@ def make_msa_mask(features: FeatureDict) -> FeatureDict:
 @typecheck
 def make_msa_features(
     msas: Dict[str, msa_parsing.Msa | None],
-    chain_id_to_chem_types: Dict[str, List[int]],
+    chain_id_to_residue: Dict[str, Dict[str, List[int]]],
+    ligand_chemtype_index: int = 3,
     raise_missing_exception: bool = False,
 ) -> FeatureDict:
     """
@@ -60,7 +61,8 @@ def make_msa_features(
     From: https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/data_pipeline.py#L224
 
     :param msas: The mapping of chain IDs to lists of (optional) MSAs for each chain.
-    :param chain_id_to_chem_types: The mapping of chain IDs to residue (integer) chemical types.
+    :param chain_id_to_residue: The mapping of chain IDs to residue information.
+    :param ligand_index: The index of the ligand in the chemical type list.
     :param raise_missing_exception: Whether to raise an exception if no MSAs are provided for any chain.
     :return: The MSA feature dictionary.
     """
@@ -70,7 +72,7 @@ def make_msa_features(
     # Infer MSA metadata.
     max_alignments = 1
     for msa in msas.values():
-        if exists(msa.sequences) and exists(msa.sequences[0]):
+        if exists(msa) and exists(msa.sequences) and exists(msa.sequences[0]):
             max_alignments = max(max_alignments, len(msa.sequences) if msa else 1)
 
     # Collect MSAs.
@@ -84,10 +86,20 @@ def make_msa_features(
         species_ids = []
         seen_sequences = set()
 
-        chain_chem_types = chain_id_to_chem_types[chain_id]
-        num_res = len(chain_chem_types)
+        chain_chemtype = chain_id_to_residue[chain_id]["chemtype"]
+        chain_residue_index = chain_id_to_residue[chain_id]["residue_index"]
 
-        msa_residue_constants = get_residue_constants(msa.msa_type.replace("protein", "peptide"))
+        num_res = len(chain_chemtype)
+        assert num_res == len(chain_residue_index), (
+            f"Residue features count mismatch for chain {chain_id}: "
+            f"{num_res} != {len(chain_residue_index)}"
+        )
+
+        msa_residue_constants = (
+            get_residue_constants(msa.msa_type.replace("protein", "peptide"))
+            if exists(msa)
+            else None
+        )
 
         gap_ids = [[GAP_ID] * num_res]
         deletion_values = [[0] * num_res]
@@ -98,9 +110,11 @@ def make_msa_features(
         elif not msa:
             # Pad the MSA to the maximum number of alignments
             # if the chain does not have any associated alignments.
-            int_msa_list.append(gap_ids * max_alignments)
-            deletion_matrix_list.append(deletion_values * max_alignments)
-            species_ids_list.append(species * max_alignments)
+            int_msa_list.append(torch.tensor(gap_ids * max_alignments, dtype=torch.long))
+            deletion_matrix_list.append(
+                torch.tensor(deletion_values * max_alignments, dtype=torch.float32)
+            )
+            species_ids_list.append(np.array(species * max_alignments, dtype=object))
             continue
 
         for sequence_index, sequence in enumerate(msa.sequences):
@@ -109,15 +123,26 @@ def make_msa_features(
             seen_sequences.add(sequence)
 
             # Convert the MSA to integers while handling
-            # ligands and (unmappable) modified polymer residues.
+            # ligands and modified polymer residues.
             msa_res_types = []
             msa_deletion_values = []
 
-            polymer_res_index = 0
+            polymer_residue_index = -1
 
-            for chem_type in chain_chem_types:
-                is_ligand = chem_type == 3
-                chem_residue_constants = get_residue_constants(res_chem_index=chem_type)
+            for idx, (chemtype, residue_index) in enumerate(
+                zip(chain_chemtype, chain_residue_index)
+            ):
+                is_polymer = chemtype < ligand_chemtype_index
+                is_ligand = not is_polymer
+
+                chem_residue_constants = get_residue_constants(res_chem_index=chemtype)
+
+                # NOTE: For modified polymer residues, we only increment the polymer residue index
+                # when the current (atomized) modified polymer residue's atom sequence ends.
+                increment_index = (
+                    0 < idx < num_res and chain_residue_index[idx - 1] != residue_index
+                )
+                polymer_residue_index += 1 if is_polymer and (idx == 0 or increment_index) else 0
 
                 if is_ligand:
                     # NOTE: For ligands, we use the unknown amino acid type.
@@ -131,17 +156,19 @@ def make_msa_features(
                     if chem_residue_constants != msa_residue_constants:
                         msa_res_type = chem_residue_constants.restype_num
                     else:
-                        res = sequence[polymer_res_index]
+                        res = sequence[polymer_residue_index]
                         msa_res_type = msa_residue_constants.MSA_CHAR_TO_ID.get(
                             res, msa_residue_constants.restype_num
                         )
 
-                    msa_deletion_value = msa.deletion_matrix[sequence_index][polymer_res_index]
-
-                    polymer_res_index += 1
+                    msa_deletion_value = msa.deletion_matrix[sequence_index][polymer_residue_index]
 
                 msa_res_types.append(msa_res_type)
                 msa_deletion_values.append(msa_deletion_value)
+
+            assert polymer_residue_index + 1 == len(
+                sequence
+            ), f"Polymer residue index length mismatch for MSA chain {chain_id}: {polymer_residue_index + 1} != {len(sequence)}"
 
             int_msa.append(msa_res_types)
             deletion_matrix.append(msa_deletion_values)
