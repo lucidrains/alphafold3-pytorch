@@ -121,6 +121,7 @@ class Msa:
 
     def truncate(self, max_seqs: int):
         """Truncates the MSA to the first `max_seqs` sequences."""
+        max_seqs = min(len(self.sequences), max_seqs)
         return Msa(
             sequences=self.sequences[:max_seqs],
             deletion_matrix=self.deletion_matrix[:max_seqs],
@@ -130,6 +131,7 @@ class Msa:
 
     def random_truncate(self, max_seqs: int):
         """Truncates the MSA to a random range of `max_seqs` sequences."""
+        max_seqs = min(len(self.sequences), max_seqs)
         start = random.randint(0, len(self.sequences) - max_seqs)  # nosec
         return Msa(
             sequences=self.sequences[start : start + max_seqs],
