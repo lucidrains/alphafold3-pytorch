@@ -2264,7 +2264,7 @@ def find_mismatched_symmetry(
 def load_msa_from_msa_dir(
     msa_dir: str | None,
     file_id: str,
-    chain_id_to_chem_types: Dict[str, List[int]],
+    chain_id_to_residue: Dict[str, Dict[str, List[int]]],
     max_msas_per_chain: int | None = None,
     randomly_truncate: bool = True,
     raise_missing_exception: bool = False,
@@ -2279,7 +2279,7 @@ def load_msa_from_msa_dir(
         return {}
 
     msas = {}
-    for chain_id in chain_id_to_chem_types:
+    for chain_id in chain_id_to_residue:
         msa_fpaths = glob.glob(os.path.join(msa_dir, f"{file_id}{chain_id}_*.a3m"))
 
         if not msa_fpaths:
@@ -2287,8 +2287,8 @@ def load_msa_from_msa_dir(
             continue
 
         # NOTE: A single chain-specific MSA file contains alignments for all polymer residues in the chain,
-        # but the ligand (and some "unmappable" modified polymer residues) are not included in the MSA file
-        # and therefore must be manually inserted into the MSAs as unknown amino acid residues.
+        # but the chain's ligands are not included in the MSA file and therefore must be manually inserted
+        # into the MSAs as unknown amino acid residues.
         assert len(msa_fpaths) == 1, (
             f"{len(msa_fpaths)} MSA files found for chain {chain_id} of file {file_id}. "
             "Please ensure that one MSA file is present for each chain."
@@ -2310,7 +2310,7 @@ def load_msa_from_msa_dir(
             )
             msas[chain_id] = msa
 
-    features = make_msa_features(msas, chain_id_to_chem_types)
+    features = make_msa_features(msas, chain_id_to_residue)
     features = make_msa_mask(features)
 
     return features
@@ -2606,10 +2606,12 @@ def pdb_input_to_molecule_input(
 
     # concat for all of additional_molecule_feats
 
+    # NOTE: `Biomolecule.residue_index` is 1-based originally
+    residue_index = torch.from_numpy(biomol.residue_index) - 1
+
     additional_molecule_feats = torch.stack(
         (
-            # NOTE: `Biomolecule.residue_index` is 1-based originally
-            torch.from_numpy(biomol.residue_index) - 1,
+            residue_index,
             torch.arange(num_tokens),
             torch.from_numpy(biomol.chain_index),
             entity_ids,
@@ -2790,15 +2792,63 @@ def pdb_input_to_molecule_input(
     num_present_atoms = mol_total_atoms - num_missing_atom_indices
     assert num_present_atoms == int(biomol.atom_mask.sum())
 
+    # handle `atom_indices_for_frame` for the PAE
+
+    atom_indices_for_frame = tensor(
+        [default(indices, (-1, -1, -1)) for indices in atom_indices_for_frame]
+    )
+
+    # build offsets for all indices
+
+    # derive `atom_lens` based on `one_token_per_atom`, for ligands and modified biomolecules
+    atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
+    ones = torch.ones_like(atoms_per_molecule)
+
+    # `is_molecule_mod` can either be
+    # 1. Bool['n'], in which case it will only be used for determining `one_token_per_atom`, or
+    # 2. Bool['n num_mods'], where it will be passed to Alphafold3 for molecule modification embeds
+    is_molecule_mod = tensor(is_molecule_mod)
+    is_molecule_any_mod = False
+
+    if is_molecule_mod.ndim == 2:
+        is_molecule_any_mod = is_molecule_mod[unique_chain_residue_indices].any(dim=-1)
+    else:
+        is_molecule_any_mod = is_molecule_mod[unique_chain_residue_indices]
+
+    # get `one_token_per_atom`
+    # default to what the paper did, which is ligands and any modified biomolecule
+    is_ligand = is_molecule_types[unique_chain_residue_indices][..., IS_LIGAND_INDEX]
+    one_token_per_atom = is_ligand | is_molecule_any_mod
+
+    assert len(molecules) == len(one_token_per_atom)
+
+    # derive the number of repeats needed to expand molecule lengths to token lengths
+    token_repeats = torch.where(one_token_per_atom, atoms_per_molecule, ones)
+
+    # craft offsets for all atom indices
+    atom_indices_offsets = repeat_interleave(
+        exclusive_cumsum(atoms_per_molecule), token_repeats, dim=0
+    )
+
+    # offset only positive atom indices
+    distogram_atom_indices = offset_only_positive(distogram_atom_indices, atom_indices_offsets)
+    molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
+    atom_indices_for_frame = offset_only_positive(
+        atom_indices_for_frame, atom_indices_offsets[..., None]
+    )
+
     # retrieve multiple sequence alignments (MSAs) for each chain
     # NOTE: if they are not locally available, `Nones` will be used
     msa_chain_ids = list(dict.fromkeys(biomol.chain_id.tolist()))
-    chain_id_to_chem_types = {
-        chain_id: biomol.chemtype[biomol.chain_id == chain_id].tolist()
+    chain_id_to_residue = {
+        chain_id: {
+            "chemtype": biomol.chemtype[biomol.chain_id == chain_id].tolist(),
+            "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
+        }
         for chain_id in msa_chain_ids
     }
     msa_features = load_msa_from_msa_dir(
-        i.msa_dir, file_id, chain_id_to_chem_types, max_msas_per_chain=i.max_msas_per_chain
+        i.msa_dir, file_id, chain_id_to_residue, max_msas_per_chain=i.max_msas_per_chain
     )
 
     msa = msa_features.get("msa")
@@ -2817,6 +2867,10 @@ def pdb_input_to_molecule_input(
     num_msas = len(msa) if exists(msa) else 1
 
     if exists(msa):
+        assert (
+            msa.shape[-1] == num_tokens
+        ), f"The number of tokens in the MSA ({msa.shape[-1]}) does not match the number of tokens in the biomolecule ({num_tokens}). "
+
         has_deletion = torch.clip(msa_features["deletion_matrix"], 0.0, 1.0)
         deletion_value = torch.atan(msa_features["deletion_matrix"] / 3.0) * (2.0 / torch.pi)
 
@@ -2882,51 +2936,6 @@ def pdb_input_to_molecule_input(
     if exists(resolution):
         is_resolved_label = ((resolution >= 0.1) & (resolution <= 3.0)).item()
         resolved_labels = torch.full((num_atoms,), is_resolved_label, dtype=torch.long)
-
-    # handle `atom_indices_for_frame` for the PAE
-
-    atom_indices_for_frame = tensor(
-        [default(indices, (-1, -1, -1)) for indices in atom_indices_for_frame]
-    )
-
-    # build offsets for all indices
-
-    # derive `atom_lens` based on `one_token_per_atom`, for ligands and modified biomolecules
-    atoms_per_molecule = tensor([mol.GetNumAtoms() for mol in molecules])
-    ones = torch.ones_like(atoms_per_molecule)
-
-    # `is_molecule_mod` can either be
-    # 1. Bool['n'], in which case it will only be used for determining `one_token_per_atom`, or
-    # 2. Bool['n num_mods'], where it will be passed to Alphafold3 for molecule modification embeds
-    is_molecule_mod = tensor(is_molecule_mod)
-    is_molecule_any_mod = False
-
-    if is_molecule_mod.ndim == 2:
-        is_molecule_any_mod = is_molecule_mod[unique_chain_residue_indices].any(dim=-1)
-    else:
-        is_molecule_any_mod = is_molecule_mod[unique_chain_residue_indices]
-
-    # get `one_token_per_atom`
-    # default to what the paper did, which is ligands and any modified biomolecule
-    is_ligand = is_molecule_types[unique_chain_residue_indices][..., IS_LIGAND_INDEX]
-    one_token_per_atom = is_ligand | is_molecule_any_mod
-
-    assert len(molecules) == len(one_token_per_atom)
-
-    # derive the number of repeats needed to expand molecule lengths to token lengths
-    token_repeats = torch.where(one_token_per_atom, atoms_per_molecule, ones)
-
-    # craft offsets for all atom indices
-    atom_indices_offsets = repeat_interleave(
-        exclusive_cumsum(atoms_per_molecule), token_repeats, dim=0
-    )
-
-    # offset only positive atom indices
-    distogram_atom_indices = offset_only_positive(distogram_atom_indices, atom_indices_offsets)
-    molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
-    atom_indices_for_frame = offset_only_positive(
-        atom_indices_for_frame, atom_indices_offsets[..., None]
-    )
 
     # create molecule input
 
