@@ -42,7 +42,7 @@ A visualization of the molecules of life used in the repository can be seen and 
 
 - <a href="https://github.com/xluo233">@xluo233</a> for contributing the confidence measures, clash penalty ranking, and sample ranking logic!
 
-- <a href="https://github.com/sj900">sj900</a> for integrating and testing the `WeightedPDBSampler` within the `PDBDataset`!
+- <a href="https://github.com/sj900">sj900</a> for integrating and testing the `WeightedPDBSampler` within the `PDBDataset` and for adding initial support for MSA parsing!
 
 - <a href="https://github.com/xluo233">@xluo233</a> again for contributing the logic for computing the model selection score as well as the unresolved rasa!
 
