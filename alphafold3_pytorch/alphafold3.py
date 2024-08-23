@@ -5703,9 +5703,6 @@ class Alphafold3(Module):
         atom_pos_given = exists(atom_pos)
 
         confidence_head_labels = (atom_indices_for_frame, resolved_labels)
-        all_labels = (distance_labels, *confidence_head_labels)
-
-        has_labels = any([*map(exists, all_labels)])
 
         can_return_loss = (
             atom_pos_given or
