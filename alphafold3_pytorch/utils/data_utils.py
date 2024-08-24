@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Set
+from typing import Any, Dict, List, Literal, Set, Tuple
 
 import numpy as np
 import torch
@@ -245,3 +245,22 @@ def make_one_hot(x: Tensor, num_classes: int) -> Tensor:
     x_one_hot = torch.zeros(*x.shape, num_classes, device=x.device)
     x_one_hot.scatter_(-1, x.unsqueeze(-1), 1)
     return x_one_hot
+
+
+@typecheck
+def get_sorted_tuple_indices(tuples_list: List[Tuple[str, Any]], order_list: List[str]) -> List[int]:
+    """
+    Get the indices of the tuples in the order specified by the order_list.
+    
+    :param tuples_list: A list of tuples containing a string and a value.
+    :param order_list: A list of strings specifying the order of the tuples.
+    :return: A list of indices of the tuples in the order specified by the order
+        list.
+    """
+    # Create a mapping from the string values to their indices
+    index_map = {value: index for index, (value, _) in enumerate(tuples_list)}
+    
+    # Generate the indices in the order specified by the order_list
+    sorted_indices = [index_map[value] for value in order_list]
+    
+    return sorted_indices
