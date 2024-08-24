@@ -66,6 +66,7 @@ from alphafold3_pytorch.utils.data_utils import (
     PDB_INPUT_RESIDUE_MOLECULE_TYPE,
     extract_mmcif_metadata_field,
     get_pdb_input_residue_molecule_type,
+    get_sorted_tuple_indices,
     is_atomized_residue,
     is_polymer,
     make_one_hot,
@@ -2410,6 +2411,87 @@ def pdb_input_to_molecule_input(
             chain_id_2 = None
         chains = (chain_id_1, chain_id_2)
 
+    # construct multiple sequence alignment (MSA) and template features prior to cropping
+
+    # retrieve MSA metadata from the `Biomolecule` object
+    biomol_chain_ids = list(dict.fromkeys(biomol.chain_id.tolist()))  # NOTE: we must maintain the order of unique chain IDs
+
+    residue_index = torch.from_numpy(biomol.residue_index) - 1  # NOTE: `Biomolecule.residue_index` is 1-based originally
+    num_tokens = len(biomol.atom_mask)
+
+    chain_id_to_residue = {
+        chain_id: {
+            "chemtype": biomol.chemtype[biomol.chain_id == chain_id].tolist(),
+            "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
+        }
+        for chain_id in biomol_chain_ids
+    }
+
+    msa_features = load_msa_from_msa_dir(
+        # NOTE: if MSAs are not locally available, `Nones` will be used
+        i.msa_dir, file_id, chain_id_to_residue, max_msas_per_chain=i.max_msas_per_chain
+    )
+
+    msa = msa_features.get("msa")
+    msa_col_mask = msa_features.get("msa_mask")
+    msa_row_mask = msa_features.get("msa_row_mask")
+
+    # collect additional MSA and token features
+    # 0: has_deletion (msa)
+    # 1: deletion_value (msa)
+    # 2: profile (token)
+    # 3: deletion_mean (token)
+
+    additional_msa_feats = None
+    additional_token_feats = None
+
+    num_msas = len(msa) if exists(msa) else 1
+
+    if exists(msa):
+        assert (
+            msa.shape[-1] == num_tokens
+        ), f"The number of tokens in the MSA ({msa.shape[-1]}) does not match the number of tokens in the biomolecule ({num_tokens}). "
+
+        has_deletion = torch.clip(msa_features["deletion_matrix"], 0.0, 1.0)
+        deletion_value = torch.atan(msa_features["deletion_matrix"] / 3.0) * (2.0 / torch.pi)
+
+        additional_msa_feats = torch.stack(
+            [
+                has_deletion,
+                deletion_value,
+            ],
+            dim=-1,
+        )
+
+        # NOTE: assumes each aligned sequence has the same mask values
+        profile_msa_mask = torch.repeat_interleave(msa_col_mask[None, ...], len(msa), dim=0)
+        msa_sum = (profile_msa_mask[:, :, None] * make_one_hot(msa, NUM_MSA_ONE_HOT)).sum(0)
+        mask_counts = 1e-6 + profile_msa_mask.sum(0)
+
+        profile = msa_sum / mask_counts[:, None]
+        deletion_mean = torch.atan(msa_features["deletion_matrix"].mean(0) / 3.0) * (
+            2.0 / torch.pi
+        )
+
+        additional_token_feats = torch.cat(
+            [
+                profile,
+                deletion_mean[:, None],
+            ],
+            dim=-1,
+        )
+
+        # convert the MSA into a one-hot representation
+        msa = make_one_hot(msa, NUM_MSA_ONE_HOT)
+        msa_row_mask = msa_row_mask.bool()
+
+    # TODO: retrieve templates for each chain
+    # NOTE: if they are not locally available, `Nones` will be used
+    template_features = load_templates_from_templates_dir(i.templates_dir, file_id)
+
+    templates = template_features.get("templates")
+    template_mask = template_features.get("template_mask")
+
     # crop the `Biomolecule` object during training only
 
     if i.training:
@@ -2420,7 +2502,7 @@ def pdb_input_to_molecule_input(
             assert exists(i.chains), "Chain IDs must be provided for cropping during training."
             chain_id_1, chain_id_2 = i.chains
 
-            biomol = biomol.crop(
+            biomol, chain_ids_and_lengths, crop_masks = biomol.crop(
                 contiguous_weight=i.cropping_config["contiguous_weight"],
                 spatial_weight=i.cropping_config["spatial_weight"],
                 spatial_interface_weight=i.cropping_config["spatial_interface_weight"],
@@ -2428,12 +2510,28 @@ def pdb_input_to_molecule_input(
                 chain_1=chain_id_1 if chain_id_1 else None,
                 chain_2=chain_id_2 if chain_id_2 else None,
             )
+
+            # retrieve cropped residue and token metadata
+            residue_index = torch.from_numpy(biomol.residue_index) - 1  # NOTE: `Biomolecule.residue_index` is 1-based originally
+            num_tokens = len(biomol.atom_mask)
+
+            # update MSA and template features after cropping
+            chain_id_sorted_indices = get_sorted_tuple_indices(chain_ids_and_lengths, biomol_chain_ids)
+            sorted_crop_mask = np.concatenate([crop_masks[idx] for idx in chain_id_sorted_indices])
+
+            # crop MSA features
+            if exists(msa):
+                msa = msa[:, sorted_crop_mask]
+
+                additional_token_feats = additional_token_feats[sorted_crop_mask]
+                additional_msa_feats = additional_msa_feats[:, sorted_crop_mask]
+
+            # TODO: crop template features
+
         except Exception as e:
             raise ValueError(f"Failed to crop the biomolecule for input {file_id} due to: {e}")
 
     # retrieve features directly available within the `Biomolecule` object
-
-    num_tokens = len(biomol.atom_mask)
 
     # create unique chain-residue index pairs to identify the first atom of each residue
     chain_residue_index = np.array(list(zip(biomol.chain_index, biomol.residue_index)))
@@ -2605,9 +2703,6 @@ def pdb_input_to_molecule_input(
     sym_ids = repeat_interleave(tensor(unrepeated_sym_ids), tensor(entity_id_counts))
 
     # concat for all of additional_molecule_feats
-
-    # NOTE: `Biomolecule.residue_index` is 1-based originally
-    residue_index = torch.from_numpy(biomol.residue_index) - 1
 
     additional_molecule_feats = torch.stack(
         (
@@ -2836,80 +2931,6 @@ def pdb_input_to_molecule_input(
     atom_indices_for_frame = offset_only_positive(
         atom_indices_for_frame, atom_indices_offsets[..., None]
     )
-
-    # retrieve multiple sequence alignments (MSAs) for each chain
-    # NOTE: if they are not locally available, `Nones` will be used
-    msa_chain_ids = list(dict.fromkeys(biomol.chain_id.tolist()))
-    chain_id_to_residue = {
-        chain_id: {
-            "chemtype": biomol.chemtype[biomol.chain_id == chain_id].tolist(),
-            "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
-        }
-        for chain_id in msa_chain_ids
-    }
-    msa_features = load_msa_from_msa_dir(
-        i.msa_dir, file_id, chain_id_to_residue, max_msas_per_chain=i.max_msas_per_chain
-    )
-
-    msa = msa_features.get("msa")
-    msa_col_mask = msa_features.get("msa_mask")
-    msa_row_mask = msa_features.get("msa_row_mask")
-
-    # collect additional MSA and token features
-    # 0: has_deletion (msa)
-    # 1: deletion_value (msa)
-    # 2: profile (token)
-    # 3: deletion_mean (token)
-
-    additional_msa_feats = None
-    additional_token_feats = None
-
-    num_msas = len(msa) if exists(msa) else 1
-
-    if exists(msa):
-        assert (
-            msa.shape[-1] == num_tokens
-        ), f"The number of tokens in the MSA ({msa.shape[-1]}) does not match the number of tokens in the biomolecule ({num_tokens}). "
-
-        has_deletion = torch.clip(msa_features["deletion_matrix"], 0.0, 1.0)
-        deletion_value = torch.atan(msa_features["deletion_matrix"] / 3.0) * (2.0 / torch.pi)
-
-        additional_msa_feats = torch.stack(
-            [
-                has_deletion,
-                deletion_value,
-            ],
-            dim=-1,
-        )
-
-        # NOTE: assumes each aligned sequence has the same mask values
-        profile_msa_mask = torch.repeat_interleave(msa_col_mask[None, ...], len(msa), dim=0)
-        msa_sum = (profile_msa_mask[:, :, None] * make_one_hot(msa, NUM_MSA_ONE_HOT)).sum(0)
-        mask_counts = 1e-6 + profile_msa_mask.sum(0)
-
-        profile = msa_sum / mask_counts[:, None]
-        deletion_mean = torch.atan(msa_features["deletion_matrix"].mean(0) / 3.0) * (
-            2.0 / torch.pi
-        )
-
-        additional_token_feats = torch.cat(
-            [
-                profile,
-                deletion_mean[:, None],
-            ],
-            dim=-1,
-        )
-
-        # convert the MSA into a one-hot representation
-        msa = make_one_hot(msa, NUM_MSA_ONE_HOT)
-        msa_row_mask = msa_row_mask.bool()
-
-    # TODO: retrieve templates for each chain
-    # NOTE: if they are not locally available, `Nones` will be used
-    template_features = load_templates_from_templates_dir(i.templates_dir, file_id)
-
-    templates = template_features.get("templates")
-    template_mask = template_features.get("template_mask")
 
     # construct atom positions from template molecules after instantiating their 3D conformers
     atom_pos = torch.from_numpy(
