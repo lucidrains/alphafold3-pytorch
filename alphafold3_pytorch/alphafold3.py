@@ -10,6 +10,7 @@ from collections import namedtuple
 import torch
 from torch import nn
 from torch import Tensor
+from torch.amp import autocast
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint, checkpoint_sequential
 
@@ -2979,6 +2980,7 @@ class WeightedRigidAlign(Module):
     """ Algorithm 28 """
 
     @typecheck
+    @autocast('cuda', enabled = False)
     def forward(
         self,
         pred_coords: Float['b n 3'],       # predicted coordinates
