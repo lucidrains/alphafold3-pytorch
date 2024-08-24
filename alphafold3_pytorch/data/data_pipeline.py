@@ -327,7 +327,7 @@ if __name__ == "__main__":
         file_id=file_id,
     )
     mmcif_feats, assembly = make_mmcif_features(mmcif_object)
-    cropped_assembly = assembly.crop(
+    cropped_assembly, _, _ = assembly.crop(
         contiguous_weight=0.2,
         spatial_weight=0.4,
         spatial_interface_weight=0.4,
