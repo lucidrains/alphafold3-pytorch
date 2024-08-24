@@ -1695,7 +1695,7 @@ class TemplateEmbedder(Module):
 
         # layers
 
-        templates = to_layers_fn(templates)
+        templates = to_layers_fn(templates, mask = mask)
 
         # final norm
 
