@@ -2626,9 +2626,13 @@ def pdb_input_to_molecule_input(
     distogram_atom_indices = []
     src_tgt_atom_indices = []
 
-    for mol_type, chemid in zip(
+    current_atom_index = 0
+    current_res_index = -1
+
+    for mol_type, chemid, res_index in zip(
         molecule_atom_types,
         biomol.chemid,
+        biomol.residue_index,
     ):
         residue_constants = get_residue_constants(
             mol_type.replace("protein", "peptide").replace("mod_", "")
@@ -2643,9 +2647,15 @@ def pdb_input_to_molecule_input(
 
         if is_atomized_residue(mol_type):
             # collect indices for each ligand and modified polymer residue token (i.e., atom)
+            if current_res_index == res_index:
+                current_atom_index += 1
+            else:
+                current_atom_index = 0
+                current_res_index = res_index
+
             atom_indices_for_frame.append(None)
-            molecule_atom_indices.append(-1)
-            distogram_atom_indices.append(-1)
+            molecule_atom_indices.append(current_atom_index)
+            distogram_atom_indices.append(current_atom_index)
             # NOTE: ligand and modified polymer residue tokens do not have source-target atom indices
         else:
             # collect indices for each polymer residue token
