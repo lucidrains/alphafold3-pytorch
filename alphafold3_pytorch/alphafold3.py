@@ -662,7 +662,6 @@ class TriangleMultiplication(Module):
         super().__init__()
 
         dim_hidden = default(dim_hidden, dim)
-        self.norm = nn.LayerNorm(dim)
 
         self.left_right_proj = nn.Sequential(
             LinearNoBias(dim, dim_hidden * 4),
@@ -695,8 +694,6 @@ class TriangleMultiplication(Module):
         if exists(mask):
             mask = to_pairwise_mask(mask)
             mask = rearrange(mask, '... -> ... 1')
-
-        x = self.norm(x)
 
         left, right = self.left_right_proj(x).chunk(2, dim = -1)
 
