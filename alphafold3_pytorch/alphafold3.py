@@ -5015,7 +5015,7 @@ class Alphafold3(Module):
         num_pde_bins: int | None = None,
         sigma_data = 16,
         num_rollout_steps = 20,
-        diffusion_num_augmentations = 4,
+        diffusion_num_augmentations = 48,
         loss_confidence_weight = 1e-4,
         loss_distogram_weight = 1e-2,
         loss_diffusion_weight = 4.,
