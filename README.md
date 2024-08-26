@@ -438,3 +438,15 @@ docker run -v .:/data --gpus all -it af3
     year    = {2023}
 }
 ```
+
+```bibtex
+@article{Ash2019OnTD,
+    title   = {On the Difficulty of Warm-Starting Neural Network Training},
+    author  = {Jordan T. Ash and Ryan P. Adams},
+    journal = {ArXiv},
+    year    = {2019},
+    volume  = {abs/1910.08475},
+    url     = {https://api.semanticscholar.org/CorpusID:204788802}
+}
+```
+

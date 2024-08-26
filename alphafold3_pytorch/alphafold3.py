@@ -5415,6 +5415,20 @@ class Alphafold3(Module):
         alphafold3.load(path)
         return alphafold3
 
+    def shrink_and_perturb_(
+        self,
+        shrink_factor = 0.5,
+        perturb_factor = 0.01
+    ):
+        # Shrink & Perturb - Ash et al. https://arxiv.org/abs/1910.08475
+        assert 0. <= shrink_factor <= 1.
+
+        for p in self.parameters():
+            noise = torch.randn_like(p.data)
+            p.data.mul_(1. - shrink_factor).add_(noise * 0.1)
+
+        return self
+
     @typecheck
     def forward(
         self,
