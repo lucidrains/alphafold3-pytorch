@@ -668,8 +668,6 @@ class TriangleMultiplication(Module):
             nn.GLU(dim = -1)
         )
 
-        self.left_right_gate = LinearNoBias(dim, dim_hidden * 2)
-
         self.out_gate = LinearNoBias(dim, dim_hidden)
 
         if mix == 'outgoing':
