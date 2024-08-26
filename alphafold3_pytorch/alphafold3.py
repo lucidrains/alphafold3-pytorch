@@ -5425,7 +5425,7 @@ class Alphafold3(Module):
 
         for p in self.parameters():
             noise = torch.randn_like(p.data)
-            p.data.mul_(1. - shrink_factor).add_(noise * 0.1)
+            p.data.mul_(1. - shrink_factor).add_(noise * perturb_factor)
 
         return self
 
