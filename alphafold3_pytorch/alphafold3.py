@@ -2778,6 +2778,7 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
+        molecule_atom_indices: Int['b n'],
         missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         return_denoised_pos = False,
