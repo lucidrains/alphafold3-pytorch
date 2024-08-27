@@ -270,6 +270,8 @@ def get_frames_from_atom_pos(
     if not filter_colinear_pos:
         return frames
 
+    is_invalid = (frames == -1).any(dim = -1)
+
     # get the edges and derive angles
 
     three_atom_pos = einx.get_at('... [m] c, ... three -> ... three c', atom_pos, frames)
@@ -284,12 +286,12 @@ def get_frames_from_atom_pos(
 
     is_colinear = (
         (degree.abs() < is_colinear_angle_thres) |
-        ((180. - degree.abs()) < is_colinear_angle_thres)
+        ((180. - degree.abs()).abs() < is_colinear_angle_thres)
     )
 
     # set any three atoms that are colinear to -1 indices
 
-    three_atom_indices = einx.where('..., ... three, -> ... three', ~is_colinear, frames, -1)
+    three_atom_indices = einx.where('..., ... three, -> ... three', ~(is_colinear | is_invalid), frames, -1)
     return three_atom_indices
 
 # atom level, what Alphafold3 accepts
