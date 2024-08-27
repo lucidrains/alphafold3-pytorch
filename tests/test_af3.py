@@ -66,6 +66,9 @@ from alphafold3_pytorch.inputs import (
     PDBDataset,
     default_extract_atom_feats_fn,
     default_extract_atompair_feats_fn,
+    get_indices_three_closest_atom_pos,
+    get_angle_between_edges,
+    get_frames_from_atom_pos
 )
 
 from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
@@ -191,6 +194,23 @@ def test_rigid_from_three_points():
     points = torch.randn(7, 11, 23, 3)
     rotation, _ = rigid_from_3_points((points, points, points))
     assert rotation.shape == (7, 11, 23, 3, 3)
+
+def test_deriving_frames_for_ligands():
+    points = torch.tensor([
+        [1., 1., 1.],
+        [-99, -99, -99],
+        [0, 0, 0],
+        [100, 100, 100],
+        [-1., -1., -1.],
+    ])
+
+    frames = get_frames_from_atom_pos(points, filter_colinear_pos = True)
+
+    assert torch.allclose(frames, torch.tensor([-1, -1, -1]))
+
+    frames = get_frames_from_atom_pos(points, filter_colinear_pos = False)
+
+    assert torch.allclose(frames, torch.tensor([0, 2, 4]))
 
 def test_compute_alignment_error():
     pred_coords = torch.randn(2, 100, 3)

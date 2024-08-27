@@ -139,6 +139,9 @@ elif os.path.exists(CCD_COMPONENTS_FILEPATH):
 
 # functions
 
+def l2norm(t):
+    return F.normalize(t, dim = -1)
+
 def flatten(arr):
     return [el for sub_arr in arr for el in sub_arr]
 
@@ -198,6 +201,96 @@ def hard_validate_atom_indices_ascending(
         difference = einx.subtract('n i, n j -> n (i j)', present_indices[1:], present_indices[:-1])
 
         assert (difference >= 0).all(), f'detected invalid {error_msg_field} for in a batch: {present_indices}'
+
+# functions for deriving the frames for ligands
+# this follows the logic from Alphafold3 Supplementary section 4.3.2
+
+@typecheck
+def get_indices_three_closest_atom_pos(
+    atom_pos: Float['... n d'],
+) -> Int['... 3']:
+
+    prec_dims, device = atom_pos.shape[:-2], atom_pos.device
+    num_atoms, has_batch = atom_pos.shape[-2], atom_pos.ndim == 3
+
+    if num_atoms < 3:
+        return atom_pos.new_full((*prec_dims, 3), -1).long()
+
+    if not has_batch:
+        atom_pos = rearrange(atom_pos, '... -> 1 ...')
+
+    atom_dist = torch.cdist(atom_pos, atom_pos)
+
+    # mask out the distance to self
+
+    eye = torch.eye(num_atoms, device = device, dtype = torch.bool)
+
+    atom_dist.masked_fill_(eye, 1e4)
+
+    # will use topk on the negative of the distance
+
+    neg_distance, two_closest_atom_indices = (-atom_dist).topk(2, dim = -1)
+
+    mean_neg_distance = neg_distance.mean(dim = -1)
+
+    best_atom_pair_index = mean_neg_distance.argmax(dim = -1)
+
+    best_two_atom_neighbors = einx.get_at('... [m] c, ... -> ... c', two_closest_atom_indices, best_atom_pair_index)
+
+    # place the chosen atom at the center
+
+    three_atom_indices, _ = pack((
+        best_two_atom_neighbors[..., 0],
+        best_atom_pair_index,
+        best_two_atom_neighbors[..., 1],
+    ), 'b *')
+
+    if not has_batch:
+        three_atom_indices = rearrange(three_atom_indices, '1 ... -> ...')
+
+    return three_atom_indices
+
+@typecheck
+def get_angle_between_edges(
+    edge1: Float['... 3'],
+    edge2: Float['... 3']
+) -> Float['...']:
+    cos = torch.dot(l2norm(edge1), l2norm(edge2))
+    return torch.acos(cos)
+
+@typecheck
+def get_frames_from_atom_pos(
+    atom_pos: Float['... n d'],
+    filter_colinear_pos: bool = False,
+    is_colinear_angle_thres: float = 25. # they use 25 degrees as a way of filtering out invalid frames
+) -> Int['... 3']:
+
+    frames = get_indices_three_closest_atom_pos(atom_pos)
+
+    if not filter_colinear_pos:
+        return frames
+
+    # get the edges and derive angles
+
+    three_atom_pos = einx.get_at('... [m] c, ... three -> ... three c', atom_pos, frames)
+
+    left_pos, center_pos, right_pos = three_atom_pos.unbind(dim = -2)
+
+    edges1, edges2 = (left_pos - center_pos), (right_pos - center_pos)
+
+    angle = get_angle_between_edges(edges1, edges2)
+
+    degree = torch.rad2deg(angle)
+
+    is_colinear = (
+        (degree.abs() < is_colinear_angle_thres) |
+        ((180. - degree.abs()) < is_colinear_angle_thres)
+    )
+
+    # set any three atoms that are colinear to -1 indices
+
+    three_atom_indices = einx.where('..., ... three, -> ... three', ~is_colinear, frames, -1)
+    return three_atom_indices
 
 # atom level, what Alphafold3 accepts
 
