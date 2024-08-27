@@ -208,16 +208,27 @@ def hard_validate_atom_indices_ascending(
 @typecheck
 def get_indices_three_closest_atom_pos(
     atom_pos: Float['... n d'],
+    mask: Bool['... n'] | None = None
 ) -> Int['... 3']:
 
     prec_dims, device = atom_pos.shape[:-2], atom_pos.device
     num_atoms, has_batch = atom_pos.shape[-2], atom_pos.ndim == 3
 
-    if num_atoms < 3:
+    if not exists(mask) and num_atoms < 3:
         return atom_pos.new_full((*prec_dims, 3), -1).long()
 
     if not has_batch:
         atom_pos = rearrange(atom_pos, '... -> 1 ...')
+
+        if exists(mask):
+            mask = rearrange(mask, '... -> 1 ...')
+
+    # figure out which set of atoms are less than 3 for masking out later
+
+    if exists(mask):
+        insufficient_atom_mask = mask.sum(dim = -1) < 3
+
+    # get distances between all atoms
 
     atom_dist = torch.cdist(atom_pos, atom_pos)
 
@@ -225,7 +236,14 @@ def get_indices_three_closest_atom_pos(
 
     eye = torch.eye(num_atoms, device = device, dtype = torch.bool)
 
-    atom_dist.masked_fill_(eye, 1e4)
+    mask_value = 1e4
+    atom_dist.masked_fill_(eye, mask_value)
+
+    # take care of padding
+
+    if exists(mask):
+        pair_mask = einx.logical_and('... i, ... j -> ... i j', mask, mask)
+        atom_dist.masked_fill_(~pair_mask, mask_value)
 
     # will use topk on the negative of the distance
 
@@ -245,6 +263,11 @@ def get_indices_three_closest_atom_pos(
         best_two_atom_neighbors[..., 1],
     ), 'b *')
 
+    # mask out
+
+    if exists(mask):
+        three_atom_indices = einx.where('..., ... three, -> ... three', ~insufficient_atom_mask, three_atom_indices, -1)
+
     if not has_batch:
         three_atom_indices = rearrange(three_atom_indices, '1 ... -> ...')
 
@@ -261,11 +284,12 @@ def get_angle_between_edges(
 @typecheck
 def get_frames_from_atom_pos(
     atom_pos: Float['... n d'],
+    mask: Bool['... n'] | None = None,
     filter_colinear_pos: bool = False,
     is_colinear_angle_thres: float = 25. # they use 25 degrees as a way of filtering out invalid frames
 ) -> Int['... 3']:
 
-    frames = get_indices_three_closest_atom_pos(atom_pos)
+    frames = get_indices_three_closest_atom_pos(atom_pos, mask = mask)
 
     if not filter_colinear_pos:
         return frames

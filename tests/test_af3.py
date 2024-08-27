@@ -206,11 +206,19 @@ def test_deriving_frames_for_ligands():
 
     frames = get_frames_from_atom_pos(points, filter_colinear_pos = True)
 
-    assert torch.allclose(frames, torch.tensor([-1, -1, -1]))
+    assert (frames == -1).all()
 
     frames = get_frames_from_atom_pos(points, filter_colinear_pos = False)
 
     assert torch.allclose(frames, torch.tensor([0, 2, 4]))
+
+    # test with mask
+
+    mask = torch.tensor([True, True, False, False, False])
+
+    frames = get_frames_from_atom_pos(points, mask = mask)
+
+    assert (frames == -1).all()
 
 def test_compute_alignment_error():
     pred_coords = torch.randn(2, 100, 3)
