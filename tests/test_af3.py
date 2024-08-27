@@ -16,6 +16,7 @@ from collections import namedtuple
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
+    MultiChainPermutationAlignment,
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     ComputeAlignmentError,
@@ -166,6 +167,53 @@ def test_weighted_rigid_align_with_mask():
     # both ways should come out with about the same results
 
     assert torch.allclose(aligned_coords[mask], aligned_coords_without_mask, atol=1e-5)
+
+def test_multi_chain_permutation_alignment():
+    batch_size = 1
+    seq_len = 16
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (batch_size, seq_len)).long()
+    molecule_atom_lens = torch.full((batch_size, seq_len), 2).long()
+
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    pred_coords = torch.randn(batch_size, atom_seq_len, 3)
+    true_coords = torch.randn(batch_size, atom_seq_len, 3)
+    weights = torch.rand(batch_size, atom_seq_len)
+    mask = torch.randint(0, 2, (batch_size, atom_seq_len)).bool()
+
+    token_bonds = torch.randint(0, 2, (batch_size, seq_len, seq_len)).bool()
+    additional_molecule_feats = torch.randint(0, 2, (batch_size, seq_len, 5))
+    is_molecule_types = torch.randint(0, 2, (batch_size, seq_len, IS_MOLECULE_TYPES)).bool()
+
+    # ensure the asymmetric and entity IDs are consistently ordered and compatible with one another
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 2] = 0
+    additional_molecule_feats[..., additional_molecule_feats.shape[1] // 2 :, 2] = 1
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 3] = 0
+
+    # offset indices correctly
+
+    molecule_atom_indices += atom_offsets
+
+    align_fn = WeightedRigidAlign()
+    permute_fn = MultiChainPermutationAlignment(weighted_rigid_align=align_fn)
+
+    aligned_true_coords = align_fn(pred_coords, true_coords, weights, mask=mask)
+    permuted_aligned_true_coords = permute_fn(
+        pred_coords=pred_coords,
+        true_coords=aligned_true_coords,
+        molecule_atom_lens=molecule_atom_lens,
+        molecule_atom_indices=molecule_atom_indices,
+        token_bonds=token_bonds,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_types=is_molecule_types,
+        mask=mask,
+    )
+
+    assert permuted_aligned_true_coords.shape == aligned_true_coords.shape
 
 def test_express_coordinates_in_frame():
     batch_size = 2
