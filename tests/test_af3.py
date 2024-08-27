@@ -16,6 +16,7 @@ from collections import namedtuple
 from alphafold3_pytorch import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
+    MultiChainPermutationAlignment,
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     ComputeAlignmentError,
@@ -166,6 +167,53 @@ def test_weighted_rigid_align_with_mask():
     # both ways should come out with about the same results
 
     assert torch.allclose(aligned_coords[mask], aligned_coords_without_mask, atol=1e-5)
+
+def test_multi_chain_permutation_alignment():
+    batch_size = 1
+    seq_len = 16
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (batch_size, seq_len)).long()
+    molecule_atom_lens = torch.full((batch_size, seq_len), 2).long()
+
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    pred_coords = torch.randn(batch_size, atom_seq_len, 3)
+    true_coords = torch.randn(batch_size, atom_seq_len, 3)
+    weights = torch.rand(batch_size, atom_seq_len)
+    mask = torch.randint(0, 2, (batch_size, atom_seq_len)).bool()
+
+    token_bonds = torch.randint(0, 2, (batch_size, seq_len, seq_len)).bool()
+    additional_molecule_feats = torch.randint(0, 2, (batch_size, seq_len, 5))
+    is_molecule_types = torch.randint(0, 2, (batch_size, seq_len, IS_MOLECULE_TYPES)).bool()
+
+    # ensure the asymmetric and entity IDs are consistently ordered and compatible with one another
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 2] = 0
+    additional_molecule_feats[..., additional_molecule_feats.shape[1] // 2 :, 2] = 1
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 3] = 0
+
+    # offset indices correctly
+
+    molecule_atom_indices += atom_offsets
+
+    align_fn = WeightedRigidAlign()
+    permute_fn = MultiChainPermutationAlignment(weighted_rigid_align=align_fn)
+
+    aligned_true_coords = align_fn(pred_coords, true_coords, weights, mask=mask)
+    permuted_aligned_true_coords = permute_fn(
+        pred_coords=pred_coords,
+        true_coords=aligned_true_coords,
+        molecule_atom_lens=molecule_atom_lens,
+        molecule_atom_indices=molecule_atom_indices,
+        token_bonds=token_bonds,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_types=is_molecule_types,
+        mask=mask,
+    )
+
+    assert permuted_aligned_true_coords.shape == aligned_true_coords.shape
 
 def test_express_coordinates_in_frame():
     batch_size = 2
@@ -358,21 +406,25 @@ def test_sequence_local_attn():
     assert out.shape == atoms.shape
 
 @pytest.mark.parametrize('karras_formulation', (True, False))
-def test_diffusion_module(
-    karras_formulation
-):
-
+def test_diffusion_module(karras_formulation):
     seq_len = 16
     atom_seq_len = 32
 
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    token_bonds = torch.randint(0, 2, (2, seq_len, seq_len)).bool()
 
     noised_atom_pos = torch.randn(2, atom_seq_len, 3)
     atom_feats = torch.randn(2, atom_seq_len, 128)
     atompair_feats = torch.randn(2, atom_seq_len, atom_seq_len, 16)
     atom_mask = torch.ones((2, atom_seq_len)).bool()
 
-    times = torch.randn(2,)
+    times = torch.randn(
+        2,
+    )
     mask = torch.ones(2, seq_len).bool()
     single_trunk_repr = torch.randn(2, seq_len, 128)
     single_inputs_repr = torch.randn(2, seq_len, 256)
@@ -380,69 +432,69 @@ def test_diffusion_module(
     pairwise_trunk = torch.randn(2, seq_len, seq_len, 128)
     pairwise_rel_pos_feats = torch.randn(2, seq_len, seq_len, 12)
 
+    # offset indices correctly
+
+    molecule_atom_indices += atom_offsets
+
     diffusion_module = DiffusionModule(
-        atoms_per_window = 27,
-        dim_pairwise_trunk = 128,
-        dim_pairwise_rel_pos_feats = 12,
-        atom_encoder_depth = 1,
-        atom_decoder_depth = 1,
-        token_transformer_depth = 1,
-        atom_encoder_kwargs = dict(
-            attn_num_memory_kv = 2
-        ),
-        token_transformer_kwargs = dict(
-            num_register_tokens = 2
-        )
+        atoms_per_window=27,
+        dim_pairwise_trunk=128,
+        dim_pairwise_rel_pos_feats=12,
+        atom_encoder_depth=1,
+        atom_decoder_depth=1,
+        token_transformer_depth=1,
+        atom_encoder_kwargs=dict(attn_num_memory_kv=2),
+        token_transformer_kwargs=dict(num_register_tokens=2),
     )
 
     atom_pos_update = diffusion_module(
         noised_atom_pos,
-        times = times,
-        atom_feats = atom_feats,
-        atompair_feats = atompair_feats,
-        atom_mask = atom_mask,
-        mask = mask,
-        single_trunk_repr = single_trunk_repr,
-        single_inputs_repr = single_inputs_repr,
-        pairwise_trunk = pairwise_trunk,
-        pairwise_rel_pos_feats = pairwise_rel_pos_feats,
-        molecule_atom_lens = molecule_atom_lens
+        times=times,
+        atom_feats=atom_feats,
+        atompair_feats=atompair_feats,
+        atom_mask=atom_mask,
+        mask=mask,
+        single_trunk_repr=single_trunk_repr,
+        single_inputs_repr=single_inputs_repr,
+        pairwise_trunk=pairwise_trunk,
+        pairwise_rel_pos_feats=pairwise_rel_pos_feats,
+        molecule_atom_lens=molecule_atom_lens,
     )
 
     assert noised_atom_pos.shape == atom_pos_update.shape
 
     edm = ElucidatedAtomDiffusion(
-        diffusion_module,
-        karras_formulation = karras_formulation,
-        num_sample_steps = 2
+        diffusion_module, karras_formulation=karras_formulation, num_sample_steps=2
     )
 
     edm_return = edm(
         noised_atom_pos,
-        atom_feats = atom_feats,
-        atompair_feats = atompair_feats,
-        atom_mask = atom_mask,
-        mask = mask,
-        single_trunk_repr = single_trunk_repr,
-        single_inputs_repr = single_inputs_repr,
-        pairwise_trunk = pairwise_trunk,
-        pairwise_rel_pos_feats = pairwise_rel_pos_feats,
-        molecule_atom_lens = molecule_atom_lens,
-        add_bond_loss = True
+        atom_feats=atom_feats,
+        atompair_feats=atompair_feats,
+        atom_mask=atom_mask,
+        mask=mask,
+        single_trunk_repr=single_trunk_repr,
+        single_inputs_repr=single_inputs_repr,
+        pairwise_trunk=pairwise_trunk,
+        pairwise_rel_pos_feats=pairwise_rel_pos_feats,
+        molecule_atom_lens=molecule_atom_lens,
+        molecule_atom_indices=molecule_atom_indices,
+        token_bonds=token_bonds,
+        add_bond_loss=True,
     )
 
     assert edm_return.loss.numel() == 1
 
     sampled_atom_pos = edm.sample(
-        atom_mask = atom_mask,
-        atom_feats = atom_feats,
-        atompair_feats = atompair_feats,
-        mask = mask,
-        single_trunk_repr = single_trunk_repr,
-        single_inputs_repr = single_inputs_repr,
-        pairwise_trunk = pairwise_trunk,
-        pairwise_rel_pos_feats = pairwise_rel_pos_feats,
-        molecule_atom_lens = molecule_atom_lens
+        atom_mask=atom_mask,
+        atom_feats=atom_feats,
+        atompair_feats=atompair_feats,
+        mask=mask,
+        single_trunk_repr=single_trunk_repr,
+        single_inputs_repr=single_inputs_repr,
+        pairwise_trunk=pairwise_trunk,
+        pairwise_rel_pos_feats=pairwise_rel_pos_feats,
+        molecule_atom_lens=molecule_atom_lens,
     )
 
     assert sampled_atom_pos.shape == noised_atom_pos.shape
@@ -622,6 +674,13 @@ def test_alphafold3(
     distogram_atom_indices = molecule_atom_lens - 1
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+    # ensure the asymmetric and entity IDs are consistently ordered and compatible with one another
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 2] = 0
+    additional_molecule_feats[..., additional_molecule_feats.shape[1] // 2 :, 2] = 1
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 3] = 0
 
     # offset indices correctly
 
@@ -1258,16 +1317,17 @@ def test_unresolved_protein_rasa():
         atom_mask=~batched_atom_input_dict['missing_atom_mask'])
 
 def test_readme1():
-    alphafold3 = Alphafold3(
-        dim_atom_inputs = 77,
-        dim_template_feats = 44
-    )
+    alphafold3 = Alphafold3(dim_atom_inputs=77, dim_template_feats=44)
 
     # mock inputs
 
     seq_len = 16
-    molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-    atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+    atom_seq_len = molecule_atom_lens.sum(dim=-1).amax()
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
 
     atom_inputs = torch.randn(2, atom_seq_len, 77)
     atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -1290,33 +1350,38 @@ def test_readme1():
 
     atom_pos = torch.randn(2, atom_seq_len, 3)
 
-    molecule_atom_indices = molecule_atom_lens - 1 # last atom, as an example
-    molecule_atom_indices += (molecule_atom_lens.cumsum(dim = -1) - molecule_atom_lens)
+    distogram_atom_indices = molecule_atom_lens - 1
 
     distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
+    # offset indices correctly
+
+    distogram_atom_indices += atom_offsets
+    molecule_atom_indices += atom_offsets
+
     # train
 
     loss = alphafold3(
-        num_recycling_steps = 2,
-        atom_inputs = atom_inputs,
-        atompair_inputs = atompair_inputs,
-        molecule_ids = molecule_ids,
-        molecule_atom_lens = molecule_atom_lens,
-        additional_molecule_feats = additional_molecule_feats,
-        additional_msa_feats = additional_msa_feats,
-        additional_token_feats = additional_token_feats,
-        is_molecule_types = is_molecule_types,
-        is_molecule_mod = is_molecule_mod,
-        msa = msa,
-        msa_mask = msa_mask,
-        templates = template_feats,
-        template_mask = template_mask,
-        atom_pos = atom_pos,
-        molecule_atom_indices = molecule_atom_indices,
-        distance_labels = distance_labels,
-        resolved_labels = resolved_labels
+        num_recycling_steps=2,
+        atom_inputs=atom_inputs,
+        atompair_inputs=atompair_inputs,
+        molecule_ids=molecule_ids,
+        molecule_atom_lens=molecule_atom_lens,
+        additional_molecule_feats=additional_molecule_feats,
+        additional_msa_feats=additional_msa_feats,
+        additional_token_feats=additional_token_feats,
+        is_molecule_types=is_molecule_types,
+        is_molecule_mod=is_molecule_mod,
+        msa=msa,
+        msa_mask=msa_mask,
+        templates=template_feats,
+        template_mask=template_mask,
+        atom_pos=atom_pos,
+        distogram_atom_indices=distogram_atom_indices,
+        molecule_atom_indices=molecule_atom_indices,
+        distance_labels=distance_labels,
+        resolved_labels=resolved_labels,
     )
 
     loss.backward()
@@ -1324,24 +1389,24 @@ def test_readme1():
     # after much training ...
 
     sampled_atom_pos = alphafold3(
-        num_recycling_steps = 4,
-        num_sample_steps = 16,
-        atom_inputs = atom_inputs,
-        atompair_inputs = atompair_inputs,
-        molecule_ids = molecule_ids,
-        molecule_atom_lens = molecule_atom_lens,
-        additional_molecule_feats = additional_molecule_feats,
-        additional_msa_feats = additional_msa_feats,
-        additional_token_feats = additional_token_feats,
-        is_molecule_types = is_molecule_types,
-        is_molecule_mod = is_molecule_mod,
-        msa = msa,
-        msa_mask = msa_mask,
-        templates = template_feats,
-        template_mask = template_mask
+        num_recycling_steps=4,
+        num_sample_steps=16,
+        atom_inputs=atom_inputs,
+        atompair_inputs=atompair_inputs,
+        molecule_ids=molecule_ids,
+        molecule_atom_lens=molecule_atom_lens,
+        additional_molecule_feats=additional_molecule_feats,
+        additional_msa_feats=additional_msa_feats,
+        additional_token_feats=additional_token_feats,
+        is_molecule_types=is_molecule_types,
+        is_molecule_mod=is_molecule_mod,
+        msa=msa,
+        msa_mask=msa_mask,
+        templates=template_feats,
+        template_mask=template_mask,
     )
 
-    sampled_atom_pos.shape # (2, <atom_seqlen>, 3)
+    sampled_atom_pos.shape  # (2, <atom_seqlen>, 3)
     assert sampled_atom_pos.ndim == 3
 
 def test_readme2():
