@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import sh
 from math import pi, sqrt
 from pathlib import Path
@@ -21,7 +22,7 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Any, List, Literal, Tuple, NamedTuple, Dict, Callable
+from typing import Callable, Dict, List, Literal, NamedTuple, Tuple
 
 from alphafold3_pytorch.tensor_typing import (
     Float,
@@ -98,6 +99,7 @@ import tempfile
 """
 global ein notation:
 
+a - number of tokens in a given chain (asym_id)
 b - batch
 ba - batch with augmentation
 bt - batch with templates dimension merged
@@ -2786,6 +2788,7 @@ class ElucidatedAtomDiffusion(Module):
         nucleotide_loss_weight = 5.,
         ligand_loss_weight = 10.,
         return_loss_breakdown = False,
+        single_structure_input=False,
     ) -> ElucidatedAtomDiffusionReturn:
 
         # diffusion loss
@@ -6345,6 +6348,7 @@ class Alphafold3(Module):
     ):
 
         atom_seq_len = atom_inputs.shape[-2]
+        single_structure_input = atom_inputs.shape[0] == 1
 
         # validate atom and atompair input dimensions
 
@@ -6823,6 +6827,7 @@ class Alphafold3(Module):
                 return_denoised_pos = True,
                 nucleotide_loss_weight = self.nucleotide_loss_weight,
                 ligand_loss_weight = self.ligand_loss_weight,
+                single_structure_input = single_structure_input,
             )
 
         # confidence head
