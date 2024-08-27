@@ -65,6 +65,7 @@ $ pip install alphafold3-pytorch
 ```python
 import torch
 from alphafold3_pytorch import Alphafold3
+from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
 
 alphafold3 = Alphafold3(
     dim_atom_inputs = 77,
@@ -74,8 +75,12 @@ alphafold3 = Alphafold3(
 # mock inputs
 
 seq_len = 16
-molecule_atom_lens = torch.randint(1, 3, (2, seq_len))
-atom_seq_len = molecule_atom_lens.sum(dim = -1).amax()
+
+molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+atom_seq_len = molecule_atom_lens.sum(dim=-1).amax()
+atom_offsets = exclusive_cumsum(molecule_atom_lens)
 
 atom_inputs = torch.randn(2, atom_seq_len, 77)
 atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
@@ -98,11 +103,15 @@ additional_msa_feats = torch.randn(2, 7, seq_len, 2)
 
 atom_pos = torch.randn(2, atom_seq_len, 3)
 
-molecule_atom_indices = molecule_atom_lens - 1 # last atom, as an example
-molecule_atom_indices += (molecule_atom_lens.cumsum(dim = -1) - molecule_atom_lens)
+distogram_atom_indices = molecule_atom_lens - 1
 
 distance_labels = torch.randint(0, 37, (2, seq_len, seq_len))
 resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+# offset indices correctly
+
+distogram_atom_indices += atom_offsets
+molecule_atom_indices += atom_offsets
 
 # train
 
@@ -122,6 +131,7 @@ loss = alphafold3(
     templates = template_feats,
     template_mask = template_mask,
     atom_pos = atom_pos,
+    distogram_atom_indices = distogram_atom_indices,
     molecule_atom_indices = molecule_atom_indices,
     distance_labels = distance_labels,
     resolved_labels = resolved_labels
