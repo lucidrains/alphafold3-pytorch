@@ -675,6 +675,13 @@ def test_alphafold3(
 
     resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
 
+    # ensure the asymmetric and entity IDs are consistently ordered and compatible with one another
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 2] = 0
+    additional_molecule_feats[..., additional_molecule_feats.shape[1] // 2 :, 2] = 1
+
+    additional_molecule_feats[..., : additional_molecule_feats.shape[1] // 2, 3] = 0
+
     # offset indices correctly
 
     distogram_atom_indices += atom_offset
