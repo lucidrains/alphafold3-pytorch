@@ -158,6 +158,20 @@ def offset_only_positive(t, offset):
     t_offsetted = t + offset
     return torch.where(is_positive, t_offsetted, t)
 
+@typecheck
+def remove_consecutive_duplicate(
+    t: Int['n ...'],
+    remove_to_value = -1
+) -> Int['n ...']:
+
+    is_duplicate = t[1:] == t[:-1]
+
+    if is_duplicate.ndim == 2:
+        is_duplicate = is_duplicate.all(dim = -1)
+
+    is_duplicate = F.pad(is_duplicate, (1, 0), value = False)
+    return einx.where('n, n ..., -> n ... ', ~is_duplicate, t, remove_to_value)
+
 def compose(*fns: Callable):
     # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
 
@@ -1322,6 +1336,10 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
     atom_indices_for_frame = offset_only_positive(atom_indices_for_frame, atom_indices_offsets[..., None])
 
+    # just use a hack to remove any duplicated indices (ligands and modified biomolecules) in a row
+
+    atom_indices_for_frame = remove_consecutive_duplicate(atom_indices_for_frame)
+
     # handle atom positions
 
     atom_pos = i.atom_pos
@@ -1451,6 +1469,13 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     ss_rnas = list(i.ss_rna)
     ss_dnas = list(i.ss_dna)
 
+    # handle atom positions - need atom positions for deriving frame of ligand for PAE
+
+    atom_pos = i.atom_pos
+
+    if isinstance(atom_pos, list):
+        atom_pos = torch.cat(atom_pos)
+
     # any double stranded nucleic acids is added to single stranded lists with its reverse complement
     # rc stands for reverse complement
 
@@ -1568,12 +1593,31 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     # convert ligands to rdchem.Mol
 
     ligands = list(alphafold3_input.ligands)
+
     mol_ligands = [
         (mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands
     ]
 
     molecule_ids.append(tensor([ligand_id] * len(mol_ligands)))
-    
+
+    # handle frames for the ligands, which depends on knowing the atom positions (section 4.3.2)
+
+    if exists(atom_pos):
+        ligand_atom_pos_offset = 0
+
+        for mol in flatten([*mol_proteins, *mol_ss_rnas, *mol_ss_dnas]):
+            ligand_atom_pos_offset += mol.GetNumAtoms()
+
+        for mol_ligand in mol_ligands:
+            num_ligand_atoms = mol_ligand.GetNumAtoms()
+            ligand_atom_pos = atom_pos[ligand_atom_pos_offset:(ligand_atom_pos_offset + num_ligand_atoms)]
+
+            frames = get_frames_from_atom_pos(ligand_atom_pos, filter_colinear_pos = True)
+
+            atom_indices_for_frame.append(frames.tolist())
+
+            ligand_atom_pos_offset += num_ligand_atoms
+
     # convert metal ions to rdchem.Mol
 
     metal_ions = alphafold3_input.metal_ions
@@ -1759,10 +1803,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     molecule_atom_indices = tensor(molecule_atom_indices)
     molecule_atom_indices = pad_to_len(molecule_atom_indices, num_tokens, value=-1)
-
-    # atom positions
-
-    atom_pos = i.atom_pos
 
     # handle missing atom indices
 
