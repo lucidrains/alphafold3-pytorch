@@ -4,7 +4,7 @@ from typing import Callable, List, Tuple, Union
 import einx
 import torch
 import torch.nn.functional as F
-from einops import pack, rearrange, reduce, repeat, unpack
+from einops import einsum, pack, rearrange, reduce, repeat, unpack
 from torch import Tensor
 from torch.nn import Module
 
@@ -527,6 +527,25 @@ def masked_average(
 
 
 @typecheck
+def remove_consecutive_duplicate(
+    t: Int["n ..."], remove_to_value: int = -1  # type: ignore
+) -> Int["n ..."]:  # type: ignore
+    """Remove consecutive duplicates from a Tensor.
+
+    :param t: The Tensor.
+    :param remove_to_value: The value to remove to.
+    :return: The Tensor with consecutive duplicates removed.
+    """
+    is_duplicate = t[1:] == t[:-1]
+
+    if is_duplicate.ndim == 2:
+        is_duplicate = is_duplicate.all(dim=-1)
+
+    is_duplicate = F.pad(is_duplicate, (1, 0), value=False)
+    return einx.where("n, n ..., -> n ... ", ~is_duplicate, t, remove_to_value)
+
+
+@typecheck
 def calculate_weighted_rigid_align_weights(
     atom_pos_ground_truth: Float["b m 3"],  # type: ignore
     molecule_atom_lens: Int["b n"],  # type: ignore
@@ -600,3 +619,261 @@ def should_checkpoint(
         and any([i.requires_grad for i in inputs])
         and (not exists(check_instance_variable) or getattr(self, check_instance_variable, False))
     )
+
+
+# functions for deriving the frames for ligands
+# this follows the logic from Alphafold3 Supplementary section 4.3.2
+
+
+@typecheck
+def get_indices_three_closest_atom_pos(
+    atom_pos: Float["... n d"],  # type: ignore
+    mask: Bool["... n"] | None = None,  # type: ignore
+) -> Int["... n 3"]:  # type: ignore
+    """Get the indices of the three closest atoms to each atom.
+
+    :param atom_pos: The atom positions.
+    :param mask: The mask to apply.
+    :return: The indices of the three closest atoms to each atom.
+    """
+    prec_dims, device = atom_pos.shape[:-2], atom_pos.device
+    num_atoms, has_batch = atom_pos.shape[-2], atom_pos.ndim == 3
+    batch_size = 1 if not has_batch else atom_pos.shape[0]
+
+    if not exists(mask) and num_atoms < 3:
+        return atom_pos.new_full((*prec_dims, 3), -1).long()
+
+    if not has_batch:
+        atom_pos = rearrange(atom_pos, "... -> 1 ...")
+
+        if exists(mask):
+            mask = rearrange(mask, "... -> 1 ...")
+
+    # figure out which set of atoms are less than 3 for masking out later
+
+    if exists(mask):
+        insufficient_atom_mask = mask.sum(dim=-1, keepdim=True) < 3
+
+    # get distances between all atoms
+
+    atom_dist = torch.cdist(atom_pos, atom_pos)
+
+    # mask out the distance to self
+
+    eye = torch.eye(num_atoms, device=device, dtype=torch.bool)
+
+    mask_value = 1e4
+    atom_dist.masked_fill_(eye, mask_value)
+
+    # take care of padding
+
+    if exists(mask):
+        pair_mask = einx.logical_and("... i, ... j -> ... i j", mask, mask)
+        atom_dist.masked_fill_(~pair_mask, mask_value)
+
+    # will use topk on the negative of the distance
+
+    _, two_closest_atom_indices = (-atom_dist).topk(2, dim=-1)
+
+    # place each atom at the center of its frame
+
+    three_atom_indices, _ = pack(
+        (
+            two_closest_atom_indices[..., 0],
+            torch.arange(num_atoms, device=device).unsqueeze(0).expand(batch_size, -1),
+            two_closest_atom_indices[..., 1],
+        ),
+        "b n *",
+    )
+
+    # mask out
+
+    if exists(mask):
+        three_atom_indices = torch.where(
+            ~insufficient_atom_mask.unsqueeze(-1), three_atom_indices, -1
+        )
+
+    if not has_batch:
+        three_atom_indices = rearrange(three_atom_indices, "1 ... -> ...")
+
+    return three_atom_indices
+
+
+@typecheck
+def get_angle_between_edges(
+    edge1: Float["... n 3"],  # type: ignore
+    edge2: Float["... n 3"],  # type: ignore
+) -> Float["... n"]:  # type: ignore
+    """Get the angles between two edges for each node.
+
+    :param edge1: The first edge.
+    :param edge2: The second edge.
+    :return: The angles between the two edges for each node.
+    """
+    cos = (l2norm(edge1) * l2norm(edge2)).sum(-1)
+    return torch.acos(cos)
+
+
+@typecheck
+def get_frames_from_atom_pos(
+    atom_pos: Float["... n d"],  # type: ignore
+    mask: Bool["... n"] | None = None,  # type: ignore
+    filter_colinear_pos: bool = False,
+    is_colinear_angle_thres: float = 25.0,  # NOTE: DM uses 25 degrees as a way of filtering out invalid frames
+) -> Int["... n 3"]:  # type: ignore
+    """Get the nearest neighbor frames for all atom positions.
+
+    :param atom_pos: The atom positions.
+    :param filter_colinear_pos: Whether to filter colinear positions.
+    :param is_colinear_angle_thres: The colinear angle threshold.
+    :return: The frames for all atoms.
+    """
+    frames = get_indices_three_closest_atom_pos(atom_pos, mask=mask)
+
+    if not filter_colinear_pos:
+        return frames
+
+    is_invalid = (frames == -1).any(dim=-1)
+
+    # get the edges and derive angles
+
+    three_atom_pos = torch.cat(
+        [
+            einx.get_at("... [m] c, ... three -> ... three c", atom_pos, frame).unsqueeze(-3)
+            for frame in frames.unbind(dim=-2)
+        ],
+        dim=-3,
+    )
+
+    left_pos, center_pos, right_pos = three_atom_pos.unbind(dim=-2)
+
+    edges1, edges2 = (left_pos - center_pos), (right_pos - center_pos)
+
+    angle = get_angle_between_edges(edges1, edges2)
+
+    degree = torch.rad2deg(angle)
+
+    is_colinear = (degree.abs() < is_colinear_angle_thres) | (
+        (180.0 - degree.abs()).abs() < is_colinear_angle_thres
+    )
+
+    # set any three atoms that are colinear to -1 indices
+
+    three_atom_indices = einx.where(
+        "..., ... three, -> ... three", ~(is_colinear | is_invalid), frames, -1
+    )
+    return three_atom_indices
+
+
+# modules for handling frames
+
+
+class ExpressCoordinatesInFrame(Module):
+    """Algorithm 29."""
+
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.eps = eps
+
+    @typecheck
+    def forward(
+        self,
+        coords: Float["b m 3"],  # type: ignore
+        frame: Float["b m 3 3"] | Float["b 3 3"] | Float["3 3"],  # type: ignore
+        pairwise: bool = False,
+    ) -> Float["b m 3"] | Float["b m m 3"]:  # type: ignore
+        """Express coordinates in the given frame.
+
+        :param coords: Coordinates to be expressed in the given frame.
+        :param frame: Frames defined by three points.
+        :return: The transformed coordinates or pairwise coordinates.
+        """
+
+        if frame.ndim == 2:
+            frame = rearrange(frame, "fr fc -> 1 1 fr fc")
+        elif frame.ndim == 3:
+            frame = rearrange(frame, "b fr fc -> b 1 fr fc")
+
+        # Extract frame atoms
+        a, b, c = frame.unbind(dim=-1)
+        w1 = l2norm(a - b, eps=self.eps)
+        w2 = l2norm(c - b, eps=self.eps)
+
+        # Build orthonormal basis
+        e1 = l2norm(w1 + w2, eps=self.eps)
+        e2 = l2norm(w2 - w1, eps=self.eps)
+        e3 = torch.cross(e1, e2, dim=-1)
+
+        if pairwise:
+            # Compute pairwise displacement vectors
+            pairwise_d = coords.unsqueeze(2) - coords.unsqueeze(1)
+
+            # Project onto frame basis
+            pairwise_transformed_coords = torch.stack(
+                (
+                    einsum(pairwise_d, e1.unsqueeze(1), "... i, ... i -> ..."),
+                    einsum(pairwise_d, e2.unsqueeze(1), "... i, ... i -> ..."),
+                    einsum(pairwise_d, e3.unsqueeze(1), "... i, ... i -> ..."),
+                ),
+                dim=-1,
+            )
+
+            # Normalize to get unit vectors
+            pairwise_transformed_coords = l2norm(pairwise_transformed_coords, eps=self.eps)
+            return pairwise_transformed_coords
+
+        else:
+            # Project onto frame basis
+            d = coords - b
+
+            transformed_coords = torch.stack(
+                (
+                    einsum(d, e1, "... i, ... i -> ..."),
+                    einsum(d, e2, "... i, ... i -> ..."),
+                    einsum(d, e3, "... i, ... i -> ..."),
+                ),
+                dim=-1,
+            )
+
+            return transformed_coords
+
+
+class RigidFrom3Points(Module):
+    """An implementation of Algorithm 21 in Section 1.8.1 in AlphaFold 2 paper:
+
+    https://www.nature.com/articles/s41586-021-03819-2
+    """
+
+    @typecheck
+    def forward(
+        self,
+        three_points: Tuple[Float["... 3"], Float["... 3"], Float["... 3"]] | Float["3 ... 3"],  # type: ignore
+    ) -> Tuple[Float["... 3 3"], Float["... 3"]]:  # type: ignore
+        """Compute a rigid transformation from three points."""
+        if isinstance(three_points, tuple):
+            three_points = torch.stack(three_points)
+
+        # allow for any number of leading dimensions
+
+        (x1, x2, x3), unpack_one = pack_one(three_points, "three * d")
+
+        # main algorithm
+
+        v1 = x3 - x2
+        v2 = x1 - x2
+
+        e1 = l2norm(v1)
+        u2 = v2 - e1 @ (e1.t() @ v2)
+        e2 = l2norm(u2)
+
+        e3 = torch.cross(e1, e2, dim=-1)
+
+        R = torch.stack((e1, e2, e3), dim=-1)
+        t = x2
+
+        # unpack
+
+        R = unpack_one(R, "* r1 r2")
+        t = unpack_one(t, "* c")
+
+        return R, t
