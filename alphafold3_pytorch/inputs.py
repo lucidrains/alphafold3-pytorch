@@ -45,7 +45,8 @@ from alphafold3_pytorch.data.data_pipeline import (
     make_msa_mask,
     make_template_features,
 )
-from alphafold3_pytorch.data.life import (
+from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
+from alphafold3_pytorch.life import (
     ATOM_BONDS,
     ATOMS,
     DNA_NUCLEOTIDES,
@@ -56,7 +57,6 @@ from alphafold3_pytorch.data.life import (
     reverse_complement,
     reverse_complement_tensor,
 )
-from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
 from alphafold3_pytorch.utils.data_utils import (
     PDB_INPUT_RESIDUE_MOLECULE_TYPE,
     extract_mmcif_metadata_field,
