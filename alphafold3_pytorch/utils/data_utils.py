@@ -214,7 +214,8 @@ def extract_mmcif_metadata_field(
         metadata_field == "release_date"
         and "_pdbx_audit_revision_history.revision_date" in mmcif_object.raw_string
     ):
-        return mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"]
+        # Return the earliest release date
+        return min(mmcif_object.raw_string["_pdbx_audit_revision_history.revision_date"])
 
     # Extract resolution
     if metadata_field == "resolution" and "_refine.ls_d_res_high" in mmcif_object.raw_string:
