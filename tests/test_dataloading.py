@@ -43,7 +43,7 @@ def test_data_input():
         dim_atom_inputs=3,
         dim_atompair_inputs=5,
         atoms_per_window=27,
-        dim_template_feats=44,
+        dim_template_feats=108,
         num_dist_bins=38,
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
