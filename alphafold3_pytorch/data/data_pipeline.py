@@ -5,6 +5,7 @@ from typing import Dict, List, MutableMapping, Optional, Tuple
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor
 
@@ -15,6 +16,11 @@ from alphafold3_pytorch.common.biomolecule import (
     to_mmcif,
 )
 from alphafold3_pytorch.data import mmcif_parsing, msa_parsing
+from alphafold3_pytorch.data.kalign import _realign_pdb_template_to_query
+from alphafold3_pytorch.data.template_parsing import (
+    TEMPLATE_TYPE,
+    _extract_template_features,
+)
 from alphafold3_pytorch.tensor_typing import typecheck
 from alphafold3_pytorch.utils.utils import exists
 
@@ -194,6 +200,277 @@ def make_msa_features(
         "deletion_matrix": torch.cat(deletion_matrix_list, dim=-1),
         "msa_species_identifiers": np.stack(species_ids_list),
         "num_alignments": max_alignments,
+    }
+    return features
+
+
+@typecheck
+def make_template_features(
+    templates: Dict[str, List[Tuple[Biomolecule, TEMPLATE_TYPE]]],
+    chain_id_to_residue: Dict[str, Dict[str, List[int]]],
+    num_templates: int | None = None,
+    kalign_binary_path: str | None = None,
+    unknown_restype: int = 20,
+    num_restype_classes: int = 32,
+    num_distogram_bins: int = 39,
+    raise_missing_exception: bool = False,
+    verbose: bool = False,
+) -> FeatureDict:
+    """Construct a feature dictionary of template features.
+
+    :param templates: The mapping of chain IDs to lists of template Biomolecule objects and their
+        template types.
+    :param chain_id_to_residue: The mapping of chain IDs to residue information.
+    :param num_templates: The (optional) number of templates to return per chain.
+    :param kalign_binary_path: The path to a local Kalign2 executable.
+    :param unknown_restype: The unknown residue type index.
+    :param num_restype_classes: The number of classes in the residue type classification.
+    :param num_distogram_bins: The number of bins in the distogram features.
+    :param raise_missing_exception: Whether to raise an exception if no templates are provided.
+    :param verbose: Whether to log verbose output.
+    :return: The template feature dictionary.
+    """
+
+    if exists(num_templates) and num_templates < 1:
+        raise ValueError("The requested number of templates must be greater than zero.")
+
+    # Infer template metadata.
+    max_templates = num_templates if exists(num_templates) else 1
+    for template in templates.values():
+        if exists(template) and len(template):
+            max_templates = max(max_templates, len(template))
+
+    # Collect templates.
+    template_restype_list = []
+    template_pseudo_beta_mask_list = []
+    template_backbone_frame_mask_list = []
+    template_distogram_list = []
+    template_unit_vector_list = []
+    chain_index_list = []
+
+    template_mask = torch.zeros(max_templates, dtype=torch.bool)
+
+    for chain_index, (chain_id, template) in enumerate(templates.items()):
+        chain_chemtype = chain_id_to_residue[chain_id]["chemtype"]
+        chain_restype = chain_id_to_residue[chain_id]["restype"]
+        chain_residue_index = chain_id_to_residue[chain_id]["residue_index"]
+
+        # Map the chain's residue types to its query sequence.
+        query_sequence = []
+        for chemtype, restype in zip(chain_chemtype, chain_restype):
+            chem_residue_constants = get_residue_constants(res_chem_index=chemtype)
+            query_sequence.append(
+                "X"
+                if restype - chem_residue_constants.min_restype_num
+                >= len(chem_residue_constants.restypes)
+                else chem_residue_constants.restypes[
+                    restype - chem_residue_constants.min_restype_num
+                ]
+            )
+        query_sequence = "".join(query_sequence)
+
+        num_res = len(chain_chemtype)
+        assert num_res == len(chain_residue_index), (
+            f"Residue features count mismatch for chain {chain_id}: "
+            f"{num_res} != {len(chain_residue_index)}"
+        )
+
+        template_restype_list.append(
+            F.one_hot(
+                torch.full((max_templates, num_res), unknown_restype, dtype=torch.long),
+                num_classes=num_restype_classes,
+            )
+        )
+        template_pseudo_beta_mask_list.append(
+            torch.zeros((max_templates, num_res), dtype=torch.bool)
+        )
+        template_backbone_frame_mask_list.append(
+            torch.zeros((max_templates, num_res), dtype=torch.bool)
+        )
+        template_distogram_list.append(
+            torch.zeros(
+                (max_templates, num_res, num_res, num_distogram_bins),
+                dtype=torch.float32,
+            )
+        )
+        template_unit_vector_list.append(
+            torch.zeros((max_templates, num_res, num_res, 3), dtype=torch.float32)
+        )
+        chain_index_list.append(torch.full((max_templates, num_res), chain_index))
+
+        if not templates[chain_id] or not exists(kalign_binary_path):
+            if raise_missing_exception:
+                raise ValueError(
+                    f"Templates for chain {chain_id} must contain at least one template and must be aligned with Kalign2."
+                )
+            continue
+
+        for template_index, (template_biomol, template_type) in enumerate(template):
+            template_chain_ids = list(
+                dict.fromkeys(template_biomol.chain_id.tolist())
+            )  # NOTE: we must maintain the order of unique chain IDs
+            assert (
+                len(template_chain_ids) == 1
+            ), f"Template Biomolecule for chain {chain_id} must contain exactly one chain."
+            template_chain_id = template_chain_ids[0]
+
+            template_chain_chemtype = template_biomol.chemtype[
+                template_biomol.chain_id == template_chain_id
+            ].tolist()
+            template_chain_restype = template_biomol.restype[
+                template_biomol.chain_id == template_chain_id
+            ].tolist()
+
+            # Map the template chain's residue types to its target sequence.
+            template_sequence = []
+            for template_chemtype, template_restype in zip(
+                template_chain_chemtype, template_chain_restype
+            ):
+                template_chem_residue_constants = get_residue_constants(
+                    res_chem_index=template_chemtype
+                )
+                template_sequence.append(
+                    "X"
+                    if template_restype - template_chem_residue_constants.min_restype_num
+                    >= len(template_chem_residue_constants.restypes)
+                    else template_chem_residue_constants.restypes[
+                        template_restype - template_chem_residue_constants.min_restype_num
+                    ]
+                )
+            template_sequence = "".join(template_sequence)
+
+            try:
+                # Use Kalign to align the query and target sequences.
+                mapping = {
+                    x: x for x, curr_char in enumerate(query_sequence) if curr_char.isalnum()
+                }
+                realigned_template_sequence, realigned_mapping = _realign_pdb_template_to_query(
+                    query_sequence=query_sequence,
+                    template_sequence=template_sequence,
+                    old_mapping=mapping,
+                    kalign_binary_path=kalign_binary_path,
+                    template_type=template_type,
+                )
+
+                # Extract features from aligned template.
+                template_features = _extract_template_features(
+                    template_biomol=template_biomol,
+                    mapping=realigned_mapping,
+                    template_sequence=realigned_template_sequence,
+                    query_sequence=query_sequence,
+                    query_chemtype=chain_chemtype,
+                    num_restype_classes=num_restype_classes,
+                    num_distogram_bins=num_distogram_bins,
+                )
+
+                template_restype_list[chain_index][template_index] = template_features[
+                    "template_restype"
+                ]
+                template_pseudo_beta_mask_list[chain_index][template_index] = template_features[
+                    "template_pseudo_beta_mask"
+                ]
+                template_backbone_frame_mask_list[chain_index][template_index] = template_features[
+                    "template_backbone_frame_mask"
+                ]
+                template_distogram_list[chain_index][template_index] = template_features[
+                    "template_distogram"
+                ]
+                template_unit_vector_list[chain_index][template_index] = template_features[
+                    "template_unit_vector"
+                ]
+                template_mask[template_index] = True
+
+            except Exception as e:
+                if verbose:
+                    logger.warning(
+                        f"Skipping extraction of template features for chain {chain_id} due to: {e}"
+                    )
+
+                template_restype_list[chain_index][template_index] = F.one_hot(
+                    torch.full((num_res,), unknown_restype, dtype=torch.long),
+                    num_classes=num_restype_classes,
+                )
+                template_pseudo_beta_mask_list[chain_index][template_index] = torch.zeros(
+                    num_res, dtype=torch.bool
+                )
+                template_backbone_frame_mask_list[chain_index][template_index] = torch.zeros(
+                    num_res, dtype=torch.bool
+                )
+                template_distogram_list[chain_index][template_index] = torch.zeros(
+                    (num_res, num_res, num_distogram_bins), dtype=torch.float32
+                )
+                template_unit_vector_list[chain_index][template_index] = torch.zeros(
+                    (num_res, num_res, 3), dtype=torch.float32
+                )
+
+    # NOTE: Following AF3 Supplement, Section 2.4, the pairwise distogram and
+    # unit vector features do not contain inter-chain interaction information.
+
+    # Initialize an empty list to store the block_diag results.
+    block_diag_distograms = []
+    block_diag_unit_vectors = []
+
+    # Loop over the first dimension (templates dimension).
+    for i in range(max_templates):
+        # Initialize an empty list to store each 2D block-diagonal matrix for distograms and unit vectors.
+        distogram_blocks = []
+        unit_vector_blocks = []
+
+        # Loop over the last dimension (channels).
+        for j in range(num_distogram_bins):
+            # Extract the 2D slice and apply `block_diag()`.
+            distogram_blocks.append(
+                torch.block_diag(*[c[i, :, :, j] for c in template_distogram_list])
+            )
+            if j < 3:
+                unit_vector_blocks.append(
+                    torch.block_diag(*[c[i, :, :, j] for c in template_unit_vector_list])
+                )
+
+        # Stack along the third dimension (residues) and append to the list.
+        block_diag_distograms.append(torch.stack(distogram_blocks, dim=-1))
+        block_diag_unit_vectors.append(torch.stack(unit_vector_blocks, dim=-1))
+
+    # Finalize template features by assembling each of them into a pairwise representation.
+    template_backbone_frame_masks = torch.cat(template_backbone_frame_mask_list, dim=1)
+    template_pseudo_beta_masks = torch.cat(template_pseudo_beta_mask_list, dim=1)
+    template_distograms = torch.stack(block_diag_distograms, dim=0)
+    template_unit_vectors = torch.stack(block_diag_unit_vectors, dim=0)
+    template_restypes = torch.cat(template_restype_list, dim=1).float()
+    chain_indices = torch.cat(chain_index_list, dim=1)
+
+    template_backbone_pairwise_frame_masks = template_backbone_frame_masks.unsqueeze(
+        1
+    ) * template_backbone_frame_masks.unsqueeze(2)
+    template_pseudo_beta_pairwise_masks = template_pseudo_beta_masks.unsqueeze(
+        1
+    ) * template_pseudo_beta_masks.unsqueeze(2)
+
+    templates = torch.cat(
+        (
+            template_distograms,
+            template_backbone_pairwise_frame_masks.unsqueeze(-1),
+            template_unit_vectors,
+            template_pseudo_beta_pairwise_masks.unsqueeze(-1),
+        ),
+        dim=-1,
+    )
+
+    is_same_chain = chain_indices.unsqueeze(1) == chain_indices.unsqueeze(2)
+    templates *= is_same_chain.unsqueeze(-1)
+
+    templates = torch.cat(
+        (
+            templates,
+            template_restypes.unsqueeze(-3).expand(-1, template_restypes.shape[-2], -1, -1),
+            template_restypes.unsqueeze(-2).expand(-1, -1, template_restypes.shape[-2], -1),
+        ),
+        dim=-1,
+    )
+
+    features = {
+        "templates": templates,
+        "template_mask": template_mask,
     }
     return features
 
