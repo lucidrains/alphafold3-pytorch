@@ -70,6 +70,8 @@ from alphafold3_pytorch.common.biomolecule import (
 )
 
 from alphafold3_pytorch.utils.model_utils import (
+    ExpressCoordinatesInFrame,
+    RigidFrom3Points,
     calculate_weighted_rigid_align_weights,
 )
 
@@ -3899,93 +3901,6 @@ class MultiChainPermutationAlignment(Module):
         permuted_true_coords = labels["true_coords"].detach()
         return permuted_true_coords
 
-class ExpressCoordinatesInFrame(Module):
-    """ Algorithm  29 """
-
-    def __init__(
-        self,
-        eps = 1e-8
-    ):
-        super().__init__()
-        self.eps = eps
-
-    @typecheck
-    def forward(
-        self,
-        coords: Float['b m 3'],
-        frame: Float['b m 3 3'] | Float['b 3 3'] | Float['3 3']
-    ) -> Float['b m 3']:
-        """
-        coords: coordinates to be expressed in the given frame
-        frame: frame defined by three points
-        """
-
-        if frame.ndim == 2:
-            frame = rearrange(frame, 'fr fc -> 1 1 fr fc')
-        elif frame.ndim == 3:
-            frame = rearrange(frame, 'b fr fc -> b 1 fr fc')
-
-        # Extract frame atoms
-        a, b, c = frame.unbind(dim=-1)
-        w1 = l2norm(a - b, eps=self.eps)
-        w2 = l2norm(c - b, eps=self.eps)
-
-        # Build orthonormal basis
-        e1 = l2norm(w1 + w2, eps=self.eps)
-        e2 = l2norm(w2 - w1, eps=self.eps)
-        e3 = torch.cross(e1, e2, dim=-1)
-
-        # Project onto frame basis
-        d = coords - b
-
-        transformed_coords = torch.stack((
-            einsum(d, e1, '... i, ... i -> ...'),
-            einsum(d, e2, '... i, ... i -> ...'),
-            einsum(d, e3, '... i, ... i -> ...'),
-        ), dim=-1)
-
-        return transformed_coords
-
-class RigidFrom3Points(Module):
-    """
-    Algorithm 21 in Section 1.8.1 in Alphafold2 paper
-    https://www.nature.com/articles/s41586-021-03819-2
-    """
-
-    @typecheck
-    def forward(
-        self,
-        three_points: Tuple[Float['... 3'], Float['... 3'], Float['... 3']] | Float['3 ... 3']
-    ) -> Tuple[Float['... 3 3'], Float['... 3']]:
-
-        if isinstance(three_points, tuple):
-            three_points = torch.stack(three_points)
-
-        # allow for any number of leading dimensions
-
-        (x1, x2, x3), unpack_one = pack_one(three_points, 'three * d')
-
-        # main algorithm
-
-        v1 = x3 - x2
-        v2 = x1 - x2
-
-        e1 = l2norm(v1)
-        u2 = v2 - e1 @ (e1.t() @ v2)
-        e2 = l2norm(u2)
-
-        e3 = torch.cross(e1, e2, dim = -1)
-
-        R = torch.stack((e1, e2, e3), dim = -1)
-        t = x2
-
-        # unpack
-
-        R = unpack_one(R, '* r1 r2')
-        t = unpack_one(t, '* c')
-
-        return R, t
-
 class ComputeAlignmentError(Module):
     """ Algorithm 30 """
 
@@ -6364,7 +6279,16 @@ class Alphafold3(Module):
         if hard_debug:
             maybe(hard_validate_atom_indices_ascending)(distogram_atom_indices, 'distogram_atom_indices')
             maybe(hard_validate_atom_indices_ascending)(molecule_atom_indices, 'molecule_atom_indices')
-            maybe(hard_validate_atom_indices_ascending)(atom_indices_for_frame, 'atom_indices_for_frame')
+
+            is_biomolecule = ~(
+                (~is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1))
+                | (exists(is_molecule_mod) and is_molecule_mod.any(dim=-1))
+            )
+            maybe(hard_validate_atom_indices_ascending)(
+                atom_indices_for_frame,
+                'atom_indices_for_frame',
+                mask=is_biomolecule,
+            )
 
         # soft validate
 
@@ -6505,11 +6429,6 @@ class Alphafold3(Module):
         mask = molecule_atom_lens > 0
         pairwise_mask = to_pairwise_mask(mask)
 
-        # prepare mask for msa module and template embedder
-        # which is equivalent to the `is_protein` of the `is_molecular_types` input
-
-        is_protein_mask = is_molecule_types[..., IS_PROTEIN_INDEX]
-
         # init recycled single and pairwise
 
         detach_when_recycling = default(detach_when_recycling, self.detach_when_recycling)
@@ -6546,7 +6465,6 @@ class Alphafold3(Module):
                     templates = templates,
                     template_mask = template_mask,
                     pairwise_repr = pairwise,
-                    mask = is_protein_mask
                 )
 
                 pairwise = embedded_template + pairwise
@@ -6558,7 +6476,6 @@ class Alphafold3(Module):
                     msa = msa,
                     single_repr = single,
                     pairwise_repr = pairwise,
-                    mask = is_protein_mask,
                     msa_mask = msa_mask,
                     additional_msa_feats = additional_msa_feats
                 )
@@ -6961,12 +6878,9 @@ class Alphafold3(Module):
                 pred_frames, _ = self.rigid_from_three_points(pred_three_atoms)
 
                 # determine mask
-                # must be residue or nucleotide with greater than 0 atoms
+                # must be amino acid, nucleotide, or ligand with greater than 0 atoms
 
-                align_error_mask = (
-                    is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
-                    & valid_atom_indices_for_frame
-                )
+                align_error_mask = valid_atom_indices_for_frame
 
                 # align error
 
@@ -6982,7 +6896,7 @@ class Alphafold3(Module):
 
                 pae_labels = distance_to_bins(align_error, self.pae_bins)
 
-                # set ignore index for invalid molecules or frames (TODO: figure out what is meant by invalid frame)
+                # set ignore index for invalid molecules or frames
 
                 pair_align_error_mask = to_pairwise_mask(align_error_mask)
 
