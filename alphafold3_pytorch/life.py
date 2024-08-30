@@ -323,6 +323,20 @@ RNA_NUCLEOTIDES = dict(
     ),
 )
 
+# ligands
+
+LIGANDS = dict(
+    X=dict(
+        resname="UNK",
+        smile=".",
+        first_atom_idx=0,
+        last_atom_idx=0,
+        distogram_atom_idx=0,
+        token_center_atom_idx=0,
+        three_atom_indices_for_frame=None,
+    )
+)
+
 # complements in tensor form, following the ordering ACG(T|U)N
 
 NUCLEIC_ACID_COMPLEMENT_TENSOR = torch.tensor([3, 2, 1, 0, 4], dtype=torch.long)

@@ -66,7 +66,7 @@ class MockAtomDataset(Dataset):
         molecule_ids = torch.randint(0, 32, (seq_len,))
         token_bonds = torch.randint(0, 2, (seq_len, seq_len)).bool()
 
-        templates = torch.randn(2, seq_len, seq_len, 44)
+        templates = torch.randn(2, seq_len, seq_len, 108)
         template_mask = torch.ones((2,)).bool()
 
         msa = torch.randn(7, seq_len, 32)

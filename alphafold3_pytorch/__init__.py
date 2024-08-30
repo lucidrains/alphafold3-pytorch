@@ -9,8 +9,6 @@ from alphafold3_pytorch.alphafold3 import (
     SmoothLDDTLoss,
     WeightedRigidAlign,
     MultiChainPermutationAlignment,
-    ExpressCoordinatesInFrame,
-    RigidFrom3Points,
     ComputeAlignmentError,
     CentreRandomAugmentation,
     TemplateEmbedder,
@@ -69,6 +67,10 @@ from alphafold3_pytorch.configs import (
     create_alphafold3_from_yaml,
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml
+)
+from alphafold3_pytorch.utils.model_utils import (
+    ExpressCoordinatesInFrame,
+    RigidFrom3Points,
 )
 
 __all__ = [

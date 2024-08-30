@@ -4,35 +4,32 @@ import copy
 import glob
 import json
 import os
-from pathlib import Path
-from functools import partial, wraps
-from itertools import groupby
 from collections import defaultdict
 from collections.abc import Iterable
+from contextlib import redirect_stderr
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from functools import partial
+from io import StringIO
+from itertools import groupby
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
 import einx
-from einops import pack, rearrange
-
 import numpy as np
-from numpy.lib.format import open_memmap
-
 import torch
-from torch.utils.data import Dataset
 import torch.nn.functional as F
-from torch import tensor, repeat_interleave
-from torch.nn.utils.rnn import pad_sequence
-
-from loguru import logger
+from einops import pack, rearrange
 from joblib import Parallel, delayed
-
+from loguru import logger
 from pdbeccdutils.core import ccd_reader
-
 from rdkit import Chem, RDLogger, rdBase
 from rdkit.Chem import AllChem, rdDetermineBonds
 from rdkit.Chem.rdchem import Atom, Mol
 from rdkit.Geometry import Point3D
+from torch import repeat_interleave, tensor
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Dataset
 
 from alphafold3_pytorch.common import amino_acid_constants, dna_constants, rna_constants
 from alphafold3_pytorch.common.biomolecule import (
@@ -40,15 +37,15 @@ from alphafold3_pytorch.common.biomolecule import (
     _from_mmcif_object,
     get_residue_constants,
 )
-from alphafold3_pytorch.data import mmcif_parsing, msa_parsing
+from alphafold3_pytorch.data import mmcif_parsing, msa_parsing, template_parsing
 from alphafold3_pytorch.data.data_pipeline import (
     FeatureDict,
     get_assembly,
     make_msa_features,
     make_msa_mask,
+    make_template_features,
 )
 from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
-
 from alphafold3_pytorch.life import (
     ATOM_BONDS,
     ATOMS,
@@ -60,8 +57,6 @@ from alphafold3_pytorch.life import (
     reverse_complement,
     reverse_complement_tensor,
 )
-
-from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.data_utils import (
     PDB_INPUT_RESIDUE_MOLECULE_TYPE,
     extract_mmcif_metadata_field,
@@ -71,7 +66,14 @@ from alphafold3_pytorch.utils.data_utils import (
     is_polymer,
     make_one_hot,
 )
-from alphafold3_pytorch.utils.model_utils import exclusive_cumsum
+from alphafold3_pytorch.utils.model_utils import (
+    exclusive_cumsum,
+    get_frames_from_atom_pos,
+    maybe,
+    offset_only_positive,
+    remove_consecutive_duplicate,
+)
+from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.utils import default, exists, first
 
 # silence RDKit's warnings
@@ -108,29 +110,29 @@ NUM_MSA_ONE_HOT = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEO
 DEFAULT_NUM_MOLECULE_MODS = 4  # `mod_protein`, `mod_rna`, `mod_dna`, and `mod_unk`
 ADDITIONAL_MOLECULE_FEATS = 5
 
-CCD_COMPONENTS_FILEPATH = os.path.join('data', 'ccd_data', 'components.cif')
-CCD_COMPONENTS_SMILES_FILEPATH = os.path.join('data', 'ccd_data', 'components_smiles.json')
+CCD_COMPONENTS_FILEPATH = os.path.join("data", "ccd_data", "components.cif")
+CCD_COMPONENTS_SMILES_FILEPATH = os.path.join("data", "ccd_data", "components_smiles.json")
 
 # load all SMILES strings in the PDB Chemical Component Dictionary (CCD)
 
 CCD_COMPONENTS_SMILES = None
 
 if os.path.exists(CCD_COMPONENTS_SMILES_FILEPATH):
-    print(f'Loading CCD component SMILES strings from {CCD_COMPONENTS_SMILES_FILEPATH}.')
+    print(f"Loading CCD component SMILES strings from {CCD_COMPONENTS_SMILES_FILEPATH}.")
     with open(CCD_COMPONENTS_SMILES_FILEPATH) as f:
         CCD_COMPONENTS_SMILES = json.load(f)
 elif os.path.exists(CCD_COMPONENTS_FILEPATH):
     print(
-        f'Loading CCD components from {CCD_COMPONENTS_FILEPATH} to extract all available SMILES strings (~3 minutes, one-time only).'
+        f"Loading CCD components from {CCD_COMPONENTS_FILEPATH} to extract all available SMILES strings (~3 minutes, one-time only)."
     )
     CCD_COMPONENTS = ccd_reader.read_pdb_components_file(
         CCD_COMPONENTS_FILEPATH,
         sanitize=False,  # Reduce loading time
     )
     print(
-        f'Saving CCD component SMILES strings to {CCD_COMPONENTS_SMILES_FILEPATH} (one-time only).'
+        f"Saving CCD component SMILES strings to {CCD_COMPONENTS_SMILES_FILEPATH} (one-time only)."
     )
-    with open(CCD_COMPONENTS_SMILES_FILEPATH, 'w') as f:
+    with open(CCD_COMPONENTS_SMILES_FILEPATH, "w") as f:
         CCD_COMPONENTS_SMILES = {
             ccd_code: Chem.MolToSmiles(CCD_COMPONENTS[ccd_code].component.mol_no_h)
             for ccd_code in CCD_COMPONENTS
@@ -139,333 +141,222 @@ elif os.path.exists(CCD_COMPONENTS_FILEPATH):
 
 # functions
 
-def l2norm(t):
-    return F.normalize(t, dim = -1)
 
 def flatten(arr):
+    """Flatten a list of lists."""
     return [el for sub_arr in arr for el in sub_arr]
 
+
 def without_keys(d: dict, exclude: set):
+    """Remove keys from a dictionary."""
     return {k: v for k, v in d.items() if k not in exclude}
 
-def pad_to_len(t, length, value = 0, dim = -1):
+
+def pad_to_len(t, length, value=0, dim=-1):
+    """Pad a tensor to a certain length."""
     assert dim < 0
     zeros = (0, 0) * (-dim - 1)
-    return F.pad(t, (*zeros, 0, max(0, length - t.shape[dim])), value = value)
+    return F.pad(t, (*zeros, 0, max(0, length - t.shape[dim])), value=value)
 
-def offset_only_positive(t, offset):
-    is_positive = t >= 0
-    t_offsetted = t + offset
-    return torch.where(is_positive, t_offsetted, t)
-
-@typecheck
-def remove_consecutive_duplicate(
-    t: Int['n ...'],
-    remove_to_value = -1
-) -> Int['n ...']:
-
-    is_duplicate = t[1:] == t[:-1]
-
-    if is_duplicate.ndim == 2:
-        is_duplicate = is_duplicate.all(dim = -1)
-
-    is_duplicate = F.pad(is_duplicate, (1, 0), value = False)
-    return einx.where('n, n ..., -> n ... ', ~is_duplicate, t, remove_to_value)
 
 def compose(*fns: Callable):
-    # for chaining from Alphafold3Input -> MoleculeInput -> AtomInput
+    """Chain e.g., from Alphafold3Input -> MoleculeInput -> AtomInput."""
 
     def inner(x, *args, **kwargs):
+        """Compose the functions."""
         for fn in fns:
             x = fn(x, *args, **kwargs)
         return x
+
     return inner
 
-def maybe(fn):
-    @wraps(fn)
-    def inner(x, *args, **kwargs):
-        if not exists(x):
-            return x
-        return fn(x, *args, **kwargs)
-    return inner
 
 # validation functions
 
+
 def hard_validate_atom_indices_ascending(
-    indices: Int['b n'] | Int['b n 3'],
-    error_msg_field: str = 'indices'
+    indices: Int["b n"] | Int["b n 3"], error_msg_field: str = "indices", mask: Bool["b n"] | None = None  # type: ignore
 ):
-    # will do a hard validate
-    # asserting if any of the indices that are not -1 (missing) are identical or descending
-    # this will cover 'distogram_atom_indices', 'molecule_atom_indices', and 'atom_indices_for_frame'
+    """Perform a hard validation on atom indices to ensure they are ascending. The function asserts
+    if any of the indices that are not -1 (missing) are identical or descending. This will cover
+    'distogram_atom_indices', 'molecule_atom_indices', and 'atom_indices_for_frame'.
+
+    :param indices: The indices to validate.
+    :param error_msg_field: The error message field.
+    :param mask: The mask to apply to the indices. Note that, when a mask is specified, only masked
+        values are expected to be ascending.
+    """
 
     if indices.ndim == 2:
-        indices = rearrange(indices, '... -> ... 1')
+        indices = rearrange(indices, "... -> ... 1")
 
     for batch_index, sample_indices in enumerate(indices):
+        if exists(mask):
+            sample_indices = sample_indices[mask[batch_index]]
 
-        all_present = (sample_indices >= 0).all(dim = -1)
+        all_present = (sample_indices >= 0).all(dim=-1)
         present_indices = sample_indices[all_present]
 
-        # relaxed assumption that if all -1 or only one molecule, it passes the test
+        # NOTE: this is a relaxed assumption, i.e., that if all -1 or only one molecule, then it passes the test
 
         if present_indices.numel() <= 1:
             continue
 
-        difference = einx.subtract('n i, n j -> n (i j)', present_indices[1:], present_indices[:-1])
+        difference = einx.subtract(
+            "n i, n j -> n (i j)", present_indices[1:], present_indices[:-1]
+        )
 
-        assert (difference >= 0).all(), f'detected invalid {error_msg_field} for in a batch: {present_indices}'
+        assert (
+            difference >= 0
+        ).all(), f"Detected invalid {error_msg_field} for a batch: {present_indices}"
 
-# functions for deriving the frames for ligands
-# this follows the logic from Alphafold3 Supplementary section 4.3.2
-
-@typecheck
-def get_indices_three_closest_atom_pos(
-    atom_pos: Float['... n d'],
-    mask: Bool['... n'] | None = None
-) -> Int['... 3']:
-
-    prec_dims, device = atom_pos.shape[:-2], atom_pos.device
-    num_atoms, has_batch = atom_pos.shape[-2], atom_pos.ndim == 3
-
-    if not exists(mask) and num_atoms < 3:
-        return atom_pos.new_full((*prec_dims, 3), -1).long()
-
-    if not has_batch:
-        atom_pos = rearrange(atom_pos, '... -> 1 ...')
-
-        if exists(mask):
-            mask = rearrange(mask, '... -> 1 ...')
-
-    # figure out which set of atoms are less than 3 for masking out later
-
-    if exists(mask):
-        insufficient_atom_mask = mask.sum(dim = -1) < 3
-
-    # get distances between all atoms
-
-    atom_dist = torch.cdist(atom_pos, atom_pos)
-
-    # mask out the distance to self
-
-    eye = torch.eye(num_atoms, device = device, dtype = torch.bool)
-
-    mask_value = 1e4
-    atom_dist.masked_fill_(eye, mask_value)
-
-    # take care of padding
-
-    if exists(mask):
-        pair_mask = einx.logical_and('... i, ... j -> ... i j', mask, mask)
-        atom_dist.masked_fill_(~pair_mask, mask_value)
-
-    # will use topk on the negative of the distance
-
-    neg_distance, two_closest_atom_indices = (-atom_dist).topk(2, dim = -1)
-
-    mean_neg_distance = neg_distance.mean(dim = -1)
-
-    best_atom_pair_index = mean_neg_distance.argmax(dim = -1)
-
-    best_two_atom_neighbors = einx.get_at('... [m] c, ... -> ... c', two_closest_atom_indices, best_atom_pair_index)
-
-    # place the chosen atom at the center
-
-    three_atom_indices, _ = pack((
-        best_two_atom_neighbors[..., 0],
-        best_atom_pair_index,
-        best_two_atom_neighbors[..., 1],
-    ), 'b *')
-
-    # mask out
-
-    if exists(mask):
-        three_atom_indices = einx.where('..., ... three, -> ... three', ~insufficient_atom_mask, three_atom_indices, -1)
-
-    if not has_batch:
-        three_atom_indices = rearrange(three_atom_indices, '1 ... -> ...')
-
-    return three_atom_indices
-
-@typecheck
-def get_angle_between_edges(
-    edge1: Float['... 3'],
-    edge2: Float['... 3']
-) -> Float['...']:
-    cos = torch.dot(l2norm(edge1), l2norm(edge2))
-    return torch.acos(cos)
-
-@typecheck
-def get_frames_from_atom_pos(
-    atom_pos: Float['... n d'],
-    mask: Bool['... n'] | None = None,
-    filter_colinear_pos: bool = False,
-    is_colinear_angle_thres: float = 25. # they use 25 degrees as a way of filtering out invalid frames
-) -> Int['... 3']:
-
-    frames = get_indices_three_closest_atom_pos(atom_pos, mask = mask)
-
-    if not filter_colinear_pos:
-        return frames
-
-    is_invalid = (frames == -1).any(dim = -1)
-
-    # get the edges and derive angles
-
-    three_atom_pos = einx.get_at('... [m] c, ... three -> ... three c', atom_pos, frames)
-
-    left_pos, center_pos, right_pos = three_atom_pos.unbind(dim = -2)
-
-    edges1, edges2 = (left_pos - center_pos), (right_pos - center_pos)
-
-    angle = get_angle_between_edges(edges1, edges2)
-
-    degree = torch.rad2deg(angle)
-
-    is_colinear = (
-        (degree.abs() < is_colinear_angle_thres) |
-        ((180. - degree.abs()).abs() < is_colinear_angle_thres)
-    )
-
-    # set any three atoms that are colinear to -1 indices
-
-    three_atom_indices = einx.where('..., ... three, -> ... three', ~(is_colinear | is_invalid), frames, -1)
-    return three_atom_indices
 
 # atom level, what Alphafold3 accepts
 
-UNCOLLATABLE_ATOM_INPUT_FIELDS = {'filepath'}
+UNCOLLATABLE_ATOM_INPUT_FIELDS = {"filepath"}
 
-ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {
-    'filepath',
-    'chains'
-}
+ATOM_INPUT_EXCLUDE_MODEL_FIELDS = {"filepath", "chains"}
 
-ATOM_DEFAULT_PAD_VALUES = dict(
-    molecule_atom_lens = 0,
-    missing_atom_mask = True
-)
+ATOM_DEFAULT_PAD_VALUES = dict(molecule_atom_lens=0, missing_atom_mask=True)
+
 
 @typecheck
 @dataclass
 class AtomInput:
-    atom_inputs:                Float['m dai']
-    molecule_ids:               Int[' n']
-    molecule_atom_lens:         Int[' n']
-    atompair_inputs:            Float['m m dapi'] | Float['nw w (w*2) dapi']
-    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
-    is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    is_molecule_mod:            Bool['n num_mods'] | None = None
-    additional_msa_feats:       Float['s n dmf'] | None = None
-    additional_token_feats:     Float['n dtf'] | None = None
-    templates:                  Float['t n n dt'] | None = None
-    msa:                        Float['s n dmi'] | None = None
-    token_bonds:                Bool['n n'] | None = None
-    atom_ids:                   Int[' m'] | None = None
-    atom_parent_ids:            Int[' m'] | None = None
-    atompair_ids:               Int['m m'] | Int['nw w (w*2)'] | None = None
-    template_mask:              Bool[' t'] | None = None
-    msa_mask:                   Bool[' s'] | None = None
-    atom_pos:                   Float['m 3'] | None = None
-    missing_atom_mask:          Bool[' m'] | None = None
-    molecule_atom_indices:      Int[' n'] | None = None
-    distogram_atom_indices:     Int[' n'] | None = None
-    atom_indices_for_frame:     Int['n 3'] | None = None
-    distance_labels:            Int['n n'] | None = None
-    resolved_labels:            Int[' m'] | None = None
-    resolution:                 Float[''] | None = None
-    chains:                     Int[' 2'] | None = None
-    filepath:                   str | None = None
+    """Dataclass for atom-level inputs."""
+
+    atom_inputs: Float["m dai"]  # type: ignore
+    molecule_ids: Int[" n"]  # type: ignore
+    molecule_atom_lens: Int[" n"]  # type: ignore
+    atompair_inputs: Float["m m dapi"] | Float["nw w (w*2) dapi"]  # type: ignore
+    additional_molecule_feats: Int[f"n {ADDITIONAL_MOLECULE_FEATS}"]  # type: ignore
+    is_molecule_types: Bool[f"n {IS_MOLECULE_TYPES}"]  # type: ignore
+    is_molecule_mod: Bool["n num_mods"] | None = None  # type: ignore
+    additional_msa_feats: Float["s n dmf"] | None = None  # type: ignore
+    additional_token_feats: Float["n dtf"] | None = None  # type: ignore
+    templates: Float["t n n dt"] | None = None  # type: ignore
+    msa: Float["s n dmi"] | None = None  # type: ignore
+    token_bonds: Bool["n n"] | None = None  # type: ignore
+    atom_ids: Int[" m"] | None = None  # type: ignore
+    atom_parent_ids: Int[" m"] | None = None  # type: ignore
+    atompair_ids: Int["m m"] | Int["nw w (w*2)"] | None = None  # type: ignore
+    template_mask: Bool[" t"] | None = None  # type: ignore
+    msa_mask: Bool[" s"] | None = None  # type: ignore
+    atom_pos: Float["m 3"] | None = None  # type: ignore
+    missing_atom_mask: Bool[" m"] | None = None  # type: ignore
+    molecule_atom_indices: Int[" n"] | None = None  # type: ignore
+    distogram_atom_indices: Int[" n"] | None = None  # type: ignore
+    atom_indices_for_frame: Int["n 3"] | None = None  # type: ignore
+    distance_labels: Int["n n"] | None = None  # type: ignore
+    resolved_labels: Int[" m"] | None = None  # type: ignore
+    resolution: Float[""] | None = None  # type: ignore
+    chains: Int[" 2"] | None = None  # type: ignore
+    filepath: str | None = None
 
     def dict(self):
+        """Return the dataclass as a dictionary."""
         return asdict(self)
+
+    def model_forward_dict(self):
+        """Return the dataclass as a dictionary without certain model fields."""
+        return without_keys(self.dict(), ATOM_INPUT_EXCLUDE_MODEL_FIELDS)
+
 
 @typecheck
 @dataclass
 class BatchedAtomInput:
-    atom_inputs:                Float['b m dai']
-    molecule_ids:               Int['b n']
-    molecule_atom_lens:         Int['b n']
-    atompair_inputs:            Float['b m m dapi'] | Float['b nw w (w*2) dapi']
-    additional_molecule_feats:  Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
-    is_molecule_types:          Bool[f'b n {IS_MOLECULE_TYPES}']
-    is_molecule_mod:            Bool['b n num_mods'] | None = None
-    additional_msa_feats:       Float['b s n dmf'] | None = None
-    additional_token_feats:     Float['b n dtf'] | None = None
-    templates:                  Float['b t n n dt'] | None = None
-    msa:                        Float['b s n dmi'] | None = None
-    token_bonds:                Bool['b n n'] | None = None
-    atom_ids:                   Int['b m'] | None = None
-    atom_parent_ids:            Int['b m'] | None = None
-    atompair_ids:               Int['b m m'] | Int['b nw w (w*2)'] | None = None
-    template_mask:              Bool['b t'] | None = None
-    msa_mask:                   Bool['b s'] | None = None
-    atom_pos:                   Float['b m 3'] | None = None
-    missing_atom_mask:          Bool['b m'] | None = None
-    molecule_atom_indices:      Int['b n'] | None = None
-    distogram_atom_indices:     Int['b n'] | None = None
-    atom_indices_for_frame:     Int['b n 3'] | None = None
-    distance_labels:            Int['b n n'] | None = None
-    resolved_labels:            Int['b m'] | None = None
-    resolution:                 Float[' b'] | None = None
-    chains:                     Int['b 2'] | None = None
-    filepath:                   List[str] | None = None
+    """Dataclass for batched atom-level inputs."""
+
+    atom_inputs: Float["b m dai"]  # type: ignore
+    molecule_ids: Int["b n"]  # type: ignore
+    molecule_atom_lens: Int["b n"]  # type: ignore
+    atompair_inputs: Float["b m m dapi"] | Float["b nw w (w*2) dapi"]  # type: ignore
+    additional_molecule_feats: Int[f"b n {ADDITIONAL_MOLECULE_FEATS}"]  # type: ignore
+    is_molecule_types: Bool[f"b n {IS_MOLECULE_TYPES}"]  # type: ignore
+    is_molecule_mod: Bool["b n num_mods"] | None = None  # type: ignore
+    additional_msa_feats: Float["b s n dmf"] | None = None  # type: ignore
+    additional_token_feats: Float["b n dtf"] | None = None  # type: ignore
+    templates: Float["b t n n dt"] | None = None  # type: ignore
+    msa: Float["b s n dmi"] | None = None  # type: ignore
+    token_bonds: Bool["b n n"] | None = None  # type: ignore
+    atom_ids: Int["b m"] | None = None  # type: ignore
+    atom_parent_ids: Int["b m"] | None = None  # type: ignore
+    atompair_ids: Int["b m m"] | Int["b nw w (w*2)"] | None = None  # type: ignore
+    template_mask: Bool["b t"] | None = None  # type: ignore
+    msa_mask: Bool["b s"] | None = None  # type: ignore
+    atom_pos: Float["b m 3"] | None = None  # type: ignore
+    missing_atom_mask: Bool["b m"] | None = None  # type: ignore
+    molecule_atom_indices: Int["b n"] | None = None  # type: ignore
+    distogram_atom_indices: Int["b n"] | None = None  # type: ignore
+    atom_indices_for_frame: Int["b n 3"] | None = None  # type: ignore
+    distance_labels: Int["b n n"] | None = None  # type: ignore
+    resolved_labels: Int["b m"] | None = None  # type: ignore
+    resolution: Float[" b"] | None = None  # type: ignore
+    chains: Int["b 2"] | None = None  # type: ignore
+    filepath: List[str] | None = None
 
     def dict(self):
+        """Return the dataclass as a dictionary."""
         return asdict(self)
 
     def model_forward_dict(self):
+        """Return the dataclass as a dictionary without certain model fields."""
         return without_keys(self.dict(), ATOM_INPUT_EXCLUDE_MODEL_FIELDS)
+
 
 # functions for saving an AtomInput to disk or loading from disk to AtomInput
 
+
 @typecheck
-def atom_input_to_file(
-    atom_input: AtomInput,
-    path: str | Path,
-    overwrite: bool = False
-) -> Path:
+def atom_input_to_file(atom_input: AtomInput, path: str | Path, overwrite: bool = False) -> Path:
+    """Save an AtomInput to disk."""
 
     if isinstance(path, str):
         path = Path(path)
 
+    path = Path(path)
+
     if not overwrite:
         assert not path.exists()
 
-    path.parents[0].mkdir(exist_ok = True, parents = True)
+    path.parents[0].mkdir(exist_ok=True, parents=True)
 
     torch.save(atom_input.dict(), str(path))
     return path
 
+
 @typecheck
 def file_to_atom_input(path: str | Path) -> AtomInput:
+    """Load an AtomInput from disk."""
     if isinstance(path, str):
         path = Path(path)
 
     assert path.is_file()
 
-    atom_input_dict = torch.load(str(path), weights_only = True)
+    atom_input_dict = torch.load(str(path), weights_only=True)
     return AtomInput(**atom_input_dict)
+
 
 @typecheck
 def default_none_fields_atom_input(i: AtomInput) -> AtomInput:
-
+    """Set default None fields in AtomInput to their default values."""
     # if templates given but template mask isn't given, default to all True
 
     if exists(i.templates) and not exists(i.template_mask):
-        i.template_mask = torch.ones(i.templates.shape[0], dtype = torch.bool)
+        i.template_mask = torch.ones(i.templates.shape[0], dtype=torch.bool)
 
     # if msa given but msa mask isn't given default to all True
 
     if exists(i.msa) and not exists(i.msa_mask):
-        i.msa_mask = torch.ones(i.msa.shape[0], dtype = torch.bool)
+        i.msa_mask = torch.ones(i.msa.shape[0], dtype=torch.bool)
 
     # default missing atom mask should be all False
 
     if not exists(i.missing_atom_mask):
-        i.missing_atom_mask = torch.zeros(i.atom_inputs.shape[0], dtype = torch.bool)
+        i.missing_atom_mask = torch.zeros(i.atom_inputs.shape[0], dtype=torch.bool)
 
     return i
+
 
 @typecheck
 def pdb_dataset_to_atom_inputs(
@@ -473,16 +364,16 @@ def pdb_dataset_to_atom_inputs(
     *,
     output_atom_folder: str | Path | None = None,
     indices: Iterable | None = None,
-    return_atom_dataset = False,
+    return_atom_dataset: bool = False,
     n_jobs: int = 8,
     parallel_kwargs: dict = dict(),
     overwrite_existing: bool = False,
 ) -> Path | AtomDataset:
-
+    """Convert a PDBDataset to AtomInputs stored on disk."""
     if not exists(output_atom_folder):
         pdb_folder = Path(pdb_dataset.folder).resolve()
         parent_folder = pdb_folder.parents[0]
-        output_atom_folder = parent_folder / f'{pdb_folder.stem}.atom-inputs'
+        output_atom_folder = parent_folder / f"{pdb_folder.stem}.atom-inputs"
 
     if isinstance(output_atom_folder, str):
         output_atom_folder = Path(output_atom_folder)
@@ -490,160 +381,182 @@ def pdb_dataset_to_atom_inputs(
     if not exists(indices):
         indices = torch.randperm(len(pdb_dataset)).tolist()
 
-    to_atom_input_fn = compose(
-        pdb_input_to_molecule_input,
-        molecule_to_atom_input
-    )
+    to_atom_input_fn = compose(pdb_input_to_molecule_input, molecule_to_atom_input)
 
-    def should_process_pdb_input(index):
-        atom_input_path = output_atom_folder / f'{index}.pt'
+    def should_process_pdb_input(index: int) -> bool:
+        """Check if a PDB input should be processed."""
+        atom_input_path = output_atom_folder / f"{index}.pt"
         return not atom_input_path.exists() or overwrite_existing
 
     @delayed
-    def pdb_input_to_atom_file(index, path):
+    def pdb_input_to_atom_file(index: int, path: str):
+        """Convert a PDB input to an atom file."""
         pdb_input = pdb_dataset[index]
 
         atom_input = to_atom_input_fn(pdb_input)
 
-        atom_input_path = path / f'{index}.pt'
+        atom_input_path = path / f"{index}.pt"
         atom_input_to_file(atom_input, atom_input_path)
 
-    Parallel(n_jobs = n_jobs, **parallel_kwargs)(pdb_input_to_atom_file(index, output_atom_folder) for index in filter(should_process_pdb_input, indices))
+    Parallel(n_jobs=n_jobs, **parallel_kwargs)(
+        pdb_input_to_atom_file(index, output_atom_folder)
+        for index in filter(should_process_pdb_input, indices)
+    )
 
     if not return_atom_dataset:
         return output_atom_folder
 
     return AtomDataset(output_atom_folder)
 
+
 # Atom dataset that returns a AtomInput based on folders of atom inputs stored on disk
 
+
 class AtomDataset(Dataset):
-    def __init__(
-        self,
-        folder: str | Path
-    ):
+    """Dataset for AtomInput stored on disk."""
+
+    def __init__(self, folder: str | Path):
         if isinstance(folder, str):
             folder = Path(folder)
 
-        assert folder.exists() and folder.is_dir(), f'atom dataset not found at {str(folder)}'
+        assert folder.exists() and folder.is_dir(), f"Atom dataset not found at {str(folder)}"
 
         self.folder = folder
-        self.files = [*folder.glob('**/*.pt')]
+        self.files = [*folder.glob("**/*.pt")]
 
-        assert len(self) > 0, f'no valid atom .pt files found at {str(folder)}'
+        assert len(self) > 0, f"No valid atom `.pt` files found at {str(folder)}"
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Return the length of the dataset."""
         return len(self.files)
 
     def __getitem__(self, idx: int) -> AtomInput:
+        """Return an item from the dataset."""
         file = self.files[idx]
         return file_to_atom_input(file)
+
 
 # functions for extracting atom and atompair features (atom_inputs, atompair_inputs)
 
 # atom reference position to atompair inputs
 # will be used in the `default_extract_atompair_feats_fn` below in MoleculeInput
 
+
 @typecheck
 def atom_ref_pos_to_atompair_inputs(
-    atom_ref_pos: Float['m 3'],
-    atom_ref_space_uid: Int[' m'] | None = None,
-) -> Float['m m 5']:
+    atom_ref_pos: Float["m 3"],  # type: ignore
+    atom_ref_space_uid: Int[" m"] | None = None,  # type: ignore
+) -> Float["m m 5"]:  # type: ignore
+    """Compute atompair inputs from atom reference positions.
 
+    :param atom_ref_pos: The reference positions of the atoms.
+    :param atom_ref_space_uid: The reference space UID of the atoms.
+    :return: The atompair inputs.
+    """
     # Algorithm 5 - lines 2-6
 
     # line 2
 
-    pairwise_rel_pos = einx.subtract('i c, j c -> i j c', atom_ref_pos, atom_ref_pos)
+    pairwise_rel_pos = einx.subtract("i c, j c -> i j c", atom_ref_pos, atom_ref_pos)
 
     # line 5 - pairwise inverse squared distance
 
-    atom_inv_square_dist = (1 + pairwise_rel_pos.norm(dim = -1, p = 2) ** 2) ** -1
-    
+    atom_inv_square_dist = (1 + pairwise_rel_pos.norm(dim=-1, p=2) ** 2) ** -1
+
     # line 3
 
     if exists(atom_ref_space_uid):
-        same_ref_space_mask = einx.equal('i, j -> i j', atom_ref_space_uid, atom_ref_space_uid)
+        same_ref_space_mask = einx.equal("i, j -> i j", atom_ref_space_uid, atom_ref_space_uid)
     else:
         same_ref_space_mask = torch.ones_like(atom_inv_square_dist).bool()
 
     # concat all into atompair_inputs for projection into atompair_feats within Alphafold3
 
-    atompair_inputs, _ = pack((
-        pairwise_rel_pos,
-        atom_inv_square_dist,
-        same_ref_space_mask.float(),
-    ), 'i j *')
+    atompair_inputs, _ = pack(
+        (
+            pairwise_rel_pos,
+            atom_inv_square_dist,
+            same_ref_space_mask.float(),
+        ),
+        "i j *",
+    )
 
     # mask out
 
     atompair_inputs = einx.where(
-        'i j, i j dapi, -> i j dapi',
-        same_ref_space_mask, atompair_inputs, 0.
+        "i j, i j dapi, -> i j dapi", same_ref_space_mask, atompair_inputs, 0.0
     )
 
     # return
 
     return atompair_inputs
 
+
 def default_extract_atom_feats_fn(atom: Atom):
-    return tensor([
-        atom.GetFormalCharge(),
-        atom.GetImplicitValence(),
-        atom.GetExplicitValence()
-    ])
+    """Extract atom features from an RDKit atom."""
+    return tensor([atom.GetFormalCharge(), atom.GetImplicitValence(), atom.GetExplicitValence()])
+
 
 def default_extract_atompair_feats_fn(mol: Mol):
+    """Extract atompair features from an RDKit molecule."""
     all_atom_pos = []
 
-    for idx, atom in enumerate(mol.GetAtoms()):
+    for idx in range(mol.GetNumAtoms()):
         pos = mol.GetConformer().GetAtomPosition(idx)
         all_atom_pos.append([pos.x, pos.y, pos.z])
 
     all_atom_pos_tensor = tensor(all_atom_pos)
 
-    return atom_ref_pos_to_atompair_inputs(all_atom_pos_tensor) # what they did in the paper, but can be overwritten
+    return atom_ref_pos_to_atompair_inputs(
+        all_atom_pos_tensor
+    )  # what they did in the paper, but can be overwritten
+
 
 # molecule input - accepting list of molecules as rdchem.Mol + the atomic lengths for how to pool into tokens
 # `n` here is the token length, which accounts for molecules that are one token per atom
 
+
 @typecheck
 @dataclass
 class MoleculeInput:
-    molecules:                  List[Mol]
-    molecule_token_pool_lens:   List[int]
-    molecule_ids:               Int[' n']
-    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS}']
-    is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    src_tgt_atom_indices:       Int['n 2']
-    token_bonds:                Bool['n n']
-    is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
-    molecule_atom_indices:      List[int | None] | None = None
-    distogram_atom_indices:     List[int | None] | None = None
-    atom_indices_for_frame:     Int['n 3'] | None = None
-    missing_atom_indices:       List[Int[' _'] | None] | None = None
-    missing_token_indices:      List[Int[' _'] | None] | None = None
-    atom_parent_ids:            Int[' m'] | None = None
-    additional_msa_feats:       Float['s n dmf'] | None = None
-    additional_token_feats:     Float[f'n dtf'] | None = None
-    templates:                  Float['t n n dt'] | None = None
-    msa:                        Float['s n dmi'] | None = None
-    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
-    template_mask:              Bool[' t'] | None = None
-    msa_mask:                   Bool[' s'] | None = None
-    distance_labels:            Int['n n'] | None = None
-    resolved_labels:            Int[' m'] | None = None
-    resolution:                 Float[''] | None = None
-    chains:                     Tuple[int | None, int | None] | None = (None, None)
-    filepath:                   str | None = None
-    add_atom_ids:               bool = False
-    add_atompair_ids:           bool = False
-    directed_bonds:             bool = False
-    extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
-    extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
+    """Dataclass for molecule-level inputs."""
+
+    molecules: List[Mol]
+    molecule_token_pool_lens: List[int]
+    molecule_ids: Int[" n"]  # type: ignore
+    additional_molecule_feats: Int[f"n {ADDITIONAL_MOLECULE_FEATS}"]  # type: ignore
+    is_molecule_types: Bool[f"n {IS_MOLECULE_TYPES}"]  # type: ignore
+    src_tgt_atom_indices: Int["n 2"]  # type: ignore
+    token_bonds: Bool["n n"]  # type: ignore
+    is_molecule_mod: Bool["n num_mods"] | Bool[" n"] | None = None  # type: ignore
+    molecule_atom_indices: List[int | None] | None = None  # type: ignore
+    distogram_atom_indices: List[int | None] | None = None  # type: ignore
+    atom_indices_for_frame: Int["n 3"] | None = None  # type: ignore
+    missing_atom_indices: List[Int[" _"] | None] | None = None  # type: ignore
+    missing_token_indices: List[Int[" _"] | None] | None = None  # type: ignore
+    atom_parent_ids: Int[" m"] | None = None  # type: ignore
+    additional_msa_feats: Float["s n dmf"] | None = None  # type: ignore
+    additional_token_feats: Float["n dtf"] | None = None  # type: ignore
+    templates: Float["t n n dt"] | None = None  # type: ignore
+    msa: Float["s n dmi"] | None = None  # type: ignore
+    atom_pos: List[Float["_ 3"]] | Float["m 3"] | None = None  # type: ignore
+    template_mask: Bool[" t"] | None = None  # type: ignore
+    msa_mask: Bool[" s"] | None = None  # type: ignore
+    distance_labels: Int["n n"] | None = None  # type: ignore
+    resolved_labels: Int[" m"] | None = None  # type: ignore
+    resolution: Float[""] | None = None  # type: ignore
+    chains: Tuple[int | None, int | None] | None = (None, None)
+    filepath: str | None = None
+    add_atom_ids: bool = False
+    add_atompair_ids: bool = False
+    directed_bonds: bool = False
+    extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
+    extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
+
 
 @typecheck
 def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
+    """Convert a MoleculeInput to an AtomInput."""
     i = mol_input
 
     molecules = i.molecules
@@ -654,7 +567,9 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     # validate total number of atoms
 
     mol_total_atoms = sum([mol.GetNumAtoms() for mol in molecules])
-    assert mol_total_atoms == sum(atom_lens), f'total atoms summed up from molecules passed in on `molecules` ({mol_total_atoms}) does not equal the number of atoms summed up in the field `molecule_token_pool_lens` {sum(atom_lens)}'
+    assert mol_total_atoms == sum(
+        atom_lens
+    ), f"Total atoms summed up from molecules passed in on `molecules` ({mol_total_atoms}) does not equal the number of atoms summed up in the field `molecule_token_pool_lens` {sum(atom_lens)}"
 
     atom_lens = tensor(atom_lens)
     total_atoms = atom_lens.sum().item()
@@ -702,16 +617,16 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
             i.missing_atom_indices
         ), f"{len(i.missing_atom_indices)} missing atom indices does not match the number of molecules given ({len(molecules)})"
 
-        missing_atom_indices: List[Int[" _"]] = [
+        missing_atom_indices: List[Int[" _"]] = [  # type: ignore
             default(indices, torch.empty((0,), dtype=torch.long))
             for indices in i.missing_atom_indices
         ]
-        missing_token_indices: List[Int[" _"]] = [
+        missing_token_indices: List[Int[" _"]] = [  # type: ignore
             default(indices, torch.empty((0,), dtype=torch.long))
             for indices in i.missing_token_indices
         ]
 
-        missing_atom_mask: List[Bool[" _"]] = []
+        missing_atom_mask: List[Bool[" _"]] = []  # type: ignore
 
         for num_atoms, mol_missing_atom_indices in zip(all_num_atoms, missing_atom_indices):
             mol_miss_atom_mask = torch.zeros(num_atoms, dtype=torch.bool)
@@ -781,7 +696,10 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
                 atom_end_index = bond.GetEndAtomIdx()
 
                 coordinates.extend(
-                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                    [
+                        [atom_start_index, atom_end_index],
+                        [atom_end_index, atom_start_index],
+                    ]
                 )
 
                 bond_type = bond.GetBondType()
@@ -829,7 +747,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     # atom_inputs
 
-    atom_inputs: List[Float["m dai"]] = []
+    atom_inputs: List[Float["m dai"]] = []  # type: ignore
 
     for mol in molecules:
         atom_feats = []
@@ -843,7 +761,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     # atompair_inputs
 
-    atompair_feats: List[Float["m m dapi"]] = []
+    atompair_feats: List[Float["m m dapi"]] = []  # type: ignore
 
     for mol, offset in zip(molecules, offsets):
         atompair_feats.append(extract_atompair_feats_fn(mol))
@@ -890,7 +808,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     is_molecule_mod = i.is_molecule_mod
 
     if is_molecule_mod.ndim == 1:
-        is_molecule_mod = rearrange(is_molecule_mod, 'n -> n 1')
+        is_molecule_mod = rearrange(is_molecule_mod, "n -> n 1")
 
     # atom input
 
@@ -917,6 +835,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         atom_parent_ids=i.atom_parent_ids,
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
+        resolved_labels=i.resolved_labels,
         resolution=i.resolution,
         chains=chains,
         filepath=i.filepath,
@@ -924,48 +843,54 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     return atom_input
 
+
 # molecule lengthed molecule input
 # molecule input - accepting list of molecules as rdchem.Mol
 
 # `n` here refers to the actual number of molecules, NOT the `n` used within Alphafold3
 # the proper token length needs to be correctly computed in the corresponding function for MoleculeLengthMoleculeInput -> AtomInput
 
+
 @typecheck
 @dataclass
 class MoleculeLengthMoleculeInput:
-    molecules:                  List[Mol]
-    molecule_ids:               Int[' n']
-    additional_molecule_feats:  Int[f'n {ADDITIONAL_MOLECULE_FEATS-1}']
-    is_molecule_types:          Bool[f'n {IS_MOLECULE_TYPES}']
-    src_tgt_atom_indices:       Int['n 2']
-    token_bonds:                Bool['n n'] | None = None
-    one_token_per_atom:         List[bool] | None = None
-    is_molecule_mod:            Bool['n num_mods'] | Bool[' n'] | None = None
-    molecule_atom_indices:      List[int | None] | None = None
-    distogram_atom_indices:     List[int | None] | None = None
-    atom_indices_for_frame:     List[Tuple[int, int, int] | None] | None = None
-    missing_atom_indices:       List[Int[' _'] | None] | None = None
-    missing_token_indices:      List[Int[' _'] | None] | None = None
-    atom_parent_ids:            Int[' m'] | None = None
-    additional_msa_feats:       Float['s n dmf'] | None = None
-    additional_token_feats:     Float['n dtf'] | None = None
-    templates:                  Float['t n n dt'] | None = None
-    msa:                        Float['s n dmi'] | None = None
-    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
-    template_mask:              Bool[' t'] | None = None
-    msa_mask:                   Bool[' s'] | None = None
-    distance_labels:            Int['n n'] | None = None
-    resolved_labels:            Int[' m'] | None = None
-    chains:                     Tuple[int | None, int | None] | None = (None, None)
-    filepath:                   str | None = None
-    add_atom_ids:               bool = False
-    add_atompair_ids:           bool = False
-    directed_bonds:             bool = False
-    extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
-    extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
+    molecules: List[Mol]
+    molecule_ids: Int[" n"]  # type: ignore
+    additional_molecule_feats: Int[f"n {ADDITIONAL_MOLECULE_FEATS-1}"]  # type: ignore
+    is_molecule_types: Bool[f"n {IS_MOLECULE_TYPES}"]  # type: ignore
+    src_tgt_atom_indices: Int["n 2"]  # type: ignore
+    token_bonds: Bool["n n"] | None = None  # type: ignore
+    one_token_per_atom: List[bool] | None = None
+    is_molecule_mod: Bool["n num_mods"] | Bool[" n"] | None = None  # type: ignore
+    molecule_atom_indices: List[int | None] | None = None
+    distogram_atom_indices: List[int | None] | None = None
+    atom_indices_for_frame: List[Tuple[int, int, int] | None] | None = None
+    missing_atom_indices: List[Int[" _"] | None] | None = None  # type: ignore
+    missing_token_indices: List[Int[" _"] | None] | None = None  # type: ignore
+    atom_parent_ids: Int[" m"] | None = None  # type: ignore
+    additional_msa_feats: Float["s n dmf"] | None = None  # type: ignore
+    additional_token_feats: Float["n dtf"] | None = None  # type: ignore
+    templates: Float["t n n dt"] | None = None  # type: ignore
+    msa: Float["s n dmi"] | None = None  # type: ignore
+    atom_pos: List[Float["_ 3"]] | Float["m 3"] | None = None  # type: ignore
+    template_mask: Bool[" t"] | None = None  # type: ignore
+    msa_mask: Bool[" s"] | None = None  # type: ignore
+    distance_labels: Int["n n"] | None = None  # type: ignore
+    resolved_labels: Int[" m"] | None = None  # type: ignore
+    chains: Tuple[int | None, int | None] | None = (None, None)
+    filepath: str | None = None
+    add_atom_ids: bool = False
+    add_atompair_ids: bool = False
+    directed_bonds: bool = False
+    extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
+    extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
+
 
 @typecheck
-def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMoleculeInput) -> AtomInput:
+def molecule_lengthed_molecule_input_to_atom_input(
+    mol_input: MoleculeLengthMoleculeInput,
+) -> AtomInput:
+    """Convert a MoleculeLengthMoleculeInput to an AtomInput."""
     i = mol_input
 
     molecules = i.molecules
@@ -986,7 +911,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     if exists(is_molecule_mod):
         if i.is_molecule_mod.ndim == 2:
-            is_molecule_any_mod = is_molecule_mod.any(dim = -1)
+            is_molecule_any_mod = is_molecule_mod.any(dim=-1)
         else:
             is_molecule_any_mod = is_molecule_mod
             is_molecule_mod = None
@@ -1026,34 +951,41 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # repeat all the molecule lengths to the token lengths, using `one_token_per_atom`
 
-    src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim = 0)
-    is_molecule_types = repeat_interleave(i.is_molecule_types, token_repeats, dim = 0)
+    src_tgt_atom_indices = repeat_interleave(i.src_tgt_atom_indices, token_repeats, dim=0)
+    is_molecule_types = repeat_interleave(i.is_molecule_types, token_repeats, dim=0)
 
-    additional_molecule_feats = repeat_interleave(i.additional_molecule_feats, token_repeats, dim = 0)
+    additional_molecule_feats = repeat_interleave(
+        i.additional_molecule_feats, token_repeats, dim=0
+    )
 
     # insert the 2nd entry into additional molecule feats, which is just an arange over the number of tokens
 
-    additional_molecule_feats, _ = pack((
-        additional_molecule_feats[..., :1],
-        torch.arange(additional_molecule_feats.shape[0]),
-        additional_molecule_feats[..., 1:]
-    ), 'n *')
+    additional_molecule_feats, _ = pack(
+        (
+            additional_molecule_feats[..., :1],
+            torch.arange(additional_molecule_feats.shape[0]),
+            additional_molecule_feats[..., 1:],
+        ),
+        "n *",
+    )
 
     additional_msa_feats = repeat_interleave(i.additional_msa_feats, token_repeats, dim=1)
 
-    additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim = 0)
+    additional_token_feats = repeat_interleave(i.additional_token_feats, token_repeats, dim=0)
     molecule_ids = repeat_interleave(i.molecule_ids, token_repeats)
 
-    atom_indices_offsets = repeat_interleave(exclusive_cumsum(atoms_per_molecule), token_repeats, dim = 0)
+    atom_indices_offsets = repeat_interleave(
+        exclusive_cumsum(atoms_per_molecule), token_repeats, dim=0
+    )
 
     distogram_atom_indices = repeat_interleave(i.distogram_atom_indices, token_repeats)
     molecule_atom_indices = repeat_interleave(i.molecule_atom_indices, token_repeats)
 
-    msa = maybe(repeat_interleave)(i.msa, token_repeats, dim = -2)
-    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim = 0)
+    msa = maybe(repeat_interleave)(i.msa, token_repeats, dim=-2)
+    is_molecule_mod = maybe(repeat_interleave)(i.is_molecule_mod, token_repeats, dim=0)
 
-    templates = maybe(repeat_interleave)(i.templates, token_repeats, dim = -3)
-    templates = maybe(repeat_interleave)(templates, token_repeats, dim = -2)
+    templates = maybe(repeat_interleave)(i.templates, token_repeats, dim=-3)
+    templates = maybe(repeat_interleave)(templates, token_repeats, dim=-2)
 
     # get all atoms
 
@@ -1077,13 +1009,8 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
         mol,
         mol_is_chainable_biomolecule,
         mol_is_first_mol_in_chain,
-        mol_is_one_token_per_atom
-    ) in zip(
-        molecules,
-        is_chainable_biomolecules,
-        is_first_mol_in_chains,
-        one_token_per_atom
-    ):
+        mol_is_one_token_per_atom,
+    ) in zip(molecules, is_chainable_biomolecules, is_first_mol_in_chains, one_token_per_atom):
         num_atoms = mol.GetNumAtoms()
 
         if mol_is_chainable_biomolecule and not mol_is_first_mol_in_chain:
@@ -1101,7 +1028,10 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
                 atom_end_index = bond.GetEndAtomIdx()
 
                 coordinates.extend(
-                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                    [
+                        [atom_start_index, atom_end_index],
+                        [atom_end_index, atom_start_index],
+                    ]
                 )
 
                 updates.extend([True, True])
@@ -1114,7 +1044,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
             row_col_slice = slice(offset, offset + num_atoms)
             token_bonds[row_col_slice, row_col_slice] = has_bond
 
-        offset += (num_atoms if mol_is_one_token_per_atom else 1)
+        offset += num_atoms if mol_is_one_token_per_atom else 1
 
     # handle maybe atom embeds
 
@@ -1152,16 +1082,16 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
             i.missing_atom_indices
         ), f"{len(i.missing_atom_indices)} missing atom indices does not match the number of molecules given ({len(molecules)})"
 
-        missing_atom_indices: List[Int[" _"]] = [
+        missing_atom_indices: List[Int[" _"]] = [  # type: ignore
             default(indices, torch.empty((0,), dtype=torch.long))
             for indices in i.missing_atom_indices
         ]
-        missing_token_indices: List[Int[" _"]] = [
+        missing_token_indices: List[Int[" _"]] = [  # type: ignore
             default(indices, torch.empty((0,), dtype=torch.long))
             for indices in i.missing_token_indices
         ]
 
-        missing_atom_mask: List[Bool[" _"]] = []
+        missing_atom_mask: List[Bool[" _"]] = []  # type: ignore
 
         for num_atoms, mol_missing_atom_indices in zip(all_num_atoms, missing_atom_indices):
             mol_miss_atom_mask = torch.zeros(num_atoms, dtype=torch.bool)
@@ -1186,10 +1116,12 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     atom_indices_for_frame = i.atom_indices_for_frame
 
     if exists(atom_indices_for_frame):
-        atom_indices_for_frame = [default(indices, (-1, -1, -1)) for indices in i.atom_indices_for_frame]
+        atom_indices_for_frame = [
+            default(indices, (-1, -1, -1)) for indices in i.atom_indices_for_frame
+        ]
         atom_indices_for_frame = tensor(atom_indices_for_frame)
 
-    atom_indices_for_frame = repeat_interleave(atom_indices_for_frame, token_repeats, dim = 0)
+    atom_indices_for_frame = repeat_interleave(atom_indices_for_frame, token_repeats, dim=0)
 
     # handle maybe atompair embeds
 
@@ -1232,7 +1164,10 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
                 atom_end_index = bond.GetEndAtomIdx()
 
                 coordinates.extend(
-                    [[atom_start_index, atom_end_index], [atom_end_index, atom_start_index]]
+                    [
+                        [atom_start_index, atom_end_index],
+                        [atom_end_index, atom_start_index],
+                    ]
                 )
 
                 bond_type = bond.GetBondType()
@@ -1280,7 +1215,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # atom_inputs
 
-    atom_inputs: List[Float["m dai"]] = []
+    atom_inputs: List[Float["m dai"]] = []  # type: ignore
 
     for mol in molecules:
         atom_feats = []
@@ -1294,7 +1229,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
     # atompair_inputs
 
-    atompair_feats: List[Float["m m dapi"]] = []
+    atompair_feats: List[Float["m m dapi"]] = []  # type: ignore
 
     for mol, offset in zip(molecules, offsets):
         atompair_feats.append(extract_atompair_feats_fn(mol))
@@ -1312,7 +1247,7 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     # mask out molecule atom indices and distogram atom indices where it is in the missing atom indices list
 
     if exists(missing_token_indices) and missing_token_indices.shape[-1]:
-        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats, dim = 0)
+        missing_token_indices = repeat_interleave(missing_token_indices, token_repeats, dim=0)
 
         is_missing_molecule_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, molecule_atom_indices
@@ -1328,13 +1263,18 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
 
         molecule_atom_indices = molecule_atom_indices.masked_fill(is_missing_molecule_atom, -1)
         distogram_atom_indices = distogram_atom_indices.masked_fill(is_missing_distogram_atom, -1)
-        atom_indices_for_frame = atom_indices_for_frame.masked_fill(is_missing_atom_indices_for_frame[..., None], -1)
+
+        atom_indices_for_frame = atom_indices_for_frame.masked_fill(
+            is_missing_atom_indices_for_frame[..., None], -1
+        )
 
     # offsets for all indices
 
     distogram_atom_indices = offset_only_positive(distogram_atom_indices, atom_indices_offsets)
     molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
-    atom_indices_for_frame = offset_only_positive(atom_indices_for_frame, atom_indices_offsets[..., None])
+    atom_indices_for_frame = offset_only_positive(
+        atom_indices_for_frame, atom_indices_offsets[..., None]
+    )
 
     # just use a hack to remove any duplicated indices (ligands and modified biomolecules) in a row
 
@@ -1354,74 +1294,81 @@ def molecule_lengthed_molecule_input_to_atom_input(mol_input: MoleculeLengthMole
     # atom input
 
     atom_input = AtomInput(
-        atom_inputs = atom_inputs_tensor,
-        atompair_inputs = atompair_inputs,
-        molecule_atom_lens = atoms_per_token,
-        molecule_ids = molecule_ids,
-        molecule_atom_indices = molecule_atom_indices,
-        distogram_atom_indices = distogram_atom_indices,
-        atom_indices_for_frame = atom_indices_for_frame,
-        missing_atom_mask = missing_atom_mask,
+        atom_inputs=atom_inputs_tensor,
+        atompair_inputs=atompair_inputs,
+        molecule_atom_lens=atoms_per_token,
+        molecule_ids=molecule_ids,
+        molecule_atom_indices=molecule_atom_indices,
+        distogram_atom_indices=distogram_atom_indices,
+        atom_indices_for_frame=atom_indices_for_frame,
+        missing_atom_mask=missing_atom_mask,
         additional_msa_feats=additional_msa_feats,
-        additional_token_feats = additional_token_feats,
-        additional_molecule_feats = additional_molecule_feats,
-        is_molecule_mod = is_molecule_mod,
-        is_molecule_types = is_molecule_types,
-        msa = msa,
-        templates = templates,
-        atom_pos = atom_pos,
-        token_bonds = token_bonds,
-        atom_parent_ids = i.atom_parent_ids,
-        atom_ids = atom_ids,
-        atompair_ids = atompair_ids,
-        chains = chains,
+        additional_token_feats=additional_token_feats,
+        additional_molecule_feats=additional_molecule_feats,
+        is_molecule_mod=is_molecule_mod,
+        is_molecule_types=is_molecule_types,
+        msa=msa,
+        msa_mask=i.msa_mask,
+        templates=templates,
+        template_mask=i.template_mask,
+        atom_pos=atom_pos,
+        token_bonds=token_bonds,
+        atom_parent_ids=i.atom_parent_ids,
+        atom_ids=atom_ids,
+        atompair_ids=atompair_ids,
+        resolved_labels=i.resolved_labels,
+        chains=chains,
         filepath=i.filepath,
     )
 
     return atom_input
 
+
 # alphafold3 input - support polypeptides, nucleic acids, metal ions + any number of ligands + misc biomolecules
 
-imm_list = partial(field, default_factory = list)
+imm_list = partial(field, default_factory=list)
+
 
 @typecheck
 @dataclass
 class Alphafold3Input:
-    proteins:                   List[Int[' _'] | str] = imm_list()
-    ss_dna:                     List[Int[' _'] | str] = imm_list()
-    ss_rna:                     List[Int[' _'] | str] = imm_list()
-    metal_ions:                 Int[' _'] | List[str] = imm_list()
-    misc_molecule_ids:          Int[' _'] | List[str] = imm_list()
-    ligands:                    List[Mol | str] = imm_list() # can be given as smiles
-    ds_dna:                     List[Int[' _'] | str] = imm_list()
-    ds_rna:                     List[Int[' _'] | str] = imm_list()
-    atom_parent_ids:            Int[' m'] | None = None
-    missing_atom_indices:       List[List[int] | None] = imm_list()
-    additional_msa_feats:       Float['s n dmf'] | None = None
-    additional_token_feats:     Float[f'n dtf'] | None = None
-    templates:                  Float['t n n dt'] | None = None
-    msa:                        Float['s n dmi'] | None = None
-    atom_pos:                   List[Float['_ 3']] | Float['m 3'] | None = None
-    reorder_atom_pos:           bool = True
-    template_mask:              Bool[' t'] | None = None
-    msa_mask:                   Bool[' s'] | None = None
-    distance_labels:            Int['n n'] | None = None
-    resolved_labels:            Int[' m'] | None = None
-    chains:                     Tuple[int | None, int | None] | None = (None, None)
-    add_atom_ids:               bool = False
-    add_atompair_ids:           bool = False
-    directed_bonds:             bool = False
-    extract_atom_feats_fn:      Callable[[Atom], Float['m dai']] = default_extract_atom_feats_fn
-    extract_atompair_feats_fn:  Callable[[Mol], Float['m m dapi']] = default_extract_atompair_feats_fn
+    """Dataclass for Alphafold3 inputs."""
+
+    proteins: List[Int[" _"] | str] = imm_list()  # type: ignore
+    ss_dna: List[Int[" _"] | str] = imm_list()  # type: ignore
+    ss_rna: List[Int[" _"] | str] = imm_list()  # type: ignore
+    metal_ions: Int[" _"] | List[str] = imm_list()  # type: ignore
+    misc_molecule_ids: Int[" _"] | List[str] = imm_list()  # type: ignore
+    ligands: List[Mol | str] = imm_list()  # can be given as smiles
+    ds_dna: List[Int[" _"] | str] = imm_list()  # type: ignore
+    ds_rna: List[Int[" _"] | str] = imm_list()  # type: ignore
+    atom_parent_ids: Int[" m"] | None = None  # type: ignore
+    missing_atom_indices: List[List[int] | None] = imm_list()  # type: ignore
+    additional_msa_feats: Float["s n dmf"] | None = None  # type: ignore
+    additional_token_feats: Float["n dtf"] | None = None  # type: ignore
+    templates: Float["t n n dt"] | None = None  # type: ignore
+    msa: Float["s n dmi"] | None = None  # type: ignore
+    atom_pos: List[Float["_ 3"]] | Float["m 3"] | None = None  # type: ignore
+    template_mask: Bool[" t"] | None = None  # type: ignore
+    msa_mask: Bool[" s"] | None = None  # type: ignore
+    distance_labels: Int["n n"] | None = None  # type: ignore
+    resolved_labels: Int[" m"] | None = None  # type: ignore
+    chains: Tuple[int | None, int | None] | None = (None, None)
+    add_atom_ids: bool = False
+    add_atompair_ids: bool = False
+    directed_bonds: bool = False
+    extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
+    extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
+
 
 @typecheck
 def map_int_or_string_indices_to_mol(
     entries: dict,
-    indices: Int[' _'] | List[str] | str,
-    mol_keyname = 'rdchem_mol',
-    return_entries = False
+    indices: Int[" _"] | List[str] | str,  # type: ignore
+    mol_keyname="rdchem_mol",
+    return_entries=False,
 ) -> List[Mol] | Tuple[List[Mol], List[dict]]:
-
+    """Map indices to molecules."""
     if isinstance(indices, str):
         indices = list(indices)
 
@@ -1442,12 +1389,12 @@ def map_int_or_string_indices_to_mol(
 
     return mols, entries
 
+
 @typecheck
 def maybe_string_to_int(
-    entries: dict,
-    indices: Int[' _'] | List[str] | str,
-) -> Int[' _']:
-
+    entries: dict, indices: Int[" _"] | List[str] | str  # type: ignore
+) -> Int[" _"]:  # type: ignore
+    """Convert string to int."""
     unknown_index = len(entries) - 1
 
     if isinstance(indices, str):
@@ -1460,8 +1407,12 @@ def maybe_string_to_int(
 
     return tensor([index.get(c, unknown_index) for c in indices]).long()
 
+
 @typecheck
-def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alphafold3Input) -> MoleculeLengthMoleculeInput:
+def alphafold3_input_to_molecule_lengthed_molecule_input(
+    alphafold3_input: Alphafold3Input,
+) -> MoleculeLengthMoleculeInput:
+    """Convert an Alphafold3Input to a MoleculeLengthMoleculeInput."""
     i = alphafold3_input
 
     chainable_biomol_entries: List[List[dict]] = []  # for reordering the atom positions at the end
@@ -1593,7 +1544,6 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
     # convert ligands to rdchem.Mol
 
     ligands = list(alphafold3_input.ligands)
-
     mol_ligands = [
         (mol_from_smile(ligand) if isinstance(ligand, str) else ligand) for ligand in ligands
     ]
@@ -1610,11 +1560,15 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
         for mol_ligand in mol_ligands:
             num_ligand_atoms = mol_ligand.GetNumAtoms()
-            ligand_atom_pos = atom_pos[ligand_atom_pos_offset:(ligand_atom_pos_offset + num_ligand_atoms)]
+            ligand_atom_pos = atom_pos[
+                ligand_atom_pos_offset : (ligand_atom_pos_offset + num_ligand_atoms)
+            ]
 
-            frames = get_frames_from_atom_pos(ligand_atom_pos, filter_colinear_pos = True)
+            frames = get_frames_from_atom_pos(ligand_atom_pos, filter_colinear_pos=True)
 
-            atom_indices_for_frame.append(frames.tolist())
+            # NOTE: since `Alphafold3Input` is only used for inference, we can safely assume that
+            # the middle atom frame of each ligand molecule is a suitable representative frame for the ligand
+            atom_indices_for_frame.append(frames[len(frames) // 2].tolist())
 
             ligand_atom_pos_offset += num_ligand_atoms
 
@@ -1646,7 +1600,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
         len(all_rna_mols),
         len(all_dna_mols),
         len(mol_ligands),
-        len(mol_metal_ions)
+        len(mol_metal_ions),
     ]
 
     num_tokens = sum(molecule_type_token_lens)
@@ -1664,23 +1618,22 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     src_tgt_atom_indices = tensor(src_tgt_atom_indices)
 
-    src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, dim = -2)
+    src_tgt_atom_indices = pad_to_len(src_tgt_atom_indices, num_tokens, dim=-2)
 
     # all molecules, layout is
     # proteins | ss rna | ss dna | ligands | metal ions
 
-    molecules = [
-        *molecules_without_ligands,
-        *mol_ligands,
-        *mol_metal_ions
-    ]
+    molecules = [*molecules_without_ligands, *mol_ligands, *mol_metal_ions]
 
     for mol in molecules:
         Chem.SanitizeMol(mol)
 
     # handle rest of non-biomolecules for atom_indices_for_frame
 
-    atom_indices_for_frame = [*atom_indices_for_frame, *([None] * (len(molecules) - len(atom_indices_for_frame)))]
+    atom_indices_for_frame = [
+        *atom_indices_for_frame,
+        *([None] * (len(molecules) - len(atom_indices_for_frame))),
+    ]
 
     assert len(atom_indices_for_frame) == len(molecules)
 
@@ -1694,6 +1647,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     @typecheck
     def get_num_atoms_per_chain(chains: List[List[Mol]]) -> List[int]:
+        """Get the number of atoms per chain."""
         atoms_per_chain = []
 
         for chain in chains:
@@ -1735,13 +1689,15 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     ligand_tokens: List[int] = [] if len(mol_ligands) == 0 else [len(mol_ligands)]
 
-    token_repeats = tensor([
-        *num_protein_tokens,
-        *num_ss_rna_tokens,
-        *num_ss_dna_tokens,
-        *ligand_tokens,
-        len(metal_ions),
-    ])
+    token_repeats = tensor(
+        [
+            *num_protein_tokens,
+            *num_ss_rna_tokens,
+            *num_ss_dna_tokens,
+            *ligand_tokens,
+            len(metal_ions),
+        ]
+    )
 
     # residue ids
 
@@ -1789,12 +1745,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     # concat for all of additional_molecule_feats
 
-    additional_molecule_feats = torch.stack((
-        residue_index,
-        asym_ids,
-        entity_ids,
-        sym_ids
-    ), dim=-1)
+    additional_molecule_feats = torch.stack((residue_index, asym_ids, entity_ids, sym_ids), dim=-1)
 
     # distogram and token centre atom indices
 
@@ -1860,7 +1811,9 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(alphafold3_input: Alpha
 
     return molecule_input
 
+
 # pdb input
+
 
 @typecheck
 @dataclass
@@ -1877,8 +1830,12 @@ class PDBInput:
     add_atompair_ids: bool = False
     directed_bonds: bool = False
     training: bool = False
+    distillation: bool = False
     resolution: float | None = None
     max_msas_per_chain: int | None = None
+    max_templates_per_chain: int | None = None
+    num_templates_per_chain: int | None = None
+    kalign_binary_path: str | None = None
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
 
@@ -1893,9 +1850,7 @@ class PDBInput:
                     f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` file extension."
                 )
         elif not exists(self.biomol):
-            raise ValueError(
-                "Either an mmCIF file or a `Biomolecule` object must be provided."
-            )
+            raise ValueError("Either an mmCIF file or a `Biomolecule` object must be provided.")
 
         if exists(self.cropping_config):
             assert self.cropping_config.keys() == {
@@ -1926,9 +1881,7 @@ class PDBInput:
             )
 
         if exists(self.msa_dir) and not os.path.exists(self.msa_dir):
-            raise FileNotFoundError(
-                f"Provided MSA directory not found: {self.msa_dir}."
-            )
+            raise FileNotFoundError(f"Provided MSA directory not found: {self.msa_dir}.")
 
         if exists(self.templates_dir) and not os.path.exists(self.templates_dir):
             raise FileNotFoundError(
@@ -2151,14 +2104,14 @@ def create_mol_from_atom_positions_and_types(
 
 
 @typecheck
-def extract_template_molecules_from_biomolecule_chains(
+def extract_canonical_molecules_from_biomolecule_chains(
     biomol: Biomolecule,
     chain_seqs: List[str],
     chain_chem_types: List[PDB_INPUT_RESIDUE_MOLECULE_TYPE],
     mol_keyname: str = "rdchem_mol",
     verbose: bool = False,
 ) -> Tuple[List[Mol], List[PDB_INPUT_RESIDUE_MOLECULE_TYPE]]:
-    """Extract RDKit template molecules and their types for the residues of each `Biomolecule`
+    """Extract RDKit canonical molecules and their types for the residues of each `Biomolecule`
     chain.
 
     NOTE: Missing atom indices are marked as a comma-separated property string for each RDKit molecule
@@ -2221,10 +2174,10 @@ def extract_template_molecules_from_biomolecule_chains(
                         f"Could not locate the PDB CCD's SMILES string for atomized residue: {seq}"
                     )
 
-                # construct template molecule for post-mapping bond orders
+                # construct canonical molecule for post-mapping bond orders
 
                 smile = seq_mapping[seq]
-                template_mol = mol_from_smile(smile)
+                canonical_mol = mol_from_smile(smile)
 
                 # find all atom positions and masks for the current atomized residue
 
@@ -2254,11 +2207,11 @@ def extract_template_molecules_from_biomolecule_chains(
                     verbose=verbose,
                 )
                 try:
-                    mol = AllChem.AssignBondOrdersFromTemplate(template_mol, mol)
+                    mol = AllChem.AssignBondOrdersFromTemplate(canonical_mol, mol)
                 except Exception as e:
                     if verbose:
                         logger.warning(
-                            f"Failed to assign bond orders from the template atomized molecule for residue {seq} due to: {e}. "
+                            f"Failed to assign bond orders from the canonical atomized molecule for residue {seq} due to: {e}. "
                             "Skipping bond order assignment."
                         )
                 res_index += mol.GetNumAtoms()
@@ -2479,7 +2432,14 @@ def load_msa_from_msa_dir(
 @typecheck
 def load_templates_from_templates_dir(
     templates_dir: str | None,
+    mmcif_dir: str | None,
     file_id: str,
+    chain_id_to_residue: Dict[str, Dict[str, List[int]]],
+    max_templates_per_chain: int | None = None,
+    num_templates_per_chain: int | None = None,
+    kalign_binary_path: str | None = None,
+    template_cutoff_date: datetime | None = None,
+    randomly_sample_num_templates: bool = False,
     raise_missing_exception: bool = False,
     verbose: bool = False,
 ) -> FeatureDict:
@@ -2495,17 +2455,55 @@ def load_templates_from_templates_dir(
             )
         return {}
 
-    # template_fpath = os.path.join(templates_dir, f"{file_id}.pdb")
-    # with open(template_fpath, "r") as f:
-    #     template = f.read()
+    if (not exists(mmcif_dir) or not os.path.exists(mmcif_dir)) and raise_missing_exception:
+        raise FileNotFoundError(f"{mmcif_dir} does not exist.")
+    elif not exists(mmcif_dir) or not os.path.exists(mmcif_dir):
+        if verbose:
+            logger.warning(
+                f"{mmcif_dir} does not exist. Skipping template loading by returning `Nones`."
+            )
+        return {}
 
-    # template = template_parsing.parse_pdb(template)
-    # features = make_template_features([template])
-    # features = make_template_mask(features)
+    templates = defaultdict(list)
+    for chain_id in chain_id_to_residue:
+        template_fpaths = glob.glob(os.path.join(templates_dir, f"{file_id}{chain_id}_*.m8"))
 
-    # return features
+        if not template_fpaths:
+            templates[chain_id] = []
+            continue
 
-    return {}
+        # NOTE: A single chain-specific template file contains a template for all polymer residues in the chain,
+        # but the chain's ligands are not included in the template file and therefore must be manually inserted
+        # into the templates as unknown amino acid residues.
+        assert len(template_fpaths) == 1, (
+            f"{len(template_fpaths)} template files found for chain {chain_id} of file {file_id}. "
+            "Please ensure that one template file is present for each chain."
+        )
+        template_fpath = template_fpaths[0]
+        query_id = file_id.split("-assembly1")[0]
+
+        template_type = os.path.splitext(os.path.basename(template_fpath))[0].split("_")[1]
+
+        template_biomols = template_parsing.parse_m8(
+            template_fpath,
+            template_type,
+            query_id,
+            mmcif_dir,
+            max_templates=max_templates_per_chain,
+            num_templates=num_templates_per_chain,
+            template_cutoff_date=template_cutoff_date,
+            randomly_sample_num_templates=randomly_sample_num_templates,
+        )
+        templates[chain_id].extend(template_biomols)
+
+    features = make_template_features(
+        templates,
+        chain_id_to_residue,
+        num_templates=num_templates_per_chain,
+        kalign_binary_path=kalign_binary_path,
+    )
+
+    return features
 
 
 @typecheck
@@ -2535,6 +2533,7 @@ def pdb_input_to_molecule_input(
             file_id=file_id,
         )
         mmcif_resolution = extract_mmcif_metadata_field(mmcif_object, "resolution")
+        mmcif_release_date = extract_mmcif_metadata_field(mmcif_object, "release_date")
         biomol = (
             _from_mmcif_object(mmcif_object)
             if "assembly" in file_id
@@ -2573,22 +2572,30 @@ def pdb_input_to_molecule_input(
     # construct multiple sequence alignment (MSA) and template features prior to cropping
 
     # retrieve MSA metadata from the `Biomolecule` object
-    biomol_chain_ids = list(dict.fromkeys(biomol.chain_id.tolist()))  # NOTE: we must maintain the order of unique chain IDs
+    biomol_chain_ids = list(
+        dict.fromkeys(biomol.chain_id.tolist())
+    )  # NOTE: we must maintain the order of unique chain IDs
 
-    residue_index = torch.from_numpy(biomol.residue_index) - 1  # NOTE: `Biomolecule.residue_index` is 1-based originally
+    residue_index = (
+        torch.from_numpy(biomol.residue_index) - 1
+    )  # NOTE: `Biomolecule.residue_index` is 1-based originally
     num_tokens = len(biomol.atom_mask)
 
     chain_id_to_residue = {
         chain_id: {
             "chemtype": biomol.chemtype[biomol.chain_id == chain_id].tolist(),
+            "restype": biomol.restype[biomol.chain_id == chain_id].tolist(),
             "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
         }
         for chain_id in biomol_chain_ids
     }
 
     msa_features = load_msa_from_msa_dir(
-        # NOTE: if MSAs are not locally available, `Nones` will be used
-        i.msa_dir, file_id, chain_id_to_residue, max_msas_per_chain=i.max_msas_per_chain
+        # NOTE: if MSAs are not locally available, no MSA features will be used
+        i.msa_dir,
+        file_id,
+        chain_id_to_residue,
+        max_msas_per_chain=i.max_msas_per_chain,
     )
 
     msa = msa_features.get("msa")
@@ -2644,9 +2651,34 @@ def pdb_input_to_molecule_input(
         msa = make_one_hot(msa, NUM_MSA_ONE_HOT)
         msa_row_mask = msa_row_mask.bool()
 
-    # TODO: retrieve templates for each chain
-    # NOTE: if they are not locally available, `Nones` will be used
-    template_features = load_templates_from_templates_dir(i.templates_dir, file_id)
+    # retrieve templates for each chain
+
+    mmcif_dir = str(Path(i.mmcif_filepath).parent.parent)
+    template_cutoff_date = datetime.strptime(mmcif_release_date, "%Y-%m-%d")
+
+    # use the template cutoff dates listed in the AF3 supplement's Section 2.4
+    if i.training:
+        template_cutoff_date = (
+            datetime.strptime("2018-04-30", "%Y-%m-%d")
+            if i.distillation
+            else (template_cutoff_date - timedelta(days=60))
+        )
+    else:
+        # NOTE: this is the template cutoff date for all inference tasks
+        template_cutoff_date = datetime.strptime("2021-09-30", "%Y-%m-%d")
+
+    template_features = load_templates_from_templates_dir(
+        # NOTE: if templates are not locally available, no template features will be used
+        i.templates_dir,
+        mmcif_dir,
+        file_id,
+        chain_id_to_residue,
+        max_templates_per_chain=i.max_templates_per_chain,
+        num_templates_per_chain=i.num_templates_per_chain,
+        kalign_binary_path=i.kalign_binary_path,
+        template_cutoff_date=template_cutoff_date,
+        randomly_sample_num_templates=exists(i.training) and i.training,
+    )
 
     templates = template_features.get("templates")
     template_mask = template_features.get("template_mask")
@@ -2671,12 +2703,20 @@ def pdb_input_to_molecule_input(
             )
 
             # retrieve cropped residue and token metadata
-            residue_index = torch.from_numpy(biomol.residue_index) - 1  # NOTE: `Biomolecule.residue_index` is 1-based originally
+            residue_index = (
+                torch.from_numpy(biomol.residue_index) - 1
+            )  # NOTE: `Biomolecule.residue_index` is 1-based originally
             num_tokens = len(biomol.atom_mask)
 
             # update MSA and template features after cropping
-            chain_id_sorted_indices = get_sorted_tuple_indices(chain_ids_and_lengths, biomol_chain_ids)
+            chain_id_sorted_indices = get_sorted_tuple_indices(
+                chain_ids_and_lengths, biomol_chain_ids
+            )
             sorted_crop_mask = np.concatenate([crop_masks[idx] for idx in chain_id_sorted_indices])
+
+            biomol_chain_ids = list(
+                dict.fromkeys(biomol.chain_id.tolist())
+            )  # NOTE: we must maintain the order of unique chain IDs
 
             # crop MSA features
             if exists(msa):
@@ -2685,7 +2725,9 @@ def pdb_input_to_molecule_input(
                 additional_token_feats = additional_token_feats[sorted_crop_mask]
                 additional_msa_feats = additional_msa_feats[:, sorted_crop_mask]
 
-            # TODO: crop template features
+            # crop template features
+            if exists(templates):
+                templates = templates[:, sorted_crop_mask][:, :, sorted_crop_mask]
 
         except Exception as e:
             raise ValueError(f"Failed to crop the biomolecule for input {file_id} due to: {e}")
@@ -2719,9 +2761,9 @@ def pdb_input_to_molecule_input(
         chem_comp_details,
     )
 
-    # retrieve RDKit template molecules for the residues of each chain,
-    # and insert the input atom coordinates into the template molecules
-    molecules, molecule_types = extract_template_molecules_from_biomolecule_chains(
+    # retrieve RDKit canonical molecules for the residues of each chain,
+    # and insert the input atom coordinates into the canonical molecules
+    molecules, molecule_types = extract_canonical_molecules_from_biomolecule_chains(
         biomol,
         chain_seqs,
         chain_chem_types,
@@ -2781,15 +2823,18 @@ def pdb_input_to_molecule_input(
 
     # collect frame, token center, distogram, and source-target atom indices for each token
     atom_indices_for_frame = []
+    is_ligand_frame = []
     molecule_atom_indices = []
+    token_center_atom_indices = []
     distogram_atom_indices = []
     src_tgt_atom_indices = []
 
     current_atom_index = 0
     current_res_index = -1
 
-    for mol_type, chemid, res_index in zip(
+    for mol_type, atom_mask, chemid, res_index in zip(
         molecule_atom_types,
+        biomol.atom_mask,
         biomol.chemid,
         biomol.residue_index,
     ):
@@ -2812,19 +2857,76 @@ def pdb_input_to_molecule_input(
                 current_atom_index = 0
                 current_res_index = res_index
 
+            # NOTE: we have to dynamically determine the token center atom index for atomized residues
+            token_center_atom_index = np.where(atom_mask)[0][0]
+
             atom_indices_for_frame.append(None)
+            is_ligand_frame.append(True)
             molecule_atom_indices.append(current_atom_index)
+            token_center_atom_indices.append(token_center_atom_index)
             distogram_atom_indices.append(current_atom_index)
             # NOTE: ligand and modified polymer residue tokens do not have source-target atom indices
         else:
             # collect indices for each polymer residue token
             atom_indices_for_frame.append(entry["three_atom_indices_for_frame"])
+            is_ligand_frame.append(False)
             molecule_atom_indices.append(entry["token_center_atom_idx"])
+            token_center_atom_indices.append(entry["token_center_atom_idx"])
             distogram_atom_indices.append(entry["distogram_atom_idx"])
             src_tgt_atom_indices.append([entry["first_atom_idx"], entry["last_atom_idx"]])
 
+    is_ligand_frame = torch.tensor(is_ligand_frame)
     molecule_atom_indices = tensor(molecule_atom_indices)
+    token_center_atom_indices = tensor(token_center_atom_indices)
     distogram_atom_indices = tensor(distogram_atom_indices)
+
+    # handle frames for ligands (AF3 Supplement, Section 4.3.2)
+    chain_id_to_token_center_atom_positions = {
+        # NOTE: Here, we improvise by using only the token center atom
+        # positions of tokens in the same chain to derive ligand frames
+        chain_id: torch.gather(
+            tensor(biomol.atom_positions[biomol.chain_id == chain_id]),
+            1,
+            token_center_atom_indices[biomol.chain_id == chain_id][..., None, None].expand(
+                -1, -1, 3
+            ),
+        ).squeeze(1)
+        for chain_id in biomol_chain_ids
+    }
+    chain_id_to_token_center_atom_mask = {
+        chain_id: torch.gather(
+            tensor(biomol.atom_mask[biomol.chain_id == chain_id]),
+            1,
+            token_center_atom_indices[biomol.chain_id == chain_id].unsqueeze(-1),
+        ).squeeze(1)
+        for chain_id in biomol_chain_ids
+    }
+
+    chain_id_to_first_token_indices = {
+        chain_id: np.where(biomol.chain_id == chain_id)[0].min() for chain_id in biomol_chain_ids
+    }
+
+    chain_id_to_frames = {
+        chain_id: get_frames_from_atom_pos(
+            atom_pos=chain_id_to_token_center_atom_positions[chain_id],
+            mask=chain_id_to_token_center_atom_mask[chain_id].bool(),
+            filter_colinear_pos=True,
+        )
+        + chain_id_to_first_token_indices[chain_id]
+        for chain_id in biomol_chain_ids
+    }
+    token_index_to_frames = {
+        token_index: frame
+        for token_index, frame in enumerate(
+            frame for chain_frames in chain_id_to_frames.values() for frame in chain_frames
+        )
+    }
+
+    for token_index in range(len(atom_indices_for_frame)):
+        if not exists(atom_indices_for_frame[token_index]):
+            atom_indices_for_frame[token_index] = tuple(
+                token_index_to_frames[token_index].tolist()
+            )
 
     # constructing the additional_molecule_feats
     # which is in turn used to derive relative positions
@@ -3094,14 +3196,39 @@ def pdb_input_to_molecule_input(
         exclusive_cumsum(atoms_per_molecule), token_repeats, dim=0
     )
 
+    # craft ligand frame offsets
+    atom_indices_for_ligand_frame = torch.zeros_like(atom_indices_for_frame)
+    for ligand_frame_index in torch.where(is_ligand_frame)[0]:
+        global_atom_indices = torch.gather(
+            atom_indices_offsets, 0, atom_indices_for_frame[ligand_frame_index]
+        )
+
+        is_ligand_frame_atom = torch.gather(
+            is_ligand_frame, 0, atom_indices_for_frame[ligand_frame_index]
+        )
+        local_token_center_atom_offsets = torch.where(
+            # NOTE: ligand frames are atomized, so for them we have to
+            # offset the atom indices using (ligand) residue atom-sequential
+            # offsets rather than fixed token center atom indices
+            is_ligand_frame_atom,
+            torch.gather(molecule_atom_indices, 0, atom_indices_for_frame[ligand_frame_index]),
+            torch.gather(token_center_atom_indices, 0, atom_indices_for_frame[ligand_frame_index]),
+        )
+
+        atom_indices_for_ligand_frame[ligand_frame_index] = (
+            global_atom_indices + local_token_center_atom_offsets
+        )
+
     # offset only positive atom indices
     distogram_atom_indices = offset_only_positive(distogram_atom_indices, atom_indices_offsets)
     molecule_atom_indices = offset_only_positive(molecule_atom_indices, atom_indices_offsets)
-    atom_indices_for_frame = offset_only_positive(
-        atom_indices_for_frame, atom_indices_offsets[..., None]
+    atom_indices_for_frame = torch.where(
+        is_ligand_frame.unsqueeze(-1),
+        atom_indices_for_ligand_frame,
+        offset_only_positive(atom_indices_for_frame, atom_indices_offsets[..., None]),
     )
 
-    # construct atom positions from template molecules after instantiating their 3D conformers
+    # construct atom positions from canonical molecules after instantiating their 3D conformers
     atom_pos = torch.from_numpy(
         np.concatenate([mol.GetConformer().GetPositions() for mol in molecules]).astype(np.float32)
     )
@@ -3164,9 +3291,11 @@ def pdb_input_to_molecule_input(
 
     return molecule_input
 
+
 # datasets
 
 # PDB dataset that returns a PDBInput based on folder
+
 
 class PDBDataset(Dataset):
     """A PyTorch Dataset for PDB mmCIF files."""
@@ -3284,52 +3413,52 @@ class PDBDataset(Dataset):
 
         return pdb_input
 
+
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation
 
 INPUT_TO_ATOM_TRANSFORM = {
-    AtomInput: compose(
-        default_none_fields_atom_input
-    ),
-    MoleculeInput: compose(
-        molecule_to_atom_input,
-        default_none_fields_atom_input
-    ),
+    AtomInput: compose(default_none_fields_atom_input),
+    MoleculeInput: compose(molecule_to_atom_input, default_none_fields_atom_input),
     Alphafold3Input: compose(
         alphafold3_input_to_molecule_lengthed_molecule_input,
         molecule_lengthed_molecule_input_to_atom_input,
-        default_none_fields_atom_input
+        default_none_fields_atom_input,
     ),
     PDBInput: compose(
-        pdb_input_to_molecule_input,
-        molecule_to_atom_input,
-        default_none_fields_atom_input
+        pdb_input_to_molecule_input, molecule_to_atom_input, default_none_fields_atom_input
     ),
 }
 
 # function for extending the config
 
+
 @typecheck
-def register_input_transform(
-    input_type: Type,
-    fn: Callable[[Any], AtomInput]
-):
+def register_input_transform(input_type: Type, fn: Callable[[Any], AtomInput]):
+    """Register an input transform."""
     if input_type in INPUT_TO_ATOM_TRANSFORM:
-        logger.warning(f'{input_type} is already registered, but overwriting')
+        logger.warning(f"{input_type} is already registered, but overwriting")
 
     INPUT_TO_ATOM_TRANSFORM[input_type] = fn
 
+
 # functions for transforming to atom inputs
+
 
 @typecheck
 def maybe_transform_to_atom_input(i: Any) -> AtomInput:
+    """Convert an input to an AtomInput."""
     maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
 
     if not exists(maybe_to_atom_fn):
-        raise TypeError(f'invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly')
+        raise TypeError(
+            f"invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly"
+        )
 
     return maybe_to_atom_fn(i)
 
+
 @typecheck
 def maybe_transform_to_atom_inputs(inputs: List[Any]) -> List[AtomInput]:
+    """Convert a list of inputs to AtomInputs."""
     return [maybe_transform_to_atom_input(i) for i in inputs]
