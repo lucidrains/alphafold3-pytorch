@@ -14,7 +14,7 @@ from alphafold3_pytorch.common.biomolecule import (
     get_residue_constants,
 )
 from alphafold3_pytorch.data import mmcif_parsing
-from alphafold3_pytorch.data.life import (
+from alphafold3_pytorch.life import (
     DNA_NUCLEOTIDES,
     HUMAN_AMINO_ACIDS,
     LIGANDS,
