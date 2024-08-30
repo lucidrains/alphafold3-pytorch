@@ -2677,7 +2677,7 @@ def pdb_input_to_molecule_input(
         num_templates_per_chain=i.num_templates_per_chain,
         kalign_binary_path=i.kalign_binary_path,
         template_cutoff_date=template_cutoff_date,
-        randomly_sample_num_templates=i.training,
+        randomly_sample_num_templates=exists(i.training) and i.training,
     )
 
     templates = template_features.get("templates")
