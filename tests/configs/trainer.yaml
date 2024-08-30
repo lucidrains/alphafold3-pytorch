@@ -1,7 +1,7 @@
 ---
 model:
     dim_atom_inputs: 77
-    dim_template_feats: 44
+    dim_template_feats: 108
     dim_template_model: 64
     atoms_per_window: 27
     dim_atom: 128
