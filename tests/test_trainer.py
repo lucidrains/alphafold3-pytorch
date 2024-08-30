@@ -38,7 +38,7 @@ def test_trainer_with_mock_atom_input(remove_test_folders):
 
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
-        dim_template_feats = 44,
+        dim_template_feats = 108,
         num_dist_bins = 38,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -175,7 +175,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
         dim_atom_inputs=3,
         dim_atompair_inputs=5,
         atoms_per_window=27,
-        dim_template_feats=44,
+        dim_template_feats=108,
         num_dist_bins=38,
         confidence_head_kwargs=dict(
             pairformer_depth=1,
@@ -287,7 +287,7 @@ def test_trainer_with_pdb_input(populate_mock_pdb_and_remove_test_folders):
 def test_collate_fn():
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
-        dim_template_feats = 44,
+        dim_template_feats = 108,
         num_dist_bins = 38,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
