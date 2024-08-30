@@ -67,13 +67,13 @@ from alphafold3_pytorch.inputs import (
     PDBDataset,
     default_extract_atom_feats_fn,
     default_extract_atompair_feats_fn,
-    get_indices_three_closest_atom_pos,
-    get_angle_between_edges,
 )
 
 from alphafold3_pytorch.utils.model_utils import (
     exclusive_cumsum,
+    get_angle_between_edges,
     get_frames_from_atom_pos,
+    get_indices_three_closest_atom_pos,
 )
 
 DATA_TEST_PDB_ID = '721p'
