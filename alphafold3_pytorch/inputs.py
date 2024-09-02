@@ -2875,6 +2875,10 @@ def pdb_input_to_molecule_input(
             distogram_atom_indices.append(entry["distogram_atom_idx"])
             src_tgt_atom_indices.append([entry["first_atom_idx"], entry["last_atom_idx"]])
 
+            # keep track of the current residue index and atom index for subsequent atomized tokens
+            current_atom_index = 0
+            current_res_index = res_index
+
     is_ligand_frame = torch.tensor(is_ligand_frame)
     molecule_atom_indices = tensor(molecule_atom_indices)
     token_center_atom_indices = tensor(token_center_atom_indices)
