@@ -636,12 +636,12 @@ def get_indices_three_closest_atom_pos(
     :param mask: The mask to apply.
     :return: The indices of the three closest atoms to each atom.
     """
-    prec_dims, device = atom_pos.shape[:-2], atom_pos.device
+    atom_dims, device = atom_pos.shape[-3:-1], atom_pos.device
     num_atoms, has_batch = atom_pos.shape[-2], atom_pos.ndim == 3
     batch_size = 1 if not has_batch else atom_pos.shape[0]
 
-    if not exists(mask) and num_atoms < 3:
-        return atom_pos.new_full((*prec_dims, 3), -1).long()
+    if num_atoms < 3:
+        return atom_pos.new_full((*atom_dims, 3), -1).long()
 
     if not has_batch:
         atom_pos = rearrange(atom_pos, "... -> 1 ...")
