@@ -16,6 +16,7 @@ from jaxtyping import (
     Shaped,
     jaxtyped
 )
+from loguru import logger
 
 from torch import Tensor
 
@@ -64,6 +65,11 @@ IS_DEBUGGING = env.bool('DEBUG', False)
 typecheck = jaxtyped(typechecker = beartype) if should_typecheck else identity
 
 beartype_isinstance = is_bearable if should_typecheck else always(True)
+
+if should_typecheck:
+    logger.info("Type checking is enabled.")
+if IS_DEBUGGING:
+    logger.info("Debugging is enabled.")
 
 __all__ = [
     Shaped,
