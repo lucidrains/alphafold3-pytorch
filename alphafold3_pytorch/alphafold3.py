@@ -935,6 +935,8 @@ class OuterProductMean(Module):
         mask: Bool['b n'] | None = None,
         msa_mask: Bool['b s'] | None = None
     ) -> Float['b n n dp']:
+        
+        dtype = msa.dtype
 
         msa = self.norm(msa)
 
@@ -945,12 +947,12 @@ class OuterProductMean(Module):
         # maybe masked mean for outer product
 
         if exists(msa_mask):
-            a = einx.multiply('b s i d, b s -> b s i d', a, msa_mask.float())
-            b = einx.multiply('b s j e, b s -> b s j e', b, msa_mask.float())
+            a = einx.multiply('b s i d, b s -> b s i d', a, msa_mask.type(dtype))
+            b = einx.multiply('b s j e, b s -> b s j e', b, msa_mask.type(dtype))
 
             outer_product = einsum(a, b, 'b s i d, b s j e -> b i j d e')
 
-            num_msa = reduce(msa_mask.float(), '... s -> ...', 'sum')
+            num_msa = reduce(msa_mask.type(dtype), '... s -> ...', 'sum')
 
             outer_product_mean = einx.divide('b i j d e, b', outer_product, num_msa.clamp(min = self.eps))
         else:
@@ -966,7 +968,9 @@ class OuterProductMean(Module):
 
         if exists(mask):
             mask = to_pairwise_mask(mask)
-            outer_product_mean = einx.multiply('b i j d, b i j', outer_product_mean, mask.float())
+            outer_product_mean = einx.multiply(
+                'b i j d, b i j', outer_product_mean, mask.type(dtype)
+            )
 
         pairwise_repr = self.to_pairwise_repr(outer_product_mean)
         return pairwise_repr
@@ -1520,6 +1524,7 @@ class RelativePositionEncoding(Module):
         additional_molecule_feats: Int[f'b n {ADDITIONAL_MOLECULE_FEATS}']
     ) -> Float['b n n dp']:
 
+        dtype = self.out_embedder.weight.dtype
         device = additional_molecule_feats.device
 
         res_idx, token_idx, asym_id, entity_id, sym_id = additional_molecule_feats.unbind(dim = -1)
@@ -1554,7 +1559,7 @@ class RelativePositionEncoding(Module):
             dist_from_bins = einx.subtract('... i, j -> ... i j', x, bins)
             indices = dist_from_bins.abs().min(dim = -1, keepdim = True).indices
             one_hots = F.one_hot(indices.long(), num_classes = len(bins))
-            return one_hots.float()
+            return one_hots.type(dtype)
 
         r_arange = torch.arange(2*self.r_max + 2, device = device)
         s_arange = torch.arange(2*self.s_max + 2, device = device)
@@ -1675,6 +1680,7 @@ class TemplateEmbedder(Module):
         mask: Bool['b n'] | None = None,
     ) -> Float['b n n dp']:
 
+        dtype = templates.dtype
         num_templates = templates.shape[1]
 
         pairwise_repr = self.pairwise_to_embed_input(pairwise_repr)
@@ -1714,7 +1720,7 @@ class TemplateEmbedder(Module):
         )
 
         num = reduce(templates, 'b t i j d -> b i j d', 'sum')
-        den = reduce(template_mask.float(), 'b t -> b', 'sum')
+        den = reduce(template_mask.type(dtype), 'b t -> b', 'sum')
 
         avg_template_repr = einx.divide('b i j d, b -> b i j d', num, den.clamp(min = self.eps))
 
@@ -2612,6 +2618,10 @@ class ElucidatedAtomDiffusion(Module):
     def device(self):
         return next(self.net.parameters()).device
 
+    @property
+    def dtype(self):
+        return next(self.net.parameters()).dtype
+
     # derived preconditioning params - Table 1
 
     def c_skip(self, sigma):
@@ -2637,10 +2647,14 @@ class ElucidatedAtomDiffusion(Module):
         network_condition_kwargs: dict,
         clamp = False,
     ):
-        batch, device = noised_atom_pos.shape[0], noised_atom_pos.device
+        batch, dtype, device = (
+            noised_atom_pos.shape[0],
+            noised_atom_pos.dtype,
+            noised_atom_pos.device,
+        )
 
         if isinstance(sigma, float):
-            sigma = torch.full((batch,), sigma, device = device)
+            sigma = torch.full((batch,), sigma, dtype=dtype, device=device)
 
         padded_sigma = rearrange(sigma, 'b -> b 1 1')
 
@@ -2668,7 +2682,7 @@ class ElucidatedAtomDiffusion(Module):
         N = num_sample_steps
         inv_rho = 1 / self.rho
 
-        steps = torch.arange(num_sample_steps, device = self.device, dtype = torch.float32)
+        steps = torch.arange(num_sample_steps, device=self.device, dtype=self.dtype)
         sigmas = (self.sigma_max ** inv_rho + steps / (N - 1) * (self.sigma_min ** inv_rho - self.sigma_max ** inv_rho)) ** self.rho
 
         sigmas = F.pad(sigmas, (0, 1), value = 0.) # last step is sigma value of 0.
@@ -2686,6 +2700,8 @@ class ElucidatedAtomDiffusion(Module):
         return_all_timesteps = False,
         **network_condition_kwargs
     ) -> Float['b m 3'] | Float['ts b m 3']:
+
+        dtype = self.dtype
 
         step_scale, num_sample_steps = self.step_scale, default(num_sample_steps, self.num_sample_steps)
 
@@ -2709,7 +2725,7 @@ class ElucidatedAtomDiffusion(Module):
 
         init_sigma = sigmas[0]
 
-        atom_pos = init_sigma * torch.randn(shape, device = self.device)
+        atom_pos = init_sigma * torch.randn(shape, dtype = dtype, device = self.device)
 
         # gradually denoise
 
@@ -2722,9 +2738,11 @@ class ElucidatedAtomDiffusion(Module):
         for sigma, sigma_next, gamma in maybe_tqdm_wrapper(sigmas_and_gammas, desc = tqdm_pbar_title):
             sigma, sigma_next, gamma = tuple(t.item() for t in (sigma, sigma_next, gamma))
 
-            atom_pos = maybe_augment_fn(atom_pos)
+            atom_pos = maybe_augment_fn(atom_pos.float()).type(dtype)
 
-            eps = self.S_noise * torch.randn(shape, device = self.device) # stochastic sampling
+            eps = self.S_noise * torch.randn(
+                shape, dtype = dtype, device = self.device
+            )  # stochastic sampling
 
             sigma_hat = sigma + gamma * sigma
             atom_pos_hat = atom_pos + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
@@ -2797,9 +2815,10 @@ class ElucidatedAtomDiffusion(Module):
 
         # diffusion loss
 
+        dtype = atom_pos_ground_truth.dtype
         batch_size = atom_pos_ground_truth.shape[0]
 
-        sigmas = self.noise_distribution(batch_size)
+        sigmas = self.noise_distribution(batch_size).type(dtype)
         padded_sigmas = rearrange(sigmas, 'b -> b 1 1')
 
         noise = torch.randn_like(atom_pos_ground_truth)
@@ -2839,11 +2858,11 @@ class ElucidatedAtomDiffusion(Module):
         )
 
         atom_pos_aligned_ground_truth = self.weighted_rigid_align(
-            pred_coords=denoised_atom_pos,
-            true_coords=atom_pos_ground_truth,
-            weights=align_weights,
+            pred_coords=denoised_atom_pos.float(),
+            true_coords=atom_pos_ground_truth.float(),
+            weights=align_weights.float(),
             mask=atom_mask,
-        )
+        ).type(dtype)
 
         # section 4.2 - multi-chain permutation alignment
 
@@ -3375,7 +3394,9 @@ class MultiChainPermutationAlignment(Module):
             selected anchor truth as well as a matrix that records how the atoms should be shifted after applying `r`.
             N.b., Optimal alignment requires 1) a rotation and 2) a shift of the positions.
         """
+        dtype = pred_pos.dtype
         batch_size = pred_pos.shape[0]
+
         input_mask = self.calculate_input_mask(
             true_masks=true_masks,
             anchor_gt_idx=anchor_gt_idx,
@@ -3389,13 +3410,13 @@ class MultiChainPermutationAlignment(Module):
             b=batch_size,
         )
         _, r, x = self.weighted_rigid_align(
-            pred_coords=anchor_pred_pos,
-            true_coords=anchor_true_pos,
+            pred_coords=anchor_pred_pos.float(),
+            true_coords=anchor_true_pos.float(),
             mask=input_mask,
             return_transforms=True,
         )
 
-        return r, x
+        return r.type(dtype), x.type(dtype)
 
     @staticmethod
     @typecheck
@@ -4498,7 +4519,9 @@ class ComputeConfidenceScore(Module):
         logits = rearrange(logits, "b plddt m -> b m plddt")
         num_bins = logits.shape[-1]
         bin_width = 1.0 / num_bins
-        bin_centers = torch.arange(0.5 * bin_width, 1.0, bin_width, device=logits.device)
+        bin_centers = torch.arange(
+            0.5 * bin_width, 1.0, bin_width, dtype=logits.dtype, device=logits.device
+        )
         probs = F.softmax(logits, dim=-1)
 
         predicted_lddt = einsum(probs, bin_centers, "b m plddt, plddt -> b m")
@@ -5177,13 +5200,15 @@ class ComputeModelSelectionScore(Module):
         :return: [b] global PDE
         """
 
+        dtype = pde_logits.dtype
+
         pde = self.compute_confidence_score.compute_pde(pde_logits, tok_repr_atm_mask)
 
         dist_logits = rearrange(dist_logits, "b dist i j -> b i j dist")
         dist_probs = F.softmax(dist_logits, dim=-1)
 
         # for distances greater than the last breaks
-        dist_breaks = F.pad(dist_breaks, (0, 1), value=1e6)
+        dist_breaks = F.pad(dist_breaks.float(), (0, 1), value=1e6).type(dtype)
         contact_mask = dist_breaks < self.contact_mask_threshold
 
         contact_prob = einx.where(
@@ -5219,6 +5244,7 @@ class ComputeModelSelectionScore(Module):
         :return: lDDT
         """
 
+        dtype = pred_coords.dtype
         atom_seq_len, device = pred_coords.shape[1], pred_coords.device
 
         # Compute distances between all pairs of atoms
@@ -5229,7 +5255,7 @@ class ComputeModelSelectionScore(Module):
         dist_diff = torch.abs(true_dists - pred_dists)
 
         lddt = einx.subtract('thresholds, ... -> ... thresholds', self.lddt_thresholds, dist_diff)
-        lddt = (lddt >= 0).float().mean(dim = -1)
+        lddt = (lddt >= 0).type(dtype).mean(dim=-1)
 
         # Restrict to bespoke inclusion radius
         is_nucleotide = is_dna | is_rna
@@ -6267,6 +6293,8 @@ class Alphafold3(Module):
         atom_seq_len = atom_inputs.shape[-2]
         single_structure_input = atom_inputs.shape[0] == 1
 
+        dtype = atom_inputs.dtype
+
         # validate atom and atompair input dimensions
 
         assert atom_inputs.shape[-1] == self.dim_atom_inputs, f'expected {self.dim_atom_inputs} for atom_inputs feature dimension, but received {atom_inputs.shape[-1]}'
@@ -6420,7 +6448,7 @@ class Alphafold3(Module):
             seq_arange = torch.arange(seq_len, device = self.device)
             token_bonds = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
 
-        token_bonds_feats = self.token_bond_to_pairwise_feat(token_bonds.float())
+        token_bonds_feats = self.token_bond_to_pairwise_feat(token_bonds.type(dtype))
 
         pairwise_init = pairwise_init + token_bonds_feats
 
@@ -6711,13 +6739,12 @@ class Alphafold3(Module):
                     fa_atom_mask, aug_atom_mask = atom_mask[:1], atom_mask[1:]
 
                     fa_atom_pos = self.frame_average(
-                        fa_atom_pos,
-                        frame_average_mask = fa_atom_mask
-                    )
+                        fa_atom_pos.float(), frame_average_mask = fa_atom_mask
+                    ).type(dtype)
 
                 # normal random augmentations, 48 times in paper
 
-                atom_pos = self.augmenter(atom_pos, mask = aug_atom_mask)
+                atom_pos = self.augmenter(atom_pos.float(), mask = aug_atom_mask).type(dtype)
 
                 # concat back the stochastic frame averaged position
 
@@ -6793,11 +6820,11 @@ class Alphafold3(Module):
 
                 try:
                     atom_pos = self.weighted_rigid_align(
-                        pred_coords=denoised_atom_pos,
-                        true_coords=atom_pos,
-                        weights=align_weights,
+                        pred_coords=denoised_atom_pos.float(),
+                        true_coords=atom_pos.float(),
+                        weights=align_weights.float(),
                         mask=atom_mask,
-                    )
+                    ).type(dtype)
                 except Exception as e:
                     # NOTE: For many (random) unit test inputs, weighted rigid alignment can be unstable
                     logger.warning(f"Skipping weighted rigid alignment due to: {e}")
@@ -7009,7 +7036,7 @@ class Alphafold3(Module):
                 lddt = einx.subtract(
                     "thresholds, ... -> ... thresholds", self.lddt_thresholds, dist_diff
                 )
-                lddt = (lddt >= 0).float().mean(dim=-1)
+                lddt = (lddt >= 0).type(dtype).mean(dim=-1)
 
                 # calculate masked averaging,
                 # after which we assign each value to one of 50 equally sized bins
@@ -7047,7 +7074,7 @@ class Alphafold3(Module):
                 else torch.full((batch_size,), False, device=self.device)
             )
 
-            confidence_weight = confidence_mask.float()
+            confidence_weight = confidence_mask.type(dtype)
 
             @typecheck
             def cross_entropy_with_weight(
