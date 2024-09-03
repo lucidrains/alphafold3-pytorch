@@ -2737,6 +2737,7 @@ def pdb_input_to_molecule_input(
     # create unique chain-residue index pairs to identify the first atom of each residue
     chain_residue_index = np.array(list(zip(biomol.chain_index, biomol.residue_index)))
     _, unique_chain_residue_indices = np.unique(chain_residue_index, axis=0, return_index=True)
+    unique_chain_residue_indices = np.sort(unique_chain_residue_indices)
 
     # retrieve molecule_ids from the `Biomolecule` object, where here it is the mapping of 33 possible residue types
     # `proteins (20) | unknown protein (1) | rna (4) | unknown RNA (1) | dna (4) | unknown DNA (1) | gap (1) | metal ion (1)`,
