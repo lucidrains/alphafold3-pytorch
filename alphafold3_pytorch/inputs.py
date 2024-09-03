@@ -3454,7 +3454,7 @@ def register_input_transform(input_type: Type, fn: Callable[[Any], AtomInput]):
 
 
 @typecheck
-def maybe_transform_to_atom_input(i: Any) -> AtomInput:
+def maybe_transform_to_atom_input(i: Any, raise_exception: bool = False) -> AtomInput | None:
     """Convert an input to an AtomInput."""
     maybe_to_atom_fn = INPUT_TO_ATOM_TRANSFORM.get(type(i), None)
 
@@ -3463,10 +3463,17 @@ def maybe_transform_to_atom_input(i: Any) -> AtomInput:
             f"invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly"
         )
 
-    return maybe_to_atom_fn(i)
+    try:
+        return maybe_to_atom_fn(i)
+    except Exception as e:
+        logger.error(f"Failed to convert input {i} to AtomInput due to: {e}")
+        if raise_exception:
+            raise e
+        return None
 
 
 @typecheck
 def maybe_transform_to_atom_inputs(inputs: List[Any]) -> List[AtomInput]:
     """Convert a list of inputs to AtomInputs."""
-    return [maybe_transform_to_atom_input(i) for i in inputs]
+    maybe_atom_inputs = [maybe_transform_to_atom_input(i) for i in inputs]
+    return [i for i in maybe_atom_inputs if exists(i)]
