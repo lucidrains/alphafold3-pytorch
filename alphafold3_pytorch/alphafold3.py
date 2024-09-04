@@ -2234,7 +2234,7 @@ class DiffusionModule(Module):
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
         use_linear_attn = False,
-        checkpoint_token_transformer = False,
+        checkpoint = False,
         linear_attn_kwargs: dict = dict(
             heads = 8,
             dim_head = 16
@@ -2300,6 +2300,7 @@ class DiffusionModule(Module):
             serial = serial,
             use_linear_attn = use_linear_attn,
             linear_attn_kwargs = linear_attn_kwargs,
+            checkpoint = checkpoint,
             **atom_encoder_kwargs
         )
 
@@ -2322,6 +2323,7 @@ class DiffusionModule(Module):
             depth = token_transformer_depth,
             heads = token_transformer_heads,
             serial = serial,
+            checkpoint = checkpoint,
             **token_transformer_kwargs
         )
 
@@ -2341,7 +2343,7 @@ class DiffusionModule(Module):
             serial = serial,
             use_linear_attn = use_linear_attn,
             linear_attn_kwargs = linear_attn_kwargs,
-            checkpoint = checkpoint_token_transformer,
+            checkpoint = checkpoint,
             **atom_decoder_kwargs
         )
 
@@ -4228,7 +4230,8 @@ class DistogramHead(Module):
         dim_pairwise = 128,
         num_dist_bins = 38,
         dim_atom = 128,
-        atom_resolution = False
+        atom_resolution = False,
+        checkpoint = False,
     ):
         super().__init__()
 
@@ -4245,26 +4248,117 @@ class DistogramHead(Module):
         if atom_resolution:
             self.atom_feats_to_pairwise = LinearNoBiasThenOuterSum(dim_atom, dim_pairwise)
 
+        # checkpointing
+
+        self.checkpoint = checkpoint
+
         # tensor typing
 
         self.da = dim_atom
 
     @typecheck
-    def forward(
+    def to_layers(
         self,
-        pairwise_repr: Float['b n n d'],
-        molecule_atom_lens: Int['b n'] | None = None,
-        atom_feats: Float['b m {self.da}'] | None = None,
-    ) -> Float['b l n n'] | Float['b l m m']:
+        pairwise_repr: Float["b n n d"],  # type: ignore
+        molecule_atom_lens: Int["b n"] | None = None,  # type: ignore
+        atom_feats: Float["b m {self.da}"] | None = None,  # type: ignore
+    ) -> Float["b l n n"] | Float["b l m m"]:  # type: ignore
+        """Compute the distogram logits.
 
+        :param pairwise_repr: The pairwise representation tensor.
+        :param molecule_atom_lens: The molecule atom lengths tensor.
+        :param atom_feats: The atom features tensor.
+        :return: The distogram logits.
+        """
         if self.atom_resolution:
             assert exists(molecule_atom_lens)
             assert exists(atom_feats)
 
             pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
+
             pairwise_repr = pairwise_repr + self.atom_feats_to_pairwise(atom_feats)
 
         logits = self.to_distogram_logits(symmetrize(pairwise_repr))
+
+        return logits
+
+    @typecheck
+    def to_checkpointed_layers(
+        self,
+        pairwise_repr: Float["b n n d"],  # type: ignore
+        molecule_atom_lens: Int["b n"] | None = None,  # type: ignore
+        atom_feats: Float["b m {self.da}"] | None = None,  # type: ignore
+    ) -> Float["b l n n"] | Float["b l m m"]:  # type: ignore
+        """Compute the checkpointed distogram logits.
+
+        :param pairwise_repr: The pairwise representation tensor.
+        :param molecule_atom_lens: The molecule atom lengths tensor.
+        :param atom_feats: The atom features tensor.
+        :return: The checkpointed distogram logits.
+        """
+        wrapped_layers = []
+        inputs = (pairwise_repr, molecule_atom_lens, atom_feats)
+
+        def atom_resolution_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, molecule_atom_lens, atom_feats = inputs
+
+                assert exists(molecule_atom_lens)
+                assert exists(atom_feats)
+
+                pairwise_repr = batch_repeat_interleave_pairwise(pairwise_repr, molecule_atom_lens)
+
+                pairwise_repr = pairwise_repr + fn(atom_feats)
+                return pairwise_repr, molecule_atom_lens, atom_feats
+
+            return inner
+
+        def distogram_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, molecule_atom_lens, atom_feats = inputs
+                pairwise_repr = fn(symmetrize(pairwise_repr))
+                return pairwise_repr, molecule_atom_lens, atom_feats
+
+            return inner
+
+        if self.atom_resolution:
+            wrapped_layers.append(atom_resolution_wrapper(self.atom_feats_to_pairwise))
+        wrapped_layers.append(distogram_wrapper(self.to_distogram_logits))
+
+        for layer in wrapped_layers:
+            inputs = checkpoint(layer, inputs)
+
+        logits, _ = inputs
+        return logits
+
+    @typecheck
+    def forward(
+        self,
+        pairwise_repr: Float["b n n d"],  # type: ignore
+        molecule_atom_lens: Int["b n"] | None = None,  # type: ignore
+        atom_feats: Float["b m {self.da}"] | None = None,  # type: ignore
+    ) -> Float["b l n n"] | Float["b l m m"]:  # type: ignore
+        """Compute the distogram logits.
+        
+        :param pairwise_repr: The pairwise representation tensor.
+        :param molecule_atom_lens: The molecule atom lengths tensor.
+        :param atom_feats: The atom features tensor.
+        :return: The distogram logits.
+        """
+        # going through the layers
+
+        if should_checkpoint(self, pairwise_repr):
+            to_layers_fn = self.to_checkpointed_layers
+        else:
+            to_layers_fn = self.to_layers
+
+        logits = to_layers_fn(
+            pairwise_repr=pairwise_repr,
+            molecule_atom_lens=molecule_atom_lens,
+            atom_feats=atom_feats,
+        )
 
         return logits
 
@@ -5892,7 +5986,7 @@ class Alphafold3(Module):
         checkpoint_trunk_pairformer = False,
         checkpoint_distogram_head = False,
         checkpoint_confidence_head = False,
-        checkpoint_diffusion_token_transformer = False,
+        checkpoint_diffusion_module = False,
         detach_when_recycling = True,
         pdb_training_set=True,
     ):
@@ -6048,7 +6142,7 @@ class Alphafold3(Module):
             dim_atompair = dim_atompair,
             dim_token = dim_token,
             dim_single = dim_single + dim_single_inputs,
-            checkpoint_token_transformer = checkpoint_diffusion_token_transformer,
+            checkpoint = checkpoint_diffusion_module,
             **diffusion_module_kwargs
         )
 
@@ -6081,6 +6175,7 @@ class Alphafold3(Module):
             dim_atom = dim_atom,
             num_dist_bins = num_dist_bins,
             atom_resolution = distogram_atom_resolution,
+            checkpoint = checkpoint_distogram_head
         )
 
         # lddt related
