@@ -818,22 +818,12 @@ def test_alphafold3_without_msa_and_templates():
             depth = 1
         ),
         pairformer_stack = dict(
-            checkpoint = True,
             depth = 2
         ),
         diffusion_module_kwargs = dict(
             atom_encoder_depth = 2,
-            atom_encoder_kwargs = dict(
-                checkpoint = True,
-            ),
             token_transformer_depth = 2,
-            token_transformer_kwargs = dict(
-                checkpoint = True,
-            ),
             atom_decoder_depth = 2,
-            atom_decoder_kwargs = dict(
-                checkpoint = True,
-            ),
         ),
     )
 

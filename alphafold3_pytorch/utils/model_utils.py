@@ -2,6 +2,7 @@ from functools import wraps
 from typing import Callable, List, Tuple, Union
 
 import einx
+import pkg_resources
 import torch
 import torch.nn.functional as F
 from einops import einsum, pack, rearrange, reduce, repeat, unpack
@@ -619,6 +620,19 @@ def should_checkpoint(
         and any([i.requires_grad for i in inputs])
         and (not exists(check_instance_variable) or getattr(self, check_instance_variable, False))
     )
+
+
+@typecheck
+def package_available(package_name: str) -> bool:
+    """Check if a package is available in your environment.
+
+    :param package_name: The name of the package to be checked.
+    :return: `True` if the package is available. `False` otherwise.
+    """
+    try:
+        return pkg_resources.require(package_name) is not None
+    except pkg_resources.DistributionNotFound:
+        return False
 
 
 # functions for deriving the frames for ligands

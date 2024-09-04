@@ -68,8 +68,13 @@ beartype_isinstance = is_bearable if should_typecheck else always(True)
 
 if should_typecheck:
     logger.info("Type checking is enabled.")
+else:
+    logger.info("Type checking is disabled.")
+
 if IS_DEBUGGING:
     logger.info("Debugging is enabled.")
+else:
+    logger.info("Debugging is disabled.")
 
 __all__ = [
     Shaped,

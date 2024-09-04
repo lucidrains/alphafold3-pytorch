@@ -4,6 +4,7 @@ on: [push, pull_request]
 env:
   TYPECHECK: True
   DEBUG: True
+  DEEPSPEED_CHECKPOINTING: False
 
 jobs:
   build:
