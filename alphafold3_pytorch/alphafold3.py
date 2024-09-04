@@ -4230,7 +4230,7 @@ class DistogramHead(Module):
         dim_pairwise = 128,
         num_dist_bins = 38,
         dim_atom = 128,
-        atom_resolution = False
+        atom_resolution = False,
         checkpoint = False,
     ):
         super().__init__()
