@@ -75,6 +75,8 @@ from alphafold3_pytorch.utils.model_utils import (
     package_available,
 )
 
+from alphafold3_pytorch.utils.model_utils import distance_to_dgram
+
 from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
@@ -454,28 +456,6 @@ def batch_repeat_interleave_pairwise(
     pairwise, unpack_one = pack_one(pairwise, '* n d')
     pairwise = batch_repeat_interleave(pairwise, molecule_atom_lens)
     return unpack_one(pairwise)
-
-@typecheck
-def distance_to_bins(
-    distance: Float['... dist'],
-    bins: Float[' bins']
-) -> Int['... dist']:
-    """
-    converting from distance to discrete bins, for distance_labels and pae_labels
-    using the same logic as openfold
-    """
-
-    distance = distance ** 2
-
-    bins = F.pad(bins ** 2, (0, 1), value = float('inf'))
-    low, high = bins[:-1], bins[1:]
-
-    one_hot = (
-        einx.greater_equal('..., bin_low -> ... bin_low', distance, low) &
-        einx.less('..., bin_high -> ... bin_high', distance, high)
-    ).long()
-
-    return one_hot.argmax(dim = -1)
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
@@ -4501,7 +4481,9 @@ class ConfidenceHead(Module):
 
         intermolecule_dist = torch.cdist(pred_molecule_pos, pred_molecule_pos, p=2)
 
-        dist_bin_indices = distance_to_bins(intermolecule_dist, self.atompair_dist_bins)
+        dist_bin_indices = distance_to_dgram(
+            intermolecule_dist, self.atompair_dist_bins, return_labels=True
+        )
         pairwise_repr = pairwise_repr + self.dist_bin_pairwise_embed(dist_bin_indices)
 
         # pairformer stack
@@ -6734,7 +6716,9 @@ class Alphafold3(Module):
                 distogram_mask = atom_mask
 
             distogram_dist = torch.cdist(distogram_pos, distogram_pos, p=2)
-            distance_labels = distance_to_bins(distogram_dist, self.distance_bins)
+            distance_labels = distance_to_dgram(
+                distogram_dist, self.distance_bins, return_labels = True
+            )
 
             # account for representative distogram atom missing from residue (-1 set on distogram_atom_indices field)
 
@@ -7014,9 +6998,9 @@ class Alphafold3(Module):
                     mask=align_error_mask,
                 )
 
-                # calculate pae labels as alignment error binned to 64 (0 - 32A) (TODO: double-check correctness of `distance_to_bins`'s bin assignments)
+                # calculate pae labels as alignment error binned to 64 (0 - 32A)
 
-                pae_labels = distance_to_bins(align_error, self.pae_bins)
+                pae_labels = distance_to_dgram(align_error, self.pae_bins, return_labels = True)
 
                 # set ignore index for invalid molecules or frames
 
@@ -7058,7 +7042,7 @@ class Alphafold3(Module):
                 # calculate pde labels as distance error binned to 64 (0 - 32A)
 
                 pde_dist = torch.abs(pde_pred_dist - pde_gt_dist)
-                pde_labels = distance_to_bins(pde_dist, self.pde_bins)
+                pde_labels = distance_to_dgram(pde_dist, self.pde_bins, return_labels = True)
 
                 # account for representative molecule atom missing from residue (-1 set on molecule_atom_indices field)
 
