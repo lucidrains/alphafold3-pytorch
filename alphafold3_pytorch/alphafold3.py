@@ -4299,7 +4299,8 @@ class ConfidenceHead(Module):
         num_pde_bins = 64,
         num_pae_bins = 64,
         pairformer_depth = 4,
-        pairformer_kwargs: dict = dict()
+        pairformer_kwargs: dict = dict(),
+        checkpoint=False
     ):
         super().__init__()
 
@@ -4319,6 +4320,7 @@ class ConfidenceHead(Module):
             dim_single = dim_single,
             dim_pairwise = dim_pairwise,
             depth = pairformer_depth,
+            checkpoint = checkpoint,
             **pairformer_kwargs
         )
 
@@ -6116,6 +6118,7 @@ class Alphafold3(Module):
             num_plddt_bins = num_plddt_bins,
             num_pde_bins = num_pde_bins,
             num_pae_bins = num_pae_bins,
+            checkpoint = checkpoint_confidence_head,
             **confidence_head_kwargs
         )
 
