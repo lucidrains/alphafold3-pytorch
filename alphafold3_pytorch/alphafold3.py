@@ -13,7 +13,6 @@ from torch import nn
 from torch import Tensor
 from torch.amp import autocast
 import torch.nn.functional as F
-from torch.utils.checkpoint import checkpoint, checkpoint_sequential
 
 from torch.nn import (
     Module,
@@ -73,6 +72,7 @@ from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     calculate_weighted_rigid_align_weights,
+    package_available,
 )
 
 from frame_averaging_pytorch import FrameAverage
@@ -171,8 +171,12 @@ LinearNoBias = partial(Linear, bias = False)
 
 # always use non reentrant checkpointing
 
-checkpoint = partial(checkpoint, use_reentrant = False)
-checkpoint_sequential = partial(checkpoint_sequential, use_reentrant = False)
+if package_available("deepspeed"):
+    import deepspeed
+
+    checkpoint = deepspeed.checkpointing.checkpoint
+else:
+    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant=False)
 
 # helper functions
 
@@ -1061,7 +1065,6 @@ class MSAModule(Module):
         msa_pwa_heads = 8,
         msa_pwa_dim_head = 32,
         checkpoint = False,
-        checkpoint_segments = 1,
         pairwise_block_kwargs: dict = dict(),
         max_num_msa: int | None = None,
         layerscale_output: bool = True
@@ -1112,7 +1115,6 @@ class MSAModule(Module):
             ]))
 
         self.checkpoint = checkpoint
-        self.checkpoint_segments = checkpoint_segments
 
         self.layers = layers
 
@@ -1182,19 +1184,19 @@ class MSAModule(Module):
                 return pairwise_repr, mask, msa, msa_mask
             return inner
 
-        def pairwise_block_wrapper(fn):
-            @wraps(fn)
-            def inner(inputs):
-                pairwise_repr, mask, msa, msa_mask = inputs
-                pairwise_repr = fn(pairwise_repr = pairwise_repr, mask = mask)
-                return pairwise_repr, mask, msa, msa_mask
-            return inner
-
         def msa_transition_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
                 pairwise_repr, mask, msa, msa_mask = inputs
                 msa = fn(msa) + msa
+                return pairwise_repr, mask, msa, msa_mask
+            return inner
+
+        def pairwise_block_wrapper(fn):
+            @wraps(fn)
+            def inner(inputs):
+                pairwise_repr, mask, msa, msa_mask = inputs
+                pairwise_repr = fn(pairwise_repr = pairwise_repr, mask = mask)
                 return pairwise_repr, mask, msa, msa_mask
             return inner
 
@@ -1210,8 +1212,10 @@ class MSAModule(Module):
             wrapped_layers.append(msa_transition_wrapper(msa_transition))
             wrapped_layers.append(pairwise_block_wrapper(pairwise_block))
 
-        pairwise_repr, *_ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+        for layer in wrapped_layers:
+            inputs = checkpoint(layer, inputs)
 
+        pairwise_repr, *_ = inputs
         return pairwise_repr
 
     @typecheck
@@ -1318,7 +1322,6 @@ class PairformerStack(Module):
         dropout_row_prob = 0.25,
         num_register_tokens = 0,
         checkpoint = False,
-        checkpoint_segments = 1,
         pairwise_block_kwargs: dict = dict(),
         pair_bias_attn_kwargs: dict = dict()
     ):
@@ -1357,7 +1360,6 @@ class PairformerStack(Module):
         # checkpointing
 
         self.checkpoint = checkpoint
-        self.checkpoint_segments = checkpoint_segments
 
         # https://arxiv.org/abs/2405.16039 and https://arxiv.org/abs/2405.15071
         # although possibly recycling already takes care of this
@@ -1446,8 +1448,10 @@ class PairformerStack(Module):
                 wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
                 wrapped_layers.append(single_transition_wrapper(single_transition))
 
-        single_repr, pairwise_repr, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+        for layer in wrapped_layers:
+            inputs = checkpoint(layer, inputs)
 
+        single_repr, pairwise_repr, _ = inputs
         return single_repr, pairwise_repr
 
     @typecheck
@@ -1590,7 +1594,6 @@ class TemplateEmbedder(Module):
         pairwise_block_kwargs: dict = dict(),
         eps = 1e-5,
         checkpoint = False,
-        checkpoint_segments = 1,
         layerscale_output = True
     ):
         super().__init__()
@@ -1615,7 +1618,6 @@ class TemplateEmbedder(Module):
         self.pairformer_stack = layers
 
         self.checkpoint = checkpoint
-        self.checkpoint_segments = checkpoint_segments
 
         self.final_norm = nn.LayerNorm(dim)
 
@@ -1666,8 +1668,10 @@ class TemplateEmbedder(Module):
         for block in self.pairformer_stack:
             wrapped_layers.append(block_wrapper(block))
 
-        templates, _ = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+        for layer in wrapped_layers:
+            inputs = checkpoint(layer, inputs)
 
+        templates, _ = inputs
         return templates
 
     @typecheck
@@ -1877,7 +1881,6 @@ class DiffusionTransformer(Module):
         add_residual = True,
         use_linear_attn = False,
         checkpoint = False,
-        checkpoint_segments = 1,
         linear_attn_kwargs = dict(
             heads = 8,
             dim_head = 16
@@ -1956,7 +1959,6 @@ class DiffusionTransformer(Module):
         assert not (not serial and checkpoint), 'checkpointing can only be used for serial version of diffusion transformer'
 
         self.checkpoint = checkpoint
-        self.checkpoint_segments = checkpoint_segments
 
         self.layers = layers
 
@@ -2021,9 +2023,10 @@ class DiffusionTransformer(Module):
             wrapped_layers.append(attn_wrapper(attn))
             wrapped_layers.append(transition_wrapper(transition))
 
-        out = checkpoint_sequential(wrapped_layers, self.checkpoint_segments, inputs)
+        for layer in wrapped_layers:
+            inputs = checkpoint(layer, inputs)
 
-        noised_repr, *_ = out
+        noised_repr, *_ = inputs
         return noised_repr
 
     @typecheck
@@ -2314,10 +2317,6 @@ class DiffusionModule(Module):
 
         self.attended_token_norm = nn.LayerNorm(dim_token)
 
-        # checkpointing
-
-        self.checkpoint_token_transformer = checkpoint_token_transformer
-
         # atom attention decoding related modules
 
         self.tokens_to_atom_decoder_input_cond = LinearNoBias(dim_token, dim_atom)
@@ -2332,6 +2331,7 @@ class DiffusionModule(Module):
             serial = serial,
             use_linear_attn = use_linear_attn,
             linear_attn_kwargs = linear_attn_kwargs,
+            checkpoint = checkpoint_token_transformer,
             **atom_decoder_kwargs
         )
 
@@ -2484,18 +2484,11 @@ class DiffusionModule(Module):
             molecule_atom_lens = molecule_atom_lens
         )
 
-        # maybe checkpoint token transformer
-
-        token_transformer = self.token_transformer
-
-        if should_checkpoint(self, tokens, 'checkpoint_token_transformer'):
-            token_transformer = partial(checkpoint, token_transformer)
-
         # token transformer
 
         tokens = self.cond_tokens_with_cond_single(conditioned_single_repr) + tokens
 
-        tokens = token_transformer(
+        tokens = self.token_transformer(
             tokens,
             mask = mask,
             single_repr = conditioned_single_repr,
@@ -5991,6 +5984,7 @@ class Alphafold3(Module):
             dim_template_feats = dim_template_feats,
             dim = dim_template_model,
             dim_pairwise = dim_pairwise,
+            checkpoint=checkpoint_input_embedding,
             **template_embedder_kwargs
         )
 
@@ -6003,6 +5997,7 @@ class Alphafold3(Module):
             dim_pairwise = dim_pairwise,
             dim_msa_input = dim_msa_inputs,
             dim_additional_msa_feats = dim_additional_msa_feats,
+            checkpoint=checkpoint_input_embedding,
             **msa_module_kwargs,
         )
 
@@ -6011,6 +6006,7 @@ class Alphafold3(Module):
         self.pairformer = PairformerStack(
             dim_single = dim_single,
             dim_pairwise = dim_pairwise,
+            checkpoint=checkpoint_trunk_pairformer,
             **pairformer_stack
         )
 
@@ -6114,13 +6110,6 @@ class Alphafold3(Module):
         )
 
         self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
-
-        # checkpointing related
-
-        self.checkpoint_trunk_pairformer = checkpoint_trunk_pairformer
-        self.checkpoint_diffusion_token_transformer = checkpoint_diffusion_token_transformer
-        self.checkpoint_distogram_head = checkpoint_distogram_head
-        self.checkpoint_confidence_head = checkpoint_confidence_head
 
         # loss related
 
@@ -6510,16 +6499,9 @@ class Alphafold3(Module):
 
                 pairwise = embedded_msa + pairwise
 
-            # maybe checkpoint trunk pairformer
-
-            pairformer = self.pairformer
-
-            if should_checkpoint(self, (single, pairwise), 'checkpoint_trunk_pairformer'):
-                pairformer = partial(checkpoint, pairformer)
-
             # main attention trunk (pairformer)
 
-            single, pairwise = pairformer(
+            single, pairwise = self.pairformer(
                 single_repr = single,
                 pairwise_repr = pairwise,
                 mask = mask
@@ -6650,12 +6632,7 @@ class Alphafold3(Module):
 
             distance_labels = torch.where(distogram_mask, distance_labels, ignore)
 
-            distogram_head_fn = self.distogram_head
-
-            if should_checkpoint(self, pairwise, 'checkpoint_distogram_head'):
-                distogram_head_fn = partial(checkpoint, distogram_head_fn)
-
-            distogram_logits = distogram_head_fn(
+            distogram_logits = self.distogram_head(
                 pairwise,
                 molecule_atom_lens = molecule_atom_lens,
                 atom_feats = atom_feats
