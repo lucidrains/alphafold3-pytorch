@@ -180,22 +180,13 @@ env.read_env()
 DEEPSPEED_CHECKPOINTING = env.bool('DEEPSPEED_CHECKPOINTING', False)
 
 if DEEPSPEED_CHECKPOINTING:
-    import deepspeed
-
-    checkpoint = deepspeed.checkpointing.checkpoint
-else:
-    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
-
-# always use non reentrant checkpointing
-
-if package_available("deepspeed"):
     assert package_available("deepspeed"), "DeepSpeed must be installed for checkpointing."
 
     import deepspeed
 
     checkpoint = deepspeed.checkpointing.checkpoint
 else:
-    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant=False)
+    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
 
 # helper functions
 
