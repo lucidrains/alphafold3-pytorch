@@ -84,6 +84,7 @@ from colt5_attention import ConditionalRoutedAttention
 import einx
 from einops import rearrange, repeat, reduce, einsum, pack, unpack
 from einops.layers.torch import Rearrange
+from environs import Env
 
 from tqdm import tqdm
 
@@ -169,9 +170,27 @@ is_molecule_types: [*, 5]
 
 LinearNoBias = partial(Linear, bias = False)
 
+# environment
+
+env = Env()
+env.read_env()
+
+# always use non reentrant checkpointing
+
+DEEPSPEED_CHECKPOINTING = env.bool('DEEPSPEED_CHECKPOINTING', False)
+
+if DEEPSPEED_CHECKPOINTING:
+    import deepspeed
+
+    checkpoint = deepspeed.checkpointing.checkpoint
+else:
+    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
+
 # always use non reentrant checkpointing
 
 if package_available("deepspeed"):
+    assert package_available("deepspeed"), "DeepSpeed must be installed for checkpointing."
+
     import deepspeed
 
     checkpoint = deepspeed.checkpointing.checkpoint
