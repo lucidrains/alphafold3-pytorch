@@ -24,7 +24,7 @@ from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
-    distance_to_bins,
+    distance_to_dgram,
     get_frames_from_atom_pos,
 )
 from alphafold3_pytorch.tensor_typing import typecheck
@@ -367,17 +367,7 @@ def _extract_template_features(
     template_distogram_dist = torch.cdist(
         template_distogram_atom_positions, template_distogram_atom_positions, p=2
     )
-    template_distogram_dist_binned = distance_to_bins(template_distogram_dist, distance_bins)
-
-    template_distogram_dist_binned[
-        # NOTE: This assigns the last bin to distances greater than the maximum bin (e.g., > 50.75 Å).
-        template_distogram_dist
-        > distance_bins.max()
-    ] = (num_distogram_bins - 1)
-
-    template_distogram = F.one_hot(
-        template_distogram_dist_binned, num_classes=num_distogram_bins
-    ).float()
+    template_distogram = distance_to_dgram(template_distogram_dist, distance_bins)
 
     # Construct unit vectors.
     template_unit_vector = torch.zeros(

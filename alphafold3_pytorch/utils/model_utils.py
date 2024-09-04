@@ -37,20 +37,30 @@ def default_lambda_lr_fn(steps: int) -> float:
 
 
 @typecheck
-def distance_to_bins(
-    distance: Float["... dist"],  # type: ignore
-    bins: Float[" bins"],  # type: ignore
-) -> Int["... dist"]:  # type: ignore
-    """Convert from distance to discrete bins, e.g., for `distance_labels`.
-
-    :param distance: The distance tensor.
-    :param bins: The bins tensor.
-    :return: The discrete bins.
+def distance_to_dgram(
+    distance: Float['... dist'],
+    bins: Float[' bins'],
+    return_labels: bool = False,
+) -> Int['... dist']:
     """
-    dist_from_dist_bins = einx.subtract(
-        "... dist, dist_bins -> ... dist dist_bins", distance, bins
-    ).abs()
-    return dist_from_dist_bins.argmin(dim=-1)
+    converting from distance to discrete bins, for distance_labels and pae_labels
+    using the same logic as openfold
+    """
+
+    distance = distance ** 2
+
+    bins = F.pad(bins ** 2, (0, 1), value = float('inf'))
+    low, high = bins[:-1], bins[1:]
+
+    one_hot = (
+        einx.greater_equal('..., bin_low -> ... bin_low', distance, low) &
+        einx.less('..., bin_high -> ... bin_high', distance, high)
+    ).long()
+
+    if return_labels:
+        return one_hot.argmax(dim = -1)
+
+    return one_hot
 
 
 @typecheck
