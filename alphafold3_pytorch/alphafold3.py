@@ -462,10 +462,20 @@ def distance_to_bins(
 ) -> Int['... dist']:
     """
     converting from distance to discrete bins, for distance_labels and pae_labels
+    using the same logic as openfold
     """
 
-    dist_from_dist_bins = einx.subtract('... dist, dist_bins -> ... dist dist_bins', distance, bins).abs()
-    return dist_from_dist_bins.argmin(dim = -1)
+    distance = distance ** 2
+
+    bins = F.pad(bins ** 2, (0, 1), value = float('inf'))
+    low, high = bins[:-1], bins[1:]
+
+    one_hot = (
+        einx.greater_equal('..., bin_low -> ... bin_low', distance, low) &
+        einx.less('..., bin_high -> ... bin_high', distance, high)
+    ).long()
+
+    return one_hot.argmax(dim = -1)
 
 # linear and outer sum
 # for single repr -> pairwise pattern throughout this architecture
