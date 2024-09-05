@@ -4218,7 +4218,7 @@ class DistogramHead(Module):
         self,
         *,
         dim_pairwise = 128,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         dim_atom = 128,
         atom_resolution = False,
         checkpoint = False,
@@ -5236,11 +5236,7 @@ class ComputeModelSelectionScore(Module):
     def __init__(
         self,
         eps: float = 1e-8,
-        dist_breaks: Float[" dist_break"] = torch.linspace(  
-            2.3125,
-            21.6875,
-            37,
-        ),
+        dist_breaks: Float[" dist_break"] = torch.linspace(2, 22, 63),
         nucleic_acid_cutoff: float = 30.0,
         other_cutoff: float = 15.0,
         contact_mask_threshold: float = 8.0,
@@ -5891,7 +5887,7 @@ class Alphafold3(Module):
         num_atom_embeds: int | None = None,
         num_atompair_embeds: int | None = None,
         num_molecule_mods: int | None = DEFAULT_NUM_MOLECULE_MODS,
-        distance_bins: List[float] = torch.linspace(3, 20, 38).float().tolist(),
+        distance_bins: List[float] = torch.linspace(2, 22, 64).float().tolist(),  # NOTE: in paper, they reuse AF2's setup of having 64 bins from 2 to 22
         pae_bins: List[float] = torch.linspace(0.5, 32, 64).float().tolist(),
         pde_bins: List[float] = torch.linspace(0.5, 32, 64).float().tolist(),
         ignore_index = -1,

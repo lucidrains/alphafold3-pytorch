@@ -96,7 +96,7 @@ def test_alphafold3_input(directed_bonds):
         num_atompair_embeds = num_atom_bond_types + 1, # 0 is for no bond
         atoms_per_window = 27,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -154,7 +154,7 @@ def test_atompos_input():
         dim_atompair_inputs = 5,
         atoms_per_window = 27,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -223,7 +223,7 @@ def test_pdbinput_input():
         atoms_per_window=27,
         dim_template_feats=108,
         num_molecule_mods=4,
-        num_dist_bins=38,
+        num_dist_bins=64,
         num_rollout_steps=2,
         diffusion_num_augmentations=2,
         confidence_head_kwargs=dict(pairformer_depth=1),

@@ -44,7 +44,7 @@ def test_data_input():
         dim_atompair_inputs=5,
         atoms_per_window=27,
         dim_template_feats=108,
-        num_dist_bins=38,
+        num_dist_bins=64,
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1),
