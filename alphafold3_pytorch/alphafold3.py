@@ -4320,7 +4320,7 @@ class DistogramHead(Module):
         for layer in wrapped_layers:
             inputs = checkpoint(layer, inputs)
 
-        logits, _ = inputs
+        logits, *_ = inputs
         return logits
 
     @typecheck
