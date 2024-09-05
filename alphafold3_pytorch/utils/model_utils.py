@@ -41,7 +41,7 @@ def distance_to_dgram(
     distance: Float['... dist'],
     bins: Float[' bins'],
     return_labels: bool = False,
-) -> Int['... dist']:
+) -> Int['... dist'] | Int['... dist bins']:
     """
     converting from distance to discrete bins, for distance_labels and pae_labels
     using the same logic as openfold
