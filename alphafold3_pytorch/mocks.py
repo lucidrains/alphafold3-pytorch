@@ -86,7 +86,7 @@ class MockAtomDataset(Dataset):
         molecule_atom_indices += atom_offsets
         distogram_atom_indices += atom_offsets
 
-        distance_labels = torch.randint(0, 37, (seq_len, seq_len))
+        distance_labels = torch.randint(0, 64, (seq_len, seq_len))
         resolved_labels = torch.randint(0, 2, (atom_seq_len,))
 
         majority_asym_id = asym_id.mode().values.item()
