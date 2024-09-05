@@ -698,7 +698,7 @@ def test_alphafold3(
         dim_token = 8,
         atoms_per_window = atoms_per_window,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = num_molecule_mods,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -804,7 +804,7 @@ def test_alphafold3_without_msa_and_templates():
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         checkpoint_trunk_pairformer = True,
         checkpoint_diffusion_module = True,
@@ -871,7 +871,7 @@ def test_alphafold3_force_return_loss():
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -953,7 +953,7 @@ def test_alphafold3_force_return_loss_with_confidence_logits():
     alphafold3 = Alphafold3(
         dim_atom_inputs = 77,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
@@ -1222,7 +1222,7 @@ def test_model_selection_score_end_to_end():
         dim_token = 8,
         atoms_per_window = 27,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
         ),
@@ -1427,7 +1427,7 @@ def test_readme2():
         dim_atompair_inputs = 5,
         atoms_per_window = 27,
         dim_template_feats = 108,
-        num_dist_bins = 38,
+        num_dist_bins = 64,
         num_molecule_mods = 0,
         confidence_head_kwargs = dict(
             pairformer_depth = 1
