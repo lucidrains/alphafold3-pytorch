@@ -39,7 +39,7 @@ atom_types = [
     "N2",
     "O4",
     "C7",
-    "_",
+    "ATM",  # NOTE: This represents a catch-all atom type for non-standard or modified residues.
     "_",
     "_",
     "_",
@@ -59,7 +59,7 @@ atom_types = [
     "_",
     "_",  # 19 null types.
 ]
-element_types = [atom_type[0] for atom_type in atom_types]
+element_types = [atom_type if atom_type == "ATM" else atom_type[0] for atom_type in atom_types]
 atom_types_set = set(atom_types)
 atom_order = {atom_type: i for i, atom_type in enumerate(atom_types)}
 atom_type_num = len(atom_types)  # := 28 + 19 null types := 47.
