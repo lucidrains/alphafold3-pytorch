@@ -5236,11 +5236,7 @@ class ComputeModelSelectionScore(Module):
     def __init__(
         self,
         eps: float = 1e-8,
-        dist_breaks: Float[" dist_break"] = torch.linspace(
-            2,
-            22,
-            64
-        ),
+        dist_breaks: Float[" dist_break"] = torch.linspace(2, 22, 63),
         nucleic_acid_cutoff: float = 30.0,
         other_cutoff: float = 15.0,
         contact_mask_threshold: float = 8.0,
