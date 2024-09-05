@@ -47,9 +47,9 @@ def distance_to_dgram(
     using the same logic as openfold
     """
 
-    distance = distance ** 2
+    distance = distance.abs()
 
-    bins = F.pad(bins ** 2, (0, 1), value = float('inf'))
+    bins = F.pad(bins, (0, 1), value = float('inf'))
     low, high = bins[:-1], bins[1:]
 
     one_hot = (
