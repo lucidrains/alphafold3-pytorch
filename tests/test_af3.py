@@ -1170,7 +1170,7 @@ def test_model_selection_score():
     atom_mask = torch.randint(0, 2, (atom_pos_true.shape[:-1])).type_as(atom_pos_true).bool()
     tok_repr_atm_mask = torch.randint(0, 2, (batch_size, seq_len)).bool()
 
-    dist_logits = torch.randn(batch_size, 38, seq_len, seq_len)
+    dist_logits = torch.randn(batch_size, 64, seq_len, seq_len)
     pde_logits = torch.randn(batch_size, 64, seq_len, seq_len)
 
     chain_length = [random.randint(seq_len // 4, seq_len //2) 
