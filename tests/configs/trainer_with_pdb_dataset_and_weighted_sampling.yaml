@@ -11,7 +11,7 @@ model:
     dim_template_model: 8
     atoms_per_window: 27
     dim_template_feats: 108
-    num_dist_bins: 38
+    num_dist_bins: 64
     ignore_index: -1
     num_dist_bins: null
     num_plddt_bins: 50
