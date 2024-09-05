@@ -121,9 +121,6 @@ def parse_m8(
             template_release_date = extract_mmcif_metadata_field(
                 template_mmcif_object, "release_date"
             )
-            template_biomol = _from_mmcif_object(
-                template_mmcif_object, chain_ids=set(template_chain)
-            )
             if not (
                 exists(template_cutoff_date)
                 and datetime.strptime(template_release_date, "%Y-%m-%d") <= template_cutoff_date
@@ -131,6 +128,9 @@ def parse_m8(
                 continue
             elif not exists(template_cutoff_date):
                 pass
+            template_biomol = _from_mmcif_object(
+                template_mmcif_object, chain_ids=set(template_chain)
+            )
             if len(template_biomol.atom_positions):
                 template_biomols.append((template_biomol, template_type))
         except Exception as e:
@@ -148,7 +148,7 @@ def _extract_template_features(
     query_chemtype: List[str],
     num_restype_classes: int = 32,
     num_distogram_bins: int = 39,
-    distance_bins: List[float] = torch.linspace(3.25, 50.75, 38).float(),
+    distance_bins: List[float] = torch.linspace(3.25, 50.75, 39).float(),
     verbose: bool = False,
 ) -> Dict[str, Any]:
     """Parse atom positions in the target structure and align with the query.
@@ -181,9 +181,9 @@ def _extract_template_features(
         f"Mapping length {len(mapping)} must match query sequence length {len(query_sequence)} "
         f"and query chemtype length {len(query_chemtype)}."
     )
-    assert num_distogram_bins == len(distance_bins) + 1, (
+    assert num_distogram_bins == len(distance_bins), (
         f"Number of distance bins {num_distogram_bins} must match the length of distance bins "
-        f"{len(distance_bins)} plus one."
+        f"{len(distance_bins)}."
     )
 
     all_atom_positions = template_biomol.atom_positions
