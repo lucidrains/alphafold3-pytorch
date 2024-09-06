@@ -10,7 +10,7 @@ from collections import namedtuple
 
 import torch
 from torch import nn
-from torch import Tensor
+from torch import Tensor, tensor
 from torch.amp import autocast
 import torch.nn.functional as F
 
@@ -4401,7 +4401,7 @@ class ConfidenceHead(Module):
     ):
         super().__init__()
 
-        atompair_dist_bins = Tensor(atompair_dist_bins)
+        atompair_dist_bins = tensor(atompair_dist_bins)
 
         self.register_buffer('atompair_dist_bins', atompair_dist_bins)
 
@@ -6161,7 +6161,7 @@ class Alphafold3(Module):
 
         # logit heads
 
-        distance_bins_tensor = Tensor(distance_bins)
+        distance_bins_tensor = tensor(distance_bins)
 
         self.register_buffer('distance_bins', distance_bins_tensor)
         num_dist_bins = default(num_dist_bins, len(distance_bins_tensor))
@@ -6186,7 +6186,7 @@ class Alphafold3(Module):
 
         # pae related bins and modules
 
-        pae_bins_tensor = Tensor(pae_bins)
+        pae_bins_tensor = tensor(pae_bins)
         self.register_buffer('pae_bins', pae_bins_tensor)
         num_pae_bins = len(pae_bins)
 
@@ -6195,7 +6195,7 @@ class Alphafold3(Module):
 
         # pde related bins
 
-        pde_bins_tensor = Tensor(pde_bins)
+        pde_bins_tensor = tensor(pde_bins)
         self.register_buffer('pde_bins', pde_bins_tensor)
         num_pde_bins = len(pde_bins)
 
