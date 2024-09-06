@@ -3283,7 +3283,7 @@ class MultiChainPermutationAlignment(Module):
 
             # Calculate entity length
             entity_mask = batch["entity_id"] == entity_id
-            entity_length[int(entity_id)] = entity_mask.sum().item()
+            entity_length[int(entity_id)] = entity_mask.sum(-1).mode().values.item()
 
         min_asym_count = min(entity_asym_count.values())
         least_asym_entities = [
@@ -3311,6 +3311,18 @@ class MultiChainPermutationAlignment(Module):
             asym_id
             for asym_id in entity_to_asym_list[least_asym_entities]
             if asym_id in input_asym_id
+        ]
+
+        # Since the entity ID to asym ID mapping is many-to-many, we need to select only
+        # prediction asym IDs with equal length w.r.t. the sampled ground truth asym ID
+        anchor_gt_asym_id_length = (
+            (batch["asym_id"] == anchor_gt_asym_id).sum(-1).mode().values.item()
+        )
+        anchor_pred_asym_ids = [
+            asym_id
+            for asym_id in anchor_pred_asym_ids
+            if (batch["asym_id"] == asym_id).sum(-1).mode().values.item()
+            == anchor_gt_asym_id_length
         ]
 
         # Remap `asym_id` values to remove any gaps in the ground truth asym IDs,
