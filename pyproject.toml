@@ -38,6 +38,8 @@ dependencies = [
     "gemmi>=0.6.6",
     "fastapi",
     "frame-averaging-pytorch>=0.0.18",
+    "gradio",
+    "gradio_molecule3d",
     "huggingface_hub>=0.21.4",
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
