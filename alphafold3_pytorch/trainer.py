@@ -111,8 +111,8 @@ def collate_inputs_to_batched_atom_input(
     inputs: List,
     int_pad_value = -1,
     atoms_per_window: int | None = None,
-    map_input_fn: Callable | None = None
-
+    map_input_fn: Callable | None = None,
+    transform_to_atom_inputs: bool = True,
 ) -> BatchedAtomInput:
 
     if exists(map_input_fn):
@@ -121,17 +121,25 @@ def collate_inputs_to_batched_atom_input(
     # go through all the inputs
     # and for any that is not AtomInput, try to transform it with the registered input type to corresponding registered function
 
-    if all(isinstance(i, AtomInput) for i in inputs):
-        atom_inputs = inputs
-    else:
+    if transform_to_atom_inputs:
         atom_inputs = maybe_transform_to_atom_inputs(inputs)
 
         if len(atom_inputs) < len(inputs):
             # if some of the `inputs` could not be converted into `atom_inputs`,
             # randomly select a subset of the `atom_inputs` to duplicate to match
             # the expected number of `atom_inputs`
-            assert len(atom_inputs) > 0, "No `AtomInput` objects could be created for the current batch."
-            atom_inputs = random.choices(atom_inputs, k=len(inputs))
+            assert (
+                len(atom_inputs) > 0
+            ), "No `AtomInput` objects could be created for the current batch."
+            atom_inputs = random.choices(atom_inputs, k=len(inputs))  # nosec
+    else:
+        atom_inputs = inputs
+
+    assert all(isinstance(i, AtomInput) for i in atom_inputs), (
+        "All inputs must be of type `AtomInput`. "
+        "If you want to transform the inputs to `AtomInput`, "
+        "set `transform_to_atom_inputs=True`."
+    )
 
     # take care of windowing the atompair_inputs and atompair_ids if they are not windowed already
 
