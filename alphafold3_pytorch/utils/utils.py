@@ -1,15 +1,6 @@
 import numpy as np
 
-from typing import Any, List
-
-def first(arr: List) -> Any:
-    """
-    Returns first element of list
-
-    :param arr: the list
-    :return: the element
-    """
-    return arr[0]
+from typing import Any, Iterable, List
 
 
 def exists(val: Any) -> bool:
@@ -21,6 +12,15 @@ def exists(val: Any) -> bool:
     return val is not None
 
 
+def not_exists(val: Any) -> bool:
+    """Check if a value does not exist.
+
+    :param val: The value to check.
+    :return: `True` if the value does not exist, otherwise `False`.
+    """
+    return val is None
+
+
 def default(v: Any, d: Any) -> Any:
     """Return default value `d` if `v` does not exist (i.e., is `None`).
 
@@ -29,6 +29,15 @@ def default(v: Any, d: Any) -> Any:
     :return: The value `v` if it exists, otherwise the default value `d`.
     """
     return v if exists(v) else d
+
+
+def first(arr: Iterable[Any]) -> Any:
+    """Return the first element of an iterable object such as a list.
+
+    :param arr: An iterable object.
+    :return: The first element of the iterable object.
+    """
+    return arr[0]
 
 
 def always(value):
