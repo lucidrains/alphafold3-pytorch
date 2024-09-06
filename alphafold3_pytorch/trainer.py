@@ -266,9 +266,14 @@ def DataLoader(
     *args,
     atoms_per_window: int | None = None,
     map_input_fn: Callable | None = None,
+    transform_to_atom_inputs: bool = True,
     **kwargs
 ):
-    collate_fn = partial(collate_inputs_to_batched_atom_input, atoms_per_window = atoms_per_window)
+    collate_fn = partial(
+        collate_inputs_to_batched_atom_input,
+        atoms_per_window = atoms_per_window,
+        transform_to_atom_inputs = transform_to_atom_inputs,
+    )
 
     if exists(map_input_fn):
         collate_fn = partial(collate_fn, map_input_fn = map_input_fn)
