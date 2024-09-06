@@ -13,6 +13,7 @@ from functools import partial
 from io import StringIO
 from itertools import groupby
 from pathlib import Path
+from retrying import retry
 from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
 
 import einx
@@ -74,7 +75,7 @@ from alphafold3_pytorch.utils.model_utils import (
     remove_consecutive_duplicate,
 )
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
-from alphafold3_pytorch.utils.utils import default, exists, first
+from alphafold3_pytorch.utils.utils import default, exists, first, not_exists
 
 # silence RDKit's warnings
 
@@ -3303,7 +3304,7 @@ def pdb_input_to_molecule_input(
 
 # datasets
 
-# PDB dataset that returns a PDBInput based on folder
+# PDB dataset that returns either a PDBInput or AtomInput based on folder
 
 
 class PDBDataset(Dataset):
@@ -3321,6 +3322,7 @@ class PDBDataset(Dataset):
         crop_size: int = 384,
         training: bool | None = None,  # extra training flag placed by Alex on PDBInput
         sample_only_pdb_ids: Set[str] | None = None,
+        return_atom_inputs: bool = False,
         **pdb_input_kwargs,
     ):
         if isinstance(folder, str):
@@ -3333,6 +3335,7 @@ class PDBDataset(Dataset):
         self.sample_type = sample_type
         self.training = training
         self.sample_only_pdb_ids = sample_only_pdb_ids
+        self.return_atom_inputs = return_atom_inputs
         self.pdb_input_kwargs = pdb_input_kwargs
 
         self.cropping_config = {
@@ -3369,8 +3372,8 @@ class PDBDataset(Dataset):
         """Return the number of PDB mmCIF files in the dataset."""
         return len(self.files)
 
-    def __getitem__(self, idx: int | str) -> PDBInput:
-        """Return a PDBInput object for the specified index."""
+    def get_item(self, idx: int | str) -> PDBInput | AtomInput | None:
+        """Return either a PDBInput or an AtomInput object for the specified index."""
         sampled_id = None
 
         if exists(self.sampler):
@@ -3412,7 +3415,7 @@ class PDBDataset(Dataset):
         if self.training:
             cropping_config = self.cropping_config
 
-        pdb_input = PDBInput(
+        i = PDBInput(
             mmcif_filepath=str(mmcif_filepath),
             chains=(chain_id_1, chain_id_2),
             cropping_config=cropping_config,
@@ -3420,7 +3423,16 @@ class PDBDataset(Dataset):
             **self.pdb_input_kwargs,
         )
 
-        return pdb_input
+        if self.return_atom_inputs:
+            i = maybe_transform_to_atom_input(i)
+        
+        return i
+
+    def __getitem__(self, idx: int | str, max_attempts: int = 5) -> PDBInput | AtomInput:
+        """Return either a PDBInput or an AtomInput object for the specified index."""
+        retry_decorator = retry(retry_on_result=not_exists, stop_max_attempt_number=max_attempts)
+        i = retry_decorator(self.get_item)(idx)
+        return i
 
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
@@ -3461,7 +3473,7 @@ def maybe_transform_to_atom_input(i: Any, raise_exception: bool = False) -> Atom
 
     if not exists(maybe_to_atom_fn):
         raise TypeError(
-            f"invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly"
+            f"Invalid input type {type(i)} being passed into Trainer that is not converted to AtomInput correctly"
         )
 
     try:
