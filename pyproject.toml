@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.4.37"
+version = "0.4.38"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
@@ -27,7 +27,7 @@ dependencies = [
     "adam-atan2-pytorch>=0.0.8",
     "beartype",
     "biopython>=1.83",
-    "click",
+    "click>=8.1",
     "CoLT5-attention>=0.11.0",
     "einops>=0.8.0",
     "einx>=0.2.2",
@@ -71,6 +71,9 @@ test = [
     "pytest",
     "pytest-shard",
 ]
+
+[project.scripts]
+alphafold3_pytorch = "alphafold3_pytorch.cli:cli"
 
 [build-system]
 requires = ["hatchling"]
