@@ -3427,7 +3427,7 @@ class PDBDataset(Dataset):
         
         return i
 
-    def __getitem__(self, idx: int | str, max_attempts: int = 10) -> Union[PDBInput, AtomInput]:
+    def __getitem__(self, idx: int | str, max_attempts: int = 10) -> PDBInput | AtomInput:
         """Return either a PDBInput or an AtomInput object for the specified index."""
         i = self.get_item(idx)
 
