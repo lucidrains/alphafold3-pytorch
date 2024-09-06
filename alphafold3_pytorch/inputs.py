@@ -2400,29 +2400,37 @@ def load_msa_from_msa_dir(
             msas[chain_id] = None
             continue
 
-        # NOTE: A single chain-specific MSA file contains alignments for all polymer residues in the chain,
-        # but the chain's ligands are not included in the MSA file and therefore must be manually inserted
-        # into the MSAs as unknown amino acid residues.
-        assert len(msa_fpaths) == 1, (
-            f"{len(msa_fpaths)} MSA files found for chain {chain_id} of file {file_id}. "
-            "Please ensure that one MSA file is present for each chain."
-        )
-        msa_fpath = msa_fpaths[0]
-        msa_type = os.path.splitext(os.path.basename(msa_fpath))[0].split("_")[-1]
-
-        with open(msa_fpath, "r") as f:
-            msa = f.read()
-            msa = msa_parsing.parse_a3m(msa, msa_type)
-            msa = (
-                (
-                    msa.random_truncate(max_msas_per_chain)
-                    if randomly_truncate
-                    else msa.truncate(max_msas_per_chain)
-                )
-                if exists(max_msas_per_chain)
-                else msa
+        try:
+            # NOTE: A single chain-specific MSA file contains alignments for all polymer residues in the chain,
+            # but the chain's ligands are not included in the MSA file and therefore must be manually inserted
+            # into the MSAs as unknown amino acid residues.
+            assert len(msa_fpaths) == 1, (
+                f"{len(msa_fpaths)} MSA files found for chain {chain_id} of file {file_id}. "
+                "Please ensure that one MSA file is present for each chain."
             )
-            msas[chain_id] = msa
+            msa_fpath = msa_fpaths[0]
+            msa_type = os.path.splitext(os.path.basename(msa_fpath))[0].split("_")[-1]
+
+            with open(msa_fpath, "r") as f:
+                msa = f.read()
+                msa = msa_parsing.parse_a3m(msa, msa_type)
+                msa = (
+                    (
+                        msa.random_truncate(max_msas_per_chain)
+                        if randomly_truncate
+                        else msa.truncate(max_msas_per_chain)
+                    )
+                    if exists(max_msas_per_chain)
+                    else msa
+                )
+                msas[chain_id] = msa
+
+        except Exception as e:
+            if verbose:
+                logger.warning(
+                    f"Failed to load MSA for chain {chain_id} of file {file_id} due to: {e}. Skipping MSA loading."
+                )
+            msas[chain_id] = None
 
     features = make_msa_features(msas, chain_id_to_residue)
     features = make_msa_mask(features)
