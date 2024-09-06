@@ -35,7 +35,7 @@ from alphafold3_pytorch.data import (
 )
 
 import torch
-from torch import Tensor
+from torch import tensor
 from torch.nn import Module
 from torch.optim import Adam, Optimizer
 from torch.nn.utils.rnn import pad_sequence
@@ -201,7 +201,7 @@ def collate_inputs_to_batched_atom_input(
 
         # get the max lengths across all dimensions
 
-        shapes_as_tensor = torch.stack([Tensor(tuple(g.shape) if exists(g) else ((0,) * ndim)).int() for g in grouped], dim = -1)
+        shapes_as_tensor = torch.stack([tensor(tuple(g.shape) if exists(g) else ((0,) * ndim)).int() for g in grouped], dim = -1)
 
         max_lengths = shapes_as_tensor.amax(dim = -1)
 
