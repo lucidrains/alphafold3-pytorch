@@ -10,7 +10,7 @@ from collections import namedtuple
 
 import torch
 from torch import nn
-from torch import Tensor
+from torch import Tensor, tensor
 from torch.amp import autocast
 import torch.nn.functional as F
 
@@ -2806,6 +2806,7 @@ class ElucidatedAtomDiffusion(Module):
         ligand_loss_weight = 10.,
         return_loss_breakdown = False,
         single_structure_input=False,
+        filepaths: List[str] | None = None,
     ) -> ElucidatedAtomDiffusionReturn:
 
         # diffusion loss
@@ -2875,7 +2876,7 @@ class ElucidatedAtomDiffusion(Module):
                 )
             except Exception as e:
                 # NOTE: For many (random) unit test inputs, permutation alignment can be unstable
-                logger.warning(f"Skipping multi-chain permutation alignment due to: {e}")
+                logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepaths}' if exists(filepaths) else ''} due to: {e}")
 
         # main diffusion mse loss
 
@@ -3282,7 +3283,7 @@ class MultiChainPermutationAlignment(Module):
 
             # Calculate entity length
             entity_mask = batch["entity_id"] == entity_id
-            entity_length[int(entity_id)] = entity_mask.sum().item()
+            entity_length[int(entity_id)] = entity_mask.sum(-1).mode().values.item()
 
         min_asym_count = min(entity_asym_count.values())
         least_asym_entities = [
@@ -3310,6 +3311,18 @@ class MultiChainPermutationAlignment(Module):
             asym_id
             for asym_id in entity_to_asym_list[least_asym_entities]
             if asym_id in input_asym_id
+        ]
+
+        # Since the entity ID to asym ID mapping is many-to-many, we need to select only
+        # prediction asym IDs with equal length w.r.t. the sampled ground truth asym ID
+        anchor_gt_asym_id_length = (
+            (batch["asym_id"] == anchor_gt_asym_id).sum(-1).mode().values.item()
+        )
+        anchor_pred_asym_ids = [
+            asym_id
+            for asym_id in anchor_pred_asym_ids
+            if (batch["asym_id"] == asym_id).sum(-1).mode().values.item()
+            == anchor_gt_asym_id_length
         ]
 
         # Remap `asym_id` values to remove any gaps in the ground truth asym IDs,
@@ -4388,7 +4401,7 @@ class ConfidenceHead(Module):
     ):
         super().__init__()
 
-        atompair_dist_bins = Tensor(atompair_dist_bins)
+        atompair_dist_bins = tensor(atompair_dist_bins)
 
         self.register_buffer('atompair_dist_bins', atompair_dist_bins)
 
@@ -6148,7 +6161,7 @@ class Alphafold3(Module):
 
         # logit heads
 
-        distance_bins_tensor = Tensor(distance_bins)
+        distance_bins_tensor = tensor(distance_bins)
 
         self.register_buffer('distance_bins', distance_bins_tensor)
         num_dist_bins = default(num_dist_bins, len(distance_bins_tensor))
@@ -6173,7 +6186,7 @@ class Alphafold3(Module):
 
         # pae related bins and modules
 
-        pae_bins_tensor = Tensor(pae_bins)
+        pae_bins_tensor = tensor(pae_bins)
         self.register_buffer('pae_bins', pae_bins_tensor)
         num_pae_bins = len(pae_bins)
 
@@ -6182,7 +6195,7 @@ class Alphafold3(Module):
 
         # pde related bins
 
-        pde_bins_tensor = Tensor(pde_bins)
+        pde_bins_tensor = tensor(pde_bins)
         self.register_buffer('pde_bins', pde_bins_tensor)
         num_pde_bins = len(pde_bins)
 
@@ -6366,7 +6379,8 @@ class Alphafold3(Module):
         detach_when_recycling: bool = None,
         min_conf_resolution: float = 0.1,
         max_conf_resolution: float = 4.0,
-        hard_validate: bool = False
+        hard_validate: bool = False,
+        filepaths: List[str] | None = None
     ) -> (
         Float['b m 3'] |
         Float['ts b m 3'] |
@@ -6849,6 +6863,7 @@ class Alphafold3(Module):
                 nucleotide_loss_weight = self.nucleotide_loss_weight,
                 ligand_loss_weight = self.ligand_loss_weight,
                 single_structure_input = single_structure_input,
+                filepaths = filepaths,
             )
 
         # confidence head
@@ -6920,7 +6935,7 @@ class Alphafold3(Module):
                         )
                     except Exception as e:
                         # NOTE: For many (random) unit test inputs, permutation alignment can be unstable
-                        logger.warning(f"Skipping multi-chain permutation alignment due to: {e}")
+                        logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepaths}' if exists(filepaths) else ''} due to: {e}")
 
                 assert exists(
                     distogram_atom_indices

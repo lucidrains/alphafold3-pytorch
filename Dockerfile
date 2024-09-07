@@ -9,6 +9,10 @@ RUN apt-get update \
         build-essential \
         git \
         wget \
+        libxrender1 \
+        libxtst6 \
+        libxext6 \
+        libxi6 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get autoremove -y \
     && apt-get clean

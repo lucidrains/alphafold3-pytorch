@@ -54,7 +54,7 @@ A visualization of the molecules of life used in the repository can be seen and 
 
 - Tom (from the Discord channel) for identifying a discrepancy between this codebase's distogram and template unit vector computations and those of OpenFold (and <a href="https://github.com/vandrw">Andrei</a> for addressing these issues)!
 
-- <a href="https://github.com/CyaNine">Kaihui</a> for identifying a bug in how non-standard atoms were handled in polymer residues!
+- <a href="https://github.com/Kaihui-Cheng">Kaihui</a> for identifying a bug in how non-standard atoms were handled in polymer residues!
 
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
 
