@@ -2187,7 +2187,15 @@ def extract_canonical_molecules_from_biomolecule_chains(
                 # construct canonical molecule for post-mapping bond orders
 
                 smile = seq_mapping[seq]
-                canonical_mol = mol_from_smile(smile)
+                try:
+                    canonical_mol = mol_from_smile(smile)
+                except Exception as e:
+                    if verbose:
+                        logger.warning(
+                            f"Failed to construct canonical RDKit molecule from the SMILES string for residue {seq} due to: {e}. "
+                            "Skipping canonical molecule construction."
+                        )
+                    canonical_mol = None
 
                 # find all atom positions and masks for the current atomized residue
 
