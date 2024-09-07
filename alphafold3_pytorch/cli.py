@@ -9,14 +9,14 @@ from alphafold3_pytorch import (
     alphafold3_inputs_to_batched_atom_input
 )
 
-from Bio.PDB.PDBIO import PDBIO
+from Bio.PDB.mmcifio import MMCIFIO
 
 # simple cli using click
 
 @click.command()
 @click.option('-ckpt', '--checkpoint', type = str, help = 'path to alphafold3 checkpoint')
 @click.option('-p', '--protein', type = str, help = 'one protein sequence')
-@click.option('-o', '--output', type = str, help = 'output path', default = 'output.pdb')
+@click.option('-o', '--output', type = str, help = 'output path', default = 'output.mmcif')
 def cli(
     checkpoint: str,
     protein: str,
@@ -40,8 +40,8 @@ def cli(
     output_path = Path(output)
     output_path.parents[0].mkdir(exist_ok = True, parents = True)
 
-    pdb_writer = PDBIO()
+    pdb_writer = MMCIFIO()
     pdb_writer.set_structure(structure)
     pdb_writer.save(str(output_path))
 
-    print(f'pdb saved to {str(output_path)}')
+    print(f'mmcif saved to {str(output_path)}')
