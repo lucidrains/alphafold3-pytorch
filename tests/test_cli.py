@@ -2,6 +2,7 @@ import os
 os.environ['TYPECHECK'] = 'True'
 os.environ['DEBUG'] = 'True'
 from shutil import rmtree
+from pathlib import Path
 
 import torch
 
@@ -21,6 +22,8 @@ def test_cli():
     checkpoint_path = './test-folder/test-cli-alphafold3.pt'
     alphafold3.save(checkpoint_path, overwrite = True)
 
-    cli(['--checkpoint', checkpoint_path, '--protein', 'AG', '--output', './test-folder/atom-pos.pt'], standalone_mode = False)
+    cli(['--checkpoint', checkpoint_path, '--protein', 'AG', '--output', './test-folder/output.pdb'], standalone_mode = False)
+
+    assert Path('./test-folder/output.pdb').exists()
 
     rmtree('./test-folder')
