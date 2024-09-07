@@ -1,6 +1,6 @@
 """mmCIF metadata."""
 
-from typing import Mapping, Sequence
+from beartype.typing import Mapping, Sequence
 
 import numpy as np
 

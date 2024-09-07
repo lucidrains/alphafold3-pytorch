@@ -17,7 +17,7 @@ import os
 import subprocess  # nosec
 import tempfile
 from loguru import logger
-from typing import Mapping, Sequence, Tuple
+from beartype.typing import Mapping, Sequence, Tuple
 
 from alphafold3_pytorch.data import msa_parsing
 from alphafold3_pytorch.data.template_parsing import (

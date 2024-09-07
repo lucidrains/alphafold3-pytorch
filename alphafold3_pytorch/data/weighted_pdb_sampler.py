@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, Iterator, List, Literal, Tuple
+from beartype.typing import Dict, Iterator, List, Literal, Tuple
 
 import numpy as np
 import polars as pl

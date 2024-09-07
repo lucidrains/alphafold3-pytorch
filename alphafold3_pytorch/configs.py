@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from alphafold3_pytorch.tensor_typing import typecheck
-from typing import Callable, List, Dict, Literal
+from beartype.typing import Callable, List, Dict, Literal
 
 from alphafold3_pytorch.alphafold3 import Alphafold3
 
@@ -24,7 +24,11 @@ from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
 import yaml
 from pathlib import Path
 
-from pydantic import BaseModel, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    model_validator,
+)
 
 from pydantic.types import (
     FilePath,
@@ -79,9 +83,10 @@ def yaml_config_path_to_dict(
 # base pydantic classes for constructing alphafold3 and trainer from config files
 
 class BaseModelWithExtra(BaseModel):
-    class Config:
-        extra = 'allow'
-        use_enum_values = True
+    model_config = ConfigDict(
+        extra = 'allow',
+        use_enum_values = True,
+    )
 
 class Alphafold3Config(BaseModelWithExtra):
     dim_atom_inputs: int

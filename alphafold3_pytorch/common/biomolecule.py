@@ -7,7 +7,7 @@ import io
 import random
 from functools import partial
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Set, Tuple
+from beartype.typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from Bio.PDB.mmcifio import MMCIFIO

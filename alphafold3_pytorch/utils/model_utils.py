@@ -1,8 +1,8 @@
 from functools import wraps
-from typing import Callable, List, Tuple, Union
+from beartype.typing import Callable, List, Tuple, Union
 
 import einx
-import pkg_resources
+import importlib.metadata
 import torch
 import torch.nn.functional as F
 from einops import einsum, pack, rearrange, reduce, repeat, unpack
@@ -644,8 +644,9 @@ def package_available(package_name: str) -> bool:
     :return: `True` if the package is available. `False` otherwise.
     """
     try:
-        return pkg_resources.require(package_name) is not None
-    except pkg_resources.DistributionNotFound:
+        importlib.metadata.version(package_name)
+        return True
+    except importlib.metadata.PackageNotFoundError:
         return False
 
 

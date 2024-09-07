@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from loguru import logger
-from typing import Any, Dict, List, Literal, Mapping, Tuple
+from beartype.typing import Any, Dict, List, Literal, Mapping, Tuple
 
 import numpy as np
 import polars as pl
