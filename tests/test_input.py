@@ -67,7 +67,9 @@ def test_atom_dataset():
 # alphafold3 input
 
 @pytest.mark.parametrize('directed_bonds', (False, True))
-def test_alphafold3_input(directed_bonds):
+def test_alphafold3_input(
+    directed_bonds
+):
 
     alphafold3_input = Alphafold3Input(
         proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
@@ -118,6 +120,46 @@ def test_alphafold3_input(directed_bonds):
     )
 
     alphafold3(**batched_atom_input.model_forward_dict(), num_sample_steps = 1)
+
+def test_return_bio_pdb_structures():
+
+    alphafold3_input = Alphafold3Input(
+        proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
+    )
+
+    batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input)
+
+    # feed it into alphafold3
+
+    alphafold3 = Alphafold3(
+        dim_atom_inputs = 3,
+        dim_atompair_inputs = 5,
+        num_atom_embeds = 0,
+        num_atompair_embeds = 0,
+        atoms_per_window = 27,
+        dim_template_feats = 108,
+        num_dist_bins = 64,
+        num_molecule_mods = 0,
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        )
+    )
+
+    alphafold3(**batched_atom_input.model_forward_dict(), num_sample_steps = 1, return_bio_pdb_structures = True)
 
 def test_atompos_input():
 

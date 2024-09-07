@@ -9,12 +9,14 @@ from alphafold3_pytorch import (
     alphafold3_inputs_to_batched_atom_input
 )
 
+from Bio.PDB.PDBIO import PDBIO
+
 # simple cli using click
 
 @click.command()
 @click.option('-ckpt', '--checkpoint', type = str, help = 'path to alphafold3 checkpoint')
 @click.option('-p', '--protein', type = str, help = 'one protein sequence')
-@click.option('-o', '--output', type = str, help = 'output path', default = 'atompos.pt')
+@click.option('-o', '--output', type = str, help = 'output path', default = 'output.pdb')
 def cli(
     checkpoint: str,
     protein: str,
@@ -33,11 +35,13 @@ def cli(
     batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input, atoms_per_window = alphafold3.atoms_per_window)
 
     alphafold3.eval()
-    sampled_atom_pos = alphafold3(**batched_atom_input.model_forward_dict())
+    structure, = alphafold3(**batched_atom_input.model_forward_dict(), return_bio_pdb_structures = True)
 
     output_path = Path(output)
     output_path.parents[0].mkdir(exist_ok = True, parents = True)
 
-    torch.save(sampled_atom_pos, str(output_path))
+    pdb_writer = PDBIO()
+    pdb_writer.set_structure(structure)
+    pdb_writer.save(str(output_path))
 
-    print(f'atomic positions saved to {str(output_path)}')
+    print(f'pdb saved to {str(output_path)}')
