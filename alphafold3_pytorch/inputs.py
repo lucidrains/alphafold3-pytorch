@@ -3414,9 +3414,11 @@ class PDBDataset(Dataset):
         # get the mmCIF file corresponding to the sampled structure
 
         if not exists(mmcif_filepath):
-            raise FileNotFoundError(f"mmCIF file for PDB ID {pdb_id} not found.")
-        if not os.path.exists(mmcif_filepath):
-            raise FileNotFoundError(f"mmCIF file {mmcif_filepath} not found.")
+            logger.warning(f"mmCIF file for PDB ID {pdb_id} not found.")
+            return None
+        elif not os.path.exists(mmcif_filepath):
+            logger.warning(f"mmCIF file {mmcif_filepath} not found.")
+            return None
 
         cropping_config = None
 
