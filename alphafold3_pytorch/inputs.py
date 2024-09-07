@@ -2281,10 +2281,17 @@ def extract_canonical_molecules_from_biomolecule_chains(
                 contiguous_res_atom_mapping = np.vectorize(contiguous_res_atom_mapping.get)(
                     res_atom_mapping
                 )
-
                 res_atom_positions = atom_positions[res_index][res_atom_mask][
                     contiguous_res_atom_mapping
                 ]
+
+                num_atom_positions = len(res_atom_positions) + len(missing_atom_indices)
+                if num_atom_positions != mol.GetNumAtoms():
+                    raise ValueError(
+                        f"The number of (missing and present) atom positions ({num_atom_positions}) for residue {res} does not match the number of atoms in the RDKit molecule ({mol.GetNumAtoms()}). "
+                        "Please ensure that these input features are correctly paired. Skipping this example."
+                    )
+                
                 mol = add_atom_positions_to_mol(
                     mol,
                     res_atom_positions.reshape(-1, 3),
