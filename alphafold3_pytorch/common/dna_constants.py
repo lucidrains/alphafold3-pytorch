@@ -255,7 +255,7 @@ restype_atom47_to_compact_atom = np.zeros([5, 47], dtype=int)
 
 def _make_constants():
     """Fill the array(s) above."""
-    for restype, restype_letter in enumerate(restypes):
+    for restype, restype_letter in enumerate(restype_1to3.keys()):
         resname = restype_1to3[restype_letter]
         for atomname in restype_name_to_compact_atom_names[resname]:
             if not atomname:
