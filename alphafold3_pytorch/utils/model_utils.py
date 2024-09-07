@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Callable, List, Tuple, Union
+from beartype.typing import Callable, List, Tuple, Union
 
 import einx
 import importlib.metadata

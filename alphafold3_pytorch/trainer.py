@@ -7,7 +7,7 @@ from pathlib import Path
 from alphafold3_pytorch.alphafold3 import Alphafold3
 from alphafold3_pytorch.attention import pad_at_dim, pad_or_slice_to
 
-from typing import TypedDict, List, Callable
+from beartype.typing import TypedDict, List, Callable
 
 from alphafold3_pytorch.tensor_typing import (
     should_typecheck,

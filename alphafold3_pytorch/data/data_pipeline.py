@@ -1,7 +1,7 @@
 """General-purpose data pipeline."""
 
 import os
-from typing import Dict, List, MutableMapping, Optional, Tuple
+from beartype.typing import Dict, List, MutableMapping, Optional, Tuple
 
 import numpy as np
 import torch

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Set, Tuple
+from beartype.typing import Any, Dict, List, Literal, Set, Tuple
 
 import numpy as np
 import torch

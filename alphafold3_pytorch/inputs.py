@@ -14,7 +14,16 @@ from io import StringIO
 from itertools import groupby
 from pathlib import Path
 from retrying import retry
-from typing import Any, Callable, Dict, List, Literal, Set, Tuple, Type
+from beartype.typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Set,
+    Tuple,
+    Type,
+)
 
 import einx
 import numpy as np

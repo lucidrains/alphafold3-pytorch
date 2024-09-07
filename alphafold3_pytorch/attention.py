@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import NamedTuple, Tuple
+from beartype.typing import NamedTuple, Tuple
 
 import torch
 from torch import nn, Tensor

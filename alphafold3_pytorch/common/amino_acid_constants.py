@@ -1,6 +1,6 @@
 """Amino acid constants used in AlphaFold."""
 
-from typing import Final
+from beartype.typing import Final
 
 import numpy as np
 

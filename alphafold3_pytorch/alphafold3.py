@@ -21,7 +21,14 @@ from torch.nn import (
     Sequential,
 )
 
-from typing import Callable, Dict, List, Literal, NamedTuple, Tuple
+from beartype.typing import (
+    Callable,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Tuple,
+)
 
 from alphafold3_pytorch.tensor_typing import (
     Float,

@@ -1,5 +1,5 @@
 import os
-from typing import Literal
+from beartype.typing import Literal
 
 import gemmi
 import rdkit.Geometry.rdGeometry as rdGeometry

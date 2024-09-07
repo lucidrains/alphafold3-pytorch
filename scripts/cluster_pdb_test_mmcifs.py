@@ -24,7 +24,7 @@ import json
 import os
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, List, Set, Tuple
+from beartype.typing import Dict, List, Set, Tuple
 
 import numpy as np
 import polars as pl

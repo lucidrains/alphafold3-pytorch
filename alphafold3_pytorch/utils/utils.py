@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Any, Iterable, List
+from beartype.typing import Any, Iterable, List
 
 
 def exists(val: Any) -> bool:
