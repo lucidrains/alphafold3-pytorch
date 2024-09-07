@@ -16,7 +16,7 @@ from Bio.PDB.mmcifio import MMCIFIO
 @click.command()
 @click.option('-ckpt', '--checkpoint', type = str, help = 'path to alphafold3 checkpoint')
 @click.option('-p', '--protein', type = str, help = 'one protein sequence')
-@click.option('-o', '--output', type = str, help = 'output path', default = 'output.mmcif')
+@click.option('-o', '--output', type = str, help = 'output path', default = 'output.cif')
 def cli(
     checkpoint: str,
     protein: str,
@@ -24,7 +24,7 @@ def cli(
 ):
 
     checkpoint_path = Path(checkpoint)
-    assert checkpoint_path.exists(), f'alphafold3 checkpoint must exist at {str(checkpoint_path)}'
+    assert checkpoint_path.exists(), f'AlphaFold 3 checkpoint must exist at {str(checkpoint_path)}'
 
     alphafold3_input = Alphafold3Input(
         proteins = [protein],
@@ -44,4 +44,4 @@ def cli(
     pdb_writer.set_structure(structure)
     pdb_writer.save(str(output_path))
 
-    print(f'mmcif saved to {str(output_path)}')
+    print(f'mmCIF file saved to {str(output_path)}')
