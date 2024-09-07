@@ -1947,18 +1947,14 @@ def extract_chain_sequences_from_biomolecule_chemical_components(
         mapped_restype = comp_details.id if is_atomized_residue(res_chem_type) else restype
         current_chain_seq.append((mapped_restype, res_chem_type))
 
-        # reset current_chain_seq if the next residue is either not part of the current chain or is a different (unmodified) molecule type
-
-        unmod_res_chem_type = get_pdb_input_residue_molecule_type(
-            comp_details.type,
-            is_modified_polymer_residue=False,
-        )
+        # reset current_chain_seq if the next residue is either not part of the current chain or is a different chemical type
 
         chain_ending = idx + 1 < len(chain_index) and chain_index[idx] != chain_index[idx + 1]
-        chem_type_ending = idx + 1 < len(chem_comps) and unmod_res_chem_type != (
+        chem_type_ending = idx + 1 < len(chem_comps) and res_chem_type != (
             get_pdb_input_residue_molecule_type(
                 chem_comps[idx + 1].type,
-                is_modified_polymer_residue=False,
+                is_modified_polymer_residue=is_polymer(chem_comps[idx + 1].type)
+                and residue_constants.restype_3to1.get(chem_comps[idx + 1].id, "X") == "X",
             )
         )
         if chain_ending or chem_type_ending:
