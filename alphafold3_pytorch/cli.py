@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import click
 from pathlib import Path
 
@@ -15,11 +17,15 @@ from Bio.PDB.mmcifio import MMCIFIO
 
 @click.command()
 @click.option('-ckpt', '--checkpoint', type = str, help = 'path to alphafold3 checkpoint')
-@click.option('-p', '--protein', type = str, help = 'one protein sequence')
+@click.option('-prot', '--protein', type = str, multiple = True, help = 'protein sequences')
+@click.option('-rna', '--rna', type = str, multiple = True, help = 'single stranded rna sequences')
+@click.option('-dna', '--dna', type = str, multiple = True, help = 'single stranded dna sequences')
 @click.option('-o', '--output', type = str, help = 'output path', default = 'output.cif')
 def cli(
     checkpoint: str,
-    protein: str,
+    protein: list[str],
+    rna: list[str],
+    dna: list[str],
     output: str
 ):
 
@@ -27,7 +33,9 @@ def cli(
     assert checkpoint_path.exists(), f'AlphaFold 3 checkpoint must exist at {str(checkpoint_path)}'
 
     alphafold3_input = Alphafold3Input(
-        proteins = [protein],
+        proteins = protein,
+        ss_rna = rna,
+        ss_dna = dna,
     )
 
     alphafold3 = Alphafold3.init_and_load(checkpoint_path)

@@ -22,8 +22,14 @@ def test_cli():
     checkpoint_path = './test-folder/test-cli-alphafold3.pt'
     alphafold3.save(checkpoint_path, overwrite = True)
 
-    cli(['--checkpoint', checkpoint_path, '--protein', 'AG', '--output', './test-folder/output.pdb'], standalone_mode = False)
+    cli([
+        '--checkpoint', checkpoint_path,
+        '-prot', 'AG',
+        '-prot', 'TC',
+        '--output',
+        './test-folder/output.mmcif'
+    ], standalone_mode = False)
 
-    assert Path('./test-folder/output.pdb').exists()
+    assert Path('./test-folder/output.mmcif').exists()
 
     rmtree('./test-folder')
