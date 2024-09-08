@@ -673,7 +673,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
         asym_ids = i.additional_molecule_feats[..., 2]
         asym_ids = F.pad(asym_ids, (1, 0), value=-1)
-        is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
+        is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) != 0
 
         is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
 
@@ -956,7 +956,7 @@ def molecule_lengthed_molecule_input_to_atom_input(
 
     asym_ids = i.additional_molecule_feats[..., 2]
     asym_ids = F.pad(asym_ids, (1, 0), value=-1)
-    is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) == 1
+    is_first_mol_in_chains = (asym_ids[1:] - asym_ids[:-1]) != 0
     is_chainable_biomolecules = i.is_molecule_types[..., IS_BIOMOLECULE_INDICES].any(dim=-1)
 
     # repeat all the molecule lengths to the token lengths, using `one_token_per_atom`
