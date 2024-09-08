@@ -11,18 +11,22 @@ from alphafold3_pytorch.utils.utils import exists
 def test_template_loading():
     """Test a template-featurized PDBDataset constructed using a WeightedPDBSampler."""
     data_test = os.path.join("data", "test")
-    if not os.path.exists(os.path.join("data", "test", "mmcif")):
-        pytest.skip("The directory `data/test/mmcif` is not populated yet.")
+    data_test_mmcif_dir = os.path.join(data_test, "mmcif")
+    data_test_clusterings_dir = os.path.join(data_test, "data_caches", "clusterings")
+    data_test_template_dir = os.path.join(data_test, "data_caches", "template", "templates")
 
-    interface_mapping_path = os.path.join(data_test, "interface_cluster_mapping.csv")
+    if not os.path.exists(data_test_mmcif_dir):
+        pytest.skip(f"The directory `{data_test_mmcif_dir}` is not populated yet.")
+
+    interface_mapping_path = os.path.join(data_test_clusterings_dir, "interface_cluster_mapping.csv")
     chain_mapping_paths = [
-        os.path.join(data_test, "ligand_chain_cluster_mapping.csv"),
+        os.path.join(data_test_clusterings_dir, "ligand_chain_cluster_mapping.csv"),
         os.path.join(
-            data_test,
+            data_test_clusterings_dir,
             "nucleic_acid_chain_cluster_mapping.csv",
         ),
-        os.path.join(data_test, "peptide_chain_cluster_mapping.csv"),
-        os.path.join(data_test, "protein_chain_cluster_mapping.csv"),
+        os.path.join(data_test_clusterings_dir, "peptide_chain_cluster_mapping.csv"),
+        os.path.join(data_test_clusterings_dir, "protein_chain_cluster_mapping.csv"),
     ]
 
     sampler = WeightedPDBSampler(
@@ -32,11 +36,11 @@ def test_template_loading():
     )
 
     pdb_input = PDBDataset(
-        folder=os.path.join("data", "test", "mmcif"),
+        folder=data_test_mmcif_dir,
         sampler=sampler,
         sample_type="default",
         crop_size=128,
-        templates_dir=os.path.join("data", "test", "template"),
+        templates_dir=data_test_template_dir,
         training=False,
     )
 
