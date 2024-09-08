@@ -2,18 +2,18 @@ import os
 
 import pytest
 
-from alphafold3_pytorch.inputs import PDBDataset
 from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
+from alphafold3_pytorch.inputs import PDBDataset
 from alphafold3_pytorch.trainer import pdb_inputs_to_batched_atom_input
 from alphafold3_pytorch.utils.utils import exists
 
 
-def test_template_loading():
-    """Test a template-featurized PDBDataset constructed using a WeightedPDBSampler."""
+def test_msa_loading():
+    """Test an MSA-featurized PDBDataset constructed using a WeightedPDBSampler."""
     data_test = os.path.join("data", "test")
     data_test_mmcif_dir = os.path.join(data_test, "mmcif")
     data_test_clusterings_dir = os.path.join(data_test, "data_caches", "clusterings")
-    data_test_template_dir = os.path.join(data_test, "data_caches", "template", "templates")
+    data_test_msa_dir = os.path.join(data_test, "data_caches", "msa", "msas")
 
     if not os.path.exists(data_test_mmcif_dir):
         pytest.skip(f"The directory `{data_test_mmcif_dir}` is not populated yet.")
@@ -40,7 +40,7 @@ def test_template_loading():
         sampler=sampler,
         sample_type="default",
         crop_size=128,
-        templates_dir=data_test_template_dir,
+        msa_dir=data_test_msa_dir,
         training=False,
     )
 
