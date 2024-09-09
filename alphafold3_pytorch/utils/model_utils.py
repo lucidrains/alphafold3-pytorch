@@ -888,7 +888,7 @@ class RigidFrom3Points(Module):
         return R, t
 
 
-class RigidFromReferenceThreePoints(Module):
+class RigidFromReference3Points(Module):
     """A modification of Algorithm 21 in Section 1.8.1 in AlphaFold 2 paper:
 
     https://www.nature.com/articles/s41586-021-03819-2
