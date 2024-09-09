@@ -390,8 +390,8 @@ def _extract_template_features(
     inv_template_backbone_frames = template_backbone_frames.transpose(-1, -2)
     template_backbone_vec = einsum(
         inv_template_backbone_frames,
-        template_backbone_points.unsqueeze(-1) - template_backbone_points.unsqueeze(-2),
-        "n i j, n k j -> n k i",
+        template_backbone_points.unsqueeze(-2) - template_backbone_points.unsqueeze(-3),
+        "n i j, m n j -> m n i",
     )
     template_inv_distance_scalar = torch.rsqrt(eps + torch.sum(template_backbone_vec**2, dim=-1))
     template_inv_distance_scalar = (
