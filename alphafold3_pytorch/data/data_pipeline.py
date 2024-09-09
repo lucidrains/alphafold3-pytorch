@@ -222,7 +222,7 @@ def make_template_features(
         template types.
     :param chain_id_to_residue: The mapping of chain IDs to residue information.
     :param num_templates: The (optional) number of templates to return per chain.
-    :param kalign_binary_path: The path to a local Kalign2 executable.
+    :param kalign_binary_path: The path to a local Kalign3 executable.
     :param unknown_restype: The unknown residue type index.
     :param num_restype_classes: The number of classes in the residue type classification.
     :param num_distogram_bins: The number of bins in the distogram features.
@@ -301,7 +301,7 @@ def make_template_features(
         if not templates[chain_id] or not exists(kalign_binary_path):
             if raise_missing_exception:
                 raise ValueError(
-                    f"Templates for chain {chain_id} must contain at least one template and must be aligned with Kalign2."
+                    f"Templates for chain {chain_id} must contain at least one template and must be aligned with Kalign3."
                 )
             continue
 
