@@ -2697,10 +2697,28 @@ def pdb_input_to_molecule_input(
         # NOTE: this is the template cutoff date for all inference tasks
         template_cutoff_date = datetime.strptime("2021-09-30", "%Y-%m-%d")
 
-    if exists(i.max_num_template_tokens) and num_tokens * i.num_templates_per_chain > i.max_num_template_tokens:
-        raise ValueError(
-            f"The number of tokens ({num_tokens}) multiplied by the number of templates per structure ({i.num_templates_per_chain}) must not exceed the maximum total number of template tokens {(i.max_num_template_tokens)}. "
-            "Skipping this example."
+    if (
+        exists(i.max_num_template_tokens)
+        and num_tokens * i.num_templates_per_chain > i.max_num_template_tokens
+    ):
+        logger.warning(
+            f"The number of tokens ({num_tokens}) multiplied by the number of templates per structure ({i.num_templates_per_chain}) exceeds the maximum total number of template tokens {(i.max_num_template_tokens)}. "
+            "Skipping curation of template features for this example."
+        )
+        template_features = {}
+    else:
+        template_features = load_templates_from_templates_dir(
+            # NOTE: if templates are not locally available, no template features will be used
+            i.templates_dir,
+            mmcif_dir,
+            file_id,
+            chain_id_to_residue,
+            max_templates_per_chain=i.max_templates_per_chain,
+            num_templates_per_chain=i.num_templates_per_chain,
+            kalign_binary_path=i.kalign_binary_path,
+            template_cutoff_date=template_cutoff_date,
+            randomly_sample_num_templates=exists(i.training) and i.training,
+            verbose=verbose,
         )
 
     template_features = load_templates_from_templates_dir(
