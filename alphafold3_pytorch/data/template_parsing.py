@@ -23,7 +23,7 @@ from alphafold3_pytorch.life import (
 )
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 from alphafold3_pytorch.utils.model_utils import (
-    RigidFromReferenceThreePoints,
+    RigidFromReference3Points,
     distance_to_dgram,
     get_frames_from_atom_pos,
 )
@@ -382,8 +382,8 @@ def _extract_template_features(
         template_three_atom_indices_for_frame.unsqueeze(-1).expand(-1, -1, 3),
     )
 
-    rigid_from_reference_three_points = RigidFromReferenceThreePoints()
-    template_backbone_frames, template_backbone_points = rigid_from_reference_three_points(
+    rigid_from_reference_3_points = RigidFromReferenceThreePoints()
+    template_backbone_frames, template_backbone_points = rigid_from_reference_3_points(
         template_backbone_frame_atom_positions.unbind(-2)
     )
 
