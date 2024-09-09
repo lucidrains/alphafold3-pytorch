@@ -11,7 +11,7 @@ from alphafold3_pytorch.utils.utils import exists
 def test_msa_loading():
     """Test an MSA-featurized PDBDataset constructed using a WeightedPDBSampler."""
     data_test = os.path.join("data", "test")
-    data_test_mmcif_dir = os.path.join(data_test, "mmcif")
+    data_test_mmcif_dir = os.path.join(data_test, "mmcifs")
     data_test_clusterings_dir = os.path.join(data_test, "data_caches", "clusterings")
     data_test_msa_dir = os.path.join(data_test, "data_caches", "msa", "msas")
 
@@ -44,5 +44,7 @@ def test_msa_loading():
         training=False,
     )
 
-    batched_atom_input = pdb_inputs_to_batched_atom_input(pdb_input[0], atoms_per_window=27)
+    sample = pdb_input.__getitem__(0, max_attempts=20)
+
+    batched_atom_input = pdb_inputs_to_batched_atom_input(sample, atoms_per_window=27)
     assert exists(batched_atom_input)
