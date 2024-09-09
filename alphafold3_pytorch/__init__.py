@@ -71,12 +71,15 @@ from alphafold3_pytorch.configs import (
 from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
+    RigidFromReferenceThreePoints,
 )
 
 __all__ = [
     Attention,
     Attend,
     RelativePositionEncoding,
+    RigidFrom3Points,
+    RigidFromReferenceThreePoints,
     SmoothLDDTLoss,
     WeightedRigidAlign,
     MultiChainPermutationAlignment,
