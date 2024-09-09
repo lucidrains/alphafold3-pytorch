@@ -133,6 +133,10 @@ def collate_inputs_to_batched_atom_input(
             ), "No `AtomInput` objects could be created for the current batch."
             atom_inputs = random.choices(atom_inputs, k=len(inputs))  # nosec
     else:
+        assert all(isinstance(i, AtomInput) for i in inputs), (
+            "When `transform_to_atom_inputs=False`, all provided "
+            "inputs must be of type `AtomInput`."
+        )
         atom_inputs = inputs
 
     assert all(isinstance(i, AtomInput) for i in atom_inputs), (
