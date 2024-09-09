@@ -59,9 +59,9 @@ dataset_config:
     dataset_type: pdb
     train_folder: ./test-folder/data/train
     train_weighted_sampler:
-        interface_mapping_path: ./data/test/interface_cluster_mapping.csv
+        interface_mapping_path: ./data/test/data_caches/clusterings/interface_cluster_mapping.csv
         chain_mapping_paths:
-            - ./data/test/ligand_chain_cluster_mapping.csv
-            - ./data/test/nucleic_acid_chain_cluster_mapping.csv
-            - ./data/test/peptide_chain_cluster_mapping.csv
-            - ./data/test/protein_chain_cluster_mapping.csv
+            - ./data/test/data_caches/clusterings/ligand_chain_cluster_mapping.csv
+            - ./data/test/data_caches/clusterings/nucleic_acid_chain_cluster_mapping.csv
+            - ./data/test/data_caches/clusterings/peptide_chain_cluster_mapping.csv
+            - ./data/test/data_caches/clusterings/protein_chain_cluster_mapping.csv
