@@ -44,7 +44,7 @@ def test_msa_loading():
         training=False,
     )
 
-    sample = pdb_input.__getitem__(0, max_attempts=15)
+    sample = pdb_input.__getitem__(0, max_attempts=20)
 
     batched_atom_input = pdb_inputs_to_batched_atom_input(sample, atoms_per_window=27)
     assert exists(batched_atom_input)

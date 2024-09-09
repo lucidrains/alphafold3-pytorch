@@ -42,7 +42,7 @@ def test_data_input():
     )
 
 
-    sample = dataset.__getitem__(0, max_attempts=15)
+    sample = dataset.__getitem__(0, max_attempts=20)
 
     mol_input = pdb_input_to_molecule_input(pdb_input=sample)
     atom_input = molecule_to_atom_input(mol_input)
