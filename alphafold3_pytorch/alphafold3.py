@@ -78,6 +78,7 @@ from alphafold3_pytorch.common.biomolecule import (
 from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
+    RigidFromReference3Points,
     calculate_weighted_rigid_align_weights,
     package_available,
 )

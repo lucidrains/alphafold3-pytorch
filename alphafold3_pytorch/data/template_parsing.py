@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from loguru import logger
 from beartype.typing import Any, Dict, List, Literal, Mapping, Tuple
+from einops import einsum
 
 import numpy as np
 import polars as pl
@@ -22,8 +23,7 @@ from alphafold3_pytorch.life import (
 )
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 from alphafold3_pytorch.utils.model_utils import (
-    ExpressCoordinatesInFrame,
-    RigidFrom3Points,
+    RigidFromReference3Points,
     distance_to_dgram,
     get_frames_from_atom_pos,
 )
@@ -150,6 +150,7 @@ def _extract_template_features(
     num_distogram_bins: int = 39,
     distance_bins: List[float] = torch.linspace(3.25, 50.75, 39).float(),
     verbose: bool = False,
+    eps: float = 1e-20,
 ) -> Dict[str, Any]:
     """Parse atom positions in the target structure and align with the query.
 
@@ -173,6 +174,7 @@ def _extract_template_features(
     :param distance_bins: List of floats representing the bins for the distance
         histogram (i.e., distogram).
     :param verbose: Whether to log verbose output.
+    :param eps: A small value to prevent division by zero.
 
     :return: A dictionary containing the extra features derived from the template
         structure.
@@ -380,17 +382,23 @@ def _extract_template_features(
         template_three_atom_indices_for_frame.unsqueeze(-1).expand(-1, -1, 3),
     )
 
-    rigid_from_three_points = RigidFrom3Points()
-    template_backbone_frames, _ = rigid_from_three_points(
+    rigid_from_reference_3_points = RigidFromReferenceThreePoints()
+    template_backbone_frames, template_backbone_points = rigid_from_reference_3_points(
         template_backbone_frame_atom_positions.unbind(-2)
     )
 
-    express_coordinates_in_frame = ExpressCoordinatesInFrame()
-    template_unit_vector = express_coordinates_in_frame(
-        template_token_center_atom_positions.unsqueeze(0),
-        template_backbone_frames.unsqueeze(0),
-        pairwise=True,
-    ).squeeze(0)
+    inv_template_backbone_frames = template_backbone_frames.transpose(-1, -2)
+    template_backbone_vec = einsum(
+        inv_template_backbone_frames,
+        template_backbone_points.unsqueeze(-2) - template_backbone_points.unsqueeze(-3),
+        "n i j, m n j -> m n i",
+    )
+    template_inv_distance_scalar = torch.rsqrt(eps + torch.sum(template_backbone_vec**2, dim=-1))
+    template_inv_distance_scalar = (
+        template_inv_distance_scalar * template_backbone_frame_mask.unsqueeze(-1)
+    )
+
+    template_unit_vector = template_backbone_vec * template_inv_distance_scalar.unsqueeze(-1)
 
     return {
         "template_restype": template_restype.float(),

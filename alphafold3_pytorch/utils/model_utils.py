@@ -809,13 +809,12 @@ class ExpressCoordinatesInFrame(Module):
         self,
         coords: Float["b m 3"],  # type: ignore
         frame: Float["b m 3 3"] | Float["b 3 3"] | Float["3 3"],  # type: ignore
-        pairwise: bool = False,
-    ) -> Float["b m 3"] | Float["b m m 3"]:  # type: ignore
+    ) -> Float["b m 3"]:  # type: ignore
         """Express coordinates in the given frame.
 
         :param coords: Coordinates to be expressed in the given frame.
         :param frame: Frames defined by three points.
-        :return: The transformed coordinates or pairwise coordinates.
+        :return: The transformed coordinates.
         """
 
         if frame.ndim == 2:
@@ -833,38 +832,19 @@ class ExpressCoordinatesInFrame(Module):
         e2 = l2norm(w2 - w1, eps=self.eps)
         e3 = torch.cross(e1, e2, dim=-1)
 
-        if pairwise:
-            # Compute pairwise displacement vectors
-            pairwise_d = coords.unsqueeze(2) - coords.unsqueeze(1)
+        # Project onto frame basis
+        d = coords - b
 
-            # Project onto frame basis
-            pairwise_transformed_coords = torch.stack(
-                (
-                    einsum(pairwise_d, e1.unsqueeze(1), "... i, ... i -> ..."),
-                    einsum(pairwise_d, e2.unsqueeze(1), "... i, ... i -> ..."),
-                    einsum(pairwise_d, e3.unsqueeze(1), "... i, ... i -> ..."),
-                ),
-                dim=-1,
-            )
+        transformed_coords = torch.stack(
+            (
+                einsum(d, e1, "... i, ... i -> ..."),
+                einsum(d, e2, "... i, ... i -> ..."),
+                einsum(d, e3, "... i, ... i -> ..."),
+            ),
+            dim=-1,
+        )
 
-            # Normalize to get unit vectors
-            pairwise_transformed_coords = l2norm(pairwise_transformed_coords, eps=self.eps)
-            return pairwise_transformed_coords
-
-        else:
-            # Project onto frame basis
-            d = coords - b
-
-            transformed_coords = torch.stack(
-                (
-                    einsum(d, e1, "... i, ... i -> ..."),
-                    einsum(d, e2, "... i, ... i -> ..."),
-                    einsum(d, e3, "... i, ... i -> ..."),
-                ),
-                dim=-1,
-            )
-
-            return transformed_coords
+        return transformed_coords
 
 
 class RigidFrom3Points(Module):
@@ -899,6 +879,100 @@ class RigidFrom3Points(Module):
 
         R = torch.stack((e1, e2, e3), dim=-1)
         t = x2
+
+        # unpack
+
+        R = unpack_one(R, "* r1 r2")
+        t = unpack_one(t, "* c")
+
+        return R, t
+
+
+class RigidFromReference3Points(Module):
+    """A modification of Algorithm 21 in Section 1.8.1 in AlphaFold 2 paper:
+
+    https://www.nature.com/articles/s41586-021-03819-2
+
+    Inpsired by the implementation in the OpenFold codebase:
+    https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/utils/feats.py#L143
+    """
+
+    @typecheck
+    def forward(
+        self,
+        three_points: Tuple[Float["... 3"], Float["... 3"], Float["... 3"]] | Float["3 ... 3"],  # type: ignore
+        eps: float = 1e-20,
+    ) -> Tuple[Float["... 3 3"], Float["... 3"]]:  # type: ignore
+        """Return a transformation object from reference coordinates.
+
+        NOTE: This method does not take care of symmetries. If you
+        provide the atom positions in the non-standard way,
+        e.g., the N atom of amino acid residues will end up
+        not at [-0.527250, 1.359329, 0.0] but instead at
+        [-0.527250, -1.359329, 0.0]. You need to take care
+        of such cases in your code.
+
+        :param three_points: Three reference points to define the transformation.
+        :param eps: A small value to avoid division by zero.
+        :return: A transformation object. After applying the translation and
+            rotation to the reference backbone, the coordinates will
+            approximately equal to the input coordinates.
+        """
+        if isinstance(three_points, tuple):
+            three_points = torch.stack(three_points)
+
+        # allow for any number of leading dimensions
+
+        (x1, x2, x3), unpack_one = pack_one(three_points, "three * d")
+
+        # main algorithm
+
+        t = -1 * x2
+        x1 = x1 + t
+        x3 = x3 + t
+
+        x3_x, x3_y, x3_z = [x3[..., i] for i in range(3)]
+        norm = torch.sqrt(eps + x3_x**2 + x3_y**2)
+        sin_x3_1 = -x3_y / norm
+        cos_x3_1 = x3_x / norm
+
+        x3_1_R = sin_x3_1.new_zeros((*sin_x3_1.shape, 3, 3))
+        x3_1_R[..., 0, 0] = cos_x3_1
+        x3_1_R[..., 0, 1] = -1 * sin_x3_1
+        x3_1_R[..., 1, 0] = sin_x3_1
+        x3_1_R[..., 1, 1] = cos_x3_1
+        x3_1_R[..., 2, 2] = 1
+
+        norm = torch.sqrt(eps + x3_x**2 + x3_y**2 + x3_z**2)
+        sin_x3_2 = x3_z / norm
+        cos_x3_2 = torch.sqrt(x3_x**2 + x3_y**2) / norm
+
+        x3_2_R = sin_x3_2.new_zeros((*sin_x3_2.shape, 3, 3))
+        x3_2_R[..., 0, 0] = cos_x3_2
+        x3_2_R[..., 0, 2] = sin_x3_2
+        x3_2_R[..., 1, 1] = 1
+        x3_2_R[..., 2, 0] = -1 * sin_x3_2
+        x3_2_R[..., 2, 2] = cos_x3_2
+
+        x3_R = einsum(x3_2_R, x3_1_R, "n i j, n j k -> n i k")
+        x1 = einsum(x3_R, x1, "n i j, n j -> n i")
+
+        _, x1_y, x1_z = [x1[..., i] for i in range(3)]
+        norm = torch.sqrt(eps + x1_y**2 + x1_z**2)
+        sin_x1 = -x1_z / norm
+        cos_x1 = x1_y / norm
+
+        x1_R = sin_x3_2.new_zeros((*sin_x3_2.shape, 3, 3))
+        x1_R[..., 0, 0] = 1
+        x1_R[..., 1, 1] = cos_x1
+        x1_R[..., 1, 2] = -1 * sin_x1
+        x1_R[..., 2, 1] = sin_x1
+        x1_R[..., 2, 2] = cos_x1
+
+        R = einsum(x1_R, x3_R, "n i j, n j k -> n i k")
+
+        R = R.transpose(-1, -2)
+        t = -1 * t
 
         # unpack
 

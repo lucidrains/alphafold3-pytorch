@@ -19,6 +19,7 @@ from alphafold3_pytorch import (
     MultiChainPermutationAlignment,
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
+    RigidFromReference3Points,
     ComputeAlignmentError,
     CentreRandomAugmentation,
     PairformerStack,
@@ -243,6 +244,13 @@ def test_rigid_from_three_points():
 
     points = torch.randn(7, 11, 23, 3)
     rotation, _ = rigid_from_3_points((points, points, points))
+    assert rotation.shape == (7, 11, 23, 3, 3)
+
+def test_rigid_from_reference_three_points():
+    rigid_from_reference_3_points = RigidFromReference3Points()
+
+    points = torch.randn(7, 11, 23, 3)
+    rotation, _ = rigid_from_reference_3_points((points, points, points))
     assert rotation.shape == (7, 11, 23, 3, 3)
 
 def test_deriving_frames_for_ligands():
