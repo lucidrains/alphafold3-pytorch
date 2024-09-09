@@ -1845,6 +1845,7 @@ class PDBInput:
     max_msas_per_chain: int | None = None
     max_templates_per_chain: int | None = None
     num_templates_per_chain: int | None = None
+    max_num_template_tokens: int | None = None
     kalign_binary_path: str | None = None
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
@@ -2696,6 +2697,12 @@ def pdb_input_to_molecule_input(
         # NOTE: this is the template cutoff date for all inference tasks
         template_cutoff_date = datetime.strptime("2021-09-30", "%Y-%m-%d")
 
+    if exists(i.max_num_template_tokens) and num_tokens * i.num_templates_per_chain > i.max_num_template_tokens:
+        raise ValueError(
+            f"The number of tokens ({num_tokens}) multiplied by the number of templates per structure ({i.num_templates_per_chain}) must not exceed the maximum total number of template tokens {(i.max_num_template_tokens)}. "
+            "Skipping this example."
+        )
+
     template_features = load_templates_from_templates_dir(
         # NOTE: if templates are not locally available, no template features will be used
         i.templates_dir,
@@ -3400,9 +3407,15 @@ class PDBDataset(Dataset):
         """Return the number of PDB mmCIF files in the dataset."""
         return len(self.files)
 
-    def get_item(self, idx: int | str) -> PDBInput | AtomInput | None:
+    def get_item(self, idx: int | str, random_idx: bool = False) -> PDBInput | AtomInput | None:
         """Return either a PDBInput or an AtomInput object for the specified index."""
         sampled_id = None
+
+        if random_idx:
+            if isinstance(idx, str):
+                idx = [*self.files.keys()][np.random.randint(0, len(self))]
+            else:
+                idx = np.random.randint(0, len(self))
 
         if exists(self.sampler):
             sample_fn = (
@@ -3455,13 +3468,23 @@ class PDBDataset(Dataset):
 
         if self.return_atom_inputs:
             i = maybe_transform_to_atom_input(i)
-        
+
         return i
 
-    def __getitem__(self, idx: int | str, max_attempts: int = 5) -> PDBInput | AtomInput:
+    def __getitem__(self, idx: int | str, max_attempts: int = 10) -> PDBInput | AtomInput:
         """Return either a PDBInput or an AtomInput object for the specified index."""
-        retry_decorator = retry(retry_on_result=not_exists, stop_max_attempt_number=max_attempts)
-        i = retry_decorator(self.get_item)(idx)
+        assert max_attempts > 0, "The maximum number of attempts must be greater than 0."
+
+        i = self.get_item(idx)
+
+        if not exists(i):
+            random_idx = not exists(self.sampler)
+
+            retry_decorator = retry(
+                retry_on_result=not_exists, stop_max_attempt_number=max_attempts
+            )
+            i = retry_decorator(self.get_item)(idx, random_idx=random_idx)
+
         return i
 
 
