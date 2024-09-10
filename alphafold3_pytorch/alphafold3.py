@@ -6749,7 +6749,6 @@ class Alphafold3(Module):
 
         # otherwise, noise and make it learn to denoise
 
-        batch_size = atom_inputs.shape[0]
         calc_diffusion_loss = exists(atom_pos)
 
         if calc_diffusion_loss:
