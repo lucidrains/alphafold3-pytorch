@@ -1843,6 +1843,7 @@ class PDBInput:
     distillation: bool = False
     resolution: float | None = None
     max_msas_per_chain: int | None = None
+    max_num_msa_tokens: int | None = None
     max_templates_per_chain: int | None = None
     num_templates_per_chain: int | None = None
     max_num_template_tokens: int | None = None
@@ -2620,13 +2621,24 @@ def pdb_input_to_molecule_input(
         for chain_id in biomol_chain_ids
     }
 
-    msa_features = load_msa_from_msa_dir(
-        # NOTE: if MSAs are not locally available, no MSA features will be used
-        i.msa_dir,
-        file_id,
-        chain_id_to_residue,
-        max_msas_per_chain=i.max_msas_per_chain,
-    )
+    if (
+        exists(i.max_num_msa_tokens)
+        and num_tokens * i.max_msas_per_chain > i.max_num_msa_tokens
+    ):
+        logger.warning(
+            f"The number of tokens ({num_tokens}) multiplied by the maximum number of MSAs per structure ({i.max_msas_per_chain}) exceeds the maximum total number of MSA tokens {(i.max_num_msa_tokens)}. "
+            "Skipping curation of MSA features for this example."
+        )
+        msa_features = {}
+    else:
+        msa_features = load_msa_from_msa_dir(
+            # NOTE: if MSAs are not locally available, no MSA features will be used
+            i.msa_dir,
+            file_id,
+            chain_id_to_residue,
+            max_msas_per_chain=i.max_msas_per_chain,
+            verbose=verbose,
+        )
 
     msa = msa_features.get("msa")
     msa_col_mask = msa_features.get("msa_mask")
