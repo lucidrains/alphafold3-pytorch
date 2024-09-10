@@ -2753,8 +2753,8 @@ class ElucidatedAtomDiffusion(Module):
         pairwise_trunk: Float['b n n dpt'],
         pairwise_rel_pos_feats: Float['b n n dpr'],
         molecule_atom_lens: Int['b n'],
-        molecule_atom_indices: Int['b n'],
         token_bonds: Bool['b n n'],
+        molecule_atom_indices: Int['b n'] | None = None,
         missing_atom_mask: Bool['b m'] | None = None,
         atom_parent_ids: Int['b m'] | None = None,
         return_denoised_pos = False,
@@ -2822,7 +2822,7 @@ class ElucidatedAtomDiffusion(Module):
 
         # section 4.2 - multi-chain permutation alignment
 
-        if single_structure_input:
+        if exists(molecule_atom_indices) and single_structure_input:
             try:
                 atom_pos_aligned_ground_truth = self.multi_chain_permutation_alignment(
                     pred_coords=denoised_atom_pos,
