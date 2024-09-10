@@ -48,7 +48,7 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem
 from tqdm import tqdm
 
-from alphafold3_pytorch.models.components.inputs import CCD_COMPONENTS_SMILES
+from alphafold3_pytorch.inputs import CCD_COMPONENTS_SMILES
 from alphafold3_pytorch.tensor_typing import typecheck
 from alphafold3_pytorch.utils.utils import exists
 from scripts.cluster_pdb_train_mmcifs import (
