@@ -68,11 +68,15 @@ from alphafold3_pytorch.configs import (
     create_trainer_from_yaml,
     create_trainer_from_conductor_yaml
 )
+
 from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     RigidFromReference3Points,
 )
+
+from alphafold3_pytorch.cli import cli
+from alphafold3_pytorch.app import app
 
 __all__ = [
     Attention,
