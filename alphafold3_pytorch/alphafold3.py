@@ -67,8 +67,10 @@ from alphafold3_pytorch.inputs import (
     NUM_MSA_ONE_HOT,
     DEFAULT_NUM_MOLECULE_MODS,
     ADDITIONAL_MOLECULE_FEATS,
+    hard_validate_atom_indices_ascending,
     BatchedAtomInput,
-    hard_validate_atom_indices_ascending
+    Alphafold3Input,
+    alphafold3_inputs_to_batched_atom_input,
 )
 
 from alphafold3_pytorch.common.biomolecule import (
@@ -6344,6 +6346,18 @@ class Alphafold3(Module):
             p.data.mul_(1. - shrink_factor).add_(noise * perturb_factor)
 
         return self
+
+    @typecheck
+    def forward_with_alphafold3_inputs(
+        self,
+        alphafold3_inputs: Alphafold3Input | list[Alphafold3Input],
+        **kwargs
+    ):
+        if not isinstance(alphafold3_inputs, list):
+            alphafold3_inputs = [alphafold3_inputs]
+
+        batched_atom_inputs = alphafold3_inputs_to_batched_atom_input(alphafold3_inputs, atoms_per_window = self.w)
+        return self.forward(**batched_atom_inputs.model_forward_dict(), **kwargs)
 
     @typecheck
     def forward(

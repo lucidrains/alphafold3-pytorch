@@ -98,12 +98,7 @@ def test_readme1():
 
 def test_readme2():
     import torch
-
-    from alphafold3_pytorch import (
-        Alphafold3,
-        Alphafold3Input,
-        alphafold3_inputs_to_batched_atom_input
-    )
+    from alphafold3_pytorch import Alphafold3, Alphafold3Input
 
     contrived_protein = 'AG'
 
@@ -120,8 +115,6 @@ def test_readme2():
     eval_alphafold3_input = Alphafold3Input(
         proteins = [contrived_protein]
     )
-
-    batched_atom_input = alphafold3_inputs_to_batched_atom_input(train_alphafold3_input, atoms_per_window = 27)
 
     # training
 
@@ -150,14 +143,12 @@ def test_readme2():
         )
     )
 
-    loss = alphafold3(**batched_atom_input.model_forward_dict())
+    loss = alphafold3.forward_with_alphafold3_inputs([train_alphafold3_input])
     loss.backward()
 
     # sampling
 
-    batched_eval_atom_input = alphafold3_inputs_to_batched_atom_input(eval_alphafold3_input, atoms_per_window = 27)
-
     alphafold3.eval()
-    sampled_atom_pos = alphafold3(**batched_eval_atom_input.model_forward_dict())
+    sampled_atom_pos = alphafold3.forward_with_alphafold3_inputs(eval_alphafold3_input)
 
     assert sampled_atom_pos.shape == (1, (5 + 4), 3)

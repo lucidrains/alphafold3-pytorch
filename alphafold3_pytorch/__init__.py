@@ -50,14 +50,14 @@ from alphafold3_pytorch.inputs import (
     PDBDataset,
     maybe_transform_to_atom_input,
     maybe_transform_to_atom_inputs,
+    alphafold3_inputs_to_batched_atom_input,
+    collate_inputs_to_batched_atom_input,
+    pdb_inputs_to_batched_atom_input,
 )
 
 from alphafold3_pytorch.trainer import (
     Trainer,
     DataLoader,
-    collate_inputs_to_batched_atom_input,
-    alphafold3_inputs_to_batched_atom_input,
-    pdb_inputs_to_batched_atom_input,
 )
 
 from alphafold3_pytorch.configs import (

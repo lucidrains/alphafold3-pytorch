@@ -7,8 +7,7 @@ import torch
 
 from alphafold3_pytorch import (
     Alphafold3,
-    Alphafold3Input,
-    alphafold3_inputs_to_batched_atom_input
+    Alphafold3Input
 )
 
 from Bio.PDB.mmcifio import MMCIFIO
@@ -40,10 +39,8 @@ def cli(
 
     alphafold3 = Alphafold3.init_and_load(checkpoint_path)
 
-    batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input, atoms_per_window = alphafold3.atoms_per_window)
-
     alphafold3.eval()
-    structure, = alphafold3(**batched_atom_input.model_forward_dict(), return_bio_pdb_structures = True)
+    structure, = alphafold3.forward_with_alphafold3_inputs(alphafold3_input, return_bio_pdb_structures = True)
 
     output_path = Path(output)
     output_path.parents[0].mkdir(exist_ok = True, parents = True)

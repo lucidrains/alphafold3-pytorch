@@ -41,7 +41,11 @@ from torch import repeat_interleave, tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-from alphafold3_pytorch.common import amino_acid_constants, dna_constants, rna_constants
+from alphafold3_pytorch.common import (
+    amino_acid_constants,
+    dna_constants,
+    rna_constants
+)
 from alphafold3_pytorch.common.biomolecule import (
     Biomolecule,
     _from_mmcif_object,
@@ -85,6 +89,13 @@ from alphafold3_pytorch.utils.model_utils import (
 )
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.utils import default, exists, first, not_exists
+
+from alphafold3_pytorch.attention import (
+    full_pairwise_repr_to_windowed,
+    full_attn_bias_to_windowed,
+    pad_at_dim,
+    pad_or_slice_to
+)
 
 # silence RDKit's warnings
 
@@ -1821,6 +1832,17 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
 
     return molecule_input
 
+@typecheck
+def alphafold3_inputs_to_batched_atom_input(
+    inp: Alphafold3Input | List[Alphafold3Input],
+    **collate_kwargs
+) -> BatchedAtomInput:
+
+    if isinstance(inp, Alphafold3Input):
+        inp = [inp]
+
+    atom_inputs = maybe_transform_to_atom_inputs(inp)
+    return collate_inputs_to_batched_atom_input(atom_inputs, **collate_kwargs)
 
 # pdb input
 
@@ -3366,6 +3388,17 @@ def pdb_input_to_molecule_input(
 
     return molecule_input
 
+@typecheck
+def pdb_inputs_to_batched_atom_input(
+    inp: PDBInput | List[PDBInput],
+    **collate_kwargs
+) -> BatchedAtomInput:
+
+    if isinstance(inp, PDBInput):
+        inp = [inp]
+
+    atom_inputs = maybe_transform_to_atom_inputs(inp)
+    return collate_inputs_to_batched_atom_input(atom_inputs, **collate_kwargs)
 
 # datasets
 
@@ -3517,6 +3550,142 @@ class PDBDataset(Dataset):
 
         return i
 
+# collation function
+
+@typecheck
+def collate_inputs_to_batched_atom_input(
+    inputs: List,
+    int_pad_value = -1,
+    atoms_per_window: int | None = None,
+    map_input_fn: Callable | None = None,
+    transform_to_atom_inputs: bool = True,
+) -> BatchedAtomInput:
+
+    if exists(map_input_fn):
+        inputs = [map_input_fn(i) for i in inputs]
+
+    # go through all the inputs
+    # and for any that is not AtomInput, try to transform it with the registered input type to corresponding registered function
+
+    if transform_to_atom_inputs:
+        atom_inputs = maybe_transform_to_atom_inputs(inputs)
+
+        if len(atom_inputs) < len(inputs):
+            # if some of the `inputs` could not be converted into `atom_inputs`,
+            # randomly select a subset of the `atom_inputs` to duplicate to match
+            # the expected number of `atom_inputs`
+            assert (
+                len(atom_inputs) > 0
+            ), "No `AtomInput` objects could be created for the current batch."
+            atom_inputs = random.choices(atom_inputs, k=len(inputs))  # nosec
+    else:
+        assert all(isinstance(i, AtomInput) for i in inputs), (
+            "When `transform_to_atom_inputs=False`, all provided "
+            "inputs must be of type `AtomInput`."
+        )
+        atom_inputs = inputs
+
+    assert all(isinstance(i, AtomInput) for i in atom_inputs), (
+        "All inputs must be of type `AtomInput`. "
+        "If you want to transform the inputs to `AtomInput`, "
+        "set `transform_to_atom_inputs=True`."
+    )
+
+    # take care of windowing the atompair_inputs and atompair_ids if they are not windowed already
+
+    if exists(atoms_per_window):
+        for atom_input in atom_inputs:
+            atompair_inputs = atom_input.atompair_inputs
+            atompair_ids = atom_input.atompair_ids
+
+            atompair_inputs_is_windowed = atompair_inputs.ndim == 4
+
+            if not atompair_inputs_is_windowed:
+                atom_input.atompair_inputs = full_pairwise_repr_to_windowed(atompair_inputs, window_size = atoms_per_window)
+
+            if exists(atompair_ids):
+                atompair_ids_is_windowed = atompair_ids.ndim == 3
+
+                if not atompair_ids_is_windowed:
+                    atom_input.atompair_ids = full_attn_bias_to_windowed(atompair_ids, window_size = atoms_per_window)
+
+    # separate input dictionary into keys and values
+
+    keys = list(atom_inputs[0].dict().keys())
+    atom_inputs = [i.dict().values() for i in atom_inputs]
+
+    outputs = []
+
+    for key, grouped in zip(keys, zip(*atom_inputs)):
+        # if all None, just return None
+
+        not_none_grouped = [*filter(exists, grouped)]
+
+        if len(not_none_grouped) == 0:
+            outputs.append(None)
+            continue
+
+        # collate lists for uncollatable fields
+
+        if key in UNCOLLATABLE_ATOM_INPUT_FIELDS:
+            outputs.append(grouped)
+            continue
+
+        # default to empty tensor for any Nones
+
+        one_tensor = not_none_grouped[0]
+
+        dtype = one_tensor.dtype
+        ndim = one_tensor.ndim
+
+        # use -1 for padding int values, for assuming int are labels - if not, handle within alphafold3
+
+        if key in ATOM_DEFAULT_PAD_VALUES:
+            pad_value = ATOM_DEFAULT_PAD_VALUES[key]
+        elif dtype in (torch.int, torch.long):
+            pad_value = int_pad_value
+        elif dtype == torch.bool:
+            pad_value = False
+        else:
+            pad_value = 0.
+
+        # get the max lengths across all dimensions
+
+        shapes_as_tensor = torch.stack([tensor(tuple(g.shape) if exists(g) else ((0,) * ndim)).int() for g in grouped], dim = -1)
+
+        max_lengths = shapes_as_tensor.amax(dim = -1)
+
+        default_tensor = torch.full(max_lengths.tolist(), pad_value, dtype = dtype)
+
+        # pad across all dimensions
+
+        padded_inputs = []
+
+        for inp in grouped:
+
+            if not exists(inp):
+                padded_inputs.append(default_tensor)
+                continue
+
+            for dim, max_length in enumerate(max_lengths.tolist()):
+                inp = pad_at_dim(inp, (0, max_length - inp.shape[dim]), value = pad_value, dim = dim)
+
+            padded_inputs.append(inp)
+
+        # stack
+
+        stacked = torch.stack(padded_inputs)
+
+        outputs.append(stacked)
+
+    # batched atom input dictionary
+
+    batched_atom_input_dict = dict(tuple(zip(keys, outputs)))
+
+    # reconstitute dictionary
+
+    batched_atom_inputs = BatchedAtomInput(**batched_atom_input_dict)
+    return batched_atom_inputs
 
 # the config used for keeping track of all the disparate inputs and their transforms down to AtomInput
 # this can be preprocessed or will be taken care of automatically within the Trainer during data collation

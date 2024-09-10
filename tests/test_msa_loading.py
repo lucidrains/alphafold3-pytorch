@@ -2,10 +2,8 @@ import pytest
 from pathlib import Path
 
 from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
-from alphafold3_pytorch.inputs import PDBDataset
-from alphafold3_pytorch.trainer import pdb_inputs_to_batched_atom_input
+from alphafold3_pytorch.inputs import PDBDataset, pdb_inputs_to_batched_atom_input
 from alphafold3_pytorch.utils.utils import exists
-
 
 def test_msa_loading():
     """Test an MSA-featurized PDBDataset constructed using a WeightedPDBSampler."""
