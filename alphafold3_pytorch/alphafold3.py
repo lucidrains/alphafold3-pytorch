@@ -2790,12 +2790,13 @@ class ElucidatedAtomDiffusion(Module):
     def noise_distribution(self, batch_size):
         return (self.P_mean + self.P_std * torch.randn((batch_size,), device = self.device)).exp() * self.sigma_data
 
+    @typecheck
     def forward(
         self,
         atom_pos_ground_truth: Float['b m 3'],
         atom_mask: Bool['b m'],
         atom_feats: Float['b m da'],
-        atompair_feats: Float['b m m dap'],
+        atompair_feats: Float['b m m dap'] | Float['b nw w (w*2) dap'],
         mask: Bool['b n'],
         single_trunk_repr: Float['b n dst'],
         single_inputs_repr: Float['b n dsi'],
@@ -6468,6 +6469,7 @@ class Alphafold3(Module):
 
         # get atom sequence length and molecule sequence length depending on whether using packed atomic seq
 
+        batch_size = molecule_atom_lens.shape[0]
         seq_len = molecule_atom_lens.shape[-1]
 
         # embed inputs
@@ -6558,6 +6560,7 @@ class Alphafold3(Module):
         else:
             seq_arange = torch.arange(seq_len, device = self.device)
             token_bonds = einx.subtract('i, j -> i j', seq_arange, seq_arange).abs() == 1
+            token_bonds = repeat(token_bonds, 'i j -> b i j', b = batch_size)
 
         token_bonds_feats = self.token_bond_to_pairwise_feat(token_bonds.type(dtype))
 
@@ -6818,6 +6821,7 @@ class Alphafold3(Module):
                     valid_atom_indices_for_frame,
                     atom_indices_for_frame,
                     molecule_atom_lens,
+                    token_bonds,
                     resolved_labels,
                     resolution
                 ) = tuple(
@@ -6844,6 +6848,7 @@ class Alphafold3(Module):
                         valid_atom_indices_for_frame,
                         atom_indices_for_frame,
                         molecule_atom_lens,
+                        token_bonds,
                         resolved_labels,
                         resolution
                     )
