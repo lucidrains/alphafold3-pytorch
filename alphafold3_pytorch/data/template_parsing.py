@@ -382,7 +382,7 @@ def _extract_template_features(
         template_three_atom_indices_for_frame.unsqueeze(-1).expand(-1, -1, 3),
     )
 
-    rigid_from_reference_3_points = RigidFromReferenceThreePoints()
+    rigid_from_reference_3_points = RigidFromReference3Points()
     template_backbone_frames, template_backbone_points = rigid_from_reference_3_points(
         template_backbone_frame_atom_positions.unbind(-2)
     )
@@ -398,7 +398,9 @@ def _extract_template_features(
         template_inv_distance_scalar * template_backbone_frame_mask.unsqueeze(-1)
     )
 
+    # NOTE: The unit vectors are initially of shape (j, i, 3), so they need to be transposed
     template_unit_vector = template_backbone_vec * template_inv_distance_scalar.unsqueeze(-1)
+    template_unit_vector = template_unit_vector.transpose(-3, -2)
 
     return {
         "template_restype": template_restype.float(),

@@ -2401,7 +2401,7 @@ def load_msa_from_msa_dir(
     file_id: str,
     chain_id_to_residue: Dict[str, Dict[str, List[int]]],
     max_msas_per_chain: int | None = None,
-    randomly_truncate: bool = True,
+    randomly_truncate: bool = False,
     raise_missing_exception: bool = False,
     verbose: bool = False,
 ) -> FeatureDict:

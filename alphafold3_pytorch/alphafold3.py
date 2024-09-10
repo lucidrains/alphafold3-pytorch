@@ -6604,6 +6604,7 @@ class Alphafold3(Module):
                     templates = templates,
                     template_mask = template_mask,
                     pairwise_repr = pairwise,
+                    mask = mask
                 )
 
                 pairwise = embedded_template + pairwise
@@ -6616,7 +6617,8 @@ class Alphafold3(Module):
                     single_repr = single,
                     pairwise_repr = pairwise,
                     msa_mask = msa_mask,
-                    additional_msa_feats = additional_msa_feats
+                    additional_msa_feats = additional_msa_feats,
+                    mask = mask
                 )
 
                 pairwise = embedded_msa + pairwise
