@@ -1888,7 +1888,6 @@ class DiffusionTransformer(Module):
         attn_num_memory_kv = False,
         trans_expansion_factor = 2,
         num_register_tokens = 0,
-        serial = True,
         add_residual = True,
         use_linear_attn = False,
         checkpoint = False,
@@ -1967,13 +1966,10 @@ class DiffusionTransformer(Module):
                 conditionable_transition
             ]))
 
-        assert not (not serial and checkpoint), 'checkpointing can only be used for serial version of diffusion transformer'
-
         self.checkpoint = checkpoint
 
         self.layers = layers
 
-        self.serial = serial
         self.add_residual = add_residual
 
         self.has_registers = num_register_tokens > 0
@@ -2075,48 +2071,6 @@ class DiffusionTransformer(Module):
         return noised_repr
 
     @typecheck
-    def to_parallel_layers(
-        self,
-        noised_repr: Float['b n d'],
-        *,
-        single_repr: Float['b n ds'],
-        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
-        mask: Bool['b n'] | None = None,
-        windowed_mask: Bool['b nw w (w*2)'] | None = None
-    ):
-
-        for linear_attn, colt5_attn, attn, transition in self.layers:
-
-            if exists(linear_attn):
-                noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
-
-            if exists(colt5_attn):
-                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
-
-            attn_out = attn(
-                noised_repr,
-                cond = single_repr,
-                pairwise_repr = pairwise_repr,
-                mask = mask,
-                windowed_mask = windowed_mask
-            )
-
-            ff_out = transition(
-                noised_repr,
-                cond = single_repr
-            )
-
-            # in the algorithm, they omitted the residual, but it could be an error
-            # attn + ff + residual was used in GPT-J and PaLM, but later found to be unstable configuration, so it seems unlikely attn + ff would work
-            # but in the case they figured out something we have not, you can use their exact formulation by setting `serial = False` and `add_residual = False`
-
-            residual = noised_repr if self.add_residual else 0.
-
-            noised_repr = ff_out + attn_out + residual
-
-        return noised_repr
-
-    @typecheck
     def forward(
         self,
         noised_repr: Float['b n d'],
@@ -2126,7 +2080,7 @@ class DiffusionTransformer(Module):
         mask: Bool['b n'] | None = None,
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
-        w, serial = self.attn_window_size, self.serial
+        w = self.attn_window_size
         has_windows = exists(w)
 
         # handle windowing
@@ -2151,12 +2105,10 @@ class DiffusionTransformer(Module):
 
         # main transformer
 
-        if serial and should_checkpoint(self, (noised_repr, single_repr, pairwise_repr)):
+        if should_checkpoint(self, (noised_repr, single_repr, pairwise_repr)):
             to_layers_fn = self.to_checkpointed_serial_layers
-        elif serial:
-            to_layers_fn = self.to_serial_layers
         else:
-            to_layers_fn = self.to_parallel_layers
+            to_layers_fn = self.to_serial_layers
 
         noised_repr = to_layers_fn(
             noised_repr,
@@ -2230,7 +2182,6 @@ class DiffusionModule(Module):
         token_transformer_heads = 16,
         atom_decoder_depth = 3,
         atom_decoder_heads = 4,
-        serial = True,
         atom_encoder_kwargs: dict = dict(),
         atom_decoder_kwargs: dict = dict(),
         token_transformer_kwargs: dict = dict(),
@@ -2298,7 +2249,6 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_encoder_depth,
             heads = atom_encoder_heads,
-            serial = serial,
             use_linear_attn = use_linear_attn,
             linear_attn_kwargs = linear_attn_kwargs,
             checkpoint = checkpoint,
@@ -2323,7 +2273,6 @@ class DiffusionModule(Module):
             dim_pairwise = dim_pairwise,
             depth = token_transformer_depth,
             heads = token_transformer_heads,
-            serial = serial,
             checkpoint = checkpoint,
             **token_transformer_kwargs
         )
@@ -2341,7 +2290,6 @@ class DiffusionModule(Module):
             attn_window_size = atoms_per_window,
             depth = atom_decoder_depth,
             heads = atom_decoder_heads,
-            serial = serial,
             use_linear_attn = use_linear_attn,
             linear_attn_kwargs = linear_attn_kwargs,
             checkpoint = checkpoint,

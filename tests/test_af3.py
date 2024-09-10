@@ -365,12 +365,11 @@ def test_msa_module(
         loss = pairwise_out.sum()
         loss.backward()
 
-@pytest.mark.parametrize('serial,checkpoint', ((False, False), (True, False), (True, True)))
+@pytest.mark.parametrize('checkpoint', (False, True))
 @pytest.mark.parametrize('use_linear_attn', (False, True))
 @pytest.mark.parametrize('use_colt5_attn', (False, True))
 def test_diffusion_transformer(
     checkpoint,
-    serial,
     use_linear_attn,
     use_colt5_attn
 ):
@@ -382,7 +381,6 @@ def test_diffusion_transformer(
     diffusion_transformer = DiffusionTransformer(
         depth = 2,
         heads = 16,
-        serial = serial,
         checkpoint = checkpoint,
         use_linear_attn = use_linear_attn,
         use_colt5_attn = use_colt5_attn
