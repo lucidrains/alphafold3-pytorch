@@ -76,6 +76,7 @@ test = [
 
 [project.scripts]
 alphafold3_pytorch = "alphafold3_pytorch.cli:cli"
+alphafold3_pytorch_app = "alphafold3_pytorch.app:app"
 
 [build-system]
 requires = ["hatchling"]
