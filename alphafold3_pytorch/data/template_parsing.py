@@ -382,7 +382,7 @@ def _extract_template_features(
         template_three_atom_indices_for_frame.unsqueeze(-1).expand(-1, -1, 3),
     )
 
-    rigid_from_reference_3_points = RigidFromReferenceThreePoints()
+    rigid_from_reference_3_points = RigidFromReference3Points()
     template_backbone_frames, template_backbone_points = rigid_from_reference_3_points(
         template_backbone_frame_atom_positions.unbind(-2)
     )
