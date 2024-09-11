@@ -1,11 +1,12 @@
 """General-purpose data pipeline."""
 
+import copy
 import os
-from beartype.typing import Dict, List, MutableMapping, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+from beartype.typing import Dict, List, MutableMapping, Optional, Set, Tuple
 from loguru import logger
 from torch import Tensor
 
@@ -15,14 +16,15 @@ from alphafold3_pytorch.common.biomolecule import (
     get_residue_constants,
     to_mmcif,
 )
-from alphafold3_pytorch.data import mmcif_parsing, msa_parsing
+from alphafold3_pytorch.data import mmcif_parsing, msa_pairing, msa_parsing
 from alphafold3_pytorch.data.kalign import _realign_pdb_template_to_query
 from alphafold3_pytorch.data.template_parsing import (
     TEMPLATE_TYPE,
     _extract_template_features,
 )
 from alphafold3_pytorch.tensor_typing import typecheck
-from alphafold3_pytorch.utils.utils import exists
+from alphafold3_pytorch.utils.data_utils import make_one_hot_np
+from alphafold3_pytorch.utils.utils import exists, not_exists
 
 # Constants
 
@@ -41,6 +43,57 @@ def make_sequence_features(sequence: str, description: str) -> FeatureDict:
 
 
 @typecheck
+def convert_numpy_chains_to_tensors(chains: Dict[str, np.ndarray]) -> FeatureDict:
+    """Convert NumPy chain features to PyTorch Tensors.
+
+    :param chains: The NumPy chain features dictionary.
+    :return: The PyTorch chain features dictionary.
+    """
+    tensor_chains = {}
+
+    for key, value in chains.items():
+        base_key = key.removesuffix("_all_seq")
+
+        if isinstance(value, np.ndarray) and value.dtype != np.object_:
+            tensor_chains[base_key] = torch.from_numpy(value)
+
+            if tensor_chains[base_key].dtype == torch.float64:
+                tensor_chains[base_key] = tensor_chains[base_key].float()
+
+    return tensor_chains
+
+
+@typecheck
+def merge_chain_features(
+    chains: List[Dict[str, np.ndarray]],
+    pair_msa_sequences: bool,
+    max_msas_per_chain: int | None = None,
+) -> FeatureDict:
+    """Merge MSA chain features.
+
+    :param features: The MSA chain features dictionary.
+    :param pair_msa_sequences: Whether to merge paired MSAs.
+    :param max_msas_per_chain: The maximum number of MSAs per chain.
+    :return: The merged MSA chain features dictionary.
+    """
+    chains = msa_pairing.merge_homomers_dense_msa(chains)
+
+    # NOTE: Unpaired and paired MSA features will simply be concatenated,
+    # following Section 2.3 of the AlphaFold 3 supplement.
+    chains_merged = msa_pairing.merge_features_from_multiple_chains(
+        chains, pair_msa_sequences=True
+    )
+    if pair_msa_sequences:
+        chains_merged = msa_pairing.concatenate_paired_and_unpaired_features(
+            chains_merged, max_msas_per_chain=max_msas_per_chain
+        )
+
+    chains_merged = convert_numpy_chains_to_tensors(chains_merged)
+
+    return chains_merged
+
+
+@typecheck
 def make_msa_mask(features: FeatureDict) -> FeatureDict:
     """
     Make MSA mask features.
@@ -50,31 +103,30 @@ def make_msa_mask(features: FeatureDict) -> FeatureDict:
     :param features: The features dictionary.
     :return: The features dictionary with new MSA mask features.
     """
-    features["msa_mask"] = torch.ones(features["msa"].shape[1], dtype=torch.float32)
+    features["msa_col_mask"] = torch.ones(features["msa"].shape[1], dtype=torch.float32)
     features["msa_row_mask"] = torch.ones((features["msa"].shape[0]), dtype=torch.float32)
     return features
 
 
 @typecheck
 def make_msa_features(
-    msas: Dict[str, msa_parsing.Msa | None],
+    msas: Dict[str, msa_parsing.Msa],
     chain_id_to_residue: Dict[str, Dict[str, List[int]]],
+    num_msa_one_hot: int,
+    uniprot_accession_to_tax_id_mapping: Dict[str, str] | None = None,
     ligand_chemtype_index: int = 3,
-    raise_missing_exception: bool = False,
-) -> FeatureDict:
+) -> List[Dict[str, np.ndarray]]:
     """
     Construct a feature dictionary of MSA features.
     From: https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/data_pipeline.py#L224
 
-    :param msas: The mapping of chain IDs to lists of (optional) MSAs for each chain.
+    :param msas: The mapping of chain IDs to lists of MSAs for each chain.
     :param chain_id_to_residue: The mapping of chain IDs to residue information.
-    :param ligand_index: The index of the ligand in the chemical type list.
-    :param raise_missing_exception: Whether to raise an exception if no MSAs are provided for any chain.
-    :return: The MSA feature dictionary.
+    :param num_msa_one_hot: The number of one-hot classes for MSA features.
+    :param uniprot_accession_to_tax_id_mapping: The mapping of UniProt accession IDs to NCBI taxonomy IDs.
+    :param ligand_chemtype_index: The index of the ligand in the chemical type list.
+    :return: The MSA chain feature dictionaries.
     """
-    if not msas:
-        raise ValueError("At least one chain's MSA must be provided.")
-
     # Infer MSA metadata.
     max_alignments = 1
     for msa in msas.values():
@@ -82,9 +134,10 @@ def make_msa_features(
             max_alignments = max(max_alignments, len(msa.sequences) if msa else 1)
 
     # Collect MSAs.
-    int_msa_list = []
-    deletion_matrix_list = []
-    species_ids_list = []
+    chains = []
+
+    current_entity_id = 0
+    entity_ids = {}
 
     for chain_id, msa in msas.items():
         int_msa = []
@@ -101,29 +154,16 @@ def make_msa_features(
             f"{num_res} != {len(chain_residue_index)}"
         )
 
-        msa_residue_constants = (
-            get_residue_constants(msa.msa_type.replace("protein", "peptide"))
-            if exists(msa)
-            else None
-        )
-
         gap_ids = [[GAP_ID] * num_res]
         deletion_values = [[0] * num_res]
-        species = ["".encode("utf-8")]
-
-        if not msa and raise_missing_exception:
-            raise ValueError(f"MSA for chain {chain_id} must contain at least one sequence.")
-        elif not msa:
-            # Pad the MSA to the maximum number of alignments
-            # if the chain does not have any associated alignments.
-            int_msa_list.append(torch.tensor(gap_ids * max_alignments, dtype=torch.long))
-            deletion_matrix_list.append(
-                torch.tensor(deletion_values * max_alignments, dtype=torch.float32)
-            )
-            species_ids_list.append(np.array(species * max_alignments, dtype=object))
-            continue
+        species = [""]
 
         for sequence_index, sequence in enumerate(msa.sequences):
+            if sequence_index == 0:
+                if sequence not in entity_ids:
+                    entity_ids[sequence] = current_entity_id
+                    current_entity_id += 1
+
             if sequence in seen_sequences:
                 continue
             seen_sequences.add(sequence)
@@ -155,17 +195,14 @@ def make_msa_features(
                     msa_res_type = chem_residue_constants.restype_num
                     msa_deletion_value = 0
                 else:
-                    # NOTE: For polymer residues of a different chemical type than the chain's MSA,
-                    # we use the unknown residue type of the corresponding chemical type
-                    # (e.g., `DN` for DNA residues in a protein chain's MSA). This should
-                    # provide the model with partial information about the residue's identity.
-                    if chem_residue_constants != msa_residue_constants:
-                        msa_res_type = chem_residue_constants.restype_num
-                    else:
-                        res = sequence[polymer_residue_index]
-                        msa_res_type = msa_residue_constants.MSA_CHAR_TO_ID.get(
-                            res, msa_residue_constants.restype_num
-                        )
+                    # NOTE: For polymer residues of a different chemical type than the
+                    # chain's MSA, we use the residue type of the corresponding chemical type
+                    # (e.g., `DA` for adenine DNA residues in a protein chain's MSA). This should
+                    # provide the model with complete information about the outlier residue's identity.
+                    res = sequence[polymer_residue_index]
+                    msa_res_type = chem_residue_constants.MSA_CHAR_TO_ID.get(
+                        res, chem_residue_constants.restype_num
+                    )
 
                     msa_deletion_value = msa.deletion_matrix[sequence_index][polymer_residue_index]
 
@@ -179,29 +216,48 @@ def make_msa_features(
             int_msa.append(msa_res_types)
             deletion_matrix.append(msa_deletion_values)
 
-            identifiers = msa_parsing.get_identifiers(msa.descriptions[sequence_index])
-            species_ids.append(identifiers.species_id.encode("utf-8"))
+            species_id = ""
+            if exists(uniprot_accession_to_tax_id_mapping):
+                accession_id = msa_parsing.get_accession_id(msa.descriptions[sequence_index])
+                species_id = uniprot_accession_to_tax_id_mapping.get(accession_id, "")
+            if sequence_index == 0:
+                species_id = "-1"  # Tag target sequence for filtering.
+            species_ids.append(species_id)
 
-        # Pad the MSA to the maximum number of alignments.
+        # Pad the MSA to the maximum number of alignments across all chains for dataloading.
         num_padding_alignments = max_alignments - len(int_msa)
 
         padding_msa = gap_ids * num_padding_alignments
         padding_deletion_matrix = deletion_values * num_padding_alignments
         padding_species_ids = species * num_padding_alignments
 
-        int_msa_list.append(torch.tensor(int_msa + padding_msa, dtype=torch.long))
-        deletion_matrix_list.append(
-            torch.tensor(deletion_matrix + padding_deletion_matrix, dtype=torch.float32)
+        # Construct MSA features for the chain.
+        chain = {
+            "msa_all_seq": np.array(int_msa + padding_msa, dtype=np.int64),
+            "msa_species_identifiers_all_seq": np.array(
+                species_ids + padding_species_ids, dtype=object
+            ),
+        }
+        padded_deletion_matrix = np.array(
+            deletion_matrix + padding_deletion_matrix, dtype=np.float32
         )
-        species_ids_list.append(np.array(species_ids + padding_species_ids, dtype=object))
 
-    features = {
-        "msa": torch.cat(int_msa_list, dim=-1),
-        "deletion_matrix": torch.cat(deletion_matrix_list, dim=-1),
-        "msa_species_identifiers": np.stack(species_ids_list),
-        "num_alignments": max_alignments,
-    }
-    return features
+        chain["has_deletion_all_seq"] = np.clip(padded_deletion_matrix, 0.0, 1.0)
+        chain["deletion_value_all_seq"] = np.arctan(padded_deletion_matrix / 3.0) * (2.0 / np.pi)
+
+        chain["entity_id"] = np.array([entity_ids[msa.sequences[0]]], dtype=np.int64)
+
+        # NOTE: Here, we compute the profile and deletion average features for the unpadded MSA.
+        chain["profile_all_seq"] = make_one_hot_np(
+            np.array(int_msa, dtype=np.int64), num_msa_one_hot
+        ).mean(0)
+        chain["deletion_mean_all_seq"] = (
+            np.clip(np.array(deletion_matrix, dtype=np.float32), 0.0, 1.0)
+        ).mean(0)
+
+        chains.append(chain)
+
+    return chains
 
 
 @typecheck
@@ -298,7 +354,7 @@ def make_template_features(
         )
         chain_index_list.append(torch.full((max_templates, num_res), chain_index))
 
-        if not templates[chain_id] or not exists(kalign_binary_path):
+        if not templates[chain_id] or not_exists(kalign_binary_path):
             if raise_missing_exception:
                 raise ValueError(
                     f"Templates for chain {chain_id} must contain at least one template and must be aligned with Kalign3."
@@ -350,6 +406,7 @@ def make_template_features(
                     old_mapping=mapping,
                     kalign_binary_path=kalign_binary_path,
                     template_type=template_type,
+                    verbose=verbose,
                 )
 
                 # Extract features from aligned template.
@@ -361,6 +418,7 @@ def make_template_features(
                     query_chemtype=chain_chemtype,
                     num_restype_classes=num_restype_classes,
                     num_distogram_bins=num_distogram_bins,
+                    verbose=verbose,
                 )
 
                 template_restype_list[chain_index][template_index] = template_features[
@@ -505,7 +563,7 @@ def get_assembly(biomol: Biomolecule, assembly_id: Optional[str] = None) -> Biom
         return biomol
 
     assembly_ids = sorted(list(assembly_gen_category.keys()))
-    if assembly_id is None:
+    if not_exists(assembly_id):
         # NOTE: Sorting ensures that the default assembly is the first biological assembly.
         assembly_id = assembly_ids[0]
     elif assembly_id not in assembly_ids:
@@ -535,7 +593,7 @@ def get_assembly(biomol: Biomolecule, assembly_id: Optional[str] = None) -> Biom
             )
             # Merge the chains with asym IDs for this operation
             # with chains from other operations
-            if assembly is None:
+            if not_exists(assembly):
                 assembly = sub_assembly
             else:
                 assembly += sub_assembly
