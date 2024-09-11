@@ -2446,7 +2446,7 @@ def extract_polymer_sequence_from_chain_residues(
     for unique_chain_res_index in unique_chain_residue_indices:
         chemtype = chain_chemtype[unique_chain_res_index]
         restype = chain_restype[unique_chain_res_index]
-    
+
         if chemtype != ligand_chemtype_index:
             rc = get_residue_constants(res_chem_index=chemtype)
             rc_restypes = rc.restypes + ["X"]
@@ -2476,10 +2476,14 @@ def load_msa_from_msa_dir(
         # Construct a length-1 MSA containing only the query sequence as a fallback.
         chain_chemtype = chain_id_to_residue[chain_id]["chemtype"]
         chain_restype = chain_id_to_residue[chain_id]["restype"]
-        unique_chain_residue_indices = chain_id_to_residue[chain_id]["unique_chain_residue_indices"]
+        unique_chain_residue_indices = chain_id_to_residue[chain_id][
+            "unique_chain_residue_indices"
+        ]
 
         chain_sequences = [
-            extract_polymer_sequence_from_chain_residues(chain_chemtype, chain_restype, unique_chain_residue_indices)
+            extract_polymer_sequence_from_chain_residues(
+                chain_chemtype, chain_restype, unique_chain_residue_indices
+            )
         ]
         chain_deletion_matrix = [[0] * len(sequence) for sequence in chain_sequences]
         chain_descriptions = ["101" for _ in chain_sequences]
@@ -2724,7 +2728,9 @@ def pdb_input_to_molecule_input(
             "restype": biomol.restype[biomol.chain_id == chain_id].tolist(),
             "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
             "unique_chain_residue_indices": np.sort(
-                np.unique(chain_residue_index[biomol.chain_id == chain_id], axis=0, return_index=True)[-1]
+                np.unique(
+                    chain_residue_index[biomol.chain_id == chain_id], axis=0, return_index=True
+                )[-1]
             ).tolist(),
         }
         for chain_id in biomol_chain_ids
