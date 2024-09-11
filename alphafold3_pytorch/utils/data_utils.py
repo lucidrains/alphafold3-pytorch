@@ -249,6 +249,18 @@ def make_one_hot(x: Tensor, num_classes: int) -> Tensor:
 
 
 @typecheck
+def make_one_hot_np(x: np.ndarray, num_classes: int) -> np.ndarray:
+    """Convert an array of indices to a one-hot encoded array.
+    :param x: A NumPy array of indices.
+    :param num_classes: The number of classes.
+    :return: A one-hot encoded NumPy array.
+    """
+    x_one_hot = np.zeros((*x.shape, num_classes), dtype=np.int64)
+    np.put_along_axis(x_one_hot, np.expand_dims(x, axis=-1), 1, axis=-1)
+    return x_one_hot
+
+
+@typecheck
 def get_sorted_tuple_indices(tuples_list: List[Tuple[str, Any]], order_list: List[str]) -> List[int]:
     """
     Get the indices of the tuples in the order specified by the order_list.
