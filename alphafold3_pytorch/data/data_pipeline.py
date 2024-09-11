@@ -67,7 +67,7 @@ def convert_numpy_chains_to_tensors(chains: Dict[str, np.ndarray]) -> FeatureDic
 def merge_chain_features(
     chains: List[Dict[str, np.ndarray]],
     pair_msa_sequences: bool,
-    max_msas_per_chain: int,
+    max_msas_per_chain: int | None = None,
 ) -> FeatureDict:
     """Merge MSA chain features.
 
@@ -85,7 +85,7 @@ def merge_chain_features(
     )
     if pair_msa_sequences:
         chains_merged = msa_pairing.concatenate_paired_and_unpaired_features(
-            chains_merged, max_msas_per_chain
+            chains_merged, max_msas_per_chain=max_msas_per_chain
         )
 
     chains_merged = convert_numpy_chains_to_tensors(chains_merged)
