@@ -2430,23 +2430,27 @@ def find_mismatched_symmetry(
 def extract_polymer_sequence_from_chain_residues(
     chain_chemtype: List[int],
     chain_restype: List[int],
+    unique_chain_residue_indices: List[int],
     ligand_chemtype_index: int = 3,
 ) -> str:
     """Extract a polymer sequence string from a chain's chemical types and residue types.
 
     :param chain_chemtype: A list of chemical types for each residue in the chain.
     :param chain_restype: A list of residue types for each residue in the chain.
+    :param unique_chain_residue_indices: A list of unique residue indices in the chain.
     :param ligand_chemtype_index: The index of the ligand chemical type.
     :return: A polymer sequence string representing the chain's residues.
     """
     polymer_sequence = []
 
-    for chemtype, restype in zip(chain_chemtype, chain_restype):
-        if chemtype == ligand_chemtype_index:
-            continue
-        rc = get_residue_constants(res_chem_index=chemtype)
-        rc_restypes = rc.restypes + ["X"]
-        polymer_sequence.append(rc_restypes[restype - rc.min_restype_num])
+    for unique_chain_res_index in unique_chain_residue_indices:
+        chemtype = chain_chemtype[unique_chain_res_index]
+        restype = chain_restype[unique_chain_res_index]
+    
+        if chemtype != ligand_chemtype_index:
+            rc = get_residue_constants(res_chem_index=chemtype)
+            rc_restypes = rc.restypes + ["X"]
+            polymer_sequence.append(rc_restypes[restype - rc.min_restype_num])
 
     return "".join(polymer_sequence)
 
@@ -2472,9 +2476,10 @@ def load_msa_from_msa_dir(
         # Construct a length-1 MSA containing only the query sequence as a fallback.
         chain_chemtype = chain_id_to_residue[chain_id]["chemtype"]
         chain_restype = chain_id_to_residue[chain_id]["restype"]
+        unique_chain_residue_indices = chain_id_to_residue[chain_id]["unique_chain_residue_indices"]
 
         chain_sequences = [
-            extract_polymer_sequence_from_chain_residues(chain_chemtype, chain_restype)
+            extract_polymer_sequence_from_chain_residues(chain_chemtype, chain_restype, unique_chain_residue_indices)
         ]
         chain_deletion_matrix = [[0] * len(sequence) for sequence in chain_sequences]
         chain_descriptions = ["101" for _ in chain_sequences]
@@ -2710,11 +2715,17 @@ def pdb_input_to_molecule_input(
     )  # NOTE: `Biomolecule.residue_index` is 1-based originally
     num_tokens = len(biomol.atom_mask)
 
+    # create unique chain-residue index pairs to identify the first atom of each residue
+    chain_residue_index = np.array(list(zip(biomol.chain_index, biomol.residue_index)))
+
     chain_id_to_residue = {
         chain_id: {
             "chemtype": biomol.chemtype[biomol.chain_id == chain_id].tolist(),
             "restype": biomol.restype[biomol.chain_id == chain_id].tolist(),
             "residue_index": residue_index[biomol.chain_id == chain_id].tolist(),
+            "unique_chain_residue_indices": np.sort(
+                np.unique(chain_residue_index[biomol.chain_id == chain_id], axis=0, return_index=True)[-1]
+            ).tolist(),
         }
         for chain_id in biomol_chain_ids
     }
