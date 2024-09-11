@@ -371,7 +371,7 @@ def merge_features_from_multiple_chains(
 @typecheck
 def concatenate_paired_and_unpaired_features(
     chains: Dict[str, np.ndarray],
-    max_msas_per_chain: int,
+    max_msas_per_chain: int | None = None,
 ) -> Dict[str, np.ndarray]:
     """Merge paired and unpaired features.
 
@@ -379,6 +379,13 @@ def concatenate_paired_and_unpaired_features(
     :param max_msas_per_chain: The maximum number of MSAs per chain.
     :return: The MSA chain feature dictionaries with paired and unpaired features merged.
     """
+    if not exists(max_msas_per_chain):
+        assert "msa" in chains and "msa_all_seq" in chains, (
+            "If max_msas_per_chain is not provided, "
+            "both 'msa' and 'msa_all_seq' must be present in 'chains'."
+        )
+        max_msas_per_chain = max(len(chains["msa"]), len(chains["msa_all_seq"])) * 2
+
     max_paired_msa_per_chain = max_msas_per_chain // 2
 
     for feature_name in MSA_FEATURES:
