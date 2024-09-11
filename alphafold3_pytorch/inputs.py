@@ -2548,7 +2548,9 @@ def load_msa_from_msa_dir(
         chains = msa_pairing.copy_unpaired_features(chains)
         chains = msa_pairing.create_paired_features(chains)
 
-    features = merge_chain_features(chains, pair_msa_sequences, max_msas_per_chain)
+    features = merge_chain_features(
+        chains, pair_msa_sequences, max_msas_per_chain=max_msas_per_chain
+    )
     features = make_msa_mask(features)
 
     return features
