@@ -56,6 +56,8 @@ A visualization of the molecules of life used in the repository can be seen and 
 
 - <a href="https://github.com/Kaihui-Cheng">Kaihui</a> for identifying a bug in how non-standard atoms were handled in polymer residues!
 
+- <a href="https://github.com/vandrw">Andrei</a> for taking on the gradio frontend interface!
+
 - <a href="https://github.com/patrick-kidger">Patrick</a> for <a href="https://docs.kidger.site/jaxtyping/">jaxtyping</a>, <a href="https://github.com/fferflo">Florian</a> for <a href="https://github.com/fferflo/einx">einx</a>, and of course, <a href="https://github.com/arogozhnikov">Alex</a> for <a href="https://einops.rocks/">einops</a>
 
 ## Install
