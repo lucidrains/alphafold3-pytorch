@@ -51,6 +51,7 @@ dependencies = [
     "rdkit>=2023.9.6",
     "retrying",
     "scikit-learn>=1.5.0",
+    "scipy==1.13.1",
     "sh>=2.0.7",
     "shortuuid",
     "tensorboard",
