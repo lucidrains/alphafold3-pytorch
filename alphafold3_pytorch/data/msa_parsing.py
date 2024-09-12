@@ -63,8 +63,10 @@ def get_msa_type(msa_chem_type: int) -> MSA_TYPE:
         return "rna"
     elif msa_chem_type == 2:
         return "dna"
+    elif msa_chem_type == 3:
+        return "ligand"
     else:
-        raise ValueError(f"Unknown MSA chemical type: {msa_chem_type}")
+        raise ValueError(f"Invalid MSA chemical type: {msa_chem_type}")
 
 
 @typecheck
