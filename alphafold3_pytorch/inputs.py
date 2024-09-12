@@ -2554,8 +2554,15 @@ def load_msa_from_msa_dir(
     pair_msa_sequences = exists(uniprot_accession_to_tax_id_mapping) and not is_monomer_or_homomer
 
     if pair_msa_sequences:
-        chains = msa_pairing.copy_unpaired_features(chains)
-        chains = msa_pairing.create_paired_features(chains)
+        try:
+            chains = msa_pairing.copy_unpaired_features(chains)
+            chains = msa_pairing.create_paired_features(chains)
+        except Exception as e:
+            if verbose:
+                logger.warning(
+                    f"Failed to pair MSAs for file {file_id} due to: {e}. Skipping MSA pairing."
+                )
+            pair_msa_sequences = False
 
     features = merge_chain_features(
         chains, pair_msa_sequences, max_msas_per_chain=max_msas_per_chain
