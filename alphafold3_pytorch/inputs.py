@@ -3532,7 +3532,9 @@ def get_token_constraints(
     token_residue_ids: Int[" n"],  # type: ignore
 ) -> Float["n n dac"]:  # type: ignore
     """Construct pairwise token constraints for the given constraint strings and ratio.
+    
     NOTE: The `binding_site` constraint is inspired by the Chai-1 model.
+
     :param constraints: The constraints to use.
     :param constraints_ratio: The constraints ratio to use during training.
     :param training: Whether the model is training.
