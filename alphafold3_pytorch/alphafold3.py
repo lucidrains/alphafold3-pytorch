@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import esm
 import random
 import sh
 from math import pi, sqrt
@@ -63,6 +64,7 @@ from alphafold3_pytorch.inputs import (
     IS_RNA,
     IS_LIGAND,
     IS_METAL_ION,
+    NUM_HUMAN_AMINO_ACIDS,
     NUM_MOLECULE_IDS,
     NUM_MSA_ONE_HOT,
     DEFAULT_NUM_MOLECULE_MODS,
@@ -136,6 +138,8 @@ dai - feature dimension (atom input)
 dmi - feature dimension (msa input)
 dmf - additional msa feats derived from msa (has_deletion and deletion_value)
 dtf - additional token feats derived from msa (profile and deletion_mean)
+dac - additional pairwise token constraint embeddings
+dpe - additional protein language model embeddings from esm
 t - templates
 s - msa
 r - registers
@@ -5951,6 +5955,9 @@ class Alphafold3(Module):
         checkpoint_diffusion_module = False,
         detach_when_recycling = True,
         pdb_training_set=True,
+        plm_embeddings: Literal["esm2_t33_650M_UR50D"] | None = None,
+        plm_repr_layer: int = 33,
+        constraint_embeddings: int | None = None,
     ):
         super().__init__()
 
@@ -5976,6 +5983,13 @@ class Alphafold3(Module):
         self.has_atom_embeds = has_atom_embeds
         self.has_atompair_embeds = has_atompair_embeds
 
+        # optional pairwise token constraint embeddings
+
+        self.constraint_embeddings = constraint_embeddings
+
+        if exists(constraint_embeddings):
+            self.constraint_embeds = LinearNoBias(constraint_embeddings, dim_pairwise)
+
         # residue or nucleotide modifications
 
         num_molecule_mods = default(num_molecule_mods, 0)
@@ -5985,6 +5999,18 @@ class Alphafold3(Module):
             self.molecule_mod_embeds = nn.Embedding(num_molecule_mods, dim_single)
 
         self.has_molecule_mod_embeds = has_molecule_mod_embeds
+
+        # optional protein language model (PLM) embeddings
+
+        self.plm_embeddings = plm_embeddings
+
+        if exists(plm_embeddings):
+            self.plm, plm_alphabet = esm.pretrained.load_model_and_alphabet_hub(plm_embeddings)
+            self.plm_repr_layer = plm_repr_layer
+            self.plm_batch_converter = plm_alphabet.get_batch_converter()
+            self.plm_embeds = nn.Linear(self.plm.embed_dim, dim_single, bias=False)
+            for p in self.plm.parameters():
+                p.requires_grad = False
 
         # atoms per window
 
@@ -6296,6 +6322,40 @@ class Alphafold3(Module):
         return self
 
     @typecheck
+    def extract_plm_embeddings(self, aa_ids: Int['b n']) -> Float['b n dpe']:
+        aa_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
+        sequence_data = [
+            (
+                f"molecule{i}",
+                "".join(
+                    [
+                        (
+                            aa_constants.restypes[id]
+                            if 0 <= id < len(aa_constants.restypes)
+                            else "X"
+                        )
+                        for id in ids
+                    ]
+                ),
+            )
+            for i, ids in enumerate(aa_ids)
+        ]
+
+        _, _, batch_tokens = self.plm_batch_converter(sequence_data)
+        batch_tokens = batch_tokens.to(self.device)
+
+        with torch.no_grad():
+            results = self.plm(batch_tokens, repr_layers=[self.plm_repr_layer])
+        token_representations = results["representations"][self.plm_repr_layer]
+
+        sequence_representations = []
+        for i, (_, seq) in enumerate(sequence_data):
+            sequence_representations.append(token_representations[i, 1 : len(seq) + 1])
+        plm_embeddings = torch.stack(sequence_representations, dim=0)
+
+        return plm_embeddings
+
+    @typecheck
     def forward_with_alphafold3_inputs(
         self,
         alphafold3_inputs: Alphafold3Input | list[Alphafold3Input],
@@ -6342,6 +6402,7 @@ class Alphafold3(Module):
         distance_labels: Int['b n n'] | Int['b m m'] | None = None,
         resolved_labels: Int['b m'] | None = None,
         resolution: Float[' b'] | None = None,
+        token_constraints: Int['b n n dac'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_all_diffused_atom_pos: bool = False,
@@ -6487,6 +6548,30 @@ class Alphafold3(Module):
             single_init = single_init.scatter_add(0, seq_indices, scatter_values)
 
             single_init = seq_unpack_one(single_init)
+
+        # handle maybe pairwise token constraint embeddings
+
+        if exists(self.constraint_embeddings):
+            assert exists(
+                token_constraints
+            ), "`token_constraints` must be provided to use constraint embeddings."
+
+            pairwise_constraint_embeds = self.constraint_embeds(token_constraints)
+            pairwise_init = pairwise_init + pairwise_constraint_embeds
+
+        # handle maybe protein language model (PLM) embeddings
+
+        if exists(self.plm_embeddings):
+            molecule_aa_ids = torch.where(
+                molecule_ids < 0,
+                NUM_HUMAN_AMINO_ACIDS,
+                molecule_ids.clamp(max=NUM_HUMAN_AMINO_ACIDS),
+            )
+
+            molecule_plm_embeddings = self.extract_plm_embeddings(molecule_aa_ids)
+            single_plm_init = self.plm_embeds(molecule_plm_embeddings)
+
+            single_init = single_init + single_plm_init
 
         # relative positional encoding
 
