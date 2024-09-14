@@ -458,3 +458,26 @@ docker run -v .:/data --gpus all -it af3
 }
 ```
 
+```bibtex
+@ARTICLE{Heinzinger2023.07.23.550085,
+    author  = {Michael Heinzinger and Konstantin Weissenow and Joaquin Gomez Sanchez and Adrian Henkel and Martin Steinegger and Burkhard Rost},
+    title   = {ProstT5: Bilingual Language Model for Protein Sequence and Structure},
+    year    = {2023},
+    doi     = {10.1101/2023.07.23.550085},
+    journal = {bioRxiv}
+}
+```
+
+```bibtex
+@article {Lin2022.07.20.500902,
+    author  = {Lin, Zeming and Akin, Halil and Rao, Roshan and Hie, Brian and Zhu, Zhongkai and Lu, Wenting and Santos Costa, Allan dos and Fazel-Zarandi, Maryam and Sercu, Tom and Candido, Sal and Rives, Alexander},
+    title   = {Language models of protein sequences at the scale of evolution enable accurate structure prediction},
+    elocation-id = {2022.07.20.500902},
+    year    = {2022},
+    doi     = {10.1101/2022.07.20.500902},
+    publisher = {Cold Spring Harbor Laboratory},
+    URL     = {https://www.biorxiv.org/content/early/2022/07/21/2022.07.20.500902},
+    eprint  = {https://www.biorxiv.org/content/early/2022/07/21/2022.07.20.500902.full.pdf},
+    journal = {bioRxiv}
+}
+```
