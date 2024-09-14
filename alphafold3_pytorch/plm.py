@@ -1,5 +1,5 @@
 import re
-from functools import partial
+from functools import partial, wraps
 
 import torch
 from beartype.typing import Literal
@@ -14,6 +14,22 @@ from alphafold3_pytorch.tensor_typing import Float, Int, typecheck
 
 def join(arr, delimiter = ''): # just redo an ugly part of python
     return delimiter.join(arr)
+
+def remove_plms(fn):
+    @wraps(fn)
+    def inner(self, *args, **kwargs):
+        has_plms = hasattr(self, 'plms')
+        if has_plms:
+            plms = self.plms
+            delattr(self, 'plms')
+
+        out = fn(self, *args, **kwargs)
+
+        if has_plms:
+            self.plms = plms
+
+        return out
+    return inner
 
 # constants
 

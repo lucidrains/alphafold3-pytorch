@@ -1098,6 +1098,10 @@ def test_alphafold3_with_plm_embeddings():
         plm_embeddings="esm2_t33_650M_UR50D",
     )
 
+    state_dict = alphafold3.state_dict()
+
+    assert not any([key.startswith('plms') for key in state_dict.keys()])
+
     # mock inputs
 
     seq_len = 16

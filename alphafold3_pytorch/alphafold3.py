@@ -82,7 +82,8 @@ from alphafold3_pytorch.common.biomolecule import (
 
 from alphafold3_pytorch.plm import (
     PLMEmbedding,
-    PLMRegistry
+    PLMRegistry,
+    remove_plms
 )
 
 from alphafold3_pytorch.utils.model_utils import (
@@ -6241,6 +6242,14 @@ class Alphafold3(Module):
     @property
     def device(self):
         return self.zero.device
+
+    @remove_plms
+    def state_dict(self, *args, **kwargs):
+        return super().state_dict(*args, **kwargs)
+
+    @remove_plms
+    def load_state_dict(self, *args, **kwargs):
+        return super().load_state_dict(*args, **kwargs)
 
     @property
     def state_dict_with_init_args(self):
