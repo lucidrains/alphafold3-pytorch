@@ -6006,9 +6006,11 @@ class Alphafold3(Module):
 
         # optional protein language model(s) (PLM) embeddings
 
-        self.plms = ModuleList([])
+        self.plms = None
 
         if exists(plm_embeddings):
+            self.plms = ModuleList([])
+
             for one_plm_embedding, one_plm_kwargs in zip(cast_tuple(plm_embeddings), cast_tuple(plm_kwargs)):
 
                 assert one_plm_embedding in PLMRegistry
