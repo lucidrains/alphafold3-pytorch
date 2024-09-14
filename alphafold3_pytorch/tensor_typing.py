@@ -1,5 +1,6 @@
 from __future__ import annotations
 from functools import partial
+import importlib.metadata
 import torch
 import numpy as np
 
@@ -60,6 +61,18 @@ ChainType = Chain
 TokenType = AtomType | ResidueType
 
 # some more colocated environmental stuff
+
+def package_available(package_name: str) -> bool:
+    """Check if a package is available in your environment.
+
+    :param package_name: The name of the package to be checked.
+    :return: `True` if the package is available. `False` otherwise.
+    """
+    try:
+        importlib.metadata.version(package_name)
+        return True
+    except importlib.metadata.PackageNotFoundError:
+        return False
 
 # maybe deespeed checkpoint, and always use non reentrant checkpointing
 
