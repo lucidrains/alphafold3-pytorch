@@ -89,8 +89,7 @@ from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     RigidFromReference3Points,
-    calculate_weighted_rigid_align_weights,
-    package_available
+    calculate_weighted_rigid_align_weights
 )
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram
@@ -256,16 +255,6 @@ def masked_average(
     den = mask.sum(dim = dim)
     return num / den.clamp(min = eps)
 
-# checkpointing utils
-
-if DEEPSPEED_CHECKPOINTING:
-    assert package_available("deepspeed"), "DeepSpeed must be installed for checkpointing."
-
-    import deepspeed
-
-    checkpoint = deepspeed.checkpointing.checkpoint
-else:
-    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
 
 @typecheck
 def should_checkpoint(
