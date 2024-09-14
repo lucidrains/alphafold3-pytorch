@@ -33,7 +33,7 @@ dependencies = [
     "einx>=0.2.2",
     "ema-pytorch>=0.5.0",
     "environs",
-    "lion-pytorch",
+    "lion-pytorch>=0.2.2",
     "joblib",
     "gemmi>=0.6.6",
     "fair-esm",
@@ -53,6 +53,7 @@ dependencies = [
     "retrying",
     "scikit-learn>=1.5.0",
     "scipy==1.13.1",
+    "sentencepiece",
     "sh>=2.0.7",
     "shortuuid",
     "tensorboard",
@@ -62,6 +63,7 @@ dependencies = [
     'torch_geometric',
     "torch>=2.1",
     "tqdm>=4.66.4",
+    "transformers[torch]",
     "loguru",
 ]
 

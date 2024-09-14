@@ -1,3 +1,4 @@
 cp .env.sample .env
-pip install -e '.[test]'
+pip install uv
+uv pip install -e '.[test]'
 pytest tests/
