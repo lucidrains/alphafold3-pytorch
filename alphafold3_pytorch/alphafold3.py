@@ -4661,9 +4661,11 @@ class ComputeConfidenceScore(Module):
                 for i, chain_i in enumerate(unique_chains[b]):
                     for j, chain_j in enumerate(unique_chains[b]):
                         if chain_i != chain_j:
-                            mask_i = (asym_id[b] == chain_i)[:, None]
-                            mask_j = (asym_id[b] == chain_j)[None, :]
-                            pair_mask = mask_i * mask_j
+                            mask_i = (asym_id[b] == chain_i)
+                            mask_j = (asym_id[b] == chain_j)
+
+                            pair_mask = einx.multiply('i, j -> i j', mask_i, mask_j)
+
                             pair_residue_weights = pair_mask * einx.multiply(
                                 "... i, ... j -> ... i j", residue_weights[b], residue_weights[b]
                             )
@@ -4691,13 +4693,12 @@ class ComputeConfidenceScore(Module):
         else:
             pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=device).bool()
             if interface:
-                pair_mask *= asym_id[:, :, None] != asym_id[:, None, :]
+                pair_mask *= einx.not_equal('b i, b j, b i j', asym_id, asym_id)
 
             predicted_tm_term *= pair_mask
 
-            pair_residue_weights = pair_mask * (
-                residue_weights[:, None, :] * residue_weights[:, :, None]
-            )
+            pair_residue_weights = pair_mask * einx.multiply('b i, b j -> b i j', residue_weights, residue_weights)
+
             normed_residue_mask = pair_residue_weights / (
                 self.eps + torch.sum(pair_residue_weights, dim=-1, keepdims=True)
             )
@@ -6008,7 +6009,7 @@ class Alphafold3(Module):
             self.plm, plm_alphabet = esm.pretrained.load_model_and_alphabet_hub(plm_embeddings)
             self.plm_repr_layer = plm_repr_layer
             self.plm_batch_converter = plm_alphabet.get_batch_converter()
-            self.plm_embeds = nn.Linear(self.plm.embed_dim, dim_single, bias=False)
+            self.plm_embeds = LinearNoBias(self.plm.embed_dim, dim_single)
             for p in self.plm.parameters():
                 p.requires_grad = False
 
