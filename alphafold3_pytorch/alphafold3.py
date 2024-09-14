@@ -82,8 +82,7 @@ from alphafold3_pytorch.common.biomolecule import (
 
 from alphafold3_pytorch.plm import (
     PLMEmbedding,
-    PLMRegistry,
-    remove_plms
+    PLMRegistry
 )
 
 from alphafold3_pytorch.utils.model_utils import (
@@ -6243,20 +6242,21 @@ class Alphafold3(Module):
     def device(self):
         return self.zero.device
 
-    @remove_plms
-    def state_dict(self, *args, **kwargs):
-        return super().state_dict(*args, **kwargs)
-
-    @remove_plms
-    def load_state_dict(self, *args, **kwargs):
-        return super().load_state_dict(*args, **kwargs)
-
     @property
     def state_dict_with_init_args(self):
+        """State dict with the initialization arguments."""
+        state_dict = self.state_dict()
+
+        for key in list(state_dict):
+            if "plms." in key:
+                # exclude any frozen PLMs from the state dictionary,
+                # but make sure to keep the PLM adapter weights
+                del state_dict[key]
+
         return dict(
-            version = self._version,
-            init_args_and_kwargs = self._args_and_kwargs,
-            state_dict = self.state_dict()
+            version=self._version,
+            init_args_and_kwargs=self._args_and_kwargs,
+            state_dict=state_dict,
         )
 
     @typecheck
