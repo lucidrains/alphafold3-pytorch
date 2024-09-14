@@ -221,7 +221,7 @@ class Trainer:
         # maybe torch compile
 
         if use_torch_compile:
-            assert not should_typecheck, f'does not work well with jaxtyping + beartype, please invoke your training script with the environment flag `TYPECHECK=False` - ex. `TYPECHECK=False python train_af3.py`'
+            assert not should_typecheck, 'does not work well with jaxtyping + beartype, please invoke your training script with the environment flag `TYPECHECK=False` - ex. `TYPECHECK=False python train_af3.py`'
             model = torch.compile(model)
 
         # model

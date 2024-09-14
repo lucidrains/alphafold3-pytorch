@@ -74,6 +74,7 @@ Repository = "https://github.com/lucidrains/alphafold3-pytorch"
 [project.optional-dependencies]
 examples = []
 test = [
+    "ruff>=0.4.2",
     "pytest",
     "pytest-shard",
 ]
@@ -96,7 +97,8 @@ line-length = 1000
 
 ignore = [
     "F722", # for jaxtyping shape annotation
-    "F401"
+    "F401",
+    "F821"
 ]
 
 [tool.hatch.metadata]
