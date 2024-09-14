@@ -1,4 +1,6 @@
 from __future__ import annotations
+from functools import partial
+import torch
 import numpy as np
 
 from beartype import beartype
@@ -57,6 +59,21 @@ ResidueType = Residue | DisorderedResidue
 ChainType = Chain
 TokenType = AtomType | ResidueType
 
+# some more colocated environmental stuff
+
+# maybe deespeed checkpoint, and always use non reentrant checkpointing
+
+DEEPSPEED_CHECKPOINTING = env.bool('DEEPSPEED_CHECKPOINTING', False)
+
+if DEEPSPEED_CHECKPOINTING:
+    assert package_available("deepspeed"), "DeepSpeed must be installed for checkpointing."
+
+    import deepspeed
+
+    checkpoint = deepspeed.checkpointing.checkpoint
+else:
+    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
+
 # use env variable TYPECHECK to control whether to use beartype + jaxtyping
 
 should_typecheck = env.bool('TYPECHECK', False)
@@ -84,5 +101,6 @@ __all__ = [
     typecheck,
     should_typecheck,
     beartype_isinstance,
+    checkpoint,
     IS_DEBUGGING
 ]
