@@ -5959,7 +5959,7 @@ class Alphafold3(Module):
         checkpoint_diffusion_module = False,
         detach_when_recycling = True,
         pdb_training_set=True,
-        plm_embeddings: PLMEmbeddings | tuple[PLMEmbedding, ...] | None = None,
+        plm_embeddings: PLMEmbedding | tuple[PLMEmbedding, ...] | None = None,
         plm_kwargs: dict | tuple[dict, ...] | None = None,
         constraint_embeddings: int | None = None,
     ):
