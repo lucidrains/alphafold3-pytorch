@@ -5992,6 +5992,7 @@ class Alphafold3(Module):
             self.plm_repr_layer = plm_repr_layer
             self.plm_batch_converter = plm_alphabet.get_batch_converter()
             self.plm_embeds = LinearNoBias(self.plm.embed_dim, dim_single)
+
             for p in self.plm.parameters():
                 p.requires_grad = False
 
