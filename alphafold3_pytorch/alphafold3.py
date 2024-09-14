@@ -4,7 +4,7 @@ import random
 import sh
 from math import pi, sqrt
 from pathlib import Path
-from itertools import product
+from itertools import product, zip_longest
 from functools import partial, wraps
 from collections import namedtuple
 
@@ -213,7 +213,7 @@ def compact(*args):
     return tuple(filter(exists, args))
 
 def cast_tuple(t, length = 1):
-    return (t,) if not isinstance(t, tuple) else ((t,) * length)
+    return t if isinstance(t, tuple) else ((t,) * length)
 
 # tensor helpers
 
@@ -5960,7 +5960,7 @@ class Alphafold3(Module):
         detach_when_recycling = True,
         pdb_training_set=True,
         plm_embeddings: PLMEmbeddings | tuple[PLMEmbedding, ...] | None = None,
-        plm_kwargs: dict | tuple[dict, ...] = dict(),
+        plm_kwargs: dict | tuple[dict, ...] | None = None,
         constraint_embeddings: int | None = None,
     ):
         super().__init__()
@@ -6011,12 +6011,13 @@ class Alphafold3(Module):
         if exists(plm_embeddings):
             self.plms = ModuleList([])
 
-            for one_plm_embedding, one_plm_kwargs in zip(cast_tuple(plm_embeddings), cast_tuple(plm_kwargs)):
-
-                assert one_plm_embedding in PLMRegistry
+            for one_plm_embedding, one_plm_kwargs in zip_longest(cast_tuple(plm_embeddings), cast_tuple(plm_kwargs)):
+                assert one_plm_embedding in PLMRegistry, f'received invalid plm embedding name {one_plm_embedding} - acceptable ones are {PLMRegistry.keys()}'
                 constructor = PLMRegistry.get(one_plm_embedding)
 
+                one_plm_kwargs = default(one_plm_kwargs, {})
                 plm = constructor(**one_plm_kwargs)
+
                 freeze_(plm)
 
                 self.plms.append(plm)

@@ -1095,7 +1095,7 @@ def test_alphafold3_with_plm_embeddings():
         num_molecule_mods=0,
         dim_atom_inputs=77,
         dim_template_feats=108,
-        plm_embeddings="esm2_t33_650M_UR50D",
+        plm_embeddings=("esm2_t33_650M_UR50D", "prostT5"),
     )
 
     # mock inputs
