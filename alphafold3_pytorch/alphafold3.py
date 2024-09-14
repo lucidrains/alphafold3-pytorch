@@ -4675,7 +4675,7 @@ class ComputeConfidenceScore(Module):
         else:
             pair_mask = torch.ones(size=(num_batch, num_res, num_res), device=device).bool()
             if interface:
-                pair_mask *= einx.not_equal('b i, b j, b i j', asym_id, asym_id)
+                pair_mask *= einx.not_equal('b i, b j -> b i j', asym_id, asym_id)
 
             predicted_tm_term *= pair_mask
 
