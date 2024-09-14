@@ -4,6 +4,7 @@ import copy
 import glob
 import json
 import os
+import random
 import statistics
 from collections import defaultdict
 from collections.abc import Iterable
@@ -133,10 +134,17 @@ MOLECULE_GAP_ID = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEO
 MOLECULE_METAL_ION_ID = MOLECULE_GAP_ID + 1
 NUM_MOLECULE_IDS = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) + 2
 
+NUM_HUMAN_AMINO_ACIDS = len(HUMAN_AMINO_ACIDS) - 1  # exclude unknown amino acid type
 NUM_MSA_ONE_HOT = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEOTIDES) + 1
 
 DEFAULT_NUM_MOLECULE_MODS = 4  # `mod_protein`, `mod_rna`, `mod_dna`, and `mod_unk`
 ADDITIONAL_MOLECULE_FEATS = 5
+
+CONSTRAINTS = Literal["binding_site"]
+CONSTRAINT_DIMS = {
+    # NOTE: A mapping of constraint types to their respective input embedding dimensionalities.
+    "binding_site": 1,
+}
 
 CCD_COMPONENTS_FILEPATH = os.path.join("data", "ccd_data", "components.cif")
 CCD_COMPONENTS_SMILES_FILEPATH = os.path.join("data", "ccd_data", "components_smiles.json")
@@ -278,6 +286,7 @@ class AtomInput:
     distance_labels: Int["n n"] | None = None  # type: ignore
     resolved_labels: Int[" m"] | None = None  # type: ignore
     resolution: Float[""] | None = None  # type: ignore
+    token_constraints: Float["n n dac"] | None = None  # type: ignore
     chains: Int[" 2"] | None = None  # type: ignore
     filepath: str | None = None
 
@@ -320,6 +329,7 @@ class BatchedAtomInput:
     distance_labels: Int["b n n"] | None = None  # type: ignore
     resolved_labels: Int["b m"] | None = None  # type: ignore
     resolution: Float[" b"] | None = None  # type: ignore
+    token_constraints: Float["b n n dac"] | None = None  # type: ignore
     chains: Int["b 2"] | None = None  # type: ignore
     filepath: List[str] | None = None
 
@@ -573,6 +583,7 @@ class MoleculeInput:
     distance_labels: Int["n n"] | None = None  # type: ignore
     resolved_labels: Int[" m"] | None = None  # type: ignore
     resolution: Float[""] | None = None  # type: ignore
+    token_constraints: Float["n n dac"] | None = None  # type: ignore
     chains: Tuple[int | None, int | None] | None = (None, None)
     filepath: str | None = None
     add_atom_ids: bool = False
@@ -865,6 +876,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         atompair_ids=atompair_ids,
         resolved_labels=i.resolved_labels,
         resolution=i.resolution,
+        token_constraints=i.token_constraints,
         chains=chains,
         filepath=i.filepath,
     )
@@ -905,6 +917,7 @@ class MoleculeLengthMoleculeInput:
     msa_mask: Bool[" s"] | None = None  # type: ignore
     distance_labels: Int["n n"] | None = None  # type: ignore
     resolved_labels: Int[" m"] | None = None  # type: ignore
+    token_constraints: Float["n n dac"] | None = None  # type: ignore
     chains: Tuple[int | None, int | None] | None = (None, None)
     filepath: str | None = None
     add_atom_ids: bool = False
@@ -1345,6 +1358,7 @@ def molecule_lengthed_molecule_input_to_atom_input(
         atom_ids=atom_ids,
         atompair_ids=atompair_ids,
         resolved_labels=i.resolved_labels,
+        token_constraints=i.token_constraints,
         chains=chains,
         filepath=i.filepath,
     )
@@ -1381,6 +1395,7 @@ class Alphafold3Input:
     msa_mask: Bool[" s"] | None = None  # type: ignore
     distance_labels: Int["n n"] | None = None  # type: ignore
     resolved_labels: Int[" m"] | None = None  # type: ignore
+    token_constraints: Float["n n dac"] | None = None  # type: ignore
     chains: Tuple[int | None, int | None] | None = (None, None)
     add_atom_ids: bool = False
     add_atompair_ids: bool = False
@@ -1792,9 +1807,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
         missing_atom_indices = []
         missing_token_indices = []
 
-        for mol_index, (mol_miss_atom_indices, mol) in enumerate(
-            zip(i.missing_atom_indices, molecules)
-        ):
+        for mol_miss_atom_indices, mol in zip(i.missing_atom_indices, molecules):
             mol_miss_atom_indices = default(mol_miss_atom_indices, [])
             mol_miss_atom_indices = tensor(mol_miss_atom_indices, dtype=torch.long)
 
@@ -1832,6 +1845,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
         chains=i.chains,
         add_atom_ids=i.add_atom_ids,
         add_atompair_ids=i.add_atompair_ids,
+        token_constraints=i.token_constraints,
         directed_bonds=i.directed_bonds,
         extract_atom_feats_fn=i.extract_atom_feats_fn,
         extract_atompair_feats_fn=i.extract_atompair_feats_fn,
@@ -1870,8 +1884,11 @@ class PDBInput:
     add_atompair_ids: bool = False
     directed_bonds: bool = False
     training: bool = False
+    inference: bool = False
     distillation: bool = False
     resolution: float | None = None
+    constraints: List[CONSTRAINTS] | None = None
+    constraints_ratio: float = 0.5
     max_msas_per_chain: int | None = None
     max_num_msa_tokens: int | None = None
     max_templates_per_chain: int | None = None
@@ -2724,6 +2741,7 @@ def pdb_input_to_molecule_input(
     residue_index = (
         torch.from_numpy(biomol.residue_index) - 1
     )  # NOTE: `Biomolecule.residue_index` is 1-based originally
+    chain_index = torch.from_numpy(biomol.chain_index)
     num_tokens = len(biomol.atom_mask)
 
     # create unique chain-residue index pairs to identify the first atom of each residue
@@ -2882,6 +2900,7 @@ def pdb_input_to_molecule_input(
             residue_index = (
                 torch.from_numpy(biomol.residue_index) - 1
             )  # NOTE: `Biomolecule.residue_index` is 1-based originally
+            chain_index = torch.from_numpy(biomol.chain_index)
             num_tokens = len(biomol.atom_mask)
 
             # update MSA and template features after cropping
@@ -3061,12 +3080,15 @@ def pdb_input_to_molecule_input(
     token_center_atom_indices = tensor(token_center_atom_indices)
     distogram_atom_indices = tensor(distogram_atom_indices)
 
+    atom_positions = tensor(biomol.atom_positions, dtype=torch.float32)
+    atom_mask = tensor(biomol.atom_mask, dtype=torch.float32)
+
     # handle frames for ligands (AF3 Supplement, Section 4.3.2)
     chain_id_to_token_center_atom_positions = {
         # NOTE: Here, we improvise by using only the token center atom
         # positions of tokens in the same chain to derive ligand frames
         chain_id: torch.gather(
-            tensor(biomol.atom_positions[biomol.chain_id == chain_id]),
+            atom_positions[biomol.chain_id == chain_id],
             1,
             token_center_atom_indices[biomol.chain_id == chain_id][..., None, None].expand(
                 -1, -1, 3
@@ -3076,7 +3098,7 @@ def pdb_input_to_molecule_input(
     }
     chain_id_to_token_center_atom_mask = {
         chain_id: torch.gather(
-            tensor(biomol.atom_mask[biomol.chain_id == chain_id]),
+            atom_mask[biomol.chain_id == chain_id],
             1,
             token_center_atom_indices[biomol.chain_id == chain_id].unsqueeze(-1),
         ).squeeze(1)
@@ -3160,7 +3182,7 @@ def pdb_input_to_molecule_input(
         (
             residue_index,
             torch.arange(num_tokens),
-            torch.from_numpy(biomol.chain_index),
+            chain_index,
             entity_ids,
             sym_ids,
         ),
@@ -3439,6 +3461,27 @@ def pdb_input_to_molecule_input(
         is_resolved_label = ((resolution >= 0.1) & (resolution <= 3.0)).item()
         resolved_labels = torch.full((num_atoms,), is_resolved_label, dtype=torch.long)
 
+    # craft optional pairwise token constraints
+
+    token_constraints = None
+
+    if exists(i.constraints):
+        token_pos = torch.gather(
+            atom_positions,
+            1,
+            token_center_atom_indices[..., None, None].expand(-1, -1, 3),
+        ).squeeze(1)
+
+        token_constraints = get_token_constraints(
+            constraints=i.constraints,
+            constraints_ratio=i.constraints_ratio,
+            training=i.training,
+            inference=i.inference,
+            token_pos=token_pos,
+            token_parent_ids=chain_index,
+            token_residue_ids=residue_index,
+        )
+
     # create molecule input
 
     molecule_input = MoleculeInput(
@@ -3461,6 +3504,7 @@ def pdb_input_to_molecule_input(
         templates=templates,
         msa=msa,
         atom_pos=atom_pos,
+        token_constraints=token_constraints,
         template_mask=template_mask,
         msa_mask=msa_row_mask,
         resolved_labels=resolved_labels,
@@ -3475,6 +3519,60 @@ def pdb_input_to_molecule_input(
     )
 
     return molecule_input
+
+
+@typecheck
+def get_token_constraints(
+    constraints: List[CONSTRAINTS],
+    constraints_ratio: float,
+    training: bool,
+    inference: bool,
+    token_pos: Float["n 3"],  # type: ignore
+    token_parent_ids: Int[" n"],  # type: ignore
+    token_residue_ids: Int[" n"],  # type: ignore
+) -> Float["n n dac"]:  # type: ignore
+    """Construct pairwise token constraints for the given constraint strings and ratio.
+    
+    NOTE: The `binding_site` constraint is inspired by the Chai-1 model.
+
+    :param constraints: The constraints to use.
+    :param constraints_ratio: The constraints ratio to use during training.
+    :param training: Whether the model is training.
+    :param inference: Whether the model is in inference.
+    :param token_pos: The token center atom positions.
+    :param token_parent_ids: The token parent (i.e., chain) IDs.
+    :param token_residue_ids: The token residue IDs.
+    :return: The pairwise token constraints.
+    """
+    assert 0 < constraints_ratio <= 1, "The constraints ratio must be in the range (0, 1]."
+
+    num_atoms = token_pos.shape[0]
+    keep_constraints = inference or (training and random.random() < constraints_ratio)  # nosec
+
+    token_constraints = []
+
+    for constraint in constraints:
+        constraint_dim = CONSTRAINT_DIMS[constraint]
+
+        pairwise_token_constraint = torch.zeros(
+            (num_atoms, num_atoms, constraint_dim), dtype=torch.float32
+        )
+
+        if keep_constraints and constraint == "binding_site":
+            # NOTE: Binding sites are defined by finding pairs of token center atoms that
+            # are within 8 Å of each other and belong to different chains and residues.
+            token_dists = torch.cdist(token_pos, token_pos)
+
+            token_dists_mask = (token_dists > 0.0) & (token_dists < 8.0)
+            token_parent_mask = token_parent_ids[None, :] != token_parent_ids[:, None]
+            token_residue_mask = token_residue_ids[None, :] != token_residue_ids[:, None]
+
+            pairwise_token_mask = token_dists_mask & token_parent_mask & token_residue_mask
+            pairwise_token_constraint[pairwise_token_mask] = 1.0
+
+        token_constraints.append(pairwise_token_constraint)
+
+    return torch.cat(token_constraints, dim=-1)
 
 
 @typecheck
