@@ -85,7 +85,6 @@ from alphafold3_pytorch.utils.model_utils import (
     RigidFrom3Points,
     RigidFromReference3Points,
     calculate_weighted_rigid_align_weights,
-    package_available,
 )
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram

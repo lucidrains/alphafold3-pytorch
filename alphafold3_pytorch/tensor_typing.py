@@ -21,6 +21,7 @@ from jaxtyping import (
 from loguru import logger
 
 from torch import Tensor
+from alphafold3_pytorch.utils.model_utils import package_available
 
 # environment
 
