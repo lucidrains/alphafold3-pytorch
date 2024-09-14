@@ -91,6 +91,8 @@ class ProstT5Wrapper(Module):
         self.model = T5EncoderModel.from_pretrained("Rostlab/ProstT5")
         self.embed_dim = 1024
 
+    @torch.no_grad()
+    @typecheck
     def forward(
         self,
         aa_ids: Int['b n']
