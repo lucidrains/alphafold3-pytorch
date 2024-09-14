@@ -6008,15 +6008,16 @@ class Alphafold3(Module):
 
         self.plms = ModuleList([])
 
-        for one_plm_embedding, one_plm_kwargs in zip(cast_tuple(plm_embeddings), cast_tuple(plm_kwargs)):
+        if exists(plm_embeddings):
+            for one_plm_embedding, one_plm_kwargs in zip(cast_tuple(plm_embeddings), cast_tuple(plm_kwargs)):
 
-            assert one_plm_embedding in PLMRegistry
-            constructor = PLMRegistry.get(one_plm_embedding)
+                assert one_plm_embedding in PLMRegistry
+                constructor = PLMRegistry.get(one_plm_embedding)
 
-            plm = constructor(**one_plm_kwargs)
-            freeze_(plm)
+                plm = constructor(**one_plm_kwargs)
+                freeze_(plm)
 
-            self.plms.append(plm)
+                self.plms.append(plm)
 
         if exists(self.plms):
             concatted_plm_embed_dim = sum([plm.embed_dim for plm in self.plms])
