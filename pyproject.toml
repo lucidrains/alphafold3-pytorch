@@ -95,7 +95,7 @@ pythonpath = [
 [tool.ruff]
 line-length = 1000
 
-ignore = [
+lint.ignore = [
     "F722", # for jaxtyping shape annotation
     "F401",
     "F821"
