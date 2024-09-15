@@ -819,6 +819,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
 
     molecule_atom_indices = i.molecule_atom_indices
     distogram_atom_indices = i.distogram_atom_indices
+    atom_indices_for_frame = i.atom_indices_for_frame
 
     if exists(missing_token_indices) and missing_token_indices.shape[-1]:
         is_missing_molecule_atom = einx.equal(
@@ -827,9 +828,29 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         is_missing_distogram_atom = einx.equal(
             "n missing, n -> n missing", missing_token_indices, distogram_atom_indices
         ).any(dim=-1)
+        is_missing_atom_indices_for_frame = einx.equal(
+            "n missing, n three -> n three missing", missing_token_indices, atom_indices_for_frame
+        ).any(dim=-1)
 
         molecule_atom_indices = molecule_atom_indices.masked_fill(is_missing_molecule_atom, -1)
         distogram_atom_indices = distogram_atom_indices.masked_fill(is_missing_distogram_atom, -1)
+        atom_indices_for_frame = atom_indices_for_frame.masked_fill(
+            is_missing_atom_indices_for_frame, -1
+        )
+
+    # sanity-check the atom indices
+    if not (-1 <= molecule_atom_indices.min() <= molecule_atom_indices.max() < total_atoms):
+        raise ValueError(
+            f"Invalid molecule atom indices found in `molecule_to_atom_input()` for {i.filepath}: {molecule_atom_indices}"
+        )
+    if not (-1 <= distogram_atom_indices.min() <= distogram_atom_indices.max() < total_atoms):
+        raise ValueError(
+            f"Invalid distogram atom indices found in `molecule_to_atom_input()` for {i.filepath}: {distogram_atom_indices}"
+        )
+    if not (-1 <= atom_indices_for_frame.min() <= atom_indices_for_frame.max() < total_atoms):
+        raise ValueError(
+            f"Invalid atom indices for frame found in `molecule_to_atom_input()` for {i.filepath}: {atom_indices_for_frame}"
+        )
 
     # handle atom positions
 
@@ -856,9 +877,9 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         atompair_inputs=atompair_inputs,
         molecule_atom_lens=atom_lens.long(),
         molecule_ids=i.molecule_ids,
-        molecule_atom_indices=i.molecule_atom_indices,
-        distogram_atom_indices=i.distogram_atom_indices,
-        atom_indices_for_frame=i.atom_indices_for_frame,
+        molecule_atom_indices=molecule_atom_indices,
+        distogram_atom_indices=distogram_atom_indices,
+        atom_indices_for_frame=atom_indices_for_frame,
         is_molecule_mod=is_molecule_mod,
         msa=i.msa,
         templates=i.templates,
@@ -3025,12 +3046,14 @@ def pdb_input_to_molecule_input(
 
     current_atom_index = 0
     current_res_index = -1
+    current_chain_index = -1
 
-    for mol_type, atom_mask, chemid, res_index in zip(
+    for mol_type, atom_mask, chemid, res_index, res_chain_index in zip(
         molecule_atom_types,
         biomol.atom_mask,
         biomol.chemid,
         biomol.residue_index,
+        biomol.chain_index,
     ):
         residue_constants = get_residue_constants(
             mol_type.replace("protein", "peptide").replace("mod_", "")
@@ -3045,11 +3068,12 @@ def pdb_input_to_molecule_input(
 
         if is_atomized_residue(mol_type):
             # collect indices for each ligand and modified polymer residue token (i.e., atom)
-            if current_res_index == res_index:
+            if current_res_index == res_index and current_chain_index == res_chain_index:
                 current_atom_index += 1
             else:
                 current_atom_index = 0
                 current_res_index = res_index
+                current_chain_index = res_chain_index
 
             # NOTE: we have to dynamically determine the token center atom index for atomized residues
             token_center_atom_index = np.where(atom_mask)[0][0]
@@ -3438,6 +3462,20 @@ def pdb_input_to_molecule_input(
         np.concatenate([mol.GetConformer().GetPositions() for mol in molecules]).astype(np.float32)
     )
     num_atoms = atom_pos.shape[0]
+
+    # sanity-check the atom indices
+    if not (-1 <= distogram_atom_indices.min() <= distogram_atom_indices.max() < num_atoms):
+        raise ValueError(
+            f"Invalid distogram atom indices found in `pdb_input_to_molecule_input()` for {filepath}: {distogram_atom_indices}"
+        )
+    if not (-1 <= molecule_atom_indices.min() <= molecule_atom_indices.max() < num_atoms):
+        raise ValueError(
+            f"Invalid molecule atom indices found in `pdb_input_to_molecule_input()` for {filepath}: {molecule_atom_indices}"
+        )
+    if not (-1 <= atom_indices_for_frame.min() <= atom_indices_for_frame.max() < num_atoms):
+        raise ValueError(
+            f"Invalid atom indices for frame found in `pdb_input_to_molecule_input()` for {filepath}: {atom_indices_for_frame}"
+        )
 
     # create atom_parent_ids using the `Biomolecule` object, which governs in the atom
     # encoder / decoder which atom attends to which, where a design choice is made such
