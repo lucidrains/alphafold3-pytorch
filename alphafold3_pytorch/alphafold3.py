@@ -5957,6 +5957,7 @@ class Alphafold3(Module):
         # store atom and atompair input dimensions for shape validation
 
         self.dim_atom_inputs = dim_atom_inputs
+        self.dim_template_feats = dim_template_feats
         self.dim_atompair_inputs = dim_atompair_inputs
 
         # optional atom and atom bond embeddings
@@ -6631,15 +6632,24 @@ class Alphafold3(Module):
 
             # templates
 
-            if exists(templates):
-                embedded_template = self.template_embedder(
-                    templates = templates,
-                    template_mask = template_mask,
-                    pairwise_repr = pairwise,
-                    mask = mask
+            if not exists(templates):
+                templates = torch.zeros(
+                    (batch_size, 1, seq_len, seq_len, self.dim_template_feats),
+                    dtype=dtype,
+                    device=self.device,
                 )
+                template_mask = torch.zeros((batch_size, 1), dtype=torch.bool, device=self.device)
 
-                pairwise = embedded_template + pairwise
+            # ensure template embedder always contributes to the loss
+
+            embedded_template = self.template_embedder(
+                templates=templates,
+                template_mask=template_mask,
+                pairwise_repr=pairwise,
+                mask=mask,
+            )
+
+            pairwise = embedded_template + pairwise
 
             # msa
 
@@ -7271,6 +7281,10 @@ class Alphafold3(Module):
                     f"ch_logits.resolved shape {ch_logits.resolved.shape[-1]}"
                 )
                 resolved_loss = cross_entropy_with_weight(ch_logits.resolved, resolved_labels, confidence_weight, label_mask, ignore)
+            else:
+                resolved_loss = (
+                    ch_logits.resolved * 0.0
+                ).mean()  # ensure resolved logits always contribute to the loss
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
 
