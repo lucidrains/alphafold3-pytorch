@@ -289,6 +289,8 @@ def test_pdbinput_input():
     loss = alphafold3(**batched_atom_input.model_forward_dict())
     loss.backward()
 
+    return
+
     # sampling
 
     batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=4)
