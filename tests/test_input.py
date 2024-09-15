@@ -243,15 +243,12 @@ def test_pdbinput_input():
             "contiguous_weight": 0.2,
             "spatial_weight": 0.4,
             "spatial_interface_weight": 0.4,
-            "n_res": 64,
+            "n_res": 4,
         },
         training=True,
     )
 
     eval_pdb_input = PDBInput(filepath)
-
-    assert True
-    return
 
     batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=27)
 
