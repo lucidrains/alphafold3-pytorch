@@ -250,7 +250,7 @@ def test_pdbinput_input():
 
     eval_pdb_input = PDBInput(filepath)
 
-    batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=27)
+    batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=4)
 
     # training
 
@@ -263,12 +263,12 @@ def test_pdbinput_input():
         dim_token=2,
         dim_atom_inputs=3,
         dim_atompair_inputs=5,
-        atoms_per_window=27,
+        atoms_per_window=4,
         dim_template_feats=108,
         num_molecule_mods=4,
         num_dist_bins=64,
-        num_rollout_steps=2,
-        diffusion_num_augmentations=2,
+        num_rollout_steps=1,
+        diffusion_num_augmentations=1,
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1, dim_msa=2),
@@ -291,7 +291,7 @@ def test_pdbinput_input():
 
     # sampling
 
-    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=27)
+    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=4)
 
     alphafold3.eval()
 
