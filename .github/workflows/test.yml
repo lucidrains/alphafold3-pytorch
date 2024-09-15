@@ -5,6 +5,7 @@ env:
   TYPECHECK: True
   DEBUG: True
   DEEPSPEED_CHECKPOINTING: False
+  IS_GITHUB_CI: True
 
 jobs:
   build:

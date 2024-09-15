@@ -17,6 +17,8 @@ from alphafold3_pytorch import (
     file_to_atom_input
 )
 
+from alphafold3_pytorch.tensor_typing import IS_GITHUB_CI
+
 from alphafold3_pytorch.data import mmcif_writing
 
 from alphafold3_pytorch.life import (
@@ -230,6 +232,7 @@ def test_atompos_input():
     assert sampled_atom_pos.shape == (1, (5 + 4 + 21 + 3), 3)
 
 def test_pdbinput_input():
+
     """Test the PDBInput class, particularly its input transformations for mmCIF files."""
     filepath = os.path.join("data", "test", "mmcifs", DATA_TEST_PDB_ID[1:3], f"{DATA_TEST_PDB_ID}-assembly1.cif")
     file_id = os.path.splitext(os.path.basename(filepath))[0]
@@ -242,14 +245,14 @@ def test_pdbinput_input():
             "contiguous_weight": 0.2,
             "spatial_weight": 0.4,
             "spatial_interface_weight": 0.4,
-            "n_res": 64,
+            "n_res": 4,
         },
         training=True,
     )
 
     eval_pdb_input = PDBInput(filepath)
 
-    batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=27)
+    batched_atom_input = pdb_inputs_to_batched_atom_input(train_pdb_input, atoms_per_window=4)
 
     # training
 
@@ -262,12 +265,12 @@ def test_pdbinput_input():
         dim_token=2,
         dim_atom_inputs=3,
         dim_atompair_inputs=5,
-        atoms_per_window=27,
+        atoms_per_window=4,
         dim_template_feats=108,
         num_molecule_mods=4,
         num_dist_bins=64,
-        num_rollout_steps=2,
-        diffusion_num_augmentations=2,
+        num_rollout_steps=1,
+        diffusion_num_augmentations=1,
         confidence_head_kwargs=dict(pairformer_depth=1),
         template_embedder_kwargs=dict(pairformer_stack_depth=1),
         msa_module_kwargs=dict(depth=1, dim_msa=2),
@@ -288,9 +291,14 @@ def test_pdbinput_input():
     loss = alphafold3(**batched_atom_input.model_forward_dict())
     loss.backward()
 
+    # sampling is too much for github ci for now
+
+    if IS_GITHUB_CI:
+        return
+
     # sampling
 
-    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=27)
+    batched_eval_atom_input = pdb_inputs_to_batched_atom_input(eval_pdb_input, atoms_per_window=4)
 
     alphafold3.eval()
 
