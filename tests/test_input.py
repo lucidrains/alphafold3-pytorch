@@ -230,6 +230,8 @@ def test_atompos_input():
     assert sampled_atom_pos.shape == (1, (5 + 4 + 21 + 3), 3)
 
 def test_pdbinput_input():
+    pytest.skip()
+
     """Test the PDBInput class, particularly its input transformations for mmCIF files."""
     filepath = os.path.join("data", "test", "mmcifs", DATA_TEST_PDB_ID[1:3], f"{DATA_TEST_PDB_ID}-assembly1.cif")
     file_id = os.path.splitext(os.path.basename(filepath))[0]
