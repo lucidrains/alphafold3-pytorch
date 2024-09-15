@@ -2854,7 +2854,7 @@ def pdb_input_to_molecule_input(
         if verbose:
             logger.warning(
                 f"The number of tokens ({num_tokens}) multiplied by the number of templates per structure ({i.num_templates_per_chain}) exceeds the maximum total number of template tokens {(i.max_num_template_tokens)}. "
-                "Skipping curation of templates features for this example."
+                "Skipping curation of template features for this example."
             )
         template_features = {}
     else:
@@ -2874,8 +2874,6 @@ def pdb_input_to_molecule_input(
 
     templates = template_features.get("templates")
     template_mask = template_features.get("template_mask")
-
-    assert exists(templates) and exists(template_mask), "Templates and template masks must be derived for each example."
 
     # crop the `Biomolecule` object during training only
 
