@@ -2485,7 +2485,7 @@ def load_msa_from_msa_dir(
     """Load MSA from a directory containing MSA files."""
     if verbose and (not_exists(msa_dir) or not os.path.exists(msa_dir)):
         logger.warning(
-            f"{msa_dir} does not exist. Dummy MSA features for each chain of file {file_id} will instead be loaded."
+            f"{msa_dir} MSA directory does not exist. Dummy MSA features for each chain of file {file_id} will instead be loaded."
         )
 
     msas = {}
@@ -2600,35 +2600,32 @@ def load_templates_from_templates_dir(
     kalign_binary_path: str | None = None,
     template_cutoff_date: datetime | None = None,
     randomly_sample_num_templates: bool = False,
-    raise_missing_exception: bool = False,
     verbose: bool = False,
 ) -> FeatureDict:
     """Load templates from a directory containing template PDB mmCIF files."""
-    if (
-        not_exists(templates_dir) or not os.path.exists(templates_dir)
-    ) and raise_missing_exception:
-        raise FileNotFoundError(f"{templates_dir} does not exist.")
-    elif not_exists(templates_dir) or not os.path.exists(templates_dir):
-        if verbose:
-            logger.warning(
-                f"{templates_dir} does not exist. Skipping template loading by returning `Nones`."
-            )
-        return {}
+    if verbose and (not_exists(templates_dir) or not os.path.exists(templates_dir)):
+        logger.warning(
+            f"{templates_dir} templates directory does not exist. Dummy template features for each chain of file {file_id} will instead be loaded."
+        )
 
-    if (not_exists(mmcif_dir) or not os.path.exists(mmcif_dir)) and raise_missing_exception:
-        raise FileNotFoundError(f"{mmcif_dir} does not exist.")
-    elif not_exists(mmcif_dir) or not os.path.exists(mmcif_dir):
-        if verbose:
-            logger.warning(
-                f"{mmcif_dir} does not exist. Skipping template loading by returning `Nones`."
-            )
-        return {}
+    if verbose and (not_exists(mmcif_dir) or not os.path.exists(mmcif_dir)):
+        logger.warning(
+            f"{mmcif_dir} mmCIF templates directory does not exist. Dummy template features for each chain of file {file_id} will instead be loaded."
+        )
 
     templates = defaultdict(list)
     for chain_id in chain_id_to_residue:
-        template_fpaths = glob.glob(os.path.join(templates_dir, f"{file_id}{chain_id}_*.m8"))
+        template_fpaths = (
+            glob.glob(os.path.join(templates_dir, f"{file_id}{chain_id}_*.m8"))
+            if exists(templates_dir)
+            else []
+        )
 
         if not template_fpaths:
+            if verbose:
+                logger.warning(
+                    f"Could not find template for chain {chain_id} of file {file_id}. A dummy template will be installed for this chain."
+                )
             templates[chain_id] = []
             continue
 
@@ -2808,30 +2805,31 @@ def pdb_input_to_molecule_input(
         exists(feat)
         for feat in [msa, msa_row_mask, has_deletion, deletion_value, profile, deletion_mean]
     )
-    if all_msa_features_exist:
-        assert (
-            msa.shape[-1] == num_tokens
-        ), f"The number of tokens in the MSA ({msa.shape[-1]}) does not match the number of tokens in the biomolecule ({num_tokens}). "
 
-        additional_msa_feats = torch.stack(
-            [
-                has_deletion,
-                deletion_value,
-            ],
-            dim=-1,
-        )
+    assert all_msa_features_exist, "All MSA features must be derived for each example."
+    assert (
+        msa.shape[-1] == num_tokens
+    ), f"The number of tokens in the MSA ({msa.shape[-1]}) does not match the number of tokens in the biomolecule ({num_tokens}). "
 
-        additional_token_feats = torch.cat(
-            [
-                profile,
-                deletion_mean[:, None],
-            ],
-            dim=-1,
-        )
+    additional_msa_feats = torch.stack(
+        [
+            has_deletion,
+            deletion_value,
+        ],
+        dim=-1,
+    )
 
-        # convert the MSA into a one-hot representation
-        msa = make_one_hot(msa, NUM_MSA_ONE_HOT)
-        msa_row_mask = msa_row_mask.bool()
+    additional_token_feats = torch.cat(
+        [
+            profile,
+            deletion_mean[:, None],
+        ],
+        dim=-1,
+    )
+
+    # convert the MSA into a one-hot representation
+    msa = make_one_hot(msa, NUM_MSA_ONE_HOT)
+    msa_row_mask = msa_row_mask.bool()
 
     # retrieve templates for each chain
 
@@ -2849,33 +2847,40 @@ def pdb_input_to_molecule_input(
         # NOTE: this is the template cutoff date for all inference tasks
         template_cutoff_date = datetime.strptime("2021-09-30", "%Y-%m-%d")
 
+    templates_dir = i.templates_dir
+    num_templates_per_chain = i.num_templates_per_chain
+
     if (
         exists(i.max_num_template_tokens)
         and num_tokens * i.num_templates_per_chain > i.max_num_template_tokens
     ):
+        templates_dir = None
+        num_templates_per_chain = 1
+
         if verbose:
             logger.warning(
                 f"The number of tokens ({num_tokens}) multiplied by the number of templates per structure ({i.num_templates_per_chain}) exceeds the maximum total number of template tokens {(i.max_num_template_tokens)}. "
-                "Skipping curation of template features for this example."
+                "Skipping curation of templates features for this example by installing a dummy template for each chain."
             )
-        template_features = {}
-    else:
-        template_features = load_templates_from_templates_dir(
-            # NOTE: if templates are not locally available, no template features will be used
-            i.templates_dir,
-            mmcif_dir,
-            file_id,
-            chain_id_to_residue,
-            max_templates_per_chain=i.max_templates_per_chain,
-            num_templates_per_chain=i.num_templates_per_chain,
-            kalign_binary_path=i.kalign_binary_path,
-            template_cutoff_date=template_cutoff_date,
-            randomly_sample_num_templates=exists(i.training) and i.training,
-            verbose=verbose,
-        )
+
+    template_features = load_templates_from_templates_dir(
+        # NOTE: if templates are not locally available, no template features will be used
+        templates_dir,
+        mmcif_dir,
+        file_id,
+        chain_id_to_residue,
+        max_templates_per_chain=i.max_templates_per_chain,
+        num_templates_per_chain=num_templates_per_chain,
+        kalign_binary_path=i.kalign_binary_path,
+        template_cutoff_date=template_cutoff_date,
+        randomly_sample_num_templates=exists(i.training) and i.training,
+        verbose=verbose,
+    )
 
     templates = template_features.get("templates")
     template_mask = template_features.get("template_mask")
+
+    assert exists(templates) and exists(template_mask), "Templates and template masks must be derived for each example."
 
     # crop the `Biomolecule` object during training only
 
