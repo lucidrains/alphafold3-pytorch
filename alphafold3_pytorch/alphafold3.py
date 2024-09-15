@@ -7282,7 +7282,9 @@ class Alphafold3(Module):
                 )
                 resolved_loss = cross_entropy_with_weight(ch_logits.resolved, resolved_labels, confidence_weight, label_mask, ignore)
             else:
-                resolved_loss = ch_logits.resolved * 0.0  # ensure resolved logits always contribute to the loss
+                resolved_loss = (
+                    ch_logits.resolved * 0.0
+                ).mean()  # ensure resolved logits always contribute to the loss
 
             confidence_loss = pae_loss + pde_loss + plddt_loss + resolved_loss
 
