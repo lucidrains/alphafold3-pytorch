@@ -87,6 +87,10 @@ if DEEPSPEED_CHECKPOINTING:
 else:
     checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
 
+# check is github ci
+
+IS_GITHUB_CI = env.bool('IS_GITHUB_CI', False)
+
 # use env variable TYPECHECK to control whether to use beartype + jaxtyping
 
 should_typecheck = env.bool('TYPECHECK', False)
@@ -115,5 +119,6 @@ __all__ = [
     should_typecheck,
     beartype_isinstance,
     checkpoint,
-    IS_DEBUGGING
+    IS_DEBUGGING,
+    IS_GITHUB_CI
 ]

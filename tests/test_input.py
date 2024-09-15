@@ -17,6 +17,8 @@ from alphafold3_pytorch import (
     file_to_atom_input
 )
 
+from alphafold3_pytorch.tensor_typing import IS_GITHUB_CI
+
 from alphafold3_pytorch.data import mmcif_writing
 
 from alphafold3_pytorch.life import (
@@ -289,7 +291,10 @@ def test_pdbinput_input():
     loss = alphafold3(**batched_atom_input.model_forward_dict())
     loss.backward()
 
-    return
+    # sampling is too much for github ci for now
+
+    if IS_GITHUB_CI:
+        return
 
     # sampling
 
