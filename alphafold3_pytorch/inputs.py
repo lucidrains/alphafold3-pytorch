@@ -1947,7 +1947,12 @@ def alphafold3_input_to_biomolecule(
     ### Step 4. Atom Masks
     # atom_masks: np.array [num_res, num_atom_types (47)]
     # Due to the first Atom that's present being a zero due to zero indexed counts we force it to be a one.
-    atom_masks = np.stack([np.array(np.concat([np.array([1]), r2a[1:]]) != 0).astype(int) for r2a in restype_to_atom])
+    atom_masks = np.stack(
+        [
+            np.array(np.concatenate([np.array([1]), r2a[1:]]) != 0).astype(int)
+            for r2a in restype_to_atom
+        ]
+    )
 
     ### Step 5. Residue Index
     # residue_index: np.array [num_res], 1-indexed
