@@ -1978,7 +1978,7 @@ def alphafold3_input_to_biomolecule(
         try:
             one_letter = restype_dict[molecule_ids[idx].item()]
             chemids.append(get_residue_constants(res_chem_index=mt).restype_1to3[one_letter])
-        except:
+        except KeyError:
             chemids.append("UNK")
 
     chemids = np.array(chemids)
