@@ -12,14 +12,25 @@ from alphafold3_pytorch import (
     maybe_transform_to_atom_input,
     collate_inputs_to_batched_atom_input,
     alphafold3_inputs_to_batched_atom_input,
+    alphafold3_input_to_biomolecule,
     pdb_inputs_to_batched_atom_input,
     atom_input_to_file,
     file_to_atom_input
 )
 
+from alphafold3_pytorch.data.data_pipeline import *
+from alphafold3_pytorch.data.data_pipeline import make_mmcif_features
+from alphafold3_pytorch.common.biomolecule import (
+    Biomolecule,
+    _from_mmcif_object,
+    get_residue_constants,
+    to_inference_mmcif,
+    to_mmcif
+)
+
 from alphafold3_pytorch.tensor_typing import IS_GITHUB_CI
 
-from alphafold3_pytorch.data import mmcif_writing
+from alphafold3_pytorch.data import mmcif_writing, mmcif_parsing
 
 from alphafold3_pytorch.life import (
     reverse_complement,
@@ -122,6 +133,107 @@ def test_alphafold3_input(
     )
 
     alphafold3(**batched_atom_input.model_forward_dict(), num_sample_steps = 1)
+
+
+def test_alphafold3_input_to_biomolecule():
+
+    alphafold3_input = Alphafold3Input(
+        proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
+        ds_dna = ['ACGTT'],
+        ds_rna = ['GCCAU', 'CCAGU'],
+        ss_dna = ['GCCTA'],
+        ss_rna = ['CGCAUA'],
+        metal_ions = ['Na', 'Na', 'Fe'],
+        misc_molecule_ids = ['Phospholipid'],
+        ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
+        add_atom_ids = True,
+        add_atompair_ids = True,
+        directed_bonds = True
+    )
+
+    test_biomol = alphafold3_input_to_biomolecule(alphafold3_input, atom_positions=torch.randn(261,47,3).numpy())
+    # Ensure that the residues got loaded correctly
+    assert test_biomol.chemid.tolist() == ['MET', 'LEU', 'GLU', 'ILE', 'CYS', 'LEU', 'LYS', 'LEU', 'VAL',
+       'GLY', 'CYS', 'LYS', 'SER', 'LYS', 'LYS', 'GLY', 'LEU', 'SER',
+       'SER', 'SER', 'SER', 'SER', 'CYS', 'TYR', 'LEU', 'GLU', 'GLU',
+       'ALA', 'LEU', 'GLN', 'ARG', 'PRO', 'VAL', 'ALA', 'SER', 'ASP',
+       'PHE', 'MET', 'GLY', 'LYS', 'CYS', 'ARG', 'GLY', 'LEU', 'ARG',
+       'THR', 'ALA', 'ARG', 'LYS', 'LEU', 'ARG', 'SER', 'HIS', 'ARG',
+       'ARG', 'ASP', 'GLN', 'LYS', 'TRP', 'HIS', 'ASP', 'LYS', 'GLN',
+       'TYR', 'LYS', 'LYS', 'ALA', 'HIS', 'LEU', 'GLY', 'THR', 'ALA',
+       'LEU', 'LYS', 'ALA', 'ASN', 'PRO', 'PHE', 'GLY', 'GLY', 'ALA',
+       'SER', 'HIS', 'ALA', 'LYS', 'GLY', 'ILE', 'VAL', 'LEU', 'GLU',
+       'LYS', 'VAL', 'GLY', 'VAL', 'GLU', 'ALA', 'LYS', 'GLN', 'PRO',
+       'ASN', 'SER', 'ALA', 'ILE', 'ARG', 'LYS', 'CYS', 'VAL', 'ARG',
+       'VAL', 'GLN', 'LEU', 'ILE', 'LYS', 'ASN', 'GLY', 'LYS', 'LYS',
+       'ILE', 'THR', 'ALA', 'PHE', 'VAL', 'PRO', 'ASN', 'ASP', 'GLY',
+       'CYS', 'LEU', 'ASN', 'PHE', 'ILE', 'GLU', 'GLU', 'ASN', 'ASP',
+       'GLU', 'VAL', 'LEU', 'VAL', 'ALA', 'GLY', 'PHE', 'GLY', 'ARG',
+       'LYS', 'GLY', 'HIS', 'ALA', 'VAL', 'GLY', 'ASP', 'ILE', 'PRO',
+       'GLY', 'VAL', 'ARG', 'PHE', 'LYS', 'VAL', 'VAL', 'LYS', 'VAL',
+       'ALA', 'ASN', 'VAL', 'SER', 'LEU', 'LEU', 'ALA', 'LEU', 'TYR',
+       'LYS', 'GLY', 'LYS', 'LYS', 'GLU', 'ARG', 'PRO', 'ARG', 'SER', 'C',
+       'G', 'C', 'A', 'U', 'A', 'G', 'C', 'C', 'A', 'U', 'A', 'U', 'G',
+       'G', 'C', 'C', 'C', 'A', 'G', 'U', 'A', 'C', 'U', 'G', 'G', 'DG',
+       'DC', 'DC', 'DT', 'DA', 'DA', 'DC', 'DG', 'DT', 'DT', 'DA', 'DA',
+       'DC', 'DG', 'DT', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL',
+       'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL',
+       'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL',
+       'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL', 'UNL',
+       'UNL', 'UNL', 'UNL', 'UNK', 'UNK', 'UNK']
+
+
+def test_alphafold3_input_to_mmcif(tmp_path):
+    """Test the Inference I/O Pipeline. This codifies the data_pipeline.py file used for training."""
+    
+    alphafold3_input = Alphafold3Input(
+    proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
+    ds_dna = ['ACGTT'],
+    ds_rna = ['GCCAU', 'CCAGU'],
+    ss_dna = ['GCCTA'],
+    ss_rna = ['CGCAUA'],
+    metal_ions = ['Na', 'Na', 'Fe'],
+    misc_molecule_ids = ['Phospholipid'],
+    ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
+    add_atom_ids = True,
+    add_atompair_ids = True,
+    directed_bonds = True
+    )
+    
+    test_biomol = alphafold3_input_to_biomolecule(alphafold3_input, atom_positions=torch.randn(261, 47, 3).numpy())
+    mmcif_string = to_inference_mmcif(
+                                        test_biomol,
+                                        "test.cif",
+                                        gapless_poly_seq=True,
+                                        insert_alphafold_mmcif_metadata=True
+                                    )
+    # Use Pytest tempfile
+    filepath = os.path.join(tmp_path, "test.cif")
+    file_id = os.path.splitext(os.path.basename(filepath))[0]
+
+    with open(filepath, 'w') as f:
+        f.write(mmcif_string)
+    
+    mmcif_object = mmcif_parsing.parse_mmcif_object(
+        filepath=filepath,
+        file_id=file_id,
+    )
+    mmcif_feats, assembly = make_mmcif_features(mmcif_object)
+
+    mmcif_string = to_mmcif(
+        assembly,
+        file_id=file_id,
+        gapless_poly_seq=True,
+        insert_alphafold_mmcif_metadata=True,
+        unique_res_atom_names=assembly.unique_res_atom_names,
+    )
+
+    # Use tempfile here as well
+    with open(os.path.basename(filepath).replace(".cif", "_reconstructed.cif"), "w") as f:
+        f.write(mmcif_string)
+
+    assert True
+
 
 def test_return_bio_pdb_structures():
 
