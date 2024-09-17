@@ -1,13 +1,13 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.5.20"
+version = "0.5.21"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
     { name = "Alex Morehead", email = "alex.morehead@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 license = { file = "LICENSE" }
 keywords = [
     'artificial intelligence',
@@ -20,7 +20,7 @@ classifiers=[
     'Intended Audience :: Developers',
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
     'License :: OSI Approved :: MIT License',
-    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
 ]
 
 dependencies = [
