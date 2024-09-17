@@ -122,6 +122,7 @@ IS_DNA_INDEX = 2
 IS_LIGAND_INDEX = -2
 IS_METAL_ION_INDEX = -1
 IS_BIOMOLECULE_INDICES = slice(0, 3)
+IS_NON_PROTEIN_INDICES = slice(1, 5)
 
 IS_PROTEIN, IS_RNA, IS_DNA, IS_LIGAND, IS_METAL_ION = tuple(
     (IS_MOLECULE_TYPES + i if i < 0 else i)
@@ -2064,6 +2065,7 @@ class PDBInput:
     num_templates_per_chain: int | None = None
     max_num_template_tokens: int | None = None
     max_length: int | None = None
+    cutoff_date: str | None = None  # NOTE: must be supplied in "%Y-%m-%d" format
     kalign_binary_path: str | None = None
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
@@ -2873,6 +2875,16 @@ def pdb_input_to_molecule_input(
         if not_exists(resolution) and exists(mmcif_resolution):
             resolution = mmcif_resolution
 
+    # perform release date filtering as requested
+
+    mmcif_release_date = datetime.strptime(mmcif_release_date, "%Y-%m-%d")
+
+    if exists(i.cutoff_date):
+        cutoff_date = datetime.strptime(i.cutoff_date, "%Y-%m-%d")
+        assert (
+            mmcif_release_date <= cutoff_date
+        ), f"The release date ({mmcif_release_date}) of the PDB example {filepath} exceeds the accepted cutoff date ({cutoff_date}). Skipping this example."
+
     # record PDB resolution value if available
 
     resolution = tensor(resolution) if exists(resolution) else None
@@ -3010,18 +3022,17 @@ def pdb_input_to_molecule_input(
     # retrieve templates for each chain
 
     mmcif_dir = str(Path(i.mmcif_filepath).parent.parent)
-    template_cutoff_date = datetime.strptime(mmcif_release_date, "%Y-%m-%d")
 
     # use the template cutoff dates listed in the AF3 supplement's Section 2.4
     if i.training:
         template_cutoff_date = (
             datetime.strptime("2018-04-30", "%Y-%m-%d")
             if i.distillation
-            else (template_cutoff_date - timedelta(days=60))
+            else (mmcif_release_date - timedelta(days=60))
         )
     else:
         # NOTE: this is the template cutoff date for all inference tasks
-        template_cutoff_date = datetime.strptime("2021-09-30", "%Y-%m-%d")
+        template_cutoff_date = datetime.strptime("2021-01-12", "%Y-%m-%d")
 
     if (
         exists(i.max_num_template_tokens)
@@ -3933,7 +3944,7 @@ class PDBDataset(Dataset):
 
         return i
 
-    def __getitem__(self, idx: int | str, max_attempts: int = 10) -> PDBInput | AtomInput:
+    def __getitem__(self, idx: int | str, max_attempts: int = 50) -> PDBInput | AtomInput:
         """Return either a PDBInput or an AtomInput object for the specified index."""
         assert max_attempts > 0, "The maximum number of attempts must be greater than 0."
 
