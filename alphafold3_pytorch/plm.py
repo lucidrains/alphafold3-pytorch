@@ -36,6 +36,9 @@ def remove_plms(fn):
 aa_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
 restypes = aa_constants.restypes + ["X"]
 
+ESM_MASK_TOKEN = "-"
+PROST_T5_MASK_TOKEN = "X"
+
 # class
 
 
@@ -72,7 +75,7 @@ class ESMWrapper(Module):
         sequence_data = [
             (
                 f"molecule{mol_idx}",
-                join([(restypes[i] if 0 <= i < len(restypes) else "X") for i in ids]),
+                join([(ESM_MASK_TOKEN if i == -1 else restypes[i]) for i in ids]),
             )
             for mol_idx, ids in enumerate(aa_ids)
         ]
@@ -119,7 +122,7 @@ class ProstT5Wrapper(Module):
         device, seq_len = self.dummy.device, aa_ids.shape[-1]
 
         str_sequences = [
-            join([(restypes[i] if 0 <= i < len(restypes) else "X") for i in ids]) for ids in aa_ids
+            join([(PROST_T5_MASK_TOKEN if i == -1 else restypes[i]) for i in ids]) for ids in aa_ids
         ]
 
         # following the readme at https://github.com/mheinzinger/ProstT5

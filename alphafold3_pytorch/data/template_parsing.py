@@ -121,13 +121,8 @@ def parse_m8(
             template_release_date = extract_mmcif_metadata_field(
                 template_mmcif_object, "release_date"
             )
-            if not (
-                exists(template_cutoff_date)
-                and datetime.strptime(template_release_date, "%Y-%m-%d") <= template_cutoff_date
-            ):
+            if exists(template_cutoff_date) and datetime.strptime(template_release_date, "%Y-%m-%d") > template_cutoff_date:
                 continue
-            elif not_exists(template_cutoff_date):
-                pass
             template_biomol = _from_mmcif_object(
                 template_mmcif_object, chain_ids=set(template_chain)
             )
