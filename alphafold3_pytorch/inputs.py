@@ -3798,6 +3798,7 @@ class PDBDataset(Dataset):
         spatial_interface_weight: float = 0.4,
         crop_size: int = 384,
         training: bool | None = None,  # extra training flag placed by Alex on PDBInput
+        filter_out_pdb_ids: Set[str] | None = None,
         sample_only_pdb_ids: Set[str] | None = None,
         return_atom_inputs: bool = False,
         **pdb_input_kwargs,
@@ -3811,6 +3812,7 @@ class PDBDataset(Dataset):
         self.sampler = sampler
         self.sample_type = sample_type
         self.training = training
+        self.filter_out_pdb_ids = filter_out_pdb_ids
         self.sample_only_pdb_ids = sample_only_pdb_ids
         self.return_atom_inputs = return_atom_inputs
         self.pdb_input_kwargs = pdb_input_kwargs
@@ -3836,6 +3838,18 @@ class PDBDataset(Dataset):
                 os.path.splitext(os.path.basename(file.name))[0]: file
                 for file in folder.glob(os.path.join("**", "*.cif"))
             }
+
+        if exists(filter_out_pdb_ids):
+            if exists(self.sampler):
+                assert not any(
+                    pdb_id in sampler_pdb_ids for pdb_id in filter_out_pdb_ids
+                ), "Some PDB IDs in `filter_out_pdb_ids` are present in the dataset's sampler mappings."
+            else:
+                self.files = {
+                    pdb_id: file
+                    for pdb_id, file in self.files.items()
+                    if pdb_id not in filter_out_pdb_ids
+                }
 
         if exists(sample_only_pdb_ids):
             if exists(self.sampler):
