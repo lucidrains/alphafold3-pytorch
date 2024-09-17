@@ -54,6 +54,9 @@ from alphafold3_pytorch.attention import (
 )
 
 from alphafold3_pytorch.inputs import (
+    CONSTRAINT_DIMS,
+    CONSTRAINTS,
+    CONSTRAINTS_MASK_VALUE,
     IS_MOLECULE_TYPES,
     IS_PROTEIN_INDEX,
     IS_DNA_INDEX,
@@ -5955,8 +5958,7 @@ class Alphafold3(Module):
         pdb_training_set=True,
         plm_embeddings: PLMEmbedding | tuple[PLMEmbedding, ...] | None = None,
         plm_kwargs: dict | tuple[dict, ...] | None = None,
-        constraint_embeddings: int | None = None,
-        constraint_dropout: float = 0.0,
+        constraints: List[CONSTRAINTS] | None = None,
     ):
         super().__init__()
 
@@ -5985,14 +5987,18 @@ class Alphafold3(Module):
 
         # optional pairwise token constraint embeddings
 
-        self.constraint_embeddings = constraint_embeddings
+        self.constraints = constraints
 
-        if exists(constraint_embeddings):
-            constraint_modules = [
-                LinearNoBias(constraint_embeddings, dim_pairwise),
-                (nn.Dropout(constraint_dropout) if constraint_dropout else nn.Identity()),
-            ]
-            self.constraint_embeds = nn.Sequential(*constraint_modules)
+        if exists(constraints):
+            self.constraint_embeds = nn.ModuleList(
+                [
+                    LinearNoBias(CONSTRAINT_DIMS[constraint], dim_pairwise)
+                    for constraint in constraints
+                ]
+            )
+            self.learnable_constraint_masks = nn.ParameterList(
+                [nn.Parameter(torch.randn(1)) for _ in constraints]
+            )
 
         # residue or nucleotide modifications
 
@@ -6544,13 +6550,22 @@ class Alphafold3(Module):
 
         # handle maybe pairwise token constraint embeddings
 
-        if exists(self.constraint_embeddings):
+        if exists(self.constraints):
             assert exists(
                 token_constraints
             ), "`token_constraints` must be provided to use constraint embeddings."
 
-            pairwise_constraint_embeds = self.constraint_embeds(token_constraints)
-            pairwise_init = pairwise_init + pairwise_constraint_embeds
+            for i, constraint in enumerate(self.constraints):
+                constraint_slice = slice(i, i + CONSTRAINT_DIMS[constraint])
+
+                token_constraint = torch.where(
+                    # replace fixed constraint mask values with learnable mask
+                    token_constraints[..., constraint_slice] == CONSTRAINTS_MASK_VALUE,
+                    self.learnable_constraint_masks[i],
+                    token_constraints[..., constraint_slice],
+                )
+
+                pairwise_init = pairwise_init + self.constraint_embeds[i](token_constraint)
 
         # handle maybe protein language model (PLM) embeddings
 
