@@ -25,20 +25,19 @@ def get_chain_count(molecule_type: CLUSTERING_RESIDUE_MOLECULE_TYPE) -> Tuple[in
 
     Example:
         n_prot, n_nuc, n_ligand = get_chain_count("protein")
-    """
-    match molecule_type:
-        case "protein":
-            return 1, 0, 0
-        case "rna":
-            return 0, 1, 0
-        case "dna":
-            return 0, 1, 0
-        case "ligand":
-            return 0, 0, 1
-        case "peptide":
-            return 1, 0, 0
-        case _:
-            raise ValueError(f"Unknown molecule type: {molecule_type}")
+    """   
+    if molecule_type == "protein":
+        return 1, 0, 0
+    if molecule_type == "rna":
+        return 0, 1, 0
+    if molecule_type == "dna":
+        return 0, 1, 0
+    if molecule_type == "ligand":
+        return 0, 0, 1
+    if molecule_type == "peptide":
+        return 1, 0, 0
+
+    raise ValueError(f"Unknown molecule type: {molecule_type}")
 
 
 def calculate_weight(
