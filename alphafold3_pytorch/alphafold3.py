@@ -64,7 +64,7 @@ from alphafold3_pytorch.inputs import (
     IS_LIGAND_INDEX,
     IS_METAL_ION_INDEX,
     IS_BIOMOLECULE_INDICES,
-    IS_NON_PROTEIN_INDICES
+    IS_NON_PROTEIN_INDICES,
     IS_PROTEIN,
     IS_DNA,
     IS_RNA,
