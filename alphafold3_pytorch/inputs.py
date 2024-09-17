@@ -3735,9 +3735,8 @@ def compute_pocket_constraint(
     theta_p_range: Tuple[float, float],
     geom_distr: torch.distributions.Geometric,
 ) -> Float["n n"]:  # type: ignore
-    """
-    Compute the pairwise token pocket constraint.
-    
+    """Compute the pairwise token pocket constraint.
+
     :param token_dists: The pairwise token distances.
     :param token_parent_ids: The token parent (i.e., chain) IDs.
     :param unique_token_parent_ids: The unique token parent IDs.
@@ -3779,9 +3778,8 @@ def compute_contact_constraint(
     theta_d_range: Tuple[float, float],
     geom_distr: torch.distributions.Geometric,
 ) -> Float["n n"]:  # type: ignore
-    """
-    Compute the pairwise token contact constraint.
-    
+    """Compute the pairwise token contact constraint.
+
     :param token_dists: The pairwise token distances.
     :param theta_d_range: The range of `theta_d` values to use for the contact constraint.
     :param geom_distr: The geometric distribution to use for sampling.
@@ -3814,8 +3812,7 @@ def compute_docking_constraint(
     dist_bins: Float["bins"],  # type: ignore
     geom_distr: torch.distributions.Geometric,
 ) -> Float["n n bins"]:  # type: ignore
-    """
-    Compute the pairwise token docking constraint.
+    """Compute the pairwise token docking constraint.
 
     :param token_dists: The pairwise token distances.
     :param token_parent_ids: The token parent (i.e., chain) IDs.
@@ -3824,25 +3821,32 @@ def compute_docking_constraint(
     :param geom_distr: The geometric distribution to use for sampling.
     :return: The pairwise token docking constraint as a one-hot encoding.
     """
-    
+
     # partition chains into two groups
 
-    group1_mask = torch.isin(token_parent_ids, unique_token_parent_ids[:len(unique_token_parent_ids) // 2])
-    group2_mask = torch.isin(token_parent_ids, unique_token_parent_ids[len(unique_token_parent_ids) // 2:])
-    
+    group1_mask = torch.isin(
+        token_parent_ids, unique_token_parent_ids[: len(unique_token_parent_ids) // 2]
+    )
+    group2_mask = torch.isin(
+        token_parent_ids, unique_token_parent_ids[len(unique_token_parent_ids) // 2 :]
+    )
+
     # create masks for inter-group distances (group1 vs group2)
 
-    inter_group_mask = (group1_mask.unsqueeze(1) & group2_mask.unsqueeze(0)) | \
-                       (group2_mask.unsqueeze(1) & group1_mask.unsqueeze(0))
-    
+    inter_group_mask = (group1_mask.unsqueeze(1) & group2_mask.unsqueeze(0)) | (
+        group2_mask.unsqueeze(1) & group1_mask.unsqueeze(0)
+    )
+
     # apply binning to the pairwise distances while sampling docking constraints
 
     token_distogram = distance_to_dgram(token_dists, dist_bins).float()
     num_bins = token_distogram.shape[-1]
 
-    pairwise_token_sampled_mask = (geom_distr.sample(token_dists.shape) == 1).expand(-1, -1, num_bins)
+    pairwise_token_sampled_mask = (geom_distr.sample(token_dists.shape) == 1).expand(
+        -1, -1, num_bins
+    )
     token_distogram[~pairwise_token_sampled_mask] = 0.0
-    
+
     # assign one-hot encoding for distances that are in inter-group positions
 
     pairwise_token_constraint = torch.zeros((*token_dists.shape, num_bins), dtype=torch.float32)
@@ -3881,7 +3885,9 @@ def get_token_constraints(
     :return: The pairwise token constraints.
     """
     assert 0 < constraints_ratio <= 1, "The constraints ratio must be in the range (0, 1]."
-    assert 0 < theta_p_range[0] < theta_p_range[1], "The `theta_p_range` must be monotonically increasing."
+    assert (
+        0 < theta_p_range[0] < theta_p_range[1]
+    ), "The `theta_p_range` must be monotonically increasing."
 
     unique_token_parent_ids = torch.unique(token_parent_ids)
     num_chains = unique_token_parent_ids.shape[0]
@@ -3926,13 +3932,15 @@ def get_token_constraints(
             )
 
         # during training, dropout chains
-        
+
         chain_dropout_constraints = random.random() < constraints_ratio  # nosec
         if keep_constraints and training and chain_dropout_constraints:
             sampled_chains = unique_token_parent_ids[
                 torch.randint(0, num_chains, (random.randint(1, num_chains),))  # nosec
             ]
-            sampled_chain_tokens_pairwise_mask = to_pairwise_mask(torch.isin(token_parent_ids, sampled_chains))
+            sampled_chain_tokens_pairwise_mask = to_pairwise_mask(
+                torch.isin(token_parent_ids, sampled_chains)
+            )
             pairwise_token_constraint[~sampled_chain_tokens_pairwise_mask] = 0.0
 
         # during training, dropout tokens
