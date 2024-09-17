@@ -91,11 +91,13 @@ from alphafold3_pytorch.utils.data_utils import (
     make_one_hot,
 )
 from alphafold3_pytorch.utils.model_utils import (
+    distance_to_dgram,
     exclusive_cumsum,
     get_frames_from_atom_pos,
     maybe,
     offset_only_positive,
     remove_consecutive_duplicate,
+    to_pairwise_mask,
 )
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
 from alphafold3_pytorch.utils.utils import default, exists, first, not_exists
@@ -145,11 +147,14 @@ NUM_MSA_ONE_HOT = len(HUMAN_AMINO_ACIDS) + len(RNA_NUCLEOTIDES) + len(DNA_NUCLEO
 DEFAULT_NUM_MOLECULE_MODS = 4  # `mod_protein`, `mod_rna`, `mod_dna`, and `mod_unk`
 ADDITIONAL_MOLECULE_FEATS = 5
 
-CONSTRAINTS = Literal["binding_site"]
+CONSTRAINTS = Literal["pocket", "contact", "docking"]
 CONSTRAINT_DIMS = {
-    # NOTE: A mapping of constraint types to their respective input embedding dimensionalities.
-    "binding_site": 1,
+    # A mapping of constraint types to their respective input embedding dimensionalities.
+    "pocket": 1,
+    "contact": 1,
+    "docking": 4,
 }
+CONSTRAINTS_MASK_VALUE = -1.0
 
 CCD_COMPONENTS_FILEPATH = os.path.join("data", "ccd_data", "components.cif")
 CCD_COMPONENTS_SMILES_FILEPATH = os.path.join("data", "ccd_data", "components_smiles.json")
@@ -2058,7 +2063,7 @@ class PDBInput:
     distillation: bool = False
     resolution: float | None = None
     constraints: List[CONSTRAINTS] | None = None
-    constraints_ratio: float = 0.5
+    constraints_ratio: float = 0.1
     max_msas_per_chain: int | None = None
     max_num_msa_tokens: int | None = None
     max_templates_per_chain: int | None = None
@@ -3681,7 +3686,6 @@ def pdb_input_to_molecule_input(
             inference=i.inference,
             token_pos=token_pos,
             token_parent_ids=chain_index,
-            token_residue_ids=residue_index,
         )
 
     # create molecule input
@@ -3724,6 +3728,130 @@ def pdb_input_to_molecule_input(
 
 
 @typecheck
+def compute_pocket_constraint(
+    token_dists: Float["n n"],  # type: ignore
+    token_parent_ids: Int[" n"],  # type: ignore
+    unique_token_parent_ids: Int[" n"],  # type: ignore
+    theta_p_range: Tuple[float, float],
+    geom_distr: torch.distributions.Geometric,
+) -> Float["n n"]:  # type: ignore
+    """
+    Compute the pairwise token pocket constraint.
+    
+    :param token_dists: The pairwise token distances.
+    :param token_parent_ids: The token parent (i.e., chain) IDs.
+    :param unique_token_parent_ids: The unique token parent IDs.
+    :param theta_p_range: The range of `theta_p` values to use for the pocket constraint.
+    :param geom_distr: The geometric distribution to use for sampling.
+    :return: The pairwise token pocket constraint.
+    """
+
+    # sample chain ID and distance threshold for pocket constraint
+
+    sampled_target_parent_id = unique_token_parent_ids[
+        torch.randint(0, len(unique_token_parent_ids), (1,))
+    ]
+
+    sampled_theta_p = random.uniform(*theta_p_range)  # nosec
+    token_dists_mask = (token_dists > 0.0) & (token_dists < sampled_theta_p)
+
+    # restrict to inter-chain distances between any non-sampled chain and the sampled chain
+
+    token_parent_mask = einx.not_equal("i, j -> i j", token_parent_ids, token_parent_ids)
+    token_parent_mask[:, token_parent_ids != sampled_target_parent_id] = False
+
+    # sample pocket constraints
+
+    pairwise_token_mask = token_dists_mask & token_parent_mask
+    pairwise_token_sampled_mask = (geom_distr.sample(pairwise_token_mask.shape) == 1).squeeze(-1)
+    pairwise_token_mask[~pairwise_token_sampled_mask] = False
+
+    # for simplicity, define the pocket constraint as a diagonalized pairwise matrix
+
+    pairwise_token_constraint = torch.diag(pairwise_token_mask.any(-1)).float()
+
+    return pairwise_token_constraint
+
+
+@typecheck
+def compute_contact_constraint(
+    token_dists: Float["n n"],  # type: ignore
+    theta_d_range: Tuple[float, float],
+    geom_distr: torch.distributions.Geometric,
+) -> Float["n n"]:  # type: ignore
+    """
+    Compute the pairwise token contact constraint.
+    
+    :param token_dists: The pairwise token distances.
+    :param theta_d_range: The range of `theta_d` values to use for the contact constraint.
+    :param geom_distr: The geometric distribution to use for sampling.
+    :return: The pairwise token contact constraint.
+    """
+
+    # sample distance threshold for contact constraint
+
+    sampled_theta_d = random.uniform(*theta_d_range)  # nosec
+    token_dists_mask = (token_dists > 0.0) & (token_dists < sampled_theta_d)
+
+    # restrict to inter-token distances while sampling contact constraints
+
+    pairwise_token_mask = token_dists_mask
+    pairwise_token_sampled_mask = (geom_distr.sample(pairwise_token_mask.shape) == 1).squeeze(-1)
+    pairwise_token_mask[~pairwise_token_sampled_mask] = False
+
+    # define the contact constraint as a pairwise matrix
+
+    pairwise_token_constraint = pairwise_token_mask.float()
+
+    return pairwise_token_constraint
+
+
+@typecheck
+def compute_docking_constraint(
+    token_dists: Float["n n"],  # type: ignore
+    token_parent_ids: Int[" n"],  # type: ignore
+    unique_token_parent_ids: Int[" n"],  # type: ignore
+    dist_bins: Float["bins"],  # type: ignore
+    geom_distr: torch.distributions.Geometric,
+) -> Float["n n bins"]:  # type: ignore
+    """
+    Compute the pairwise token docking constraint.
+
+    :param token_dists: The pairwise token distances.
+    :param token_parent_ids: The token parent (i.e., chain) IDs.
+    :param unique_token_parent_ids: The unique token parent IDs.
+    :param dist_bins: The distance bins to use for the docking constraint.
+    :param geom_distr: The geometric distribution to use for sampling.
+    :return: The pairwise token docking constraint as a one-hot encoding.
+    """
+    
+    # partition chains into two groups
+
+    group1_mask = torch.isin(token_parent_ids, unique_token_parent_ids[:len(unique_token_parent_ids) // 2])
+    group2_mask = torch.isin(token_parent_ids, unique_token_parent_ids[len(unique_token_parent_ids) // 2:])
+    
+    # create masks for inter-group distances (group1 vs group2)
+
+    inter_group_mask = (group1_mask.unsqueeze(1) & group2_mask.unsqueeze(0)) | \
+                       (group2_mask.unsqueeze(1) & group1_mask.unsqueeze(0))
+    
+    # apply binning to the pairwise distances while sampling docking constraints
+
+    token_distogram = distance_to_dgram(token_dists, dist_bins).float()
+    num_bins = token_distogram.shape[-1]
+
+    pairwise_token_sampled_mask = (geom_distr.sample(token_dists.shape) == 1).expand(-1, -1, num_bins)
+    token_distogram[~pairwise_token_sampled_mask] = 0.0
+    
+    # assign one-hot encoding for distances that are in inter-group positions
+
+    pairwise_token_constraint = torch.zeros((*token_dists.shape, num_bins), dtype=torch.float32)
+    pairwise_token_constraint[inter_group_mask] = token_distogram[inter_group_mask]
+
+    return pairwise_token_constraint
+
+
+@typecheck
 def get_token_constraints(
     constraints: List[CONSTRAINTS],
     constraints_ratio: float,
@@ -3731,12 +3859,14 @@ def get_token_constraints(
     inference: bool,
     token_pos: Float["n 3"],  # type: ignore
     token_parent_ids: Int[" n"],  # type: ignore
-    token_residue_ids: Int[" n"],  # type: ignore
-    dist_belong_thres: float = 8.
+    theta_p_range: Tuple[float, float] = (6.0, 20.0),
+    theta_d_range: Tuple[float, float] = (6.0, 30.0),
+    dist_bins: Float["bins"] = torch.tensor([0.0, 4.0, 8.0, 16.0]),  # type: ignore
+    p: float = 1.0 / 3.0,
 ) -> Float["n n dac"]:  # type: ignore
     """Construct pairwise token constraints for the given constraint strings and ratio.
-    
-    NOTE: The `binding_site` constraint is inspired by the Chai-1 model.
+
+    NOTE: The `pocket`, `contact`, and `docking` constraints are inspired by the Chai-1 model.
 
     :param constraints: The constraints to use.
     :param constraints_ratio: The constraints ratio to use during training.
@@ -3744,34 +3874,82 @@ def get_token_constraints(
     :param inference: Whether the model is in inference.
     :param token_pos: The token center atom positions.
     :param token_parent_ids: The token parent (i.e., chain) IDs.
-    :param token_residue_ids: The token residue IDs.
+    :param theta_p_range: The range of `theta_p` values to use for the pocket constraint.
+    :param theta_d_range: The range of `theta_d` values to use for the contact constraint.
+    :param dist_bins: The distance bins to use for the docking constraint.
+    :param p: The probability of success for the geometric distribution.
     :return: The pairwise token constraints.
     """
     assert 0 < constraints_ratio <= 1, "The constraints ratio must be in the range (0, 1]."
+    assert 0 < theta_p_range[0] < theta_p_range[1], "The `theta_p_range` must be monotonically increasing."
 
-    num_atoms = token_pos.shape[0]
-    keep_constraints = inference or (training and random.random() < constraints_ratio)  # nosec
+    unique_token_parent_ids = torch.unique(token_parent_ids)
+    num_chains = unique_token_parent_ids.shape[0]
+
+    num_tokens = token_pos.shape[0]
+    token_ids = torch.arange(num_tokens)
+
+    geom_distr = torch.distributions.Geometric(torch.tensor([p]))
 
     token_constraints = []
 
     for constraint in constraints:
         constraint_dim = CONSTRAINT_DIMS[constraint]
-
-        pairwise_token_constraint = torch.zeros(
-            (num_atoms, num_atoms, constraint_dim), dtype=torch.float32
+        pairwise_token_constraint = torch.full(
+            (num_tokens, num_tokens, constraint_dim), CONSTRAINTS_MASK_VALUE, dtype=torch.float32
         )
 
-        if keep_constraints and constraint == "binding_site":
-            # NOTE: Binding sites are defined by finding pairs of token center atoms that
-            # are within 8 Å of each other and belong to different chains and residues.
-            token_dists = torch.cdist(token_pos, token_pos)
+        token_dists = torch.cdist(token_pos, token_pos)
+        keep_constraints = inference or (training and random.random() < constraints_ratio)  # nosec
 
-            token_dists_mask = (token_dists > 0.0) & (token_dists < dist_belong_thres)
-            token_parent_mask = einx.not_equal('i, j -> i j', token_parent_ids, token_parent_ids)
-            token_residue_mask = einx.not_equal('i, j -> i j', token_residue_ids, token_residue_ids)
+        if keep_constraints and constraint == "pocket" and num_chains > 1:
+            pairwise_token_constraint = compute_pocket_constraint(
+                token_dists=token_dists,
+                token_parent_ids=token_parent_ids,
+                unique_token_parent_ids=unique_token_parent_ids,
+                theta_p_range=theta_p_range,
+                geom_distr=geom_distr,
+            ).unsqueeze(-1)
+        elif keep_constraints and constraint == "contact":
+            pairwise_token_constraint = compute_contact_constraint(
+                token_dists=token_dists,
+                theta_d_range=theta_d_range,
+                geom_distr=geom_distr,
+            ).unsqueeze(-1)
+        elif keep_constraints and constraint == "docking" and num_chains > 1:
+            pairwise_token_constraint = compute_docking_constraint(
+                token_dists=token_dists,
+                token_parent_ids=token_parent_ids,
+                unique_token_parent_ids=unique_token_parent_ids,
+                dist_bins=dist_bins,
+                geom_distr=geom_distr,
+            )
 
-            pairwise_token_mask = token_dists_mask & token_parent_mask & token_residue_mask
-            pairwise_token_constraint[pairwise_token_mask] = 1.0
+        # during training, dropout chains
+        
+        chain_dropout_constraints = random.random() < constraints_ratio  # nosec
+        if keep_constraints and training and chain_dropout_constraints:
+            sampled_chains = unique_token_parent_ids[
+                torch.randint(0, num_chains, (random.randint(1, num_chains),))  # nosec
+            ]
+            sampled_chain_tokens_pairwise_mask = to_pairwise_mask(torch.isin(token_parent_ids, sampled_chains))
+            pairwise_token_constraint[~sampled_chain_tokens_pairwise_mask] = 0.0
+
+        # during training, dropout tokens
+
+        token_dropout_constraints = random.random() < constraints_ratio  # nosec
+        if keep_constraints and training and token_dropout_constraints:
+            sampled_tokens = token_ids[
+                torch.randint(0, num_tokens, (random.randint(1, num_tokens),))  # nosec
+            ]
+            sampled_tokens_pairwise_mask = to_pairwise_mask(torch.isin(token_ids, sampled_tokens))
+            pairwise_token_constraint[~sampled_tokens_pairwise_mask] = 0.0
+
+        # aggregate token constraints
+
+        if keep_constraints and not pairwise_token_constraint.any():
+            # NOTE: if all constraints were dropped, we will not include the constraint
+            pairwise_token_constraint.fill_(CONSTRAINTS_MASK_VALUE)
 
         token_constraints.append(pairwise_token_constraint)
 
