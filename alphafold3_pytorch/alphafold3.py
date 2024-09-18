@@ -6570,10 +6570,15 @@ class Alphafold3(Module):
         # handle maybe protein language model (PLM) embeddings
 
         if exists(self.plms):
+            aa_ids = torch.where(
+                (molecule_ids < 0) | (molecule_ids > NUM_HUMAN_AMINO_ACIDS),
+                NUM_HUMAN_AMINO_ACIDS,
+                molecule_ids,
+            )
             molecule_aa_ids = torch.where(
                 is_molecule_types[..., IS_NON_PROTEIN_INDICES].any(dim=-1),
                 -1,
-                molecule_ids,
+                aa_ids,
             )
 
             plm_embeds = [plm(molecule_aa_ids) for plm in self.plms]
