@@ -44,6 +44,7 @@ dependencies = [
     "huggingface_hub>=0.21.4",
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
+    "multimolecule",
     "numpy>=1.23.5",
     "polars>=1.1.0",
     "pdbeccdutils>=0.8.5",

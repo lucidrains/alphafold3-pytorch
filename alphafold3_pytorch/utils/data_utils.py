@@ -1,7 +1,8 @@
-from beartype.typing import Any, Dict, List, Literal, Set, Tuple
+import csv
 
 import numpy as np
 import torch
+from beartype.typing import Any, Dict, Iterable, List, Literal, Set, Tuple
 from torch import Tensor
 
 from alphafold3_pytorch.tensor_typing import ChainType, ResidueType, typecheck
@@ -251,6 +252,7 @@ def make_one_hot(x: Tensor, num_classes: int) -> Tensor:
 @typecheck
 def make_one_hot_np(x: np.ndarray, num_classes: int) -> np.ndarray:
     """Convert an array of indices to a one-hot encoded array.
+
     :param x: A NumPy array of indices.
     :param num_classes: The number of classes.
     :return: A one-hot encoded NumPy array.
@@ -261,19 +263,46 @@ def make_one_hot_np(x: np.ndarray, num_classes: int) -> np.ndarray:
 
 
 @typecheck
-def get_sorted_tuple_indices(tuples_list: List[Tuple[str, Any]], order_list: List[str]) -> List[int]:
-    """
-    Get the indices of the tuples in the order specified by the order_list.
-    
+def get_sorted_tuple_indices(
+    tuples_list: List[Tuple[str, Any]], order_list: List[str]
+) -> List[int]:
+    """Get the indices of the tuples in the order specified by the order_list.
+
     :param tuples_list: A list of tuples containing a string and a value.
     :param order_list: A list of strings specifying the order of the tuples.
-    :return: A list of indices of the tuples in the order specified by the order
-        list.
+    :return: A list of indices of the tuples in the order specified by the order list.
     """
     # Create a mapping from the string values to their indices
     index_map = {value: index for index, (value, _) in enumerate(tuples_list)}
-    
+
     # Generate the indices in the order specified by the order_list
     sorted_indices = [index_map[value] for value in order_list]
-    
+
     return sorted_indices
+
+
+@typecheck
+def load_tsv_to_dict(filepath):
+    """Load a two-column TSV file into a dictionary.
+
+    :param filepath: The path to the TSV file.
+    :return: A dictionary containing the TSV data.
+    """
+    result = {}
+    with open(filepath, mode="r", newline="") as file:
+        reader = csv.reader(file, delimiter="\t")
+        for row in reader:
+            result[row[0]] = row[1]
+    return result
+
+
+@typecheck
+def join(arr: Iterable[Any], delimiter: str = "") -> str:
+    """Join the elements of an iterable into a string using a delimiter.
+
+    :param arr: The iterable to join.
+    :param delimiter: The delimiter to use.
+    :return: The joined string.
+    """
+    # Re-do an ugly part of python
+    return delimiter.join(arr)
