@@ -1170,6 +1170,7 @@ def test_alphafold3_with_plm_embeddings():
     assert loss.numel() == 1
 
 def test_alphafold3_with_nlm_embeddings():
+
     alphafold3 = Alphafold3(
         num_atom_embeds=7,
         num_atompair_embeds=3,
@@ -1177,6 +1178,23 @@ def test_alphafold3_with_nlm_embeddings():
         dim_atom_inputs=77,
         dim_template_feats=108,
         nlm_embeddings="rinalmo",
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
     )
 
     state_dict = alphafold3.state_dict()
@@ -1187,8 +1205,8 @@ def test_alphafold3_with_nlm_embeddings():
 
     # mock inputs
 
-    seq_len = 16
-    atom_seq_len = 32
+    seq_len = 2
+    atom_seq_len = 4
 
     molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
