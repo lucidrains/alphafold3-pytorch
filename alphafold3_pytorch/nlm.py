@@ -84,9 +84,9 @@ class RiNALMoWrapper(Module):
                         RINALMO_MASK_TOKEN
                         if i == -1
                         else (
-                            rna_restypes[i - rna_min_restype_num]
-                            if rna_min_restype_num <= i < dna_min_restype_num
-                            else dna_restypes[i - dna_min_restype_num]
+                            dna_restypes[i - dna_min_restype_num]
+                            if i >= dna_min_restype_num
+                            else rna_restypes[i - rna_min_restype_num]
                         )
                     )
                     for i in ids
