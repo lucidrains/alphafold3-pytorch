@@ -58,7 +58,6 @@ from alphafold3_pytorch.inputs import (
     CONSTRAINTS,
     CONSTRAINTS_MASK_VALUE,
     IS_MOLECULE_TYPES,
-    IS_NA_INDICES,
     IS_NON_NA_INDICES,
     IS_PROTEIN_INDEX,
     IS_DNA_INDEX,
@@ -2540,8 +2539,11 @@ class ElucidatedAtomDiffusion(Module):
         multi_chain_permutation_alignment_kwargs: dict = dict(),
         centre_random_augmentation_kwargs: dict = dict(),
         karras_formulation = True,  # use the original EDM formulation from Karras et al. Table 1 in https://arxiv.org/abs/2206.00364 - differences are that the noise and sampling schedules are scaled by sigma data, as well as loss weight adds the sigma data instead of multiply in denominator
+        verbose = False,
     ):
         super().__init__()
+
+        self.verbose = verbose
         self.net = net
 
         # parameters
@@ -2787,10 +2789,15 @@ class ElucidatedAtomDiffusion(Module):
         ligand_loss_weight = 10.,
         return_loss_breakdown = False,
         single_structure_input=False,
+        verbose=None,
         filepaths: List[str] | None = None,
     ) -> ElucidatedAtomDiffusionReturn:
+        verbose = default(verbose, self.verbose)
 
         # diffusion loss
+
+        if verbose:
+            logger.info("Sampling noise distribution within EDM")
 
         dtype = atom_pos_ground_truth.dtype
         batch_size = atom_pos_ground_truth.shape[0]
@@ -2801,6 +2808,9 @@ class ElucidatedAtomDiffusion(Module):
         noise = torch.randn_like(atom_pos_ground_truth)
 
         noised_atom_pos = atom_pos_ground_truth + padded_sigmas * noise  # alphas are 1. in the paper
+
+        if verbose:
+            logger.info("Running preconditioned network forward pass within EDM")
 
         denoised_atom_pos = self.preconditioned_network_forward(
             noised_atom_pos,
@@ -2826,6 +2836,9 @@ class ElucidatedAtomDiffusion(Module):
 
         # section 3.7.1 equation 2 - weighted rigid aligned ground truth
 
+        if verbose:
+            logger.info("Calculating weighted rigid aligned ground truth within EDM")
+
         align_weights = calculate_weighted_rigid_align_weights(
             atom_pos_ground_truth=atom_pos_ground_truth,
             molecule_atom_lens=molecule_atom_lens,
@@ -2844,6 +2857,9 @@ class ElucidatedAtomDiffusion(Module):
         # section 4.2 - multi-chain permutation alignment
 
         if exists(molecule_atom_indices) and single_structure_input:
+            if verbose:
+                logger.info("Running multi-chain permutation alignment within EDM")
+
             try:
                 atom_pos_aligned_ground_truth = self.multi_chain_permutation_alignment(
                     pred_coords=denoised_atom_pos,
@@ -2860,6 +2876,9 @@ class ElucidatedAtomDiffusion(Module):
                 logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepaths}' if exists(filepaths) else ''} due to: {e}")
 
         # main diffusion mse loss
+
+        if verbose:
+            logger.info("Calculating main diffusion loss within EDM")
 
         losses = F.mse_loss(denoised_atom_pos, atom_pos_aligned_ground_truth, reduction = 'none') / 3.
         losses = einx.multiply('b m c, b m -> b m c',  losses, align_weights)
@@ -2888,6 +2907,9 @@ class ElucidatedAtomDiffusion(Module):
         bond_loss = self.zero
 
         if add_bond_loss:
+            if verbose:
+                logger.info("Calculating bond loss within EDM")
+
             atompair_mask = to_pairwise_mask(atom_mask)
 
             denoised_cdist = torch.cdist(denoised_atom_pos, denoised_atom_pos, p = 2)
@@ -2897,6 +2919,9 @@ class ElucidatedAtomDiffusion(Module):
             bond_losses = bond_losses * loss_weights
 
             if atompair_mask.sum() > MAX_ELEMENTS_FOR_BACKPROP:
+                if verbose:
+                    logger.info("Subsetting atom pairs for backprop within EDM")
+                
                 # randomly subset the atom pairs to supervise
 
                 flat_atompair_mask_indices = torch.arange(atompair_mask.numel(), device=self.device)[atompair_mask.view(-1)]
@@ -2916,6 +2941,9 @@ class ElucidatedAtomDiffusion(Module):
         smooth_lddt_loss = self.zero
 
         if add_smooth_lddt_loss:
+            if verbose:
+                logger.info("Calculating smooth lDDT loss within EDM")
+
             assert exists(is_molecule_types)
 
             is_nucleotide_or_ligand_fields = is_molecule_types.unbind(dim=-1)
@@ -3803,6 +3831,7 @@ class MultiChainPermutationAlignment(Module):
         additional_molecule_feats: Int[f"b n {ADDITIONAL_MOLECULE_FEATS}"] | None = None,  # type: ignore - additional molecule features
         is_molecule_types: Bool[f"b n {IS_MOLECULE_TYPES}"] | None = None,  # type: ignore - molecule types
         mask: Bool["b m"] | None = None,  # type: ignore - mask for variable lengths
+        eps: int = int(1e6),
     ) -> Float["b m 3"]:  # type: ignore
         """Compute the multi-chain permutation alignment.
 
@@ -3819,6 +3848,7 @@ class MultiChainPermutationAlignment(Module):
         :param token_bonds: The token bonds.
         :param is_molecule_types: Molecule type of each atom.
         :param mask: The mask for variable lengths.
+        :param eps: A large integer value to server as a placeholder asym ID.
         :return: The optimally chain-permuted aligned coordinates.
         """
         num_atoms = pred_coords.shape[1]
@@ -3864,7 +3894,7 @@ class MultiChainPermutationAlignment(Module):
         # we need to group them together by assigning covalent ligands the same
         # asym IDs as the polymer chains to which they are most frequently bonded.
         covalent_bonded_asym_id = torch.where(
-            covalent_bond_mask, token_asym_id[..., None], torch.tensor(float("nan"))
+            covalent_bond_mask, token_asym_id[..., None], eps
         )
 
         covalent_bond_mode_values, _ = covalent_bonded_asym_id.mode(dim=-1, keepdim=False)
@@ -5988,8 +6018,11 @@ class Alphafold3(Module):
         plm_kwargs: dict | tuple[dict, ...] | None = None,
         nlm_kwargs: dict | tuple[dict, ...] | None = None,
         constraints: List[CONSTRAINTS] | None = None,
+        verbose: bool = False,
     ):
         super().__init__()
+
+        self.verbose = verbose
 
         # store atom and atompair input dimensions for shape validation
 
@@ -6473,6 +6506,7 @@ class Alphafold3(Module):
         min_conf_resolution: float = 0.1,
         max_conf_resolution: float = 4.0,
         hard_validate: bool = False,
+        verbose: bool | None = None,
         filepaths: List[str] | None = None
     ) -> (
         Float['b m 3'] |
@@ -6482,6 +6516,7 @@ class Alphafold3(Module):
         Float[''] |
         Tuple[Float[''], LossBreakdown]
     ):
+        verbose = default(verbose, self.verbose)
 
         atom_seq_len = atom_inputs.shape[-2]
         single_structure_input = atom_inputs.shape[0] == 1
@@ -6494,6 +6529,9 @@ class Alphafold3(Module):
         assert atompair_inputs.shape[-1] == self.dim_atompair_inputs, f'expected {self.dim_atompair_inputs} for atompair_inputs feature dimension, but received {atompair_inputs.shape[-1]}'
 
         # hard validate when debug env variable is turned on
+
+        if verbose:
+            logger.info("Hard validating inputs...")
 
         hard_debug = hard_validate or IS_DEBUGGING
 
@@ -6512,6 +6550,9 @@ class Alphafold3(Module):
             )
 
         # soft validate
+
+        if verbose:
+            logger.info("Soft validating inputs...")
 
         valid_molecule_atom_mask = valid_atom_len_mask = molecule_atom_lens >= 0
 
@@ -6538,6 +6579,9 @@ class Alphafold3(Module):
 
         # if atompair inputs are not windowed, window it
 
+        if verbose:
+            logger.info("Windowing atompair inputs...")
+
         is_atompair_inputs_windowed = atompair_inputs.ndim == 5
 
         if not is_atompair_inputs_windowed:
@@ -6554,6 +6598,9 @@ class Alphafold3(Module):
         seq_len = molecule_atom_lens.shape[-1]
 
         # embed inputs
+
+        if verbose:
+            logger.info("Embedding inputs...")
 
         (
             single_inputs,
@@ -6589,6 +6636,9 @@ class Alphafold3(Module):
 
         # handle maybe molecule modifications
 
+        if verbose:
+            logger.info("Handling molecule modifications...")
+
         assert not (exists(is_molecule_mod) ^ self.has_molecule_mod_embeds), 'you either set `num_molecule_mods` and did not pass in `is_molecule_mod` or vice versa'
 
         if self.has_molecule_mod_embeds:
@@ -6609,6 +6659,9 @@ class Alphafold3(Module):
 
         # handle maybe pairwise token constraint embeddings
 
+        if verbose:
+            logger.info("Handling pairwise token constraint embeddings...")
+
         if exists(self.constraints):
             assert exists(
                 token_constraints
@@ -6628,6 +6681,9 @@ class Alphafold3(Module):
 
         # handle maybe protein language model (PLM) embeddings
 
+        if verbose:
+            logger.info("Handling protein language model embeddings...")
+
         if exists(self.plms):
             aa_ids = torch.where(
                 (molecule_ids < 0) | (molecule_ids > NUM_HUMAN_AMINO_ACIDS),
@@ -6642,21 +6698,21 @@ class Alphafold3(Module):
 
             plm_embeds = [plm(molecule_aa_ids) for plm in self.plms]
 
-            # concat all plm embeddings and project and add to single init
+            # concat all PLM embeddings and project and add to single init
 
-            all_plm_embeds = torch.cat(plm_embeds, dim = -1)
+            all_plm_embeds = torch.cat(plm_embeds, dim=-1)
             single_plm_init = self.to_plm_embeds(all_plm_embeds)
 
             single_init = single_init + single_plm_init
 
         # handle maybe nucleotide language model (NLM) embeddings
 
+        if verbose:
+            logger.info("Handling nucleotide language model embeddings...")
+
         if exists(self.nlms):
             na_ids = torch.where(
-                is_molecule_types[..., IS_NA_INDICES].any(dim=-1)
-                & (
-                    (molecule_ids < MIN_RNA_NUCLEOTIDE_ID) | (molecule_ids > MAX_DNA_NUCLEOTIDE_ID)
-                ),
+                (molecule_ids < MIN_RNA_NUCLEOTIDE_ID) | (molecule_ids > MAX_DNA_NUCLEOTIDE_ID),
                 MISSING_RNA_NUCLEOTIDE_ID,
                 molecule_ids,
             )
@@ -6676,6 +6732,9 @@ class Alphafold3(Module):
             single_init = single_init + single_nlm_init
 
         # relative positional encoding
+
+        if verbose:
+            logger.info("Applying relative positional encoding...")
 
         relative_position_encoding = self.relative_position_encoding(
             additional_molecule_feats = additional_molecule_feats
@@ -6697,6 +6756,9 @@ class Alphafold3(Module):
         pairwise_init = pairwise_init + relative_position_encoding
 
         # token bond features
+
+        if verbose:
+            logger.info("Applying token bond features...")
 
         if exists(token_bonds):
             # well do some precautionary standardization
@@ -6730,7 +6792,10 @@ class Alphafold3(Module):
 
         # for each recycling step
 
-        for _ in range(num_recycling_steps):
+        if verbose:
+            logger.info("Starting recycling steps...")
+
+        for i in range(num_recycling_steps):
 
             # handle recycled single and pairwise if not first step
 
@@ -6750,6 +6815,9 @@ class Alphafold3(Module):
             # else go through main transformer trunk from alphafold2
 
             # templates
+
+            if verbose:
+                logger.info(f"Applying template embeddings in recycling step {i}...")
 
             if not exists(templates):
                 templates = torch.zeros(
@@ -6772,6 +6840,9 @@ class Alphafold3(Module):
 
             # msa
 
+            if verbose:
+                logger.info(f"Applying MSA embeddings in recycling step {i}...")
+
             if exists(msa):
                 embedded_msa = self.msa_module(
                     msa = msa,
@@ -6785,6 +6856,9 @@ class Alphafold3(Module):
                 pairwise = embedded_msa + pairwise
 
             # main attention trunk (pairformer)
+
+            if verbose:
+                logger.info(f"Applying pairformer in recycling step {i}...")
 
             single, pairwise = self.pairformer(
                 single_repr = single,
@@ -6811,6 +6885,9 @@ class Alphafold3(Module):
         return_loss = default(return_loss, can_return_loss)
 
         # if neither atom positions or any labels are passed in, sample a structure and return
+
+        if verbose:
+            logger.info("Sampling atomic coordinates...")
 
         if not return_loss:
             sampled_atom_pos = self.edm.sample(
@@ -6897,6 +6974,9 @@ class Alphafold3(Module):
 
         # distogram head
 
+        if verbose:
+            logger.info("Calculating distogram logits and losses...")
+
         molecule_pos = None
 
         if not exists(distance_labels) and atom_pos_given and exists(distogram_atom_indices):
@@ -6944,6 +7024,9 @@ class Alphafold3(Module):
             distogram_loss = F.cross_entropy(distogram_logits, distance_labels, ignore_index = ignore)
 
         # otherwise, noise and make it learn to denoise
+
+        if verbose:
+            logger.info("Calculating diffusion loss...")
 
         calc_diffusion_loss = exists(atom_pos)
 
@@ -7016,6 +7099,9 @@ class Alphafold3(Module):
                 aug_atom_mask = atom_mask
 
                 if self.stochastic_frame_average:
+                    if verbose:
+                        logger.info("Applying stochastic frame averaging...")
+
                     fa_atom_pos, atom_pos = atom_pos[:1], atom_pos[1:]
                     fa_atom_mask, aug_atom_mask = atom_mask[:1], atom_mask[1:]
 
@@ -7025,12 +7111,18 @@ class Alphafold3(Module):
 
                 # normal random augmentations, 48 times in paper
 
+                if verbose:
+                    logger.info("Applying random augmentations...")
+
                 atom_pos = self.augmenter(atom_pos.float(), mask = aug_atom_mask).type(dtype)
 
                 # concat back the stochastic frame averaged position
 
                 if self.stochastic_frame_average:
                     atom_pos = torch.cat((fa_atom_pos, atom_pos), dim = 0)
+
+            if verbose:
+                logger.info("Calculating diffusion loss with EDM...")
 
             diffusion_loss, denoised_atom_pos, diffusion_loss_breakdown, _ = self.edm(
                 atom_pos,
@@ -7055,10 +7147,14 @@ class Alphafold3(Module):
                 nucleotide_loss_weight = self.nucleotide_loss_weight,
                 ligand_loss_weight = self.ligand_loss_weight,
                 single_structure_input = single_structure_input,
+                verbose = verbose,
                 filepaths = filepaths,
             )
 
         # confidence head
+
+        if verbose:
+            logger.info("Calculating confidence head logits and losses...")
 
         should_call_confidence_head = any([*map(exists, confidence_head_labels)])
 
@@ -7092,6 +7188,9 @@ class Alphafold3(Module):
             if atom_pos_given:
                 # section 3.7.1 equation 2 - weighted rigid aligned ground truth
 
+                if verbose:
+                    logger.info("Calculating weighted rigid alignment...")
+
                 align_weights = calculate_weighted_rigid_align_weights(
                     atom_pos_ground_truth=atom_pos,
                     molecule_atom_lens=molecule_atom_lens,
@@ -7114,6 +7213,9 @@ class Alphafold3(Module):
                 # section 4.2 - multi-chain permutation alignment
 
                 if single_structure_input:
+                    if verbose:
+                        logger.info("Calculating multi-chain permutation alignment...")
+
                     try:
                         atom_pos = self.multi_chain_permutation_alignment(
                             pred_coords=denoised_atom_pos,
@@ -7136,6 +7238,9 @@ class Alphafold3(Module):
                 distogram_pos = atom_pos
 
                 if not self.distogram_atom_resolution:
+                    if verbose:
+                        logger.info("Gathering distogram atom positions...")
+
                     # molecule_pos = einx.get_at('b [m] c, b n -> b n c', atom_pos, distogram_atom_indices)
 
                     distogram_atom_coords_indices = repeat(
@@ -7153,6 +7258,9 @@ class Alphafold3(Module):
             pae_labels = None
 
             if atom_pos_given and exists(atom_indices_for_frame):
+                if verbose:
+                    logger.info("Calculating PAE labels...")
+
                 denoised_molecule_pos = None
 
                 if not exists(molecule_pos):
@@ -7218,6 +7326,9 @@ class Alphafold3(Module):
             pde_labels = None
 
             if atom_pos_given:
+                if verbose:
+                    logger.info("Calculating PDE labels...")
+
                 denoised_molecule_pos = None
 
                 assert exists(
@@ -7255,6 +7366,9 @@ class Alphafold3(Module):
             # determine plddt labels if possible
 
             if atom_pos_given:
+                if verbose:
+                    logger.info("Calculating plDDT labels...")
+
                 # gather metadata
 
                 pred_coords, true_coords = denoised_atom_pos, atom_pos
@@ -7331,6 +7445,9 @@ class Alphafold3(Module):
 
             return_pae_logits = exists(pae_labels)
 
+            if verbose:
+                logger.info("Calculating confidence head logits...")
+
             ch_logits = self.confidence_head(
                 single_repr = single.detach(),
                 single_inputs_repr = single_inputs.detach(),
@@ -7372,6 +7489,9 @@ class Alphafold3(Module):
                     einx.multiply('b ..., b -> b ...', labels, weight.long()),
                     ignore_index = ignore_index
                 )
+
+            if verbose:
+                logger.info("Calculating confidence head losses...")
 
             if exists(pae_labels):
                 assert pae_labels.shape[-1] == ch_logits.pae.shape[-1], (
