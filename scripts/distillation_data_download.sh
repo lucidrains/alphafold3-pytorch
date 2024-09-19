@@ -22,7 +22,7 @@ awsv2 --install
 AFDB_URL="https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/swissprot_cif_v4.tar"
 OUTPUT_DIR="./data/afdb_data"
 
-MMCIF_OUTPUT_DIR="$OUTPUT_DIR/train_mmcifs"
+MMCIF_OUTPUT_DIR="$OUTPUT_DIR/unfiltered_train_mmcifs"
 MSA_OUTPUT_DIR="$OUTPUT_DIR/data_caches/msa/train_msas"
 
 mkdir -p "$MMCIF_OUTPUT_DIR"
