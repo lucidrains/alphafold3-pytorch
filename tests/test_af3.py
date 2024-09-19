@@ -1187,8 +1187,8 @@ def test_alphafold3_with_nlm_embeddings():
 
     # mock inputs
 
-    seq_len = 16
-    atom_seq_len = 32
+    seq_len = 2
+    atom_seq_len = 4
 
     molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
     molecule_atom_lens = torch.full((2, seq_len), 2).long()
