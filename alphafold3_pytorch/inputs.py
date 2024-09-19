@@ -29,6 +29,7 @@ from beartype.typing import (
 
 import einx
 import numpy as np
+import polars as pl
 import timeout_decorator
 import torch
 import torch.nn.functional as F
@@ -2069,6 +2070,7 @@ class PDBInput:
     training: bool = False
     inference: bool = False
     distillation: bool = False
+    distillation_multimer_sampling_ratio: float = 2.0 / 3.0
     resolution: float | None = None
     constraints: List[CONSTRAINTS] | None = None
     constraints_ratio: float = 0.1
@@ -2888,6 +2890,11 @@ def pdb_input_to_molecule_input(
         if not_exists(resolution) and exists(mmcif_resolution):
             resolution = mmcif_resolution
 
+        if i.distillation and not_exists(mmcif_release_date):
+            raise ValueError(
+                f"The release date of the PDB distillation example {filepath} is missing. Please ensure that the release date is available for distillation set training."
+            )
+
     # perform release date filtering as requested
 
     mmcif_release_date = datetime.strptime(mmcif_release_date, "%Y-%m-%d")
@@ -2901,30 +2908,6 @@ def pdb_input_to_molecule_input(
     # record PDB resolution value if available
 
     resolution = tensor(resolution) if exists(resolution) else None
-
-    # map (sampled) chain IDs to indices prior to cropping
-
-    chains = None
-
-    if exists(i.chains):
-        chain_id_1, chain_id_2 = i.chains
-        chain_id_to_idx = {
-            chain_id: chain_idx
-            for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
-        }
-        # NOTE: we have to manually nullify a chain ID value
-        # e.g., if an empty string is passed in as a "null" chain ID
-        if chain_id_1:
-            chain_id_1 = chain_id_to_idx[chain_id_1]
-        else:
-            chain_id_1 = None
-        if chain_id_2:
-            chain_id_2 = chain_id_to_idx[chain_id_2]
-        else:
-            chain_id_2 = None
-        chains = (chain_id_1, chain_id_2)
-
-    # construct multiple sequence alignment (MSA) and template features prior to cropping
 
     # retrieve MSA metadata from the `Biomolecule` object
     biomol_chain_ids = list(
@@ -2958,6 +2941,54 @@ def pdb_input_to_molecule_input(
         }
         for chain_id in biomol_chain_ids
     }
+
+    # sample a chain (or chain pair) for distillation examples
+
+    if (
+        i.distillation
+        and not_exists(i.chains)
+        or (exists(i.chains) and not (exists(i.chains[0]) or exists(i.chains[1])))
+    ):
+        chain_id_1, chain_id_2 = i.chains if exists(i.chains) else (None, None)
+
+        if len(biomol_chain_ids) == 1:
+            chain_id_1 = biomol_chain_ids[0]
+        elif (
+            len(biomol_chain_ids) > 1 and random.random() < i.distillation_multimer_sampling_ratio  # nosec
+        ):
+            chain_id_1, chain_id_2 = random.sample(biomol_chain_ids, 2)  # nosec
+        elif len(biomol_chain_ids) > 1:
+            chain_id_1 = random.choice(biomol_chain_ids)  # nosec
+        else:
+            raise ValueError(
+                f"Could not find any chain IDs for the distillation example {file_id}."
+            )
+
+        i.chains = (chain_id_1, chain_id_2)
+
+    # map (sampled) chain IDs to indices prior to cropping
+
+    chains = None
+
+    if exists(i.chains):
+        chain_id_1, chain_id_2 = i.chains
+        chain_id_to_idx = {
+            chain_id: chain_idx
+            for (chain_id, chain_idx) in zip(biomol.chain_id, biomol.chain_index)
+        }
+        # NOTE: we have to manually nullify a chain ID value
+        # e.g., if an empty string is passed in as a "null" chain ID
+        if chain_id_1:
+            chain_id_1 = chain_id_to_idx[chain_id_1]
+        else:
+            chain_id_1 = None
+        if chain_id_2:
+            chain_id_2 = chain_id_to_idx[chain_id_2]
+        else:
+            chain_id_2 = None
+        chains = (chain_id_1, chain_id_2)
+
+    # construct multiple sequence alignment (MSA) and template features prior to cropping
 
     msa_dir = i.msa_dir
     max_msas_per_chain = i.max_msas_per_chain
@@ -3068,7 +3099,6 @@ def pdb_input_to_molecule_input(
             num_templates_per_chain=i.num_templates_per_chain,
             kalign_binary_path=i.kalign_binary_path,
             template_cutoff_date=template_cutoff_date,
-            randomly_sample_num_templates=exists(i.training) and i.training,
             verbose=verbose,
         )
 
@@ -3675,6 +3705,9 @@ def pdb_input_to_molecule_input(
     if exists(resolution):
         is_resolved_label = ((resolution >= 0.1) & (resolution <= 3.0)).item()
         resolved_labels = torch.full((num_atoms,), is_resolved_label, dtype=torch.long)
+    elif i.distillation:
+        # NOTE: distillation examples are assigned a minimal resolution label to enable confidence head scoring
+        resolution = torch.tensor([0.1])
 
     # craft optional pairwise token constraints
 
@@ -4151,6 +4184,151 @@ class PDBDataset(Dataset):
                 retry_on_result=not_exists, stop_max_attempt_number=max_attempts
             )
             i = retry_decorator(self.get_item)(idx, random_idx=random_idx)
+
+        return i
+
+class PDBDistillationDataset(Dataset):
+    """A PyTorch Dataset for PDB distillation mmCIF files."""
+
+    @typecheck
+    def __init__(
+        self,
+        folder: str | Path,
+        contiguous_weight: float = 0.2,
+        spatial_weight: float = 0.4,
+        spatial_interface_weight: float = 0.4,
+        crop_size: int = 384,
+        training: bool | None = None,  # extra training flag placed by Alex on PDBInput
+        filter_out_pdb_ids: Set[str] | None = None,
+        sample_only_pdb_ids: Set[str] | None = None,
+        return_atom_inputs: bool = False,
+        multimer_sampling_ratio: float = (2.0 / 3.0),
+        uniprot_to_pdb_id_mapping_filepath: str | Path | None = None,
+        **pdb_input_kwargs,
+    ):
+        if isinstance(folder, str):
+            folder = Path(folder)
+
+        assert (
+            folder.exists() and folder.is_dir()
+        ), f"{str(folder)} does not exist for PDBDistillationDataset"
+        self.folder = folder
+
+        self.training = training
+        self.filter_out_pdb_ids = filter_out_pdb_ids
+        self.sample_only_pdb_ids = sample_only_pdb_ids
+        self.return_atom_inputs = return_atom_inputs
+        self.multimer_sampling_ratio = multimer_sampling_ratio
+        self.pdb_input_kwargs = pdb_input_kwargs
+
+        self.cropping_config = {
+            "contiguous_weight": contiguous_weight,
+            "spatial_weight": spatial_weight,
+            "spatial_interface_weight": spatial_interface_weight,
+            "n_res": crop_size,
+        }
+
+        # subsample mmCIF files
+
+        self.uniprot_to_pdb_id_mapping_df = pl.read_csv(
+            uniprot_to_pdb_id_mapping_filepath,
+            has_header=False,
+            separator="\t",
+            new_columns=["uniprot_accession", "database", "pdb_id"],
+        )
+        self.uniprot_to_pdb_id_mapping_df.drop_in_place("database")
+
+        uniprot_to_pdb_id_mapping = dict(self.uniprot_to_pdb_id_mapping_df.iter_rows())
+
+        self.files = {
+            os.path.splitext(os.path.basename(file.name))[0]: file
+            for file in folder.glob(os.path.join("**", "*.cif"))
+            if os.path.splitext(os.path.basename(file.name))[0] in uniprot_to_pdb_id_mapping
+        }
+
+        if exists(filter_out_pdb_ids):
+            self.files = {
+                accession_id: file
+                for accession_id, file in self.files.items()
+                if uniprot_to_pdb_id_mapping[accession_id] not in filter_out_pdb_ids
+            }
+
+        if exists(sample_only_pdb_ids):
+            self.files = {
+                accession_id: file
+                for accession_id, file in self.files.items()
+                if uniprot_to_pdb_id_mapping[accession_id] in sample_only_pdb_ids
+            }
+
+        self.file_index_to_id = {i: pdb_id for i, pdb_id in enumerate(self.files)}
+
+        assert len(self) > 0, f"No valid mmCIFs / PDBs found at {str(folder)}"
+
+    def __len__(self):
+        """Return the number of PDB mmCIF files in the dataset."""
+        return len(self.files)
+
+    def get_item(self, idx: int | str, random_idx: bool = False) -> PDBInput | AtomInput | None:
+        """Return either a PDBInput or an AtomInput object for the specified index."""
+        if random_idx:
+            if isinstance(idx, str):
+                idx = [*self.files.keys()][np.random.randint(0, len(self))]
+            else:
+                idx = np.random.randint(0, len(self))
+
+        accession_id, chain_id_1, chain_id_2 = None, None, None
+
+        if isinstance(idx, int):
+            accession_id = self.file_index_to_id.get(idx, None)
+
+        elif isinstance(idx, str):
+            accession_id = idx
+
+        if not_exists(accession_id):
+            logger.warning(f"Accession ID for index {idx} not found.")
+            return None
+
+        # get the mmCIF file corresponding to the sampled structure
+
+        mmcif_filepath = self.files.get(accession_id, None)
+
+        if not_exists(mmcif_filepath):
+            logger.warning(f"mmCIF file for accession ID {accession_id} not found.")
+            return None
+        elif not os.path.exists(mmcif_filepath):
+            logger.warning(f"mmCIF file {mmcif_filepath} not found.")
+            return None
+
+        cropping_config = None
+
+        if self.training:
+            cropping_config = self.cropping_config
+
+        i = PDBInput(
+            mmcif_filepath=str(mmcif_filepath),
+            chains=(chain_id_1, chain_id_2),
+            cropping_config=cropping_config,
+            training=self.training,
+            distillation_multimer_sampling_ratio=self.multimer_sampling_ratio,
+            **self.pdb_input_kwargs,
+        )
+
+        if self.return_atom_inputs:
+            i = maybe_transform_to_atom_input(i)
+
+        return i
+
+    def __getitem__(self, idx: int | str, max_attempts: int = 50) -> PDBInput | AtomInput:
+        """Return either a PDBInput or an AtomInput object for the specified index."""
+        assert max_attempts > 0, "The maximum number of attempts must be greater than 0."
+
+        i = self.get_item(idx)
+
+        if not_exists(i):
+            retry_decorator = retry(
+                retry_on_result=not_exists, stop_max_attempt_number=max_attempts
+            )
+            i = retry_decorator(self.get_item)(idx, random_idx=True)
 
         return i
 
