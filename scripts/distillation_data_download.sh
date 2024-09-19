@@ -14,10 +14,9 @@
 # Load required modules
 module load pawseyenv/2024.05
 module load singularity/4.1.0-slurm
-module load aws-cli/2.13.0
 
 # Ensure AWS CLI is installed
-awsv2 --install && alias aws="awsv2" | grep "AWS CLI is already installed."
+awsv2 --install
 
 # Define paths
 AFDB_URL="https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/swissprot_cif_v4.tar"
@@ -33,7 +32,7 @@ mkdir -p "$MSA_OUTPUT_DIR"
 bash -c "
     wget -O $OUTPUT_DIR/afdb_swissprot_cif_v4.tar $AFDB_URL \
     && tar -xvf $OUTPUT_DIR/afdb_swissprot_cif_v4.tar -C $MMCIF_OUTPUT_DIR \
-    && aws s3 cp s3://openfold/pdb/ $MSA_OUTPUT_DIR --recursive --no-sign-request
+    && awsv2 s3 cp s3://openfold/pdb/ $MSA_OUTPUT_DIR --recursive --no-sign-request
 "
 
 # Inform user of task completion
