@@ -34,14 +34,20 @@ def process_archive(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
         pdb_filepath = os.path.join(input_pdb_dir, pdb_group_code, f"{pdb_id}-assembly1.cif")
 
         if os.path.exists(pdb_filepath):
-            mmcif_object = mmcif_parsing.parse_mmcif_object(
-                filepath=pdb_filepath, file_id=f"{pdb_id}-assembly1.cif"
-            )
-            mmcif_release_date = extract_mmcif_metadata_field(mmcif_object, "release_date")
+            try:
+                mmcif_object = mmcif_parsing.parse_mmcif_object(
+                    filepath=pdb_filepath, file_id=f"{pdb_id}-assembly1.cif"
+                )
+                mmcif_release_date = extract_mmcif_metadata_field(mmcif_object, "release_date")
 
-            pdb_release_date = max(
-                pdb_release_date, datetime.strptime(mmcif_release_date, "%Y-%m-%d")
-            )
+                pdb_release_date = max(
+                    pdb_release_date, datetime.strptime(mmcif_release_date, "%Y-%m-%d")
+                )
+            except Exception as e:
+                print(
+                    f"An error occurred while processing PDB ID {pdb_id} associated with {pdb_filepath}: {e}. Skipping this prediction..."
+                )
+                return
 
     if pdb_release_date == datetime(1970, 1, 1):
         print(
