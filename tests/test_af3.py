@@ -1170,6 +1170,7 @@ def test_alphafold3_with_plm_embeddings():
     assert loss.numel() == 1
 
 def test_alphafold3_with_nlm_embeddings():
+
     alphafold3 = Alphafold3(
         num_atom_embeds=7,
         num_atompair_embeds=3,
@@ -1177,6 +1178,23 @@ def test_alphafold3_with_nlm_embeddings():
         dim_atom_inputs=77,
         dim_template_feats=108,
         nlm_embeddings="rinalmo",
+        confidence_head_kwargs = dict(
+            pairformer_depth = 1
+        ),
+        template_embedder_kwargs = dict(
+            pairformer_stack_depth = 1
+        ),
+        msa_module_kwargs = dict(
+            depth = 1
+        ),
+        pairformer_stack = dict(
+            depth = 2
+        ),
+        diffusion_module_kwargs = dict(
+            atom_encoder_depth = 1,
+            token_transformer_depth = 1,
+            atom_decoder_depth = 1,
+        ),
     )
 
     state_dict = alphafold3.state_dict()
