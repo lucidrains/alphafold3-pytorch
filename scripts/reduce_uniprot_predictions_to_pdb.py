@@ -4,16 +4,20 @@ import os
 import shutil
 from collections import defaultdict
 from datetime import datetime
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 
 import polars as pl
+import timeout_decorator
 from beartype.typing import Dict, Set, Tuple
 from tqdm import tqdm
 
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 
+PROCESS_ARCHIVE_MAX_SECONDS_PER_INPUT = 15
 
+
+@timeout_decorator.timeout(PROCESS_ARCHIVE_MAX_SECONDS_PER_INPUT, use_signals=True)
 def process_archive(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
     """Process a single archive file by extracting it to a given output directory and updating the
     release date of the associated PDB entries.
@@ -111,7 +115,7 @@ def filter_pdb_files(
             archives_to_keep[archive_accession_id].add(archive_file)
 
     # Prepare the multiprocessing pool
-    pool = Pool(processes=cpu_count() // 8)
+    pool = Pool(processes=12)
 
     # Prepare arguments for each worker
     archive_infos = [
