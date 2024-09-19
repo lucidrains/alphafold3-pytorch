@@ -58,7 +58,6 @@ from alphafold3_pytorch.inputs import (
     CONSTRAINTS,
     CONSTRAINTS_MASK_VALUE,
     IS_MOLECULE_TYPES,
-    IS_NA_INDICES,
     IS_NON_NA_INDICES,
     IS_PROTEIN_INDEX,
     IS_DNA_INDEX,
@@ -6699,9 +6698,9 @@ class Alphafold3(Module):
 
             plm_embeds = [plm(molecule_aa_ids) for plm in self.plms]
 
-            # concat all plm embeddings and project and add to single init
+            # concat all PLM embeddings and project and add to single init
 
-            all_plm_embeds = torch.cat(plm_embeds, dim = -1)
+            all_plm_embeds = torch.cat(plm_embeds, dim=-1)
             single_plm_init = self.to_plm_embeds(all_plm_embeds)
 
             single_init = single_init + single_plm_init
@@ -6713,10 +6712,7 @@ class Alphafold3(Module):
 
         if exists(self.nlms):
             na_ids = torch.where(
-                is_molecule_types[..., IS_NA_INDICES].any(dim=-1)
-                & (
-                    (molecule_ids < MIN_RNA_NUCLEOTIDE_ID) | (molecule_ids > MAX_DNA_NUCLEOTIDE_ID)
-                ),
+                (molecule_ids < MIN_RNA_NUCLEOTIDE_ID) | (molecule_ids > MAX_DNA_NUCLEOTIDE_ID),
                 MISSING_RNA_NUCLEOTIDE_ID,
                 molecule_ids,
             )
