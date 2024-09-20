@@ -2,23 +2,24 @@ import glob
 import gzip
 import os
 import shutil
+import timeout_decorator
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Pool
 
 import polars as pl
-import timeout_decorator
 from beartype.typing import Dict, Set, Tuple
 from tqdm import tqdm
 
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 
+
 PROCESS_ARCHIVE_MAX_SECONDS_PER_INPUT = 15
 
 
 @timeout_decorator.timeout(PROCESS_ARCHIVE_MAX_SECONDS_PER_INPUT, use_signals=True)
-def process_archive(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
+def process_archive_with_timeout(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
     """Process a single archive file by extracting it to a given output directory and updating the
     release date of the associated PDB entries.
 
@@ -77,6 +78,22 @@ def process_archive(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
 
     with open(output_file, "w") as f:
         f.writelines(new_lines)
+
+
+def process_archive(archive_info: Tuple[str, Dict[str, Set[str]], str, str]):
+    """Process a single archive file by extracting it to a given output directory and updating the
+    release date of the associated PDB entries.
+
+    :param archive_info: A tuple containing the path to the archive file, a dictionary mapping
+        UniProt accession IDs to PDB IDs, the path to the input PDB directory, and the path to the
+        output directory.
+    """
+    try:
+        process_archive_with_timeout(archive_info)
+    except Exception as e:
+        print(
+            f"Processing of archive info {archive_info} took too long and was terminated due to: {e}. Skipping this prediction..."
+        )
 
 
 def filter_pdb_files(
