@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from loguru import logger
+
 from alphafold3_pytorch.common.biomolecule import _from_mmcif_object, to_mmcif
 from alphafold3_pytorch.data.data_pipeline import get_assembly
 from alphafold3_pytorch.data.mmcif_parsing import MmcifObject, parse_mmcif_object
@@ -13,8 +15,13 @@ def write_mmcif_from_filepath_and_id(
 ):
     """Write an input mmCIF file to an output mmCIF filepath using the provided keyword arguments
     (e.g., sampled coordinates)."""
-    mmcif_object = parse_mmcif_object(filepath=input_filepath, file_id=file_id)
-    return write_mmcif(mmcif_object, output_filepath=output_filepath, **kwargs)
+    try:
+        mmcif_object = parse_mmcif_object(filepath=input_filepath, file_id=file_id)
+        return write_mmcif(mmcif_object, output_filepath=output_filepath, **kwargs)
+    except Exception as e:
+        logger.warning(
+            f"Failed to write mmCIF file {output_filepath} due to: {e}. Perhaps cropping was performed on this example?"
+        )
 
 
 def write_mmcif(

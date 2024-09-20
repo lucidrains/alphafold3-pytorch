@@ -1461,8 +1461,15 @@ def test_unresolved_protein_rasa():
 
     # rest of the test
 
-    mmcif_filepath = os.path.join("data", "test", "mmcifs", DATA_TEST_PDB_ID[1:3], f"{DATA_TEST_PDB_ID}-assembly1.cif")
-    pdb_input = PDBInput(mmcif_filepath)
+    mmcif_filepath = os.path.join(
+        "data",
+        "test",
+        "pdb_data",
+        "mmcifs",
+        DATA_TEST_PDB_ID[1:3],
+        f"{DATA_TEST_PDB_ID}-assembly1.cif",
+    )
+    pdb_input = PDBInput(mmcif_filepath, inference=True)
 
     mol_input = pdb_input_to_molecule_input(pdb_input)
     atom_input = molecule_to_atom_input(mol_input)

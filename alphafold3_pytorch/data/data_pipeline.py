@@ -113,7 +113,6 @@ def make_msa_features(
     msas: Dict[str, msa_parsing.Msa],
     chain_id_to_residue: Dict[str, Dict[str, List[int]]],
     num_msa_one_hot: int,
-    uniprot_accession_to_tax_id_mapping: Dict[str, str] | None = None,
     ligand_chemtype_index: int = 3,
 ) -> List[Dict[str, np.ndarray]]:
     """
@@ -123,7 +122,6 @@ def make_msa_features(
     :param msas: The mapping of chain IDs to lists of MSAs for each chain.
     :param chain_id_to_residue: The mapping of chain IDs to residue information.
     :param num_msa_one_hot: The number of one-hot classes for MSA features.
-    :param uniprot_accession_to_tax_id_mapping: The mapping of UniProt accession IDs to NCBI taxonomy IDs.
     :param ligand_chemtype_index: The index of the ligand in the chemical type list.
     :return: The MSA chain feature dictionaries.
     """
@@ -216,10 +214,9 @@ def make_msa_features(
             int_msa.append(msa_res_types)
             deletion_matrix.append(msa_deletion_values)
 
-            species_id = ""
-            if exists(uniprot_accession_to_tax_id_mapping):
-                accession_id = msa_parsing.get_accession_id(msa.descriptions[sequence_index])
-                species_id = uniprot_accession_to_tax_id_mapping.get(accession_id, "")
+            # Parse species ID for MSA pairing if possible.
+            species_id = msa_parsing.get_identifiers(msa.descriptions[sequence_index]).species_id
+
             if sequence_index == 0:
                 species_id = "-1"  # Tag target sequence for filtering.
             species_ids.append(species_id)
@@ -654,7 +651,7 @@ def make_mmcif_features(
 
 
 if __name__ == "__main__":
-    filepath = os.path.join("data", "test", "mmcifs", "a4", "7a4d-assembly1.cif")
+    filepath = os.path.join("data", "test", "pdb_data", "mmcifs", "a4", "7a4d-assembly1.cif")
     file_id = os.path.splitext(os.path.basename(filepath))[0]
 
     mmcif_object = mmcif_parsing.parse_mmcif_object(

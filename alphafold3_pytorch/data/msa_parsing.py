@@ -159,6 +159,15 @@ class Msa:
         """Returns the number of sequences in the MSA."""
         return len(self.sequences)
 
+    def __add__(self, other):
+        """Concatenates two MSAs."""
+        return Msa(
+            sequences=self.sequences + other.sequences,
+            deletion_matrix=self.deletion_matrix + other.deletion_matrix,
+            descriptions=self.descriptions + other.descriptions,
+            msa_type=self.msa_type,
+        )
+
     def truncate(self, max_seqs: int):
         """Truncates the MSA to the first `max_seqs` sequences."""
         max_seqs = min(len(self.sequences), max_seqs)

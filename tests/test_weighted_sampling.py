@@ -17,7 +17,7 @@ from alphafold3_pytorch import (
 
 DATA_TEST_PDB_ID = '209d'
 
-TEST_FOLDER = Path("./data/test/data_caches/clusterings/")
+TEST_FOLDER = Path("data", "test", "pdb_data", "data_caches", "clusterings")
 
 INTERFACE_MAPPING_PATH = str(TEST_FOLDER / "interface_cluster_mapping.csv")
 
@@ -56,7 +56,7 @@ def test_cluster_based_sample(sampler: Sampler):
 @pytest.fixture()
 def populate_mock_pdb_and_remove_test_folders():
     proj_root = Path('.')
-    working_cif_file = proj_root / 'data' / 'test' / 'mmcifs' / DATA_TEST_PDB_ID[1:3] / f'{DATA_TEST_PDB_ID}-assembly1.cif'
+    working_cif_file = proj_root / 'data' / 'test' / 'pdb_data' / 'mmcifs' / DATA_TEST_PDB_ID[1:3] / f'{DATA_TEST_PDB_ID}-assembly1.cif'
 
     pytest_root_folder = Path('./test-folder')
     data_folder = pytest_root_folder / 'data'

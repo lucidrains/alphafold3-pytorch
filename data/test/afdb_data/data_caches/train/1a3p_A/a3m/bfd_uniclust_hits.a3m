@@ -1,0 +1,2124 @@
+>query
+PGAPSSYDGYCLNGGVAMHIESLDSYTCNCVIGYSGDRCQTRDLR
+>tr|Q866M9|Q866M9_BOVIN Epidermal growth factor (Fragment) OS=Bos taurus GN=EGF PE=4 SV=1
+PEYTPNFEGYCLNGRVCIYFGIANLFSCHCPIGYPGKRGEYIDFD
+>UniRef100_A0A4U5UCC1 Pro-epidermal growth factor n=1 Tax=Collichthys lucidus TaxID=240159 RepID=A0A4U5UCC1_COLLU
+AECQNTLGKY-----LCKCPAGYHSNGKACEAGYMGERCQFSDLE
+>UniRef100_A0A6J0X3X2 LOW QUALITY PROTEIN: pro-epidermal growth factor n=1 Tax=Odocoileus virginianus texanus TaxID=9880 RepID=A0A6J0X3X2_ODOVR
+PECSPNYEGYCLNGGLCIYFGIDTLFACHYPVGYTGKPCEYTACG
+>UniRef100_B7T147 EGF-like domain-containing protein n=1 Tax=Acropora millepora TaxID=45264 RepID=B7T147_ACRMI
+------RETYCLHGGTCFRVPSEnSGPQCHCTEYYAGFRCMYQYA-
+>tr|B4MMK9|B4MMK9_DROWI Vein (Fragment) OS=Drosophila willistoni GN=vn PE=4 SV=2
+-PCDKVISDYCFHGGTCMLIPSLSDLFCICPDNFFGKQCENSVP-
+>UniRef100_A0A498LID1 Pro-neuregulin-membrane-bound isoform-like isoform X1 n=1 Tax=Labeo rohita TaxID=84645 RepID=A0A498LID1_LABRO
+--CkpgdikqdldeppmDPDVSVYPLPVLLVSLCQGQSVGLVSgagvehfpppqsprrrpprlCCRGACGGRAlllvpaLLL---
+>UniRef100_UPI0015A52C4A pro-neuregulin-2, membrane-bound isoform isoform X6 n=1 Tax=Oxyura jamaicensis TaxID=8884 RepID=UPI0015A52C4A
+--ClcdctcqilskvsdrihRRPVSAFRNGQLLQSVLRQYDSWLCHVGKNRKSTRRnkegEMS---
+>tr|G3HU46|G3HU46_CRIGR Pro-neuregulin-1, membrane-bound isoform OS=Cricetulus griseus GN=I79_014450 PE=4 SV=1
+--CKKEKEewlGVGVEAGRGWELQAILAPAAlasLCNGTVcsdaqRAGTCCSVM--
+>UniRef100_A0A5C6MYU6 Versican core protein n=1 Tax=Takifugu flavidus TaxID=433684 RepID=A0A5C6MYU6_9TELE
+------TPPSLTGGKPVMEREE--STDAGLHMGHTvvGEPVVIPDF-
+>UniRef100_A0A6A4T3H4 Ig-like domain-containing protein n=1 Tax=Scophthalmus maximus TaxID=52904 RepID=A0A6A4T3H4_SCOMX
+--CNDSEKAYCVNGGDCYFIHGINQLSCKanidprhrvCMHSKYVESCTER---
+>UniRef100_A0A2I4AU77 pro-neuregulin-4, membrane-bound isoform n=1 Tax=Austrofundulus limnaeus TaxID=52670 RepID=A0A2I4AU77_9TELE
+--CDAKEAGYCMNEATCYKISSMNLLSCVCRENYKGSRCEQY---
+>ERR1719367_1313842
+------LIRIALMEALVNFFLLLENYHAFVPEDFMVNAVNLKNX-
+>ERR1719187_3064197
+--------PNRCGIGKCIGLDE-RSYVCHCPTGYAFRLatCKS----
+>tr|Q4SFP7|Q4SFP7_TETNG Chromosome 7 SCAF14601, whole genome shotgun sequence (Fragment) OS=Tetraodon nigroviridis GN=GSTENG00019001001 PE=4 SV=1
+--CDHntsnrlrprqkmqrnREGLLCEwrrlllhtwYRSTLLQAPGVGEKEGRCPNDFTGDRCQTY---
+>tr|A0A060XWG4|A0A060XWG4_ONCMY Uncharacterized protein OS=Oncorhynchus mykiss GN=GSONMT00012781001 PE=4 SV=1
+--CKESEQHLL--SVGFYFRTCLSRSLCVCVCV------------
+>UniRef100_A0A3M0LAG8 Neuregulin domain-containing protein n=1 Tax=Hirundo rustica rustica TaxID=333673 RepID=A0A3M0LAG8_HIRRU
+--PGYPQLLFMSKEGDTQHLAIHPllreKEVAGlrCPNEFTGDRCQNY---
+>UniRef100_A0A4U1FS05 Neuregulin domain-containing protein (Fragment) n=1 Tax=Monodon monoceros TaxID=40151 RepID=A0A4U1FS05_MONMO
+--LKYVCKRNEVSRGYFLVNMDNTacqLFSCK---SRQGSGTFAD---
+>UniRef100_A0A5N4CER1 Pro-neuregulin-4 (Fragment) n=1 Tax=Camelus dromedarius TaxID=9838 RepID=A0A5N4CER1_CAMDR
+-HTSWKPYAFYINQWNRECNSLSKILFYRCIENYTGARCEEVFL-
+>UniRef100_A0A6I9JVZ8 pro-neuregulin-4, membrane-bound isoform n=1 Tax=Chrysochloris asiatica TaxID=185453 RepID=A0A6I9JVZ8_CHRAS
+EPCGPRQRSFCLNGGICYVIPTIPSPFCRCIENYTGARCEEVFL-
+>tr|U3KMQ5|U3KMQ5_RABIT Uncharacterized protein OS=Oryctolagus cuniculus PE=4 SV=1
+EPCGSSHRSFCLNGGICYVIPTIPSPFCRALRNQLCVSGHpsqLLL--
+>UniRef100_A0A3B3V1L4 EGF-like domain-containing protein n=1 Tax=Poecilia latipinna TaxID=48699 RepID=A0A3B3V1L4_9TELE
+RPCGAENQKYCLNDGKCIYPQDSLKPSCICMPSHSGPRCEIFiFT-
+>UniRef100_UPI0006CED7E2 protein spitz-like isoform X1 n=2 Tax=Cimex lectularius TaxID=79782 RepID=UPI0006CED7E2
+-TCPPSYAdSFCLNGATCFTVDIgeFQTYYCECADGFMGMRCEFKDLD
+>UniRef100_A0A3Q3N8T1 EGF-like domain-containing protein n=1 Tax=Labrus bergylta TaxID=56723 RepID=A0A3Q3N8T1_9LABR
+TKCESTFDKYCLNNGLCMLLVDINEHHCKCEDGFYGPRCGNLEL-
+>UniRef100_A0A3Q2PN08 Ig-like domain-containing protein n=1 Tax=Fundulus heteroclitus TaxID=8078 RepID=A0A3Q2PN08_FUNHE
+-RCNDSEKAYCANGGDFLSFHQPSSFQHIPAPSISPP--------
+>UniRef100_A0A5A9NIY9 Pro-neuregulin-2, membrane-bound isoform n=1 Tax=Triplophysa tibetana TaxID=1572043 RepID=A0A5A9NIY9_9TELE
+-RQAFSEEAFqsvlksyghhfdsgrlrselqvlysdqdlqsnrgklcdylvflkdmvldsampqlyklfslvatigatsagversfsCLKRLKSYTRKTMGQGRLSSLALLAIERTLVKSL-
+>tr|A0A096LT40|A0A096LT40_POEFO Uncharacterized protein OS=Poecilia formosa PE=4 SV=1
+TSCEKEFDTYCFNNGQCILLEDIKEHHCKCKKGFYGPRCATPEL-
+>UniRef100_A0A5N3VEK2 Uncharacterized protein n=1 Tax=Muntiacus muntjak TaxID=9888 RepID=A0A5N3VEK2_MUNMU
+-TIQSSPTAVYTGSLQCFCFNRLYipySFFSFLFFFFPKAGH------
+>UniRef100_A0A673SZ85 Neuregulin 1 n=1 Tax=Suricata suricatta TaxID=37032 RepID=A0A673SZ85_SURSU
+-KCAEKEKTFCVNGGECFMVKDLSnpsRYLCKSRGTLPEESADHHR--
+>UniRef100_UPI00083BFA5B uncharacterized protein LOC108555941 n=1 Tax=Eufriesea mexicana TaxID=516756 RepID=UPI00083BFA5B
+-------FHSDIPAETARDLSRVADKGAGSTRWKDVFRVQAKNP-
+>UniRef100_UPI001401FDBA OMEGA-stichotoxin-Sgt1a-like n=1 Tax=Petromyzon marinus TaxID=7757 RepID=UPI001401FDBA
+QPCPAHYRDYCLNGGSCHYLHQTDKPHCRCSAEFAGHRCELFALE
+>LakMenE01Jun11ns_1017448.scaffolds.fasta_scaffold6836489_1 # 1 # 321 # 1 # ID=6836489_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.355
+--WSIQKKSPCQNGGELIFTQDylnsNEGIICHCQKGFNGEFCQIIDS-
+>APPan5920702752_1055751.scaffolds.fasta_scaffold1282989_1 # 2 # 220 # -1 # ID=1282989_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.676
+--CAN---QTCSNRGQCIPLNGNFKWKCMCKDMNSGEQCQLSAS-
+>OM-RGC.v1.025171433 GOS_JCVI_SCAF_1099266132532_1_gene3159382	COG0765	K09971
+--CQSNNNnnsSVCNQRGVCLPNDDsmsyNKTFTCICSNGYHGDRCEFSDE-
+>Dee2metaT_33_FD_contig_31_2720704_length_250_multi_1_in_0_out_0_1 # 2 # 250 # 1 # ID=916856_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.550
+--CSSAA-NRCNHNGQCIPIDDrist-SNYSCLCNEGFSGSNYEITNT-
+>UniRef100_UPI00096B0AA0 protein vein isoform X1 n=1 Tax=Aethina tumida TaxID=116153 RepID=UPI00096B0AA0
+-DCPEDAaKGYCYNGGTCRQLIALKEMLCQCPENYSGLRCITFTP-
+>tr|A0A2D0R1F6|A0A2D0R1F6_ICTPU epigen OS=Ictalurus punctatus GN=epgn PE=4 SV=1
+PLCSKQRKSYCIN-GLCLFHENSSMPSctcvCRCHVDYLGERCEHMNS-
+>ERR1719244_1215823
+----LLEGgQGGEDGATCFTVKIGQsiLYNCECADGFMGQRCEFKDLD
+>UniRef100_A0A1R3JZX7 Uncharacterized protein n=1 Tax=Corchorus olitorius TaxID=93759 RepID=A0A1R3JZX7_9ROSI
+--CDGTNSFWCENGGICQEIVQGEDYLCKCRPGYTGEHCQHPG--
+>UniRef100_A0A673I3E5 Uncharacterized protein n=1 Tax=Sinocyclocheilus rhinocerous TaxID=307959 RepID=A0A673I3E5_9TELE
+-RCSESERNYCVNGGKCFTLEVTpgnIRRLCRCPNEFTGDRCQNYVM-
+>UniRef100_A0A3Q7T3E9 probetacellulin n=1 Tax=Vulpes vulpes TaxID=9627 RepID=A0A3Q7T3E9_VULVU
+-FLPILPCTCSAA-GPVPGTQDAAVNNIVeeevedCDEGYTGARCERVDL-
+>UniRef100_UPI0004ED010D probetacellulin n=1 Tax=Nannospalax galili TaxID=1026970 RepID=UPI0004ED010D
+-YITKPLAQGVLH-EQVPawlkaFITAVTDPGILllfrCEKGYFGARCERVDL-
+>UniRef100_A0A5F9CVH9 Epithelial mitogen n=1 Tax=Oryctolagus cuniculus TaxID=9986 RepID=A0A5F9CVH9_RABIT
+HPCLEEHDSYCIN-GVCLFHHELEKVICRIFCTMKGNaTAKNIQE-
+>UniRef100_A0A4Z2FBA0 Neurogenic locus notch 3 n=1 Tax=Liparis tanakae TaxID=230148 RepID=A0A4Z2FBA0_9TELE
+---PSTSATPGQISHLFpSKPSKNSQEERTCRLGFIGPLCHHTD--
+>SoiMetStandDraft_5_1073268.scaffolds.fasta_scaffold2948265_1 # 3 # 260 # -1 # ID=2948265_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.748
+-------LHPVCGDGWCG--GL--HESGWTQPGYCPEDCDGP---
+>tr|Q4RSM9|Q4RSM9_TETNG Chromosome 12 SCAF14999, whole genome shotgun sequence OS=Tetraodon nigroviridis GN=GSTENG00029620001 PE=4 SV=1
+-PCTSTHEHYCVH-GNCKYIDGVQEPMCMCWKDYEGERCEIHTP-
+>UniRef100_UPI001403784B protransforming growth factor alpha n=1 Tax=Amblyraja radiata TaxID=386614 RepID=UPI001403784B
+-DCPDAHLHFCIH-GTCRFFVLESTPACICHPGFIGTRCAYADI-
+>UniRef100_A0A183EER4 Uncharacterized protein n=1 Tax=Gongylonema pulchrum TaxID=637853 RepID=A0A183EER4_9BILA
+----ACHKHQCQNGATCA-VDPENEFNYLLDESLLLATYPEN---
+>UniRef100_A0A5J5CVS5 Uncharacterized protein (Fragment) n=1 Tax=Etheostoma spectabile TaxID=54343 RepID=A0A5J5CVS5_9PERO
+------PSVAPAPGATL--AP-------AARHLLTGADAHLPA--
+>ERR1719150_425969
+------VVILELERLLILATLPIGELVCRCTEGFTGQRCQYK---
+>tr|B7PKT5|B7PKT5_IXOSC Titin, putative OS=Ixodes scapularis GN=8053054 PE=4 SV=1
+------LVSYCLNGGTCIFYEAVKEPVCQLDLHQLQGVTEPIR--
+>UniRef100_R0LN01 Fibulin-7 (Fragment) n=1 Tax=Anas platyrhynchos TaxID=8839 RepID=R0LN01_ANAPL
+-----CGAALCPSAWAC--WVQLQEWGQSWLPDARGTVGVHQ---
+>UniRef100_V8P624 Fibulin-7 (Fragment) n=1 Tax=Ophiophagus hannah TaxID=8665 RepID=V8P624_OPHHA
+-----------SRKPRC--AQLDRMQHCSCEAGFHMSGTTEN---
+>UniRef100_A0A4W5PFB1 Neuregulin 2a n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5PFB1_9TELE
+-VCTEFTAAFFMSFCPPLLLN-------RCPDGFFGQRCLQ----
+>UniRef100_A0A5C6MNP7 Pro-neuregulin-2, membrane-bound isoform n=1 Tax=Takifugu flavidus TaxID=433684 RepID=A0A5C6MNP7_9TELE
+-------MGGVLAWAGQWLAERESpEKWRECPNDYTGDRCQN----
+>UniRef100_A0A5C6P4S1 Pro-neuregulin-2, membrane-bound isoform n=1 Tax=Takifugu flavidus TaxID=433684 RepID=A0A5C6P4S1_9TELE
+---------MAILGCSTVHYKSILGLSLWVHLGAANVARlLR----
+>UniRef100_A0A5N4EDU9 Pro-neuregulin-2 n=1 Tax=Camelus dromedarius TaxID=9838 RepID=A0A5N4EDU9_CAMDR
+-RCQ----QFAMVN-FSRYVQNEDFAYCLVSLALSGVQH-Q----
+>UniRef100_A0A5N5M0T8 Neuregulin domain-containing protein n=1 Tax=Pangasianodon hypophthalmus TaxID=310915 RepID=A0A5N5M0T8_PANHP
+-------------MHMCWNIRLLNfVLLCFSPSTCHLPVMAE----
+>ERR550525_994049
+-------DWWSRRANP-eEKGGMrsTIsysmsqrpgyqaqvcvdLNQGRCMAGRPRtlrgCHALAPTPQ
+>UniRef100_UPI0010A8ED65 LOW QUALITY PROTEIN: proheparin-binding EGF-like growth factor n=1 Tax=Ornithorhynchus anatinus TaxID=9258 RepID=UPI0010A8ED65
+-PCLRKFKDFCXH-GECKYVKKLKPPLAFCQQGYHGERCHGLI--
+>UniRef100_A0A6G1QT61 Christmas factor n=1 Tax=Channa argus TaxID=215402 RepID=A0A6G1QT61_9TELE
+----SVSRIPARMEVCV--RTESVRMFAGANQTLLARAVRSV---
+>UniRef100_A0A553QNH5 Delta-like protein n=1 Tax=Danionella translucida TaxID=623744 RepID=A0A553QNH5_9TELE
+-----AHAVLVSLGKavrsRSTNalaahAEMEEAALCTCPPGFYGRNCELSA--
+>UniRef100_UPI000CDAEBFC protransforming growth factor alpha n=1 Tax=Cyanistes caeruleus TaxID=156563 RepID=UPI000CDAEBFC
+-DCPDSHSQFCFH-GTCRFLVQEDKPACVCHSGYVGTLTCVCPQ-
+>ERR1719234_421011
+-------PDYCLNGGTCQFTAHLESKLANALKATGESAANEN---
+>UniRef100_A0A1A9XN51 CUB domain-containing protein n=1 Tax=Glossina fuscipes fuscipes TaxID=201502 RepID=A0A1A9XN51_GLOFF
+-L-GKPETFIGEEQlDVGRHIGD-AAITCHCLPGYKGTRCEIPEI-
+>UniRef100_A0A3P8ZI77 EGF-like domain-containing protein n=1 Tax=Esox lucius TaxID=8010 RepID=A0A3P8ZI77_ESOLU
+------IGNNCNKHGTCKPLLDTSHSLCHCENDYYGENCTNgiK---
+>UniRef100_A0A3B4VL62 Uncharacterized protein n=1 Tax=Seriola dumerili TaxID=41447 RepID=A0A3B4VL62_SERDU
+---RGFSQPRGNFARIF--HMQFDSYTTSCPAFPSAALCE-----
+>UniRef100_A0A3Q0J1R0 LOW QUALITY PROTEIN: neurogenic locus Notch protein n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0J1R0_DIACI
+-----CVPNRCLTPGMI--VirswilvYRTERMVIDFGMKHIGSRCEGD---
+>UniRef100_A0A093S6D2 Hepatocyte growth factor activator (Fragment) n=1 Tax=Manacus vitellinus TaxID=328815 RepID=A0A093S6D2_9PASS
+-----CWVAP----GTWFLLCSKEGWCLQCPETFT----------
+>UniRef100_UPI00067421F5 hepatocyte growth factor activator isoform X4 n=1 Tax=Oreochromis niloticus TaxID=8128 RepID=UPI00067421F5
+-----HSNAPVLRASLGEYVSKPRRLSCVVSAFSE----------
+>UniRef100_UPI000F748A0B pro-neuregulin-1, membrane-bound isoform isoform X5 n=1 Tax=Cricetulus griseus TaxID=10029 RepID=UPI000F748A0B
+---ASTERAYVSS----------EspiRISVSTEGANTSSYGIWW---
+>UniRef100_A0A3M0K777 Uncharacterized protein n=1 Tax=Hirundo rustica rustica TaxID=333673 RepID=A0A3M0K777_HIRRU
+-PNGSRGFPDDPDGAVVP--KS----ACLCPASFHGPDCQQT---
+>UniRef100_Q4S488 Chromosome undetermined SCAF14743, whole genome shotgun sequence (Fragment) n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=Q4S488_TETNG
+-PCAAYAANPCLNGGSCL--DGPLGHRSW-PSRRTGCCCTTD---
+>UniRef100_UPI0014257F69 neural-cadherin-like n=1 Tax=Anneissia japonica TaxID=1529436 RepID=UPI0014257F69
+-PCDGSPGDTCITPSTFptpA--DKLISppplrrssrqrhtpttvcvisfksnlayWRrskfifkmfcifhsCTCPTGFEGGRCEMT---
+>UniRef100_A0A4W5JYZ9 Delta-like protein n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5JYZ9_9TELE
+-----CDSNPCRYGGLCTV-SSEP-LRSLWITMLGGTVDPLTn---
+>UniRef100_UPI00074012F0 delta-like protein 3 n=1 Tax=Lepisosteus oculatus TaxID=7918 RepID=UPI00074012F0
+-----CDSNPCKNGGSCNL--LHSTvFTASFLDSYVLAPRSTpEH--
+>UniRef100_A0A226DQH9 Cubilin n=1 Tax=Folsomia candida TaxID=158441 RepID=A0A226DQH9_FOLCA
+----PCLVQPSpcQNNGVCSPNPLTTsGFTCTCGSDFTGEFCQDQ---
+>UniRef100_A0A0V0X6B2 Basement membrane-specific heparan sulfate proteoglycan core protein n=1 Tax=Trichinella sp. T6 TaxID=92179 RepID=A0A0V0X6B2_9BILA
+-QADTCSVNSCLNEAKCVPSDGDFGYKCQCKLNTVGTYCERR---
+>UniRef100_V4A6I5 Uncharacterized protein n=1 Tax=Lottia gigantea TaxID=225164 RepID=V4A6I5_LOTGI
+-SYNVCQDRPCLNRGSCIPENNQFGYRCVCARGYAGFRCEVA---
+>UniRef100_UPI000CD5F795 versican core protein n=1 Tax=Paramormyrops kingsleyae TaxID=1676925 RepID=UPI000CD5F795
+---EtsytvEGQTVEIPEHSSI--KPVAFAGTQLTFSRWPCHFDRmpcfsllS----
+>UniRef100_UPI00083C0526 vitamin K-dependent protein Z isoform X2 n=1 Tax=Rhinopithecus bieti TaxID=61621 RepID=UPI00083C0526
+--------SPASTTDLV--RTASGATPAPAPPAMRAATASWL---
+>UniRef100_UPI0012B5EF43 retinoschisin-like n=1 Tax=Actinia tenebrosa TaxID=6105 RepID=UPI0012B5EF43
+----PCNDRTSPCDGLCVPVPGQlPRTICLCL-KTPVSNCQpD----
+>UniRef100_A0A1E1X912 Putative low-density lipoprotein receptor (Fragment) n=1 Tax=Amblyomma aureolatum TaxID=187763 RepID=A0A1E1X912_9ACAR
+--CRECPPFVCLNDAICEWTPRAAYPSCTCKNGYKGRRCELPG--
+>UniRef100_A0A4D5S3U7 Putative low-density lipoprotein receptor (Fragment) n=1 Tax=Ixodes scapularis TaxID=6945 RepID=A0A4D5S3U7_IXOSC
+--CGYCPSDYCKNGGSCNVAPEPEngYPKCTCQSDTSGKRCNVLK--
+>ERR1711983_382412
+------IDSFCLNGGECSYYEMIGELVCRCKQGLTFQPLNMMN--
+>ERR1719350_829001
+-------AEVTLEAPDLSELFAAGDL-----LLRRDgQRCQFKK--
+>ERR1719491_2546497
+--------VFLIKS--TYVFSIYLidfYYPNRCPEGYAGQRCQFKK--
+>UniRef100_A0A3B3CLH8 Uncharacterized protein n=2 Tax=Oryzias melastigma TaxID=30732 RepID=A0A3B3CLH8_ORYME
+-----SSSSMaSFSSAV---------LSASSLPTHSAASATAP---
+>UniRef100_A0A3B3ZXW9 Sushi domain-containing protein n=1 Tax=Periophthalmus magnuspinnatus TaxID=409849 RepID=A0A3B3ZXW9_9GOBI
+-----NSSSPsllFLSSGAS--SSSLPMSAALSASSKSSSSSSSsS---
+>UniRef100_A0A2Y9HPS6 coagulation factor VII n=1 Tax=Neomonachus schauinslandi TaxID=29088 RepID=A0A2Y9HPS6_NEOSC
+----AFSDVPDKEFQNVM--TYLTSIPSTalpsqEECSSSPSVRAS----
+>UniRef100_A0A4W4FLB0 Uncharacterized protein n=1 Tax=Electrophorus electricus TaxID=8005 RepID=A0A4W4FLB0_ELEEL
+---------GEFSYGKSI--I----NIVNCGLRFSGNFVEL----
+>UniRef100_A0A6J3QB44 coagulation factor VII isoform X2 n=1 Tax=Tursiops truncatus TaxID=9739 RepID=A0A6J3QB44_TURTR
+----KENLEPIRRAARLS--EMPVTLHSLSFTPLVTSSCTS----
+>UniRef100_UPI0006433443 sushi, nidogen and EGF-like domain-containing protein 1 n=1 Tax=Condylura cristata TaxID=143302 RepID=UPI0006433443
+----PSMTCELGRGHVP--RSPWQRFGQAPP--------PV----
+>UniRef100_A0A0L7QUB9 Versican core protein (Fragment) n=1 Tax=Habropoda laboriosa TaxID=597456 RepID=A0A0L7QUB9_9HYME
+----DRQNAVCQSGGTCKQIGA-EAMSCGCVDGYVGRSCEIHLL-
+>UniRef100_A0A674IH30 Transforming growth factor alpha n=1 Tax=Terrapene carolina triunguis TaxID=2587831 RepID=A0A674IH30_TERCA
+-NPNDRIIiSWVRL-GFCAFFFNSPlSSLHSCHSGFVGTRCEHADL-
+>ERR1711942_352368
+-------KYYCSNGGTCFQIAT-GgEPKCL--RRWMDGPEMPRS--
+>UniRef100_UPI000A3C3D4C LOW QUALITY PROTEIN: neurocan core protein n=1 Tax=Columba livia TaxID=8932 RepID=UPI000A3C3D4C
+----HAGTPLCQGRIGP--GEGTQEPRGLGAPQH--PHIPA----
+>UniRef100_UPI000FFB9A24 LOW QUALITY PROTEIN: neurocan core protein n=1 Tax=Falco peregrinus TaxID=8954 RepID=UPI000FFB9A24
+----QDLALPAGGAAAT--LGSGGAPRSLCSPSCGASRCEK----
+>UniRef100_UPI0009E19550 uncharacterized protein LOC110054636 n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E19550
+-----CSTNSCTLYDECAID-TDNKNMC----GSCGKDgvsdsFFL----
+>UniRef100_UPI000C03D62C uncharacterized protein LOC111326661 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=UPI000C03D62C
+-----CLSNPCQFYRSCRALYQVKDFWSGFLPNNHGNYCE-----
+>UniRef100_UPI0013904D86 uncharacterized protein LOC116615290 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI0013904D86
+-----CRGVLCPERQRCIVNAEGVGYHCVCLEGLTGDDCET----
+>RifCSP19_2_1023855.scaffolds.fasta_scaffold206023_1 # 219 # 401 # 1 # ID=206023_1;partial=01;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.705
+------NAStDCESGQLCEPplpdliglvpdSVNTRNFCVPCEATDTDPNCTVA---
+>UniRef100_UPI000CDFDF92 LOW QUALITY PROTEIN: cadherin EGF LAG seven-pass G-type receptor 3-like n=1 Tax=Salvelinus alpinus TaxID=8036 RepID=UPI000CDFDF92
+----PVLLQPLFQTRACASqrrsrtlcnlqektytsppkrpecertsltapsvrsdeKD--GSGPRSPRPTPSGMTCddgpfvpsrfhteiqhdpedgpghydvvELD---
+>UniRef100_A0A3Q1J3H7 Christmas factor n=1 Tax=Anabas testudineus TaxID=64144 RepID=A0A3Q1J3H7_ANATE
+-----CLFTPMLHVLLIG--TYIQENDLFCaRVCFFSSSAIVK---
+>UniRef100_M3YFR2 Coagulation factor X n=1 Tax=Mustela putorius furo TaxID=9669 RepID=M3YFR2_MUSPF
+-----GARGPGAETAEAQ--QNRPHVPCRALRGRQ----------
+>ERR1719247_2518712
+-------FSPCVN-ATCV--DLVSKPATKaCTKMIFGKETKV----
+>UniRef100_S4RDU5 Uncharacterized protein n=1 Tax=Petromyzon marinus TaxID=7757 RepID=S4RDU5_PETMA
+----SCESIVYPTGTDV--TSLRTTNTCPCPTPGSGPLCEVPP--
+>UniRef100_A0A3Q1C3E6 Transmembrane protein with EGF-like and two follistatin-like domains 2a n=1 Tax=Amphiprion ocellaris TaxID=80972 RepID=A0A3Q1C3E6_AMPOC
+-PCPDHYKNYCVHG-ECQFPSILAQPSCSCHSGFRGPQCDIKEY-
+>UniRef100_UPI00138FC17B discoidin domain-containing receptor 2 isoform X2 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FC17B
+-------AVECAKPVLCQNTYlfcvgipDEQSQQCVCSPDYAGRRCEI----
+>UniRef100_H3CHX4 Slit homolog 2 (Drosophila) n=2 Tax=Tetraodon nigroviridis TaxID=99883 RepID=H3CHX4_TETNG
+-VCRPCQESADESFSLTNHK-RGENITLSRSYSKYLIXCEEP---
+>UniRef100_UPI0006B0A33B LOW QUALITY PROTEIN: slit homolog 1 protein n=1 Tax=Apteryx mantelli mantelli TaxID=202946 RepID=UPI0006B0A33B
+-GVDVAGGAQCQCHCPVSLG-AARAALCFLP---QGRDCEVA---
+>UniRef100_W5KHT0 Slit homolog 2 (Drosophila) n=1 Tax=Astyanax mexicanus TaxID=7994 RepID=W5KHT0_ASTMX
+-KLTVPYHTPAKNNGTCSNH-PIDFY-SACPYGYKTVR---P---
+>UniRef100_A0A2I3SG43 Jagged canonical Notch ligand 2 n=1 Tax=Pan troglodytes TaxID=9598 RepID=A0A2I3SG43_PANTR
+-----CASSPCHSGGLCE--DLADG--STATAPRAPPTLQV----
+>UniRef100_A0A674PBS6 Versican a n=1 Tax=Takifugu rubripes TaxID=31033 RepID=A0A674PBS6_TAKRU
+-----SQRNKLLPAHDTIKVT--RsgkllslktmgmsvlilivrlminpllqtvarvnifiFITSSWTIHLTPYICLFiD---
+>UniRef100_A0A3B4GFT5 Uncharacterized protein n=1 Tax=Pundamilia nyererei TaxID=303518 RepID=A0A3B4GFT5_9CICH
+-PCADSFSGFCVH-GKCEI-NKYNMATCRf--VTHQIGRLSQsQHI-
+>UniRef100_A0A3Q4HEU6 Transmembrane protein with EGF-like and two follistatin-like domains 1a n=1 Tax=Neolamprologus brichardi TaxID=32507 RepID=A0A3Q4HEU6_NEOBR
+-PCADSFSGFCVH-GKCEI-NKYNMATCRCDAGYKGPQCDEpQDF-
+>UniRef100_UPI00063F445A tomoregulin-1 n=1 Tax=Propithecus coquereli TaxID=379532 RepID=UPI00063F445A
+---------WCAL-LKMVLPDLPHQKARLCESGYTGQHCEKTDF-
+>UniRef100_UPI0006AA972D tomoregulin-2 n=1 Tax=Pundamilia nyererei TaxID=303518 RepID=UPI0006AA972D
+-PNDSLSLSLSPH--SCAFVRLCVR-DLSCHSGFRGPHCDIKEY-
+>UniRef100_V8P4V8 Tomoregulin-1 (Fragment) n=1 Tax=Ophiophagus hannah TaxID=8665 RepID=V8P4V8_OPHHA
+----TSILETIFL-ARIVLVATASMENVN---SFIQHRKLPADF-
+>UniRef100_A0A452S0Q0 Neuregulin domain-containing protein n=1 Tax=Ursus americanus TaxID=9643 RepID=A0A452S0Q0_URSAM
+-PAVVMDHGFLNVVCSVLLLITF--LPSRCQPGFTGARCTEN---
+>UniRef100_UPI0012B59A2B uncharacterized protein LOC116294750 n=1 Tax=Actinia tenebrosa TaxID=6105 RepID=UPI0012B59A2B
+------LPSTCPPHTTCRDMCLpkFKRFMCVCPPGNT-NGCKE----
+>UniRef100_A7SR11 Predicted protein n=1 Tax=Nematostella vectensis TaxID=45351 RepID=A7SR11_NEMVE
+-------YRFTGNGGTML--PTYEVPRLRCNSRASGYMNGTH---
+>UniRef100_UPI0015B1DE73 fibropellin-3-like n=1 Tax=Stegodyphus dumicola TaxID=202533 RepID=UPI0015B1DE73
+------EVCECENGKCV--KDSMGEEVCVCPPEFSQYTPTR----
+>UniRef100_H3C5H2 Aggrecan a n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=H3C5H2_TETNG
+---QTTEASPALTAGRE--SEELVFITCaaafpVVLSSQTERVAAAD---
+>UniRef100_UPI0003314F11 LOW QUALITY PROTEIN: protein crumbs homolog 1 n=1 Tax=Sorex araneus TaxID=42254 RepID=UPI0003314F11
+---DEYASAPCLNGGWYQ--EWLNQFSYFCDVGFAAEHCEAD---
+>UniRef100_UPI0010A515C2 protein crumbs homolog 1-like isoform X1 n=1 Tax=Denticeps clupeoides TaxID=299321 RepID=UPI0010A515C2
+----DQRCGDLGNATCT--PTSARDLACQCAEGPSARSpCLSQ---
+>UniRef100_W5MDC6 Crumbs cell polarity complex component 2b n=1 Tax=Lepisosteus oculatus TaxID=7918 RepID=W5MDC6_LEPOC
+-------KHKLLQRGSH--PCGYCCYLT-GLGlMFKG-GCSLL---
+>UniRef100_UPI001127F78E uncharacterized protein LOC115095510 isoform X2 n=2 Tax=Rhinatrema bivittatum TaxID=194408 RepID=UPI001127F78E
+-QI---------------LKNPNRASNLSCFKGYLGSQCQYVDL-
+>UniRef100_A0A0N4Y093 Slit homolog 1 protein (inferred by orthology to a C. elegans protein) n=1 Tax=Nippostrongylus brasiliensis TaxID=27835 RepID=A0A0N4Y093_NIPBR
+-------KNKCQNGAKC--VDLVGLKKVGSDTSKTPKIVAP----
+>UniRef100_A0A3Q0IWG0 protein slit-like n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0IWG0_DIACI
+-----AGNKMCEvhnkmfIGLHN--LKILSlssNeITCVMPGSF-DYLTTLHT--
+>UniRef100_A0A670ZEN6 Uncharacterized protein n=1 Tax=Pseudonaja textilis TaxID=8673 RepID=A0A670ZEN6_PSETE
+-----LNSFLLTQPKLC--LRLLS----------SGLFCEFSP--
+>UniRef100_W5KHT0 Slit homolog 2 (Drosophila) n=1 Tax=Astyanax mexicanus TaxID=7994 RepID=W5KHT0_ASTMX
+-----CLDNKCKNASAV--YRRGERLHVCVSEGYSGLFWVFSP--
+>MDTD01.2.fsa_nt_gb|MDTD01159187.1|_1 # 3 # 368 # 1 # ID=72284_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.432
+------AANVCGDDATC--VNTDGSFECLDASTTIDVlydsdsdiaGFQFNV--
+>UniRef100_A0A346FF47 Epidermal growth factor-like protein n=1 Tax=Vaccinia virus TaxID=10245 RepID=A0A346FF47_9POXV
+--CGPEGDGYCLH-GDCIHARDIDGMYCRCSDHKN----------
+>UniRef100_A0A3Q0IWG0 protein slit-like n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0IWG0_DIACI
+-----ACPSGCSCDGTR--VDCSQrglKEIPKDIPLYTtelilndneiGKIKSDgL---
+>UniRef100_B0LVF1 Heparan sulfate proteoglycan 2 domain V/endorepellin (Fragment) n=1 Tax=Danio rerio TaxID=7955 RepID=B0LVF1_DANRE
+-NCPTCKDRPCQNDGTCEDSV-ASLYKCTCKRGFTGSNCQHHS--
+>UniRef100_UPI000A2A9E2D neuropilin-2 n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI000A2A9E2D
+-----CETNPCGPIYECIPHIGSLNYTCVCSTYTDGlNSCSKD---
+>UniRef100_UPI00109BEBC1 coadhesin-like n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI00109BEBC1
+-----C-SKTCGGGSQ------TRTRTCTNPAPAYGgNSCSgssxesaqcntascpaSS---
+>UniRef100_UPI00155FF9A2 pro-neuregulin-3, membrane-bound isoform-like n=1 Tax=Acipenser ruthenus TaxID=7906 RepID=UPI00155FF9A2
+-PCRDKDLAYCLNEGECFVIETLTgsHKHCSCCGNSLVYWVPMV---
+>UniRef100_A7SK56 Predicted protein n=1 Tax=Nematostella vectensis TaxID=45351 RepID=A7SK56_NEMVE
+-----LK-NGREDAGEGEAFKYLGDLVKFLKKGredagegeafkYLGDLVK-----
+>UniRef100_A0A183EER4 Uncharacterized protein n=1 Tax=Gongylonema pulchrum TaxID=637853 RepID=A0A183EER4_9BILA
+-----CYRHSCSPGSLCV--AIPIEQREEYSLGYTSAvQCiQA----
+>UniRef100_A0A662YMH0 Neurogenic locus notch-like protein 2 n=1 Tax=Acipenser ruthenus TaxID=7906 RepID=A0A662YMH0_ACIRT
+-----CEtllsvilgaqtGMRVLDPALH--CETLLSVILGAQTGMRvldpALHCEtllsvilgaqtgmrvldpalhcvsplalTL---
+>ERR1719228_635465
+--------VICQNGGACY--DGIFSAECHVLPGLKEGFVSA----
+>ERR1719228_3003349
+--------FAYGEYGVCH--TSVFQVLGGCTG---CVLSIC----
+>UniRef100_UPI00094E263D basement membrane-specific heparan sulfate proteoglycan core protein isoform X4 n=1 Tax=Dendroctonus ponderosae TaxID=77166 RepID=UPI00094E263D
+-NCETCTENKCQHRGTCQEAL-TTEgYTCICSAMFSGPTCDKRK--
+>UniRef100_UPI000C8262D7 LOW QUALITY PROTEIN: basement membrane-specific heparan sulfate proteoglycan core protein n=1 Tax=Dasypus novemcinctus TaxID=9361 RepID=UPI000C8262D7
+-RCPTCGDEPCQVTLHPALPP-SCPSSYPWPGLAPGGRCEHSQ--
+>UniRef100_A0A226N3C8 Peptidase S1 domain-containing protein n=1 Tax=Callipepla squamata TaxID=9009 RepID=A0A226N3C8_CALSU
+-----ASVLNLTEGGFVRS--AKKRgk-KSHFRQGITGKALSYQ---
+>ERR1712228_234184
+----CERDNPCANGATCKHLKG-LTSSCACPDGWVAKNCDQK---
+>UniRef100_A0A182FIN4 Uncharacterized protein n=1 Tax=Anopheles albimanus TaxID=7167 RepID=A0A182FIN4_ANOAL
+-----CTVDV----DECA--EGSG-FHCSREPAVPCINLP-----
+>ETNmetMinimDraft_30_1059905.scaffolds.fasta_scaffold278435_1 # 4 # 315 # -1 # ID=278435_1;partial=00;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.337
+---------TDYDQDGC--KDDVED-EDECPIGFTGAGCTLN---
+>UniRef100_UPI0005F45C49 protein crumbs homolog 2 isoform X6 n=1 Tax=Cercocebus atys TaxID=9531 RepID=UPI0005F45C49
+---FRCWRWPCLQPVPA--------SSSSSWASFQGSWQPES---
+>UniRef100_A0A673WKH2 Uncharacterized protein n=1 Tax=Salmo trutta TaxID=8032 RepID=A0A673WKH2_SALTR
+----SSYLHLKLFQNNV--FSLISGLNIFFP---------SE---
+>UniRef100_A0A3Q0IV67 neural-cadherin n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0IV67_DIACI
+------QTNIpanvtvivkeipheaVIKSGSIRI-AGMSdedFIRVWNYKGHAPDVEIGR---
+>tr|Q4RV64|Q4RV64_TETNG Chromosome 15 SCAF14992, whole genome shotgun sequence OS=Tetraodon nigroviridis GN=GSTENG00028489001 PE=4 SV=1
+-----SYTRPHKHTRRyslipvrqmhT--LNRGPALLYFCHPFFFIFLQ------
+>UniRef100_UPI000CF007F4 LOW QUALITY PROTEIN: agrin-like n=1 Tax=Cimex lectularius TaxID=79782 RepID=UPI000CF007F4
+-PCTK---SACEGNQTC--FPLLSEYRCSCVAPTCSETG------
+>UniRef100_UPI001239B3DA agrin isoform X3 n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=UPI001239B3DA
+---EEFRED-TMNMIPT--APRKLPEMPVTTPRppVVATRARPA---
+>UniRef100_A0A2B4T1E8 Apple domain-containing protein n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4T1E8_STYPI
+------QTYPFDTYGDALQDKelVGHVFHSSVISNpvqcYM--LCKD----
+>UniRef100_UPI0003F05ABA neurogenic locus Notch protein-like n=1 Tax=Saccoglossus kowalevskii TaxID=10224 RepID=UPI0003F05ABA
+-------EELVIEQGEQV--TisspnypndYPNNLHCIWRVtnrdgrqlkvtpvemntecGYDMVNLGHG---
+>UniRef100_A0A2G8LNC3 Putative fibrillin-2-like n=1 Tax=Stichopus japonicus TaxID=307972 RepID=A0A2G8LNC3_STIJA
+-------LRASGDGIPAN-FDSKGHqvwitFISDSRNSLSGFSIEIM---
+>UniRef100_UPI00138FF95D adhesive plaque matrix protein 2 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FF95D
+-------CPDVEGSQLTLTEKG-------CVVGASNQKCP-----
+>UniRef100_UPI00148FC25C versican core protein-like n=1 Tax=Notolabrus celidotus TaxID=1203425 RepID=UPI00148FC25C
+-------------MGECRLFK--QplqpqdsqTSTTLIDDPLPSKAKEPilqsgD---
+>APLak6261669570_1056073.scaffolds.fasta_scaffold26044_1 # 3 # 467 # 1 # ID=26044_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.559
+-------AAACQAASASCALPSELSYTCDCIDDYVGDMCESC---
+>UniRef100_UPI0003314F11 LOW QUALITY PROTEIN: protein crumbs homolog 1 n=1 Tax=Sorex araneus TaxID=42254 RepID=UPI0003314F11
+----YYQSHPCANGATC--ISDANGSSSLCLENLTGKFSGH----
+>UniRef100_S4RDU5 Uncharacterized protein n=1 Tax=Petromyzon marinus TaxID=7757 RepID=S4RDU5_PETMA
+-------NFL-DFKRKT--VE--FNSTVVMAQLLTTTKTSQV---
+>UniRef100_A0A452V7A0 Uncharacterized protein n=1 Tax=Ursus maritimus TaxID=29073 RepID=A0A452V7A0_URSMA
+-----CSRAPlgGGRPGTC--QGQRG--ASASLGCPEGPHASRA---
+>ERR1719193_2971188
+-------RIPV---------TESAGISDCCAIGTKEEKKNNS---
+>UniRef100_A0A2T7NQ82 Uncharacterized protein n=1 Tax=Pomacea canaliculata TaxID=400727 RepID=A0A2T7NQ82_POMCA
+-----CAGEPCMNGGECV--AKRRctsvtvLWDSQTPtvktahtYAQCLVCCVAE---
+>UniRef100_A0A2I3SG43 Jagged canonical Notch ligand 2 n=1 Tax=Pan troglodytes TaxID=9598 RepID=A0A2I3SG43_PANTR
+-------WAQGLECGEVVD-HMPAGCLAAPPLLAPPPDIPRR---
+>UniRef100_A0A4W4GJP5 Delta-like protein n=1 Tax=Electrophorus electricus TaxID=8005 RepID=A0A4W4GJP5_ELEEL
+-------FCSVLfYSTLFLN-TGPDKYHCACPEGYSGENCERAD--
+>EndMetStandDraft_8_1072994.scaffolds.fasta_scaffold5807572_1 # 69 # 242 # -1 # ID=5807572_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.431
+----QNFKRGMALNWILVSfahAQTLHSLISNGMHKFTRLGRQKW---
+>GraSoiStandDraft_37_1057305.scaffolds.fasta_scaffold2189359_1 # 1 # 249 # 1 # ID=2189359_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.566
+------ANNPCDPDTFCQ--DGINSYQCYCLPDSNSTNCVNP---
+>LauGreDrversion4_2_1035121.scaffolds.fasta_scaffold5900716_1 # 1 # 168 # 1 # ID=5900716_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.375
+------SLSHCKHGGYGCS-RNSFGYGCICPYPWGEAFCDQP---
+>UniRef100_UPI0003EBFF0E sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1-like n=1 Tax=Neolamprologus brichardi TaxID=32507 RepID=UPI0003EBFF0E
+----SCPhlSLPKHGFLSC--SNSFGSYRVVCQVGCDrGYRLEGDS--
+>UniRef100_A0A6A5D3V4 Axon guidance protein n=2 Tax=Schistosoma haematobium TaxID=6185 RepID=A0A6A5D3V4_SCHHA
+--QQHDPRNDVNTSSLVNGNEN-LLYFQNAKIPKDQHNHQD----
+>tr|L5LMC9|L5LMC9_MYODS Coagulation factor IX OS=Myotis davidii GN=MDA_GLEAN10002826 PE=3 SV=1
+-----CPDHPSGAGGGG--EahkGDRGQQpllaptDSTKRlGPAPGAGCR-Y---
+>ERR550532_1370735
+--PTHTSeyeITSCETEdidkEYCtwrsgD--NNFTAPSCVCPVGYREDLRCVKDE-
+>UniRef100_UPI00106D72A0 uncharacterized protein LOC114523360 n=1 Tax=Dendronephthya gigantea TaxID=151771 RepID=UPI00106D72A0
+-FCKECLENANRANKDCIKF---Y-------NKIASSDQDLKH--
+>UniRef100_A0A0Q3MIN0 T-plasminogen activator n=1 Tax=Amazona aestiva TaxID=12930 RepID=A0A0Q3MIN0_AMAAE
+------TRDNLRFGCDVEITQDGRQtPMSAPAGGSNCDCSMPD---
+>UniRef100_A0A226NWI2 T-plasminogen activator (Fragment) n=1 Tax=Colinus virginianus TaxID=9014 RepID=A0A226NWI2_COLVI
+------SLKALVLSVSLREQLLIHLlYLQGLHTRYKRGARSRD---
+>UniRef100_A0A2B4RG16 Fibropellin-1 (Fragment) n=2 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4RG16_STYPI
+-----RISLAA------LKSTRSRDVTVVT----PSLSKKQN---
+>UniRef100_UPI0011AE7398 agrin n=1 Tax=Serinus canaria TaxID=9135 RepID=UPI0011AE7398
+-PKIGDI-----PGGMEII-PKSIPKLGISQMGWRLSQ--N--L-
+>UniRef100_G3USA9 Uncharacterized protein n=1 Tax=Meleagris gallopavo TaxID=9103 RepID=G3USA9_MELGA
+----SIKFSTVSGWGRLL--DGGATSTFLMrvdLPRVKTQECEK----
+>ERR1719350_2436907
+------KGHACENGGKC--VEGPFTVIDITFTNSEYEKCSKF---
+>ERR1712046_178839
+-ECTNPDSPICMNGGACFSYFRvtrgySNLEKCVCEAGFFGPHCEYKN--
+>UniRef100_A0A1S3GJQ5 sushi, nidogen and EGF-like domain-containing protein 1 n=1 Tax=Dipodomys ordii TaxID=10020 RepID=A0A1S3GJQ5_DIPOR
+-----VHHEEGESGTRVHHEE--GEPGTRVHHGEEGESGTHvhheegesgtrdtkgkresqacvctvgkresqarvctmkresrarvctvgkresrarvctigkresrarvctmkresrarvctvgkreTRP-
+>UniRef100_UPI0007B81E8A vitamin K-dependent protein Z-like isoform X2 n=2 Tax=Sinocyclocheilus rhinocerous TaxID=307959 RepID=UPI0007B81E8A
+-----THVNTAAHAGMGS--VVTHAHVrrCTAAPTVKLVNVMiY----
+>UniRef100_A0A091DVT9 Lactadherin n=1 Tax=Fukomys damarensis TaxID=885580 RepID=A0A091DVT9_FUKDA
+-----GRRIPSRPGSPC--RPDSVSFYCLCPEGFIGLLCNET---
+>UniRef100_A0A5N3WRP1 Uncharacterized protein (Fragment) n=1 Tax=Muntiacus muntjak TaxID=9888 RepID=A0A5N3WRP1_MUNMU
+-----PTGSYLYTFPLCTPQTHKHALVSKTPEGFPRFFYVRE---
+>UniRef100_A0A667YZP6 Lactadherin n=1 Tax=Myripristis murdjan TaxID=586833 RepID=A0A667YZP6_9TELE
+------------NNTTCLVAALCSG--TLSKNNSCPSLVLNP---
+>UniRef100_A0A2K6K420 Uncharacterized protein n=1 Tax=Rhinopithecus bieti TaxID=61621 RepID=A0A2K6K420_RHIBE
+----IPVPPPLLNGGSCSIPQDSQSTHCSCPRPSPAKTSGT----
+>ERR1712045_863427
+---PTTQATICKNGGIIIENArAPGGFLCNCPLEYDGTRCEKR---
+>ERR1712071_334931
+----ACASSPCRNGGQCMA-NGVGKYSCQCLSGYEDQVPSATS--
+>UniRef100_A0A060WMK6 Uncharacterized protein n=1 Tax=Oncorhynchus mykiss TaxID=8022 RepID=A0A060WMK6_ONCMY
+-----HSKGVSQNSGFLTALFRGRTTDLLTGERDTHTLCAQK---
+>ETNmetMinimDraft_29_1059903.scaffolds.fasta_scaffold90816_1 # 3 # 518 # -1 # ID=90816_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.467
+----ECEPNPCSSLFDC--EDKENSYECVVNIPKLMGVLA-----
+>UniRef100_A0A1S3G813 Neurogenic locus notch homolog protein 1 n=1 Tax=Dipodomys ordii TaxID=10020 RepID=A0A1S3G813_DIPOR
+-----VHGILFWEPGVC--GLRP-GPDTQCCPLPSGPNCQTN---
+>UniRef100_A0A3Q0J1R0 LOW QUALITY PROTEIN: neurogenic locus Notch protein n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0J1R0_DIACI
+-----CnpiydGRLLFSQLNFA--RDHDPGVWLIYKLQITGINCEIN---
+>UniRef100_A0A4U5UUM4 Neurogenic locus notch homolog protein 1 n=1 Tax=Collichthys lucidus TaxID=240159 RepID=A0A4U5UUM4_COLLU
+-----CESNPCMNGGTL--QGHDqrirlhlsHGLHCMFNKLFALTsgpNCQTN---
+>UniRef100_UPI000C8525D5 LOW QUALITY PROTEIN: neurogenic locus notch homolog protein 1 n=1 Tax=Dasypus novemcinctus TaxID=9361 RepID=UPI000C8525D5
+-----HEAASEPGGLLS--QGLTwgPGAPLPACPGP-GRRCHGR---
+>UniRef100_A0A6I9XN63 LOW QUALITY PROTEIN: sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1-like n=1 Tax=Pogonomyrmex barbatus TaxID=144034 RepID=A0A6I9XN63_9HYME
+-----CENLLCLNNGXCI--NRVHDHICECPSLLKTVLTVIE---
+>ERR1719360_202811
+-----SSINLHHSRGVCRS-NGYSSYTCDCPAGCTGKDCRTI---
+>SRR5438552_11131999
+--------SPLLQSVSFT--DVASAYQCTFPPYSTLFRSQS----
+>UniRef100_UPI0015AC5F8C adhesive plaque matrix protein 2-like n=1 Tax=Stegodyphus dumicola TaxID=202533 RepID=UPI0015AC5F8C
+------DIYPCVH-GTCVK-TAGKGVFCKCDENHKGISCDVQV--
+>UniRef100_A0A1D2MTE1 Uncharacterized protein n=1 Tax=Orchesella cincta TaxID=48709 RepID=A0A1D2MTE1_ORCCI
+------QS--AQSKSVVT--DGKwH------SVTFIGPDVYLDD--
+>UniRef100_UPI000B8FDEF4 protein crumbs-like n=1 Tax=Folsomia candida TaxID=158441 RepID=UPI000B8FDEF4
+------PfGNIVYDDKFAIsINSGGNMTYTTKPSEFPSSISHHSV--
+>tr|Q4SU99|Q4SU99_TETNG Chromosome 3 SCAF13974, whole genome shotgun sequence (Fragment) OS=Tetraodon nigroviridis GN=GSTENG00012561001 PE=3 SV=1
+-----CRLPV-RTEPPALA--TLRPTPANVHMVSTDTTATK----
+>tr|R0JB03|R0JB03_ANAPL Vitamin K-dependent protein C (Fragment) OS=Anas platyrhynchos GN=Anapl_07298 PE=3 SV=1
+-----CSCHPKSTVS-CCS--LEsrchFATSPSCDSGFPTSRASC----
+>HubBroStandDraft_6_1064221.scaffolds.fasta_scaffold7470941_1 # 2 # 100 # -1 # ID=7470941_1;partial=10;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.556
+-----CGSTPCSNGGAC--SQSLASS----GQTWVAATCTAS---
+>UniRef100_UPI0003314F11 LOW QUALITY PROTEIN: protein crumbs homolog 1 n=1 Tax=Sorex araneus TaxID=42254 RepID=UPI0003314F11
+------WHVSSGTTRT--------QRLCFYPAKYTGAQCETD---
+>UniRef100_UPI0007426E6A protein crumbs homolog 1-like n=1 Tax=Cyprinodon variegatus TaxID=28743 RepID=UPI0007426E6A
+--------PRGQQEEQS--MLGTNTNISSTLPP-K---GLVS---
+>UniRef100_UPI00099F572B protein crumbs homolog 1-like n=1 Tax=Oncorhynchus kisutch TaxID=8019 RepID=UPI00099F572B
+--------VKIPNRGFV--IVKDEPSTDPLIID-S---VDVG---
+>UniRef100_UPI0014718BF9 protein crumbs homolog 2-like n=1 Tax=Thalassophryne amazonica TaxID=390379 RepID=UPI0014718BF9
+-----VPFRLTRHISRS--CDWWRRVNCKCYEG---HNCETD---
+>UniRef100_A0A6L5CUI3 Uncharacterized protein n=1 Tax=Ephemera danica TaxID=1049336 RepID=A0A6L5CUI3_9INSE
+----VAHAKSTTERSFATAQE---------TTEDYAARLLNNV--
+>UniRef100_UPI000E6E18B7 cubilin-like n=1 Tax=Ctenocephalides felis TaxID=7515 RepID=UPI000E6E18B7
+----NSNSDDIKQRELTRFTR-----ELQNYMYFAPAARYLSG--
+>UPI000432FF3B status=active
+--------N----GLNSKKKWQVSKFNISsdTATIFLHAKL------
+>tr|A0A0F8CQZ4|A0A0F8CQZ4_LARCR Pro-neuregulin-3, membrane-bound isoform OS=Larimichthys crocea GN=EH28_07032 PE=4 SV=1
+-----KE-EEERRGGERM---TSKgaKEEGWCREGYQGIRCDQF---
+>ERR1719430_499878
+------MS------GSDLANMMKHGVRVVRGPDWKWSDSQDI---
+>ERR1712223_969696
+-------HNYCLNNDFAIS----PIPVCQVV--FVLKAI------
+>ERR1712218_61018
+-------------DFFNFL-AHCGATVCLYFFNNLGSRCNL----
+>UniRef100_A0A3Q2X9S7 Uncharacterized protein n=1 Tax=Hippocampus comes TaxID=109280 RepID=A0A3Q2X9S7_HIPCM
+------AVSywqytpFDRQGRTVNSR--WIDL----SFFSLLKRCEEV---
+>TergutCu122P1_1016479.scaffolds.fasta_scaffold126420_1 # 2 # 448 # -1 # ID=126420_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.662
+--CEHAASDVCSNGGSCH-VDSAGRSSCICTPDFKGVRCQEPV--
+>DEB0MinimDraft_4_1074332.scaffolds.fasta_scaffold1097243_1 # 2 # 205 # 1 # ID=1097243_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.373
+--CEMAGTLACDNGGTCR-VDSDGVSSCHCEAGYRGVQCKHRI--
+>ERR1719362_1027665
+-------FEI------KL--DMLEQKDFKQNEHIQ--NKLTKS--
+>ERR1719278_541312
+-------FEI------KL--NSLEQTAIQQNDTLV--DHENRV--
+>ERR1719336_1647421
+------WGRSCRWGGFR--TRRPSTWAGRCRRRCCCR--------
+>UniRef100_F1RQB2 Uncharacterized protein n=1 Tax=Sus scrofa TaxID=9823 RepID=F1RQB2_PIG
+----ECSQNPCLNGGKCTQTRG-AGKAGAEPCTYPRRLFGGL---
+>UniRef100_UPI0008546388 protocadherin Fat 2 n=1 Tax=Nanorana parkeri TaxID=125878 RepID=UPI0008546388
+----ACRHNPCPSEKMCAEMPD-GAYACLCHSPFPSPs-CVLG---
+>UniRef100_UPI00109FBA60 protocadherin Fat 2 isoform X1 n=1 Tax=Erpetoichthys calabaricus TaxID=27687 RepID=UPI00109FBA60
+----NCNITPCLKERKCTK-IS-G-LQCVCYPPYPATSHCE----
+>ERR1711942_352368
+-------RCQVNFSGKCFQIAT-GGEQCHCADGWMGQRCQDRI--
+>UniRef100_A0A6G1P9Z9 Neural-cadherin Cadherin-N n=1 Tax=Channa argus TaxID=215402 RepID=A0A6G1P9Z9_9TELE
+-----AINSCSHID-TCDF-NNPQDVNDSKGSHFRQTLLNVDS--
+>UniRef100_R7VGG3 Uncharacterized protein n=1 Tax=Capitella teleta TaxID=283909 RepID=R7VGG3_CAPTE
+-----CSIPICVNGWCALT-EDGDR-YCYCKPGWEGPICNMTG--
+>UniRef100_UPI00142583E7 neural-cadherin-like n=2 Tax=Anneissia japonica TaxID=1529436 RepID=UPI00142583E7
+-----CFGVICDGGYRCEV--NEAGKGVCVPNK--------DT--
+>ERR1719325_54461
+----YECVNFCLNGGVCKLDDGTAIPVCACAFGHYGLRCELDSF-
+>ERR1719397_233059
+---------WVKDERERDCYSTVleeyNTDVCACKTD----ACNSA---
+>ERR1711971_850793
+-----TAKSTPTIAPAILVrmEELASTLSVTTPASVRTALSEST---
+>UniRef100_A0A4W4HBJ6 Uncharacterized protein n=1 Tax=Electrophorus electricus TaxID=8005 RepID=A0A4W4HBJ6_ELEEL
+-----CGRRRCADGATA---SGPHGGVCLIGSFSFNFFSFLspprgSK--
+>UniRef100_H2PTC2 Uncharacterized protein n=1 Tax=Pongo abelii TaxID=9601 RepID=H2PTC2_PONAB
+-----SLNVTCLDGSPC--EGGSPAANCSCLEGLAGQRCQVPT--
+>UniRef100_UPI0009E1F4DC uncharacterized protein LOC110045346 n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E1F4DC
+-GCQSPTSPGCFNGGSCIADDKKQTFSCSCKLPWIGENCAKLD--
+>KBSMisStandDraft_5_1062788.scaffolds.fasta_scaffold2768674_1 # 1 # 468 # 1 # ID=2768674_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.605
+----RCGGLPAgqVNKVAC--PNRdldstlsgnmykiGQSISCSVSAKFTTSPNSSW---
+>UniRef100_A0A3Q2Q3B2 Uncharacterized protein n=1 Tax=Fundulus heteroclitus TaxID=8078 RepID=A0A3Q2Q3B2_FUNHE
+-----ALPAPVTSTPTPA--NVPPVSTAPTVTKVGATPVQT----
+>UniRef100_A0A673G4V9 Coagulation factor VII, like n=1 Tax=Sinocyclocheilus rhinocerous TaxID=307959 RepID=A0A673G4V9_9TELE
+-----SAQnnTQTSHHNTTI--YIMNIYSCLNPVVRPt----------
+>UniRef100_Q4SU99 Chromosome 3 SCAF13974, whole genome shotgun sequence (Fragment) n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=Q4SU99_TETNG
+-----RTEPPA---LATL--RPTPANVHMVSTDTTATKCVS----
+>UniRef100_UPI000BE1E521 protein crumbs-like n=1 Tax=Varroa destructor TaxID=109461 RepID=UPI000BE1E521
+------GSSSCFPNRTCETStTANSVENSTCRSGSTDPNIDN----
+>UniRef100_UPI000CDF93F0 protein crumbs homolog 1 n=1 Tax=Salvelinus alpinus TaxID=8036 RepID=UPI000CDF93F0
+------KSNPCLNGGYCRNLinnylsSTPSPSTAVLPLLLFLPPLPS----
+>UniRef100_W2TLX1 Uncharacterized protein n=1 Tax=Necator americanus TaxID=51031 RepID=W2TLX1_NECAM
+------DLDLALKYLIMTDHfgYETSTHECKCNRGYTGPQCST----
+>tr|M3XVL8|M3XVL8_MUSPF Uncharacterized protein OS=Mustela putorius furo PE=4 SV=1
+-----CDSSPCLHNTTST--EFMDKFKYLFPPGFIGSRYKIN---
+>ERR1712151_425596
+-------SNGQRkklaCDCVHG--DCIGGSKCKCSIGWSGSKCDQD---
+>ERR1719238_30683
+--------NPCEENEDCT--NNNGSFSCGCVAAWFVDNSVTC---
+>SRR4029434_595580
+--------CVCLECGWSVF-EVCVCLECVCESVCLGRSEEHTS--
+>UniRef100_A0A060VZ58 Delta-like protein n=1 Tax=Oncorhynchus mykiss TaxID=8022 RepID=A0A060VZ58_ONCMY
+-----GFCLPAHL--PT--WQFLLGFAQFLSWNLRCCLDPSH---
+>UniRef100_A0A2I3SG43 Jagged canonical Notch ligand 2 n=1 Tax=Pan troglodytes TaxID=9598 RepID=A0A2I3SG43_PANTR
+-----DSCLVSVGSGSG--QLARDGVQCPTAPPCLFHRRHEC---
+>UniRef100_A0A667YRX7 Delta-like protein n=1 Tax=Myripristis murdjan TaxID=586833 RepID=A0A667YRX7_9TELE
+-----REIYECRHLYYT--DSHFPSFSLWLPTLSLIAPVSFS---
+>UniRef100_A0A667Z4D3 Delta-like protein n=1 Tax=Myripristis murdjan TaxID=586833 RepID=A0A667Z4D3_9TELE
+-----LYYTDSHFPSFS--LWLPTLSLIAPVSFSSSRSRHVN---
+>UniRef100_A0A671TWW3 Delta-like protein n=1 Tax=Sparus aurata TaxID=8175 RepID=A0A671TWW3_SPAAU
+------------SKIAL--NLHPLNVFCTCKCHTLSLSPSLD---
+>UniRef100_A0A672MDC9 Delta-like protein n=1 Tax=Sinocyclocheilus grahami TaxID=75366 RepID=A0A672MDC9_SINGR
+-----GSHLLFSECMIC--VLLYDGFSFKFWEY-AAKYKQ-N---
+>ERR1712226_191202
+----ECHTNPCQNQGTALICQ--VDTHALVFQDSLEKVVKLIL--
+>UniRef100_A0A224X4I4 Putative neural cell adhesion molecule l1 (Fragment) n=1 Tax=Panstrongylus lignarius TaxID=156445 RepID=A0A224X4I4_9HEMI
+-LCDTCGDSRCRNGAICQETPNMRGYTCICPKGISGHDCERS---
+>UniRef100_A0A6J3C565 basement membrane-specific heparan sulfate proteoglycan core protein isoform X1 n=1 Tax=Galleria mellonella TaxID=7137 RepID=A0A6J3C565_GALME
+-YCDPCVPNLCANDGVCQEASNERGYICLCTPGFAGLNCNRT---
+>UniRef100_A0A061IMZ8 Neurocan core protein n=1 Tax=Cricetulus griseus TaxID=10029 RepID=A0A061IMZ8_CRIGR
+----STPEGPTLASWLL--TGSTSSTGVPS-PRNMGvDMAETT---
+>UniRef100_UPI000521C384 neurocan core protein n=1 Tax=Dryobates pubescens TaxID=118200 RepID=UPI000521C384
+----PADLLPRSSQSPA--QEHLTS-SPPAPPELGTvPSTAAE---
+>UniRef100_UPI000FD65472 neurocan core protein-like n=1 Tax=Corapipo altera TaxID=415028 RepID=UPI000FD65472
+----DEQLRPASSSPAA--TAQRGDLPGAApAPTAPGlgmdgGTPLPP---
+>UniRef100_A0A3M6TYN5 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6TYN5_9CNID
+------QEMQCLNGGTCFALRIgqSLSLSFWVY---------WRK--
+>UniRef100_A0A5J5DMX7 EGF-like domain-containing protein n=1 Tax=Etheostoma spectabile TaxID=54343 RepID=A0A5J5DMX7_9PERO
+------VPIICMDCQRCS--DTNLVPVGAVLQ--RQSLCLSD---
+>UniRef100_V3ZSM0 Uncharacterized protein n=1 Tax=Lottia gigantea TaxID=225164 RepID=V3ZSM0_LOTGI
+------METKAYLHPTIIV-IITLSYYLLLPLPV---RCQTE---
+>ERR1712226_529169
+-----LARADCASQTTT--TT-----TSTTTRPVTAPDFITD---
+>UniRef100_UPI0010FCA94D contactin-associated protein 1-like n=1 Tax=Acropora millepora TaxID=45264 RepID=UPI0010FCA94D
+----PFVNHSCYHENACVPDLRANSHRCeACQAGFVGNQYEWK---
+>ERR1719272_360081
+-----CASYPCASGATCV--DWFFCICVRLQ----LWLCWLQ---
+>SaaInlStandDraft_1057018.scaffolds.fasta_scaffold1446714_1 # 3 # 227 # 1 # ID=1446714_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.418
+-----CEGnHTCdrLHSNCRLH---gPANYTCECHAGYETTDvngqlvvpsltvntgdgaVCTE---
+>APWor3302396380_1045249.scaffolds.fasta_scaffold435157_1 # 129 # 200 # -1 # ID=435157_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.667
+-----SDEvifRPGktsaeislVIDNDTLH---ePN-------ETFSVTVstsdnvtvfstttvnltiIDND---
+>UniRef100_UPI00106A640C uncharacterized protein LOC114520094 isoform X1 n=1 Tax=Dendronephthya gigantea TaxID=151771 RepID=UPI00106A640C
+-----SSAER-SEEPSQ---ATPETLNASTITSPIKKEKKE----
+>UniRef100_UPI00106D79A6 uncharacterized protein LOC114522223 n=1 Tax=Dendronephthya gigantea TaxID=151771 RepID=UPI00106D79A6
+-----SKTHEvvtVTPTPTAhvltLIPSSIVLIQASSTVPYPMTSSAT----
+>tr|A0A1I8IZT6|A0A1I8IZT6_9PLAT Uncharacterized protein OS=Macrostomum lignano PE=4 SV=1
+--CDSANKTHCQNGGTCVINNFDGKPHCVCLIVSNETAENCVEF-
+>OM-RGC.v1.003204834 TARA_018_DCM_0.22-1.6_scaffold368359_1_gene406098	""	""
+------KPILVSREGPVMKFVTPIavRFNYTCPDDYTGQRCDKI---
+>UniRef100_UPI000B5404AF EGF-like and EMI domain-containing protein 1 n=1 Tax=Ictidomys tridecemlineatus TaxID=43179 RepID=UPI000B5404AF
+------AMGTHFNSRKCSD---GEVQNCQCSQGFHGPHCQYG---
+>UniRef100_A0A3N0ZAA5 Inactive serine protease PAMR1 n=1 Tax=Anabarilius grahami TaxID=495550 RepID=A0A3N0ZAA5_ANAGA
+-----SARSSSIPTASNL-MKwsntaprnpsgndyrswggrprrylleaSSQRLICSPSPwgckprplnsrfiakqctddrqlshSHAGTFSGTM---
+>UniRef100_UPI000873D172 inactive serine protease PAMR1 isoform X1 n=1 Tax=Lates calcarifer TaxID=8187 RepID=UPI000873D172
+-----AAPLLACMMGLAS-WTVLTLTTVPVWLATQARGVKMW---
+>SRR5882672_8744631
+----NSSQAQHhhaplcphvdcgakASNGVCD--EHCNVMSCNFDG----GECLK----
+>ERR1719478_220594
+----RHETETHVVHTAMPGVQE-AGFTCQCADGFSGDLCQVRK--
+>UniRef100_UPI0009535D30 protein delta homolog 1 n=1 Tax=Bos indicus TaxID=9915 RepID=UPI0009535D30
+----VMQPGSGGEIIQVGFLG--GLLEGRlgSPAWWLQ---APP---
+>SRR5512140_633776
+-------GVQCPDGEVC--VDGVGTYTCLVSGAVPVVAL------
+>UniRef100_A0A1D2NDP6 Agrin n=1 Tax=Orchesella cincta TaxID=48709 RepID=A0A1D2NDP6_ORCCI
+-----LTTTPMYVPNEPDEYqgirekshrngissfsS-LHNLTHFHPDSNNGKGHNHH---
+>UniRef100_A0A2D9T4L8 Uncharacterized protein (Fragment) n=1 Tax=Sandaracinus sp. TaxID=2024858 RepID=A0A2D9T4L8_9DELT
+--------PTCADIDECA--MDNGGcgdvayYACTNNEGGAPTCADI----
+>UniRef100_A0A1S3WFJ2 MAM and LDL-receptor class A domain-containing protein 1 n=1 Tax=Erinaceus europaeus TaxID=9365 RepID=A0A1S3WFJ2_ERIEU
+-SCSDCPAHVAQSAGTCVrI--QQVGPRCRCVQGWRGNRCHMQ---
+>UniRef100_UPI000787E75E LOW QUALITY PROTEIN: MAM and LDL-receptor class A domain-containing protein 1 n=1 Tax=Rousettus aegyptiacus TaxID=9407 RepID=UPI000787E75E
+-MTKQRDIGVTKETGVANsllrkwwnlyS--GENSPVCRCEQGWKGNXCHIK---
+>EndMetStandDraft_3_1072993.scaffolds.fasta_scaffold2763732_1 # 2 # 190 # 1 # ID=2763732_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.725
+-------Hvaplggtltlncsatgdlqpviswkkqggqlpvgrsqqingalvirslql-NDSGSYICVA--TIAGVLKRE----AVSNTKV----
+>UniRef100_A0A2B4RGH0 Uncharacterized protein n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4RGH0_STYPI
+-----ILTSAVLPSGSVMLMQIARTVMAPTAVLIKAEFLGME---
+>ERR1719336_1771644
+-------DNFCLSHSvACRVVD--GSPECFCPSGWSGTDVTCV---
+>ERR1719464_2562933
+-------HNLCLNDGESSSWT--VTPSVCVSWASSGTGVR-----
+>ERR1719323_724428
+-------PAHL-RTVpLRclQGGG--WLTRMLLPSGWSGDRCHL----
+>ERR1719367_2786279
+-------EDNNRAAEVGVILE--SQPECLCQPPYHGDRCHL----
+>ERR1711868_360578
+-------HNMCLHGGHCIILS--VMLHRMRLRPRIvRKRF------
+>UniRef100_A0A212C3M6 Gla domain-containing protein (Fragment) n=1 Tax=Cervus elaphus hippelaphus TaxID=46360 RepID=A0A212C3M6_CEREH
+-----ATHAPALRL-LCR--LR-----GRALPERLNEGTYSP---
+>UniRef100_W5PDE4 Gla domain-containing protein n=1 Tax=Ovis aries TaxID=9940 RepID=W5PDE4_SHEEP
+-----CASQPSLGHG-CE--TV-LSFITWCPFNVAGWVSFLA---
+>UniRef100_UPI000F54F5FF uromodulin-like n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=UPI000F54F5FF
+------TREACSSHGICSPIsLREKIHKCVCYPGYSGTNCEIDPV-
+>UniRef100_UPI000B98725D cubilin n=1 Tax=Nilaparvata lugens TaxID=108931 RepID=UPI000B98725D
+----DNTSIAVTGTGKRS--DVK-------ALKSRGAQCTIDV--
+>UniRef100_A0A226PFY3 Uncharacterized protein n=1 Tax=Colinus virginianus TaxID=9014 RepID=A0A226PFY3_COLVI
+-----TSLRLLKNFVITMEIHS-G--LLLPTTAYVKFNVHEAA--
+>ERR1719360_234872
+--------AP--CSEMC--IPVLDSYSCACPHHQGGGGSHAP---
+>UniRef100_UPI0007DB6EDE vitamin K-dependent protein C n=1 Tax=Anolis carolinensis TaxID=28377 RepID=UPI0007DB6EDE
+----ETMAEENLGSKNQTS--AQAFSVNFNQTTVQGRTEEEDVE-
+>ERR1719354_664232
+--ATSLTLQFVKMALL--VVILtkVHFIHVFCMPGFKGKHCEQKD--
+>ERR1719427_2459244
+--CHKYDPPVCKNHALCAYSNEPPFYSCLCTSGFTGTNCEIEI--
+>ERR1719354_334773
+--VMNSILPCVKMEELVHLEKKSPYYESLCRPGWNGRNCEIKT--
+>ERR1719457_64377
+--------PYSVMNNW-----HIVIISLKSCVCWNGKNCEIKT--
+>RhiMetdeSRZDD1v2_1073273.scaffolds.fasta_scaffold4040746_2 # 144 # 455 # 1 # ID=4040746_2;partial=01;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.619
+------DNGGCGHTATC--VNRENGFDCIDCPEQSHLAMaypNFA---
+>ERR1712141_478970
+------YGNYCKHDSICSIDSSTNSPKCDCTDYYYGDRCDQENF-
+>ERR1711976_239977
+------SSDYCGANGSCTING-NGDAVCICNTGYYGTLCDTTNP-
+>UniRef100_UPI000523C52E LOW QUALITY PROTEIN: slit homolog 1 protein-like n=1 Tax=Tauraco erythrolophus TaxID=121530 RepID=UPI000523C52E
+-KCNPCISSPCQRAGRAGH-NALAPSLLPLLPPLQGRDCEVA---
+>UniRef100_A0A672HHJ6 Uncharacterized protein n=1 Tax=Salarias fasciatus TaxID=181472 RepID=A0A672HHJ6_SALFA
+---ALFLATTAWRPwTLCT--GRQTAI-----MTWNALLQQLM---
+>UniRef100_A0A669FC66 Coagulation factor VII, like n=1 Tax=Oreochromis niloticus TaxID=8128 RepID=A0A669FC66_ORENI
+-----VNQifllsfNHFHKSDIIILT--L-LQKCQCLDGFEGRYCQTV---
+>UniRef100_W5Q9T5 Sushi, nidogen and EGF like domains 1 n=1 Tax=Ovis aries TaxID=9940 RepID=W5Q9T5_SHEEP
+----SGSPRP-------G--HGLRSFSRASCCSQAAARTAVw----
+>tr|A0A0S7J9R7|A0A0S7J9R7_9TELE PGBM (Fragment) OS=Poeciliopsis prolifica GN=PGBM PE=4 SV=1
+-TVppakiiharmedgvriqrPVCTSAPAPedsqaatasitrlyiatqrpvdpmllasTGRMVwattvaaiwASLE-RNAWKVSW---------------
+>ERR1719239_122940
+-KCSPCYKSPCLNSGFCILDNnsvnpGHADFRCECLPSFHGDRCQHE---
+>SRR4051794_11467109
+-------PNPCISSAPCV--LsgDAGLTSCLYHCNQTKV--------
+>ERR1719505_524376
+--------NPSKNDGICKEfQDTGAFSHCECKAPYVPPVCEG----
+>UniRef100_A0A4U5U7N7 Neural-cadherin Cadherin-N n=1 Tax=Collichthys lucidus TaxID=240159 RepID=A0A4U5U7N7_COLLU
+-TTKEYldekravCRTPMRRVCQC--MPVVFQTHisvCQCPAQFEGPECQQN---
+>UniRef100_A0A183AXV9 EGF-like domain-containing protein n=1 Tax=Echinostoma caproni TaxID=27848 RepID=A0A183AXV9_9TREM
+-NCTGRFENYCYNALKCVYISVLETAACYCRTGYTGVRCDMFNL-
+>UniRef100_C3ZPL3 Uncharacterized protein n=1 Tax=Branchiostoma floridae TaxID=7739 RepID=C3ZPL3_BRAFL
+----ECLVTNHGCENDC--ENTPGSYTCSCPEGFElkdDRRTCQD---
+>ERR1719424_1684529
+-------LT----PSHPHTLY-PPRYTCSCPSGTHGDHCQHT---
+>UniRef100_A0A3B4BV69 Uncharacterized protein n=1 Tax=Pygocentrus nattereri TaxID=42514 RepID=A0A3B4BV69_PYGNA
+-----ESEDSVSVNESKDAISidetkDSVSKGSSFPDTFEGKPAKD----
+>UniRef100_A0A3N0YBI1 Lactadherin n=1 Tax=Anabarilius grahami TaxID=495550 RepID=A0A3N0YBI1_ANAGA
+-----------QIHVYCSAHgEaytatVFTTPVTDNRA-YQPHGGTTD---
+>UniRef100_A0A3N0Z6Y7 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Anabarilius grahami TaxID=495550 RepID=A0A3N0Z6Y7_ANAGA
+--------SVCESKDTISIDEskDVASKSSDLPDVFEDKTEKNG---
+>UniRef100_A0A498L4U7 EGF-like repeat and discoidin I-like domain-containing 3 isoform X2 n=1 Tax=Labeo rohita TaxID=84645 RepID=A0A498L4U7_LABRO
+-----VVTVPVHRLMKVLPIEyvsfsQTVRSALSKASGWEE-RSVID---
+>UniRef100_A0A556U5B7 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Bagarius yarrelli TaxID=175774 RepID=A0A556U5B7_BAGYA
+--------DRPWQPAKSLYEQeeeeeKKREEVEDVKVDETVVEEEGY---
+>UniRef100_A0A6J2UU22 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Chanos chanos TaxID=29144 RepID=A0A6J2UU22_CHACN
+------TTADRSNGDGEEILSseseeRISVSESKETVSLDETKDVS----
+>UniRef100_UPI001402450B tissue-type plasminogen activator-like n=1 Tax=Amblyraja radiata TaxID=386614 RepID=UPI001402450B
+-------VLPLLLSLSIGT-eMSRWHY------GRKHTSSRAD---
+>UniRef100_UPI0014827778 hepatocyte growth factor activator n=1 Tax=Pantherophis guttatus TaxID=94885 RepID=UPI0014827778
+-------SDPCLpRGSRSCRRtFFSDTTVCVCSHLFSGRHCNMA---
+>UniRef100_A0A315VNX9 Uncharacterized protein (Fragment) n=1 Tax=Gambusia affinis TaxID=33528 RepID=A0A315VNX9_GAMAF
+-----GTLRQHGARGGR--KDSRE--------KKNRANPVR----
+>UniRef100_A0A6F9AKY1 Uncharacterized protein n=1 Tax=Coregonus sp. 'balchen' TaxID=861768 RepID=A0A6F9AKY1_9TELE
+-----SQLLWSFDAPAS--LPPPSLLLPLfqALQTVSMETTVG----
+>UniRef100_A0A3P8ZVF3 FAT atypical cadherin 1b n=1 Tax=Esox lucius TaxID=8010 RepID=A0A3P8ZVF3_ESOLU
+-----SLFGlecgfVVLKSHRA--LGMLMSACRRQRVPALTETKRS----
+>UniRef100_A0A671QED9 Uncharacterized protein n=1 Tax=Sinocyclocheilus anshuiensis TaxID=1608454 RepID=A0A671QED9_9TELE
+--CR---------VCVCVC-----ESVCVCFSHACLHLVSSDI--
+>UniRef100_L9JA46 Cubilin n=1 Tax=Tupaia chinensis TaxID=246437 RepID=L9JA46_TUPCH
+-----AGLIRVLTLATS---NIIELFYSLFD------LVPVG---
+>tr|R7VFM2|R7VFM2_CAPTE Uncharacterized protein (Fragment) OS=Capitella teleta GN=CAPTEDRAFT_130820 PE=4 SV=1
+--------NDCCDECECE--NTKGSYKCKCPPGQKLDADERS---
+>UniRef100_A0A0R3TXX6 Uncharacterized protein n=1 Tax=Rodentolepis nana TaxID=102285 RepID=A0A0R3TXX6_RODNA
+----ANRSAVCLHGGECVDSPNGVDFSLSVLIG------AVA---
+>tr|A0A1L8GFE3|A0A1L8GFE3_XENLA Uncharacterized protein OS=Xenopus laevis GN=XELAEV_18025007mg PE=4 SV=1
+-----FNNKGILQSPNEV--TTENKK----TPSTLAPICSIL---
+>tr|F6PWP4|F6PWP4_XENTR Uncharacterized protein OS=Xenopus tropicalis PE=4 SV=1
+-----CVTDTLAHHLT-------NQY----RFGYIGILCLHS---
+>UniRef100_UPI000C821DBA LOW QUALITY PROTEIN: delta-like protein 3 n=1 Tax=Dasypus novemcinctus TaxID=9361 RepID=UPI000C821DBA
+------ESPSCLLGPVAWGSDPP----LRSVAGWGGSSCPRA---
+>tr|A0A226N3C8|A0A226N3C8_CALSU Uncharacterized protein OS=Callipepla squamata GN=ASZ78_006709 PE=3 SV=1
+-----AEMGEPVYGTESDQ--NspasvlnltEGGFVRSakkRGKKSHFRQGITG---
+>UniRef100_A0A091W562 Fibulin-7 (Fragment) n=1 Tax=Opisthocomus hoazin TaxID=30419 RepID=A0A091W562_OPIHO
+----SPLWTSFPAGGTS--EPGKSPFPSAAHPC-SAVSCHPP---
+>UniRef100_A0A1L8GFE3 Sushi domain-containing protein n=1 Tax=Xenopus laevis TaxID=8355 RepID=A0A1L8GFE3_XENLA
+----NKGILQSPNEVTT--ENkkTPSTLAPICSIlIY---NSNSP---
+>tr|G3V2R7|G3V2R7_HUMAN Protein delta homolog 1 OS=Homo sapiens GN=DLK1 PE=4 SV=1
+----SPLFTSALRPYlpALAPTTS-SQSPVAGVPHFLIPahSVP-cI---
+>tr|W5LHF9|W5LHF9_ASTMX Delta-like protein OS=Astyanax mexicanus PE=4 SV=1
+-----CVSCECLVGAELI--YTfiKYIYKCIF--SLFSPVLQL----
+>AP48_1055490.scaffolds.fasta_scaffold187619_1 # 417 # 602 # -1 # ID=187619_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.339
+--------QTCSDRGQCVTLDEydlsKNKSTCICDQFSDDDFCQVNDA-
+>CoawatStandDraft_6_1074263.scaffolds.fasta_scaffold996217_1 # 71 # 229 # -1 # ID=996217_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.289
+----------IMNNTKWLIVDDdlhxx--SGIRICSKGFFGTXCDIPAS-
+>ADurb_Gly_02_Slu_FD_contig_31_1677492_length_352_multi_2_in_0_out_0_1 # 1 # 351 # -1 # ID=201892_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.558
+-------PDPYSN-GYGSLSSSemafAAHPVCTVPIGYYGNGCRLAKK-
+>UniRef100_A7RNK6 Predicted protein n=1 Tax=Nematostella vectensis TaxID=45351 RepID=A7RNK6_NEMVE
+-----SRDCECHHNAPCHY-AVSGEPICACPLGTYGRLCEHD---
+>UniRef100_A0A3L8S453 Receptor protein-tyrosine kinase (Fragment) n=1 Tax=Chloebia gouldiae TaxID=44316 RepID=A0A3L8S453_CHLGU
+--------LPAQTMVFVMK----ILGNASVLQVLWEKHVRKL---
+>UniRef100_F6UTL2 Receptor protein-tyrosine kinase n=1 Tax=Ornithorhynchus anatinus TaxID=9258 RepID=F6UTL2_ORNAN
+--------SVCLPFFICIN----PRTDTPFTPPGEMISFCVA---
+>UniRef100_UPI000FFB952B tyrosine-protein kinase receptor Tie-1 isoform X4 n=1 Tax=Chelonia mydas TaxID=8469 RepID=UPI000FFB952B
+--------RLCSALWISTD----FCFQPCSGMGPPQFPVGFA---
+>UniRef100_H2L335 Uncharacterized protein n=1 Tax=Oryzias latipes TaxID=8090 RepID=H2L335_ORYLA
+---------KSGISGFLE-----KQNVTKHkwLKVSFSFSCLQST--
+>UniRef100_UPI00077D51E0 slit homolog 1 protein-like n=1 Tax=Nothobranchius furzeri TaxID=105023 RepID=UPI00077D51E0
+-PINLVLHlflTRGPNNSLFFK-NTFLFYDC-----------------
+>ERR550514_775820
+----DPNSVPRT------------EYAGPVGTGWVGngyskLMCNVQG--
+>UniRef100_A0A4D5S2K8 Putative eyes shut (Fragment) n=1 Tax=Ixodes scapularis TaxID=6945 RepID=A0A4D5S2K8_IXOSC
+-----CADVDCQKEVVCSP--KDAKWFCRC-AGLAGSPCHAKT--
+>UniRef100_N6TWL0 Uncharacterized protein (Fragment) n=1 Tax=Dendroctonus ponderosae TaxID=77166 RepID=N6TWL0_DENPD
+-----VWRIHVKTELLALR--TKKTGNAIAE---MGQTCDISI--
+>UniRef100_UPI0011616C4B protein eyes shut n=1 Tax=Ixodes scapularis TaxID=6945 RepID=UPI0011616C4B
+-----CADVDCQQEYVCSP--KGAKWSCRC-TELAGSPCHAKT--
+>UniRef100_UPI00109B714D uncharacterized protein LOC110240462 n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI00109B714D
+----PPCNRTCKNGGICKHRDCAPGTICQCGKFNNKEQCDSW---
+>UniRef100_UPI0010FCBA93 uncharacterized protein LOC114956409 n=1 Tax=Acropora millepora TaxID=45264 RepID=UPI0010FCBA93
+----DINRVPlgsisdlaaesCKEIKTSEPQVtSGKf-WLStIKRGVAMQSYCDMK---
+>tr|H9J8Z0|H9J8Z0_BOMMO Uncharacterized protein OS=Bombyx mori PE=4 SV=1
+----QLQSSKF----SEY--KTFSHLLETLQKRYTGKSCEVQ---
+>UniRef100_C3ZK85 Uncharacterized protein n=1 Tax=Branchiostoma floridae TaxID=7739 RepID=C3ZK85_BRAFL
+----WCALVTCPFDWTCQ--DYGAHFTCLGRWT------------
+>UniRef100_A0A6J1NPJ3 LOW QUALITY PROTEIN: fat-like cadherin-related tumor suppressor homolog n=1 Tax=Bicyclus anynana TaxID=110368 RepID=A0A6J1NPJ3_BICAN
+------APLRRPVRVAAQPLPapasrcralGADAFECACQRALRGRRCELD---
+>UniRef100_UPI0008F9FBF6 delta-like protein 4 n=1 Tax=Cyprinus carpio TaxID=7962 RepID=UPI0008F9FBF6
+------DSSPCKNRGLCSR-QLTDSFSSPCPRELSawmhwhtaGRQLSPR---
+>UniRef100_A0A060Z324 Peptidase S1 domain-containing protein (Fragment) n=1 Tax=Oncorhynchus mykiss TaxID=8022 RepID=A0A060Z324_ONCMY
+---------DNRHTGLYIA--DELKAVIndLGPQKvFALVTDNVKVF-
+>UniRef100_UPI0011455B4D coagulation factor X-like isoform X2 n=1 Tax=Takifugu rubripes TaxID=31033 RepID=UPI0011455B4D
+---EPLSDKPLSERREVHG--GAGSvRVSLSPTIWR--------Q-
+>tr|G1SLN5|G1SLN5_RABIT Delta like non-canonical Notch ligand 2 OS=Oryctolagus cuniculus GN=DLK2 PE=4 SV=1
+------KTSPRRTCPFPLL-SSLGAVRGLCPAP--PRSCQELS--
+>tr|G3PF31|G3PF31_GASAC Delta-like 2 homolog (Drosophila) OS=Gasterosteus aculeatus PE=4 SV=1
+------------MGAACVM-EDSGRLhLCVCPRGSTAEDCQLKT--
+>UniRef100_UPI00071CE047 basement membrane-specific heparan sulfate proteoglycan core protein-like n=1 Tax=Calidris pugnax TaxID=198806 RepID=UPI00071CE047
+-SCPTCQDQPCQvrlGEGDAHSS-PPPSHLGDMGM-------------
+>ERR1711969_292468
+--------QTSRTGSLGV---RRKTAQCVCVFGWEGEHCEIEIL-
+>ERR1719402_2062083
+------GGELCLNSVRSS-RNGVHSYSCECVPPYTGTRCETN---
+>UniRef100_A0A1I7X7T4 Uncharacterized protein n=1 Tax=Heterorhabditis bacteriophora TaxID=37862 RepID=A0A1I7X7T4_HETBA
+----NVYWESVLNREQS--ALHflvltMAHVTILVVPsdvivqvaGMESGACEQE---
+>ERR1719506_924385
+-------SYAPMNGDKN--HQGkkvctiysstdfnqkwygkengqlkymqiacvksgNSDAKLADMATGPAGTCETNI--
+>UniRef100_A0A2P4WLU9 Uncharacterized protein (Fragment) n=1 Tax=Caenorhabditis remanei TaxID=31234 RepID=A0A2P4WLU9_CAERE
+-----STASATKGtlvlGGRCLFYK--NRSRCKCRGGYKGKFCERK---
+>UniRef100_UPI00158B1075 protein cueball n=1 Tax=Chelonus insularis TaxID=460826 RepID=UPI00158B1075
+-------SQTCFYNELFDI----INNKCQCEHSFNDLLCKKS---
+>ERR1719435_474501
+----DSDPERAI---------GVNRMNAPQMDgLMQGSNYLD----
+>UniRef100_G1KM89 Uncharacterized protein n=1 Tax=Anolis carolinensis TaxID=28377 RepID=G1KM89_ANOCA
+-----CPEQLKLSLNQCMP--LVFDiYFCilvcavcfeislcLCVSSVTDTVESHL---
+>UniRef100_UPI001403C01D LOW QUALITY PROTEIN: vasorin-like n=1 Tax=Tyto alba alba TaxID=507980 RepID=UPI001403C01D
+-------PQsTCLNGGhVAH-LGAQEASHGVpCPLGSPGAYCERG---
+>ERR1712166_386498
+-------TVFVPTEVLV---RTVSEVLLV-LVRLDGAE--PS---
+>ERR1719234_3023641
+-------GH-CPAGTECV--DGANSFTCICPDEGCTSAANQQ---
+>ERR550519_3142590
+-------TASVCVNGDCE--NLEGSYNCHCLPGWMEQDCSLD---
+>ADurb_Leu_01_Slu_FD_contig_21_1094746_length_409_multi_4_in_0_out_0_1 # 2 # 409 # -1 # ID=84276_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.468
+-----CVSFPCGVDNEC--TDEINGYTCTCTTGYTPGYLMSNEL-
+>tr|D3GE88|D3GE88_DANRE Plasminogen activator, urokinase a OS=Danio rerio GN=plaua PE=2 SV=1
+--------MKCILGGFLLTCVLC-----W-TEAIIGEMDErwkssStsV---
+>UniRef100_A0A158RCU1 Uncharacterized protein n=1 Tax=Thelazia callipaeda TaxID=103827 RepID=A0A158RCU1_THECL
+-----STKTAEVSDvyALRDLKDYFVNWKKFAPKNVATM--------
+>ERR1719197_295268
+--CSATdPDLFCVNGGDCNPNYSNDGIPCMCPDGWEGFHCEFKT--
+>tr|I3JHB0|I3JHB0_ORENI von Willebrand factor D and EGF domains OS=Oreochromis niloticus GN=LOC100690390 PE=4 SV=1
+---------YGFDFFKCVLVN--GVAKCICPSSWAGSKCQEA---
+>ERR1712232_206788
+-------SGLNSTNSTPHsNYTAGVDYWCDCLPGWRGPLCEVN---
+>UniRef100_A0A261ADV5 Uncharacterized protein (Fragment) n=1 Tax=Caenorhabditis remanei TaxID=31234 RepID=A0A261ADV5_CAERE
+--CVDACEGFCLNGGSCLK-TGRGETKCICRNGFVGRRWFGQH--
+>UniRef100_A0A4W5K1N3 Meprin A subunit n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5K1N3_9TELE
+----PCNPDPCLNGGVCVvEKH--GKATCRKDNKsrkkREELTRARKS--
+>UniRef100_A0A5G2QYN6 Meprin A subunit n=1 Tax=Sus scrofa TaxID=9823 RepID=A0A5G2QYN6_PIG
+----PCDPNPCQNEGICVNVK--GMASCRyaPWPAggrsESAARGLLMR--
+>2_EtaG_2_1085320.scaffolds.fasta_scaffold318099_1 # 1 # 417 # 1 # ID=318099_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.547
+-----CYFFLTLFESLALSSKLLK--LCKIFVVFTSFSqliqtrglsynhllax-------
+>ERR1712110_1039764
+------RTEVCVS-----WCW--GTLPVPVGPALVEAGVRLP---
+>ERR1719330_1791668
+------VGDFSLCGGSLQP-G--ILPVSMYVRLLSERRCEIA---
+>UniRef100_F1QB17 Netrin g2a (Fragment) n=1 Tax=Danio rerio TaxID=7955 RepID=F1QB17_DANRE
+------TSSSCVRMAAPAF-----RIRSVCVRPTSGVFCVSSR--
+>tr|A7SJC6|A7SJC6_NEMVE Predicted protein OS=Nematostella vectensis GN=v1g213160 PE=4 SV=1
+-------QNPEFepragwvYSRLRT--TQFNRLLSNCTDCYNGATCKVN---
+>KBSSwiStaDraftv2_1062776.scaffolds.fasta_scaffold5655535_1 # 2 # 364 # 1 # ID=5655535_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.653
+--------LLSFAPGS-----VKYNILIYCLLIFSILSFKTD---
+>UniRef100_A0A183VNW5 Uncharacterized protein n=1 Tax=Trichobilharzia regenti TaxID=157069 RepID=A0A183VNW5_TRIRE
+-PCIYDNVSICFNGGTCLTTSDGDGILCLCPTGFTGPQCKVRF--
+>AmaraimetaFIIA10_FD_contig_31_281314_length_231_multi_3_in_0_out_0_1 # 1 # 231 # -1 # ID=262392_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.632
+-----SS---LSASLKCIFIIPFLL-GKLLSSKSRKTCDHF----
+>GWRWMinimDraft_1066009.scaffolds.fasta_scaffold61848_1 # 2 # 196 # 1 # ID=61848_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.456
+-----TP---MTASLKCIFIFFFFFLTSYYLQGLDRHWIKL----
+>UPI0007BE174A status=active
+-----IL---LVNSSKYILINENDLVNCHLQ-RQQRHEIKR----
+>AntAceMinimDraft_9_1070365.scaffolds.fasta_scaffold1142403_1 # 2 # 232 # 1 # ID=1142403_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.459
+-----KLLLH----SSCYTDEINCSCCCCCLGVVVI----LL---
+>UniRef100_UPI0004F0B6AF probetacellulin isoform X3 n=1 Tax=Callithrix jacchus TaxID=9483 RepID=UPI0004F0B6AF
+-RCPKQYKHYCIK-GRCRFVVAEQTPSCVPLRKHRKRKRKEEEM-
+>UniRef100_A0A3S3P9V1 Uncharacterized protein n=1 Tax=Dinothrombium tinctorium TaxID=1965070 RepID=A0A3S3P9V1_9ACAR
+-KCNPLHTiNDCLNQGFCRYFRGSTVTTCKCNGMYEGEKCERPKL-
+>ERR1712178_371381
+----ECQELTHNYGgnSTCT--DLPGSFKCTCLDGFDSNDDGTV---
+>ERR1711871_953603
+----PCALGEDQCSthSECfH--DAPGVYHCECHPGYSSDSGVRQ---
+>ERR1711965_1082414
+----PCALSEDHCSfhSECfH--DAPGVYHCECHPGYSSDIAVRQ---
+>ERR1711953_347859
+-------R---TKGNpsYC--IEQCQ-NEATCVaalMDRSGNACFL----
+>ERR1711899_420042
+--------TDLAETeqrATildkenilaLVN-QGGKDKIV--R--F-GSQMNASI--
+>ERR1712223_1479973
+---------VILDGVDCFA-TKISTIAQITDLAETEQRATILD--
+>ERR1719273_908265
+----------WQKD-SNNE-EGDYCNKAVCAPGCPGKNCEIRI--
+>ERR1719383_1267216
+----PEFAVDCANGGKCVDGIRPSDVTCKCPGDFYGARCELE---
+>UniRef100_A0A6G1S655 Neural-cadherin n=1 Tax=Aceria tosichella TaxID=561515 RepID=A0A6G1S655_9ACAR
+------WSLSCGSNGICNNVDYGGGFYCECPVPQTSEYKtctnctcdqLVI---
+>UniRef100_V3ZVB6 Uncharacterized protein n=1 Tax=Lottia gigantea TaxID=225164 RepID=V3ZVB6_LOTGI
+------LIPFCETDPCISGRC-N-VDKCECFEGWDGKFCEKR---
+>UniRef100_A0A226E1D1 Agrin n=1 Tax=Folsomia candida TaxID=158441 RepID=A0A226E1D1_FOLCA
+-----CPLISRSGRLTTTPIYVPAGaggeedeeeqagdeitgksrhksYknrnHiednsdngfaISNSVAANGEENFPK---
+>UniRef100_UPI00077B9942 agrin isoform X1 n=1 Tax=Tetranychus urticae TaxID=32264 RepID=UPI00077B9942
+-----CHSLSCQSPADEPSPPDDDN-S--VDGGFHRHDHQH----
+>tr|G3N3S9|G3N3S9_BOVIN Sushi, nidogen and EGF like domains 1 OS=Bos taurus GN=SNED1 PE=4 SV=1
+------SPGLLTPLGPC--WGHFGHWGWSQSPGFRGLvHCPAA---
+>tr|A0A0S7EKR9|A0A0S7EKR9_9TELE SLIT1 (Fragment) OS=Poeciliopsis prolifica GN=SLIT1 PE=4 SV=1
+-KCTPCVSSLARTREPAKS-TNPA-VHLRLQVGFYG---------
+>tr|A0A1U7THQ5|A0A1U7THQ5_TARSY slit homolog 1 protein-like OS=Tarsius syrichta GN=LOC103260100 PE=4 SV=1
+-VPEALLSAGRRLSGRLGPAlfaggtaagghggqgARLRP-FAGSEAASEGRDCEVS---
+>UniRef100_UPI0008FAAEEE LOW QUALITY PROTEIN: protein jagged-1a-like n=1 Tax=Cyprinus carpio TaxID=7962 RepID=UPI0008FAAEEE
+-----------MTQSSCFP-AVIDSCTVAVASNSTPGGMRL----
+>ERR1719189_3342847
+-----LLLRPLRQRRHPSPYGGYQKFTCSCPLGFQGKRCELDI--
+>tr|W5MDX8|W5MDX8_LEPOC Sushi, nidogen and EGF-like domains 1 OS=Lepisosteus oculatus PE=4 SV=1
+-----CSSYPCCIFPQQS--PTA-------VKLNHGRTAQLN---
+>PorBlaMBantryBay_2_1084458.scaffolds.fasta_scaffold435255_1 # 3 # 305 # 1 # ID=435255_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.459
+-----CVGDphcstfdglfPLNYQGTCE--YLLAGVVSSPSSGVLAFQVYAQ---
+>tr|A0A182UFP0|A0A182UFP0_9DIPT Uncharacterized protein OS=Anopheles melas PE=4 SV=1
+-----SGVAYYQRGAMQRHNAM-QkdiRVSSRATRGGTGHQHRS----
+>ERR1711970_1713303
+---------cveyrgtksttktgktcrnwsektelynPEKNPEA----DLIG-NLCRNPNNWTNA-wCYTtdgswdncdipkckdMD--
+>UniRef100_T1IRS6 Uncharacterized protein n=1 Tax=Strigamia maritima TaxID=126957 RepID=T1IRS6_STRMM
+-HCDPwKNVTLCERGHQCRFVVFFFNLFT--------VLSTIGD--
+>UniRef100_A0A553R800 Uncharacterized protein n=1 Tax=Danionella translucida TaxID=623744 RepID=A0A553R800_9TELE
+----PCVETPCANGGTCR--ANRDEYDCDYFIHNTskpflsffysllcsrcaecGNYCLN----
+>UniRef100_UPI00077B2447 neurogenic locus notch homolog protein 1-like n=1 Tax=Acropora digitifera TaxID=70779 RepID=UPI00077B2447
+-------L-RVLVSEVC--V-LQRRIRLFVNAPVSSLVASA----
+>ERR1719409_1715986
+-------------WGFEEGHLDESTIPVAAPNGFSAQIICQ----
+>UniRef100_Q4RQ96 Chromosome 17 SCAF15006, whole genome shotgun sequence (Fragment) n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=Q4RQ96_TETNG
+-----ACQRPVFMAAVKM--ESFPTLACVKLD---GRAADVK---
+>UniRef100_A0A6F9DE61 Basement membrane-specific heparan sulfate proteoglycan core protein-like n=1 Tax=Phallusia mammillata TaxID=59560 RepID=A0A6F9DE61_9ASCI
+-----AE--NNDILSDMQPSGM---F--LARSRPSA-R--FV---
+>UniRef100_UPI00033150C8 LOW QUALITY PROTEIN: basement membrane-specific heparan sulfate proteoglycan core protein n=1 Tax=Sorex araneus TaxID=42254 RepID=UPI00033150C8
+-----QEPAQGX-GLGLLPWGK-PAWGSLHRTHTPGDLCEHE---
+>UniRef100_A0A383ZY86 proepiregulin isoform X2 n=1 Tax=Balaenoptera acutorostrata scammoni TaxID=310752 RepID=A0A383ZY86_BALAS
+-QCSSDMSGYCFH-GQCIYLVDMSENHCRYRNRKSKEPKKEY---
+>SRR5258707_1623904
+-------PDPCHHRGAT--ANRIANYRCPCPIGYHVPHGQS----
+>ERR550534_1044289
+----PCDKLHSTGCKAV--GNEMSDYKCDCRTGYKGANCSTEI--
+>tr|W5PDE4|W5PDE4_SHEEP Uncharacterized protein OS=Ovis aries PE=3 SV=1
+-------StdefwktymggspcasQPSLGHGCE----TVLSFITWCPFNVAGWVSFLA---
+>UniRef100_A0A6G1R0M2 Protein eyes shut-like protein Epidermal growth factor-like protein 10 n=1 Tax=Channa argus TaxID=215402 RepID=A0A6G1R0M2_9TELE
+-------------RKEV--IDLKEVGVKLTPMSAAQTHAKTR---
+>tr|H2UJ44|H2UJ44_TAKRU Plasminogen activator, urokinase a OS=Takifugu rubripes GN=LOC101068458 PE=3 SV=1
+----------------QMKLLvILVIFVAFCSDVV-SRNLEdiTSS--
+>ERR1719431_1337701
+--------RKR-NGDWlvkCRKFTKRPLMKKKCD-SYQHYYCLISD--
+>tr|U4UG97|U4UG97_DENPD Uncharacterized protein (Fragment) OS=Dendroctonus ponderosae GN=D910_09379 PE=4 SV=1
+-----CNSNPCRNGATC--TDGINSTFGPMWNGFFGAVAINR---
+>tr|A0A2G8LP71|A0A2G8LP71_STIJA Putative neurogenic locus notch-like protein 1 isoform X2 OS=Stichopus japonicus GN=BSL78_01052 PE=4 SV=1
+-----CNPSPCVDGATC--TRTGVdSFSCKCPPNYVVGATCER---
+>ERR1719454_621342
+-------SRTRASTVVC--AWTAwAPTCAHAPPATPARTARPSS--
+>ERR1712051_795684
+-------SYSMWNSLP--LPF-vCEIHKLKCPPKFLKKHTHPKR--
+>ERR1719210_619131
+-----CDNNQCITANTLFCEDRVNGYICQCNDDFYGDFCEIP---
+>ERR1719265_596969
+--------KTnsaneCHkentlncknvdaNLDDDDDTNDSPSYSCTCKTGWSGDHC------
+>SRR3954467_2215912
+--------NTCGAHGTCNA-IDSSTYSCTCDAGYDSSTLTCD---
+>UniRef100_A0A1I7YKU4 EGF-like domain-containing protein n=1 Tax=Steinernema glaseri TaxID=37863 RepID=A0A1I7YKU4_9BILA
+------MTDPCLNGGILLYNRKLEFHYCGCFQGYVGPLCNV----
+>ERR1712178_393896
+-PCINTDVNPCHNNAVCVTTPEdAPFYECQCLDGFVGTFCELES--
+>ERR1712176_130410
+------EPSFCSMVGVCFYEYlDTSVWKCICPTGYHGEHCQHKY--
+>tr|H2T134|H2T134_TAKRU Delta/notch-like EGF repeat containing OS=Takifugu rubripes PE=4 SV=1
+----ACHSRPCSHNGTCTDIKQgvdGRNFTCTCPPGVFCMGTSVCL--
+>SRR4029079_10296983
+-----CAAAKCSSHAHC--VDGVASYVCACNPGFTGPSCDLARLE
+>ERR1719230_1174383
+-----CQnPNVCGENEQCKN--VKAGFICVCRPGYRKGPKGvcID---
+>ERR1719259_811756
+-----KEVPVCGNFSTCER--VGSGHTCKCITGYNKDETNicRN---
+>ERR1740139_6573
+---------LPVSDGRglppCIHDpvhtalvleecrQGLpCPATLYCPEGFSGEHCEYSDT-
+>ERR1740139_620125
+-----SLHIMLAQHSGITIFanTVHEVLSCFIEKR------------
+>UniRef100_UPI000C77BE83 pikachurin-like n=1 Tax=Eurytemora affinis TaxID=88015 RepID=UPI000C77BE83
+------SnsmcgQGTCRDQSSPFSSNPANqsRQGCDCPLGSSGDRCQRQ---
+>UniRef100_G1LRK7 CFC domain-containing protein n=1 Tax=Ailuropoda melanoleuca TaxID=9646 RepID=G1LRK7_AILME
+-------KTCHLNGGTFIF-----WSFSACPPSFYGWNCECD---
+>UniRef100_A0A3L8SQH2 Uncharacterized protein n=1 Tax=Chloebia gouldiae TaxID=44316 RepID=A0A3L8SQH2_CHLGU
+---PCGWERRGSLPGLL--AHRLPHSRLHSLVLH-----------
+>UniRef100_UPI000C047A19 adhesive plaque matrix protein 2-like n=1 Tax=Stylophora pistillata TaxID=50429 RepID=UPI000C047A19
+---PVSSCNTCPLNAVC--VEGE----CACISGFyfIDNTCQKI---
+>SRR6476660_9852840
+-----CAVNSCHPDAIC--VDAVNSYTCTCATSCDDQNPCTAD--
+>CryGeyDrversion2_3_1046612.scaffolds.fasta_scaffold41392_1 # 287 # 499 # -1 # ID=41392_1;partial=00;start_type=ATG;rbs_motif=AGGAGG;rbs_spacer=5-10bp;gc_cont=0.324
+----ECDGFSCSGHGNC--TDYIDAYGCTCEKGWRGNKTVTL---
+>tr|W5MJS7|W5MJS7_LEPOC Notch 3 OS=Lepisosteus oculatus PE=4 SV=1
+--------HPRLWSvipfPFSH--LIVCVSFLAPRPGFTGSTCQI----
+>UniRef100_A0A5N3WRP1 Uncharacterized protein (Fragment) n=1 Tax=Muntiacus muntjak TaxID=9888 RepID=A0A5N3WRP1_MUNMU
+-------EEPGIESGLCHVS-KiseagkGTTYMKDSGFPLT------cktrvksmrcavlshfshrsqrsN---
+>tr|W5P0Y6|W5P0Y6_SHEEP Notch 1 OS=Ovis aries GN=NOTCH1 PE=4 SV=1
+--------GPGQVGGLAGGGGpgSWCPAVCPRPrPPRRATRCAL----
+>tr|A0A146WI22|A0A146WI22_FUNHE Neurogenic locus notch protein 1 OS=Fundulus heteroclitus PE=4 SV=1
+--------DHVNMEGYARRQRTIRASPasaLKDGKARRvxxxxxxXXXCEF----
+>SRR5688572_958596
+--------AHCVGAVTCNPADGSQSRCQLCAAGYQGTICNV----
+>tr|J9PA37|J9PA37_CANLF Notch 4 OS=Canis lupus familiaris GN=NOTCH4 PE=4 SV=1
+-----------EDNCTCHHG-HCQRSSCVCDVGWTGPACEA----
+>tr|A0A1D5RH83|A0A1D5RH83_MACMU Sushi, nidogen and EGF like domains 1 OS=Macaca mulatta GN=SNED1 PE=4 SV=1
+-------PGFGLERGSCL--WPGTTLPTLPAWPLVTAVVLAG---
+>KBSMisStandDraft_5_1062788.scaffolds.fasta_scaffold2768674_1 # 1 # 468 # 1 # ID=2768674_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.605
+----ACDPSKHIITiTPTI--PVRRTHRGLPKITFYTPpEVEVL---
+>UniRef100_UPI00123AED9E protocadherin Fat 1 isoform X1 n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=UPI00123AED9E
+----NCLDAECEG---IPTI--TSGFPMRLIIIIIGVL-------
+>UniRef100_W4ZGP8 Uncharacterized protein n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=W4ZGP8_STRPU
+----ECEGIPTITSGFPMRLIiiIIGVLVAIIIiVFILAAC-------
+>tr|V4AJ71|V4AJ71_LOTGI Delta-like protein (Fragment) OS=Lottia gigantea GN=LOTGIDRAFT_71205 PE=4 SV=1
+----DCMSNPCLKGALC--N--ISKYNHLFCTAWYRFdikvtFYSSD---
+>tr|A0A0L7LP21|A0A0L7LP21_9NEOP Delta-like protein OS=Operophtera brumata GN=OBRU01_04500 PE=4 SV=1
+----PAPPRCACDPGYT--GmlcdereyeyltyychcappgwqgKNCtqraapAPPRCACDPGYTGVLCDER---
+>UniRef100_UPI0003F07656 sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1-like n=1 Tax=Saccoglossus kowalevskii TaxID=10224 RepID=UPI0003F07656
+--------PPRLRNGNyhgmeytfgnslhyyCH-----PGYtiqgsplqHCAANGQWNGTTPQCvP---
+>UniRef100_J9E9X2 EGF-like domain-containing protein n=1 Tax=Wuchereria bancrofti TaxID=6293 RepID=J9E9X2_WUCBA
+-------MNYAIIEAHVL--AIKIRTFCICRLGYTGMHCENS---
+>GraSoiStandDraft_10_1057309.scaffolds.fasta_scaffold4390685_2 # 86 # 238 # 1 # ID=4390685_2;partial=01;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.497
+-------EAFCVNSGTCKDSVGIAqgY---VVSLSFWcLLRCFFLN--
+>GraSoiStandDraft_46_1057282.scaffolds.fasta_scaffold2393170_1 # 176 # 328 # 1 # ID=2393170_1;partial=01;start_type=GTG;rbs_motif=GGA/GAG/AGG;rbs_spacer=5-10bp;gc_cont=0.471
+-----PASSPKTNGPTL--MPTPSVEPahtkdkeLTTKPTMVTRE-------
+>SaaInl4_100m_RNA_FD_contig_51_856457_length_274_multi_1_in_0_out_0_1 # 1 # 273 # 1 # ID=357091_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.590
+----RSTASTTTTTTTttttttpaptttqP--PSKLVQYTVATAVGYYF---------
+>ERR1719354_276173
+------VEQKCENGSGCIAHNYWPYYSCACLEGYHGKYCQYKGS-
+>ERR1719383_1497007
+-----ARRILAKTAPSAR--IWSMTIIATVPRALTAKTVKSM---
+>UniRef100_C3YMB6 Uncharacterized protein (Fragment) n=1 Tax=Branchiostoma floridae TaxID=7739 RepID=C3YMB6_BRAFL
+------AVNNGNCSQMCV--DTEGSFYCRCLAGYylasDGKTC-IN---
+>ERR1719167_1197836
+-PCNNQPTTPCLNGGRCNNKNCngdyCSDYTCSCPLYYYGKNCQNSEF-
+>UniRef100_H2ZYW6 Uncharacterized protein n=1 Tax=Latimeria chalumnae TaxID=7897 RepID=H2ZYW6_LATCH
+--------KVCNMGNCISD--SSDNFTCSCPPLWVGSKCELS---
+>ERR1719458_1117962
+------NSSPSQLPVHLP-GRIqeLSVRDASVERVQQL---------
+>ERR1719507_2155778
+------NSPPCRTDPMHT-DALVEKDTLALTVT------------
+>UniRef100_A0A2U3XJ94 pro-neuregulin-2, membrane-bound isoform-like n=1 Tax=Leptonychotes weddellii TaxID=9713 RepID=A0A2U3XJ94_LEPWE
+-ASDDDADGALAAESTPFL-------------GLRGAHDAL----
+>UniRef100_A0A5N3WKT6 Uncharacterized protein n=1 Tax=Muntiacus muntjak TaxID=9888 RepID=A0A5N3WKT6_MUNMU
+-KIGKLAPGDCHDGLILSNCGCIVTLFSHQS-GFLGQEPYL----
+>ERR1719461_1892592
+--------IPAG-VPVCTS--VPE--STFPWLFWTGATCGED---
+>UniRef100_A0A1I8IWP5 Uncharacterized protein n=1 Tax=Macrostomum lignano TaxID=282301 RepID=A0A1I8IWP5_9PLAT
+---------KKVDQETPPLL-INYNNRCRCKIGFSGTHCETN---
+>UniRef100_S4RDU5 Uncharacterized protein n=1 Tax=Petromyzon marinus TaxID=7757 RepID=S4RDU5_PETMA
+-----CVSSPCQNAGTCHVREdgDDSGFQLYRRPDVRAGNCQIN---
+>UniRef100_UPI000C76BB7C protein slit-like n=1 Tax=Eurytemora affinis TaxID=88015 RepID=UPI000C76BB7C
+-----TVLVDMKEGFVRKVLMnvkTTNIFRCNCTSGYEGRVCEKS---
+>UniRef100_UPI001140DFD0 protein slit-like n=1 Tax=Octopus vulgaris TaxID=6645 RepID=UPI001140DFD0
+-----CCNEKSRPNPVC--L-YEAK--CHCPRGFNGYRCESN---
+>ERR1711964_522470
+-----CQPGFCTNGGTCMENVECRLFTCECSTASND-FCEPFF--
+>UniRef100_A0A3B4BV69 Uncharacterized protein n=1 Tax=Pygocentrus nattereri TaxID=42514 RepID=A0A3B4BV69_PYGNA
+-----LFESPLEKSVRSTGGDSSSTQFLLSPERR---RVdT-----
+>UniRef100_A0A3N0YBI1 Lactadherin n=1 Tax=Anabarilius grahami TaxID=495550 RepID=A0A3N0YBI1_ANAGA
+-----TRARARINIGRAYTQWCELKEAKVSKHGFCIRWFR-----
+>UniRef100_A0A498L4U7 EGF-like repeat and discoidin I-like domain-containing 3 isoform X2 n=1 Tax=Labeo rohita TaxID=84645 RepID=A0A498L4U7_LABRO
+-----VNRFRVRTVVTVPVHRLMKVLPV----KY---VNrF-----
+>UniRef100_A0A4W3I7T8 Lactadherin n=1 Tax=Callorhinchus milii TaxID=7868 RepID=A0A4W3I7T8_CALMI
+-----ACSRTHTAWGLPYTHTYTQPGVCLTHTDSHIEMH------
+>UniRef100_A0A6J2UU22 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Chanos chanos TaxID=29144 RepID=A0A6J2UU22_CHACN
+-----SSQNSLTASLCSLRLLFDSPPEKKAPLSLtGRKDTsT-----
+>UniRef100_F1Q6J1 EGF-like repeats and discoidin I-like domains 3b n=1 Tax=Danio rerio TaxID=7955 RepID=F1Q6J1_DANRE
+-----CEPVPCENSADCPTTPADENGSS--ASDW---KEqS-----
+>UniRef100_UPI00090752C2 EGF-like repeat and discoidin I-like domain-containing protein 3 isoform X1 n=1 Tax=Alligator mississippiensis TaxID=8496 RepID=UPI00090752C2
+-----APGNECEHELRGSNLYEQRAAPFLILHQSIRGSGdQ-----
+>UniRef100_UPI000E41B933 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Carassius auratus TaxID=7957 RepID=UPI000E41B933
+-----YDSQRCRGGEFRNIPSSRTEILL--------PDRmQ-----
+>UniRef100_UPI001176D5AC LOW QUALITY PROTEIN: EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Salarias fasciatus TaxID=181472 RepID=UPI001176D5AC
+-----RTFDLCCVILLCLVFVTLEVGLArqErmGPLLLSIALClG-----
+>UniRef100_UPI001476CC43 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Esox lucius TaxID=8010 RepID=UPI001476CC43
+-----CEPVSCEGEPDCFTYQPEEVLLSS-TSDW-----------
+>UniRef100_A0A195CIL4 Cubilin n=1 Tax=Cyphomyrmex costatus TaxID=456900 RepID=A0A195CIL4_9HYME
+-------MISTSNKLWIRFYTDGvtEGAGATATLNTIDPLCSLS---
+>UniRef100_A0A1B0CTE2 Uncharacterized protein n=1 Tax=Lutzomyia longipalpis TaxID=7200 RepID=A0A1B0CTE2_LUTLO
+-------SIPVSMGARASVRLE--KWVSHATARDPSQDCCTE---
+>tr|A0A226PSM5|A0A226PSM5_COLVI Uncharacterized protein OS=Colinus virginianus GN=H355_016660 PE=4 SV=1
+-----C-VLPVVQKK--QT--KKLVFNIAMLK----SA-SAW---
+>tr|G3IFZ3|G3IFZ3_CRIGR Delta and Notch-like epidermal growth factor-related receptor OS=Cricetulus griseus GN=I79_022669 PE=4 SV=1
+-----MQ-----SLRSCCL--SQEAYSSqrlKCKRVlFpesillsNEPETSVL---
+>UniRef100_A0A368GZU7 EGF-like domain protein n=1 Tax=Ancylostoma caninum TaxID=29170 RepID=A0A368GZU7_ANCCA
+---TDACEGLCYNDANCLK-TGRGETRCICRPGYTGRRIAPLH--
+>UniRef100_A0A1S4GGL7 Slit homolog 1 protein precursor n=2 Tax=gambiae species complex TaxID=44542 RepID=A0A1S4GGL7_ANOGA
+------QQHECKFGVCFQPNPSSADYICKCAPGYSGKRCEYL---
+>UniRef100_A0A3Q0IWG0 protein slit-like n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0IWG0_DIACI
+------LSL-SSNEITCVMpgSFDYlTTLHTLQLAGnkMrevHNKMFIGL---
+>UniRef100_UPI000BBDC790 LOW QUALITY PROTEIN: slit homolog 2 protein n=1 Tax=Astyanax mexicanus TaxID=7994 RepID=UPI000BBDC790
+------DTSTALTRRRCVVK-DYGTPVCQVSAGYAGVKXCER---
+>UniRef100_UPI000E6E4BC3 LOW QUALITY PROTEIN: protein slit n=1 Tax=Ctenocephalides felis TaxID=7515 RepID=UPI000E6E4BC3
+------QHHECQQGVCFQPNPANADYICKCAPGYSGKRCEYL---
+>UniRef100_T1L555 Uncharacterized protein n=1 Tax=Tetranychus urticae TaxID=32264 RepID=T1L555_TETUR
+-------FTNpCPNNAIC--LPQFSDYLCSCASNNRSQTCLN----
+>SRR6478735_8086281
+------YDNngGCDSLTHCTNTA-TGRTCSACPLGYTGTGetgcTGLP---
+>OrbCnscriptome_3_FD_contig_21_3298809_length_243_multi_2_in_0_out_0_1 # 2 # 163 # 1 # ID=362963_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.315
+--------TVCATNGICHKQC-NSETKCTNNTGPYPTNCAYKR--
+>SRR5690348_10342687
+-----------L-VGGCFVYE--VPSDAGDAVGEAGENSggtSA----
+>UniRef100_A0A3P8WFN3 Uncharacterized protein n=1 Tax=Cynoglossus semilaevis TaxID=244447 RepID=A0A3P8WFN3_CYNSE
+---------PDLTTGVRTGTLsvpmTCADSPC-----FPGVPCEPT---
+>SRR4051812_14266872
+--------DRGDSGATCAEMSPGNGYACACSAGFTGSGGatPS----
+>UniRef100_A0A673WJ43 Uncharacterized protein n=1 Tax=Salmo trutta TaxID=8032 RepID=A0A673WJ43_SALTR
+--CRSNSVRWGLWCARVRP--VVSRSRSAVTRSLT---VYPLT--
+>UniRef100_G3HAF0 MAM and LDL-receptor class A domain-containing protein C10orf112 n=1 Tax=Cricetulus griseus TaxID=10029 RepID=G3HAF0_CRIGR
+--CSGIPFPFNFSLQYDLL--TKSSGDKMLKVGFLNNDRHELI--
+>UniRef100_A0A091LJ57 Epidermal growth factor-like 7 (Fragment) n=1 Tax=Cathartes aura TaxID=43455 RepID=A0A091LJ57_CATAU
+--------C--VFWGVCVA-----EPSEPLAPGKHLlttpVLTVSDV--
+>UniRef100_A0A091SFZ5 Epidermal growth factor-like 7 (Fragment) n=1 Tax=Nestor notabilis TaxID=176057 RepID=A0A091SFZ5_NESNO
+--------DlSDTASGLGSF-----EGRGQIPPGVRAaVPLVSDV--
+>UniRef100_A0A3B3DHU3 EGF-like-domain, multiple 7 n=1 Tax=Oryzias melastigma TaxID=30732 RepID=A0A3B3DHU3_ORYME
+--------IFAKQVGALRA-----PR--QSRERWMTRSHLrfrlSDV--
+>UniRef100_A0A6J0TSM5 epidermal growth factor-like protein 7 isoform X1 n=1 Tax=Pogona vitticeps TaxID=103695 RepID=A0A6J0TSM5_9SAUR
+--------TAVPKWRDVRP-----PEQVRLPFRVDGKVLR-DV--
+>UniRef100_W5P0T5 EGF like domain multiple 7 n=1 Tax=Ovis aries TaxID=9940 RepID=W5P0T5_SHEEP
+--------SPAGQERAlhGTH-----PPAAHHPQAGpRAPSCiadRPAH--
+>tr|A7SR76|A7SR76_NEMVE Predicted protein (Fragment) OS=Nematostella vectensis GN=v1g128516 PE=4 SV=1
+-RCGPCIPSPCKNGGLCAEVKSKDGFICICKEGYLGKTCDSEFI-
+>tr|V8NP67|V8NP67_OPHHA Slit-like 1 protein (Fragment) OS=Ophiophagus hannah GN=SLIT1 PE=4 SV=1
+--------MVAPTGPVR--M--VGPACLKkEMEPALRTYCEqP----
+>tr|H3A8X1|H3A8X1_LATCH Uncharacterized protein OS=Latimeria chalumnae PE=4 SV=1
+----MCHTHTHKKSNIC--FLYINKETCIWPTYFSGEFCEeL----
+>UniRef100_A0A6J2KW07 LOW QUALITY PROTEIN: aggrecan core protein n=1 Tax=Phyllostomus discolor TaxID=89673 RepID=A0A6J2KW07_9CHIR
+---ARSCAKDPCGAGTC--QEMAGHATCLCPPGHTGEHCNID---
+>UniRef100_UPI001470E275 LOW QUALITY PROTEIN: aggrecan core protein n=1 Tax=Thalassophryne amazonica TaxID=390379 RepID=UPI001470E275
+---QEGHAGPTDEIyvTSP--AEAYtSPTTAASMPLVTPAAVEQP---
+>ERR1712088_887784
+-----CYGNPCVIGARTTAPA-LTRWERMSVNARLGLKVA-----
+>ERR1719188_2211370
+-----LLRKPLLQRRQMQRHG-SRPLHLPVPSGLFRVPLR-----
+>ERR1719192_2026803
+-----LLRKPMLQ--RRQMQR-HGSRPLHCPVGYSGFRCE-----
+>ERR1712226_863743
+-----CYGNPCVNGAECKVLE-LLSSENQPLLVWGdsllVLDLC-----
+>UniRef100_A0A6I8NU11 Uncharacterized protein n=1 Tax=Ornithorhynchus anatinus TaxID=9258 RepID=A0A6I8NU11_ORNAN
+-----------RGVVRVG--SFYPPPNPQPPPGFSGILCEE----
+>ERR1740137_130142
+------ASRTCEEVDAVLTpidSDEENEFLRNmfdSGKVWTGIRR--D---
+>UniRef100_A0A0Q3QSL7 Brevican core protein-like protein n=1 Tax=Amazona aestiva TaxID=12930 RepID=A0A0Q3QSL7_AMAAE
+-----TrrdgLSSPHPGSSGVIPVGtplgDPAPSTAVPLPALPTERASVG---
+>UniRef100_A0A5F4VXH4 Uncharacterized protein n=1 Tax=Callithrix jacchus TaxID=9483 RepID=A0A5F4VXH4_CALJA
+-----AreLEAPSEDNsGRTAP----AGTSVQAQPVLPTDSASRG---
+>UniRef100_UPI00111C7C5E brevican core protein isoform X2 n=1 Tax=Nannospalax galili TaxID=1026970 RepID=UPI00111C7C5E
+-----AreLEGLSEEKsGRTVP----AGTSVQTQPVLPTDSASQG---
+>ERR1712157_158560
+-------NRKGTKEKTKCCNQLEFGEPCSCYGEYEGPHCEFRK--
+>ERR1712079_966165
+-------TTGARTTGPAS--TRSGSTSV-------AVFLALR---
+>PorBlaMBantryBay_2_1084458.scaffolds.fasta_scaffold435255_1 # 3 # 305 # 1 # ID=435255_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.459
+---------ACLANSKLS--AChvVSKFFEVCSRKGTVVSCSD----
+>UniRef100_A0A6J2E1D5 pikachurin isoform X3 n=1 Tax=Zalophus californianus TaxID=9704 RepID=A0A6J2E1D5_ZALCA
+----RLLSSAEANNSDSQ--PQGGDHRETPTPGHDRQLQTwPT---
+>SRR4051812_15136367
+------HtPSMCVHAVGC--KNTIGSYNCTCqTGMYWFYX-------
+>UniRef100_G7YTD4 Pro-neuregulin-2 membrane-bound isoform n=1 Tax=Clonorchis sinensis TaxID=79923 RepID=G7YTD4_CLOSI
+-ECPEEHRDYCLNGGQCYMLKSdRNVLQCRKSHLNKAKRSRP----
+>ERR1719389_571165
+--------DPLM----SATVV-SGSLVCACPAGTEVdgLscaVCEQG---
+>tr|A0A0C9RA39|A0A0C9RA39_9HYME Jag1b protein OS=Fopius arisanus GN=jag1b PE=4 SV=1
+----SVRLSHVKMAALAS--MEKNEFTCNCPSAWQGTLCQF----
+>SRR5688572_7411375
+----SCDDLKCAEPAECK--EADGKASCVCPRGYDDAKGDG----
+>SRR5262245_26288424
+----ECSGGVVdacgVGALGCT--DESGSFSCSCGSGFSGTgtTACE----
+>UniRef100_A0A3B5BFM8 Uncharacterized protein n=1 Tax=Stegastes partitus TaxID=144197 RepID=A0A3B5BFM8_9TELE
+------VISFCVRKYLQLD-MHMLILITFLILLLIYFFCSPV---
+>UniRef100_A0A3Q3EGG2 Hyaluronan binding protein 2 n=1 Tax=Labrus bergylta TaxID=56723 RepID=A0A3Q3EGG2_9LABR
+--------MKSIQLQPSqRS-LLPSSPSVGGRSQAAPPGSLeeRslflelipV---
+>UniRef100_A0A667ZJ06 Hyaluronan binding protein 2 n=1 Tax=Myripristis murdjan TaxID=586833 RepID=A0A667ZJ06_9TELE
+-----NLTSLYLMQMSVIQ-TPVSTEVCVTALLPGASHVHAlM---
+>UniRef100_A0A672JIZ9 Hyaluronan binding protein 2 n=1 Tax=Salarias fasciatus TaxID=181472 RepID=A0A672JIZ9_SALFA
+-----RCDFSHVSHRVHML-LSRTVRRQKVPESLTCCFCSTV---
+>UniRef100_A8WFR8 Zgc:171352 protein n=1 Tax=Danio rerio TaxID=7955 RepID=A8WFR8_DANRE
+-----VIQTLARTMEFVRR-KKAAASNASVHRPILAKSVKMR---
+>UniRef100_S7PWL4 Hyaluronan-binding protein 2 n=1 Tax=Myotis brandtii TaxID=109478 RepID=S7PWL4_MYOBR
+-----RSSCKASVTATPEF-FRET-LGLDHGDPGRGTRSL-V---
+>JFBN01.2.fsa_nt_gb|JFBN01327524.1|_1 # 1 # 513 # -1 # ID=54211_1;partial=10;start_type=ATG;rbs_motif=GGAGG;rbs_spacer=5-10bp;gc_cont=0.708
+-----SEEYYCANGGACP-LGEPHEPCTDCDEGWEGSRCEKKI--
+>UniRef100_A0A3Q2LCU6 Crumbs cell polarity complex component 2 n=1 Tax=Equus caballus TaxID=9796 RepID=A0A3Q2LCU6_HORSE
+----PRGRVPRPGQRVS--RQQGALRRGCCAVGRGTRWRQVG---
+>ERR1711962_1196888
+---------PNQNSNACNL-----PNECHCGQNTQdpKGVCCH----
+>ERR1719272_2358512
+------GSSPCQNGSSCT--EADDKFSCKCLVLHR-KRMPVR---
+>ERR1719367_2348461
+----EMQSELTTN----K--R-laasmlLAGYTCK---GFRVpkgalgspystgrknDDCTPI---
+>SRR3569833_584993
+----ACVMTPVGLispETTNV--DGstrlVFRPPNTCVPG-------DL---
+>UniRef100_A0A6I8P6T0 Cadherin EGF LAG seven-pass G-type receptor 3 n=1 Tax=Ornithorhynchus anatinus TaxID=9258 RepID=A0A6I8P6T0_ORNAN
+------GPWGRDAGWMCS--WPPSPFSAPHPIPFPGSFPLPA---
+>ERR1719203_1064890
+-----SAHAFCTNGGECKRTVERTeeHAGCKCPGGYEGNFCQFV---
+>UniRef100_A0A1S3QCY7 slit homolog 1 protein-like n=1 Tax=Salmo salar TaxID=8030 RepID=A0A1S3QCY7_SALSA
+-AANPCQGNKCVR-GVCV-VQDVQSYRCECEEGWRATLCNqqgeltapavpeGP---
+>UniRef100_A0A2D0QFF0 slit homolog 2 protein-like n=1 Tax=Ictalurus punctatus TaxID=7998 RepID=A0A2D0QFF0_ICTPU
+-RCvcpegfegdqceiniDDCEDNDCENNSTCV--DGVNTYTCLCSSEYTAANNNevekgsvlnlvfvpsqvgvsnevfvpnrvgVS---
+>UniRef100_A0A094ZF16 Agrin n=2 Tax=Schistosoma TaxID=6181 RepID=A0A094ZF16_SCHHA
+------NVHTlssriqtkkCENYGIGSI-GSDGKYTCICQPGWQGDVCEQA---
+>ERR1719270_2036407
+------EEDAQGHDGlqlpvrLL--GQGQHDLLPGGPQGGYGELYARE---
+>ERR1712223_1842037
+-------PTTCARTGAlV--VTGRTSTLasalLSSPASsaRSNRWWRisihrhlrAN---
+>tr|A0A091HS84|A0A091HS84_CALAN Neural-cadherin (Fragment) OS=Calypte anna GN=N300_03353 PE=4 SV=1
+-RLDSWSRQQSGTGGRN--TQIWAGTDQ-----DHRQMNRQD---
+>UniRef100_A0A3Q0DNA2 protocadherin Fat 4 n=1 Tax=Tarsius syrichta TaxID=1868482 RepID=A0A3Q0DNA2_TARSY
+----------FYIGGSC--ARTRGLHSQSCPSLHTLASC------
+>UniRef100_A0A158RCS1 Uncharacterized protein n=1 Tax=Thelazia callipaeda TaxID=103827 RepID=A0A158RCS1_THECL
+-------SEAMKFSHPSKSKEKNYDSKTKVANTFNDTLNTDgmI---
+>ERR1719219_969183
+--------NICLASGNSN--AGTCTGACVNTAGIAKNL-------
+>ERR1711970_886435
+-----SDFNPCPQSSrtYCV--NVGGSYECRCRVGYQIPAGITPN--
+>UniRef100_UPI001482AF6E cadherin-related tumor suppressor n=1 Tax=Thrips palmi TaxID=161013 RepID=UPI001482AF6E
+-----CQRAACHAGSVCADSLRiaspalplrvtdsaslvlsapalQRDVQCRCADGFTGARCDRRQ--
+>UniRef100_W4ZDU6 Uncharacterized protein n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=W4ZDU6_STRPU
+------SIQFSSVQFGSVQLSSI-QFRSvqfrSSVQFRTGRHCES----
+>UniRef100_A0A164W012 Delta-like protein n=1 Tax=Daphnia magna TaxID=35525 RepID=A0A164W012_9CRUS
+---------PPLPASQPSP--QTEAGSCWTSKGAG--HCVHG---
+>UniRef100_B7PW69 Delta-like protein n=1 Tax=Ixodes scapularis TaxID=6945 RepID=B7PW69_IXOSC
+---------PAKHSGAPDR--ETPSPCAACPKGSRcvlGPRSQVQ---
+>UniRef100_A0A4W5P0A7 Lactadherin n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5P0A7_9TELE
+----QCQLRKYRAGESLR--------YNICMSVYV----FVP---
+>UniRef100_A0A093T8U4 Epidermal growth factor-like 7 (Fragment) n=1 Tax=Phalacrocorax carbo TaxID=9209 RepID=A0A093T8U4_PHACA
+-------HSACQAE--QLP-----QPTASCCPGWSranshALSCNRDV--
+>UniRef100_A0A2P4SC15 EGF-like domain-containing protein (Fragment) n=1 Tax=Bambusicola thoracicus TaxID=9083 RepID=A0A2P4SC15_BAMTH
+-------DVPAHPAGWG-L-----PARQPCPHGA--IPVLSDA--
+>UniRef100_UPI0010FB227A epidermal growth factor-like protein 7 n=1 Tax=Protobothrops mucrosquamatus TaxID=103944 RepID=UPI0010FB227A
+-------KVSHRQAyRKISR-----PE-YVCGPEWKQR----NV--
+>ERR1719220_1054492
+-PCYTDSGNPCLNDGNCSAlYDDDLNFICECQGKWQGPTCEDEDL-
+>ERR1712151_569676
+-PCYAIHpvigdhnstldTSACKHNGLCTAyLDGSNAFTCECLPGYTGSTCQNIDV-
+>UniRef100_A0A3Q0IWR7 uncharacterized protein LOC103508436 n=1 Tax=Diaphorina citri TaxID=121845 RepID=A0A3Q0IWR7_DIACI
+-----ECKDECASGmqlagdGTCE--PCPRGtYRtqglepacVSCPSGRTTPKAGgAT---
+>SRR6185312_14340384
+-----CASNPCFGIGQD--QTF----TITAPGEYLVFDGDP----
+>SRR5438045_1271321
+-----CGSFPYQNHCNF--LVLVSRLLCQYPCHLSVICCES----
+>UniRef100_A0A287DBF0 Uncharacterized protein n=1 Tax=Ictidomys tridecemlineatus TaxID=43179 RepID=A0A287DBF0_ICTTR
+-SLCDSDIDGPYSENSVFKVESLNNsr---RTSILYGECCCCAL---
+>UniRef100_A0A2K5QB69 Uncharacterized protein n=1 Tax=Cebus capucinus imitator TaxID=1737458 RepID=A0A2K5QB69_CEBCA
+---------LGYKKVVLATLDLFYFphKTFRIGLSISVTTTTTI---
+>UniRef100_A0A2K6G2U6 Uncharacterized protein n=1 Tax=Propithecus coquereli TaxID=379532 RepID=A0A2K6G2U6_PROCO
+-NHSSSNLKSQLNLNKFLIFFPIHDrnKKVDFERLLPAQKYKDE---
+>UniRef100_A0A3Q7XCV1 pro-neuregulin-3, membrane-bound isoform-like isoform X4 n=1 Tax=Ursus arctos horribilis TaxID=116960 RepID=A0A3Q7XCV1_URSAR
+-ECTE-----FLGRATFWRTNMLTCscDICFLHITFMGCD-------
+>UniRef100_A0A498LMT4 Pro-neuregulin-membrane-bound isoform-like protein n=1 Tax=Labeo rohita TaxID=84645 RepID=A0A498LMT4_LABRO
+-VSpIMERLLLIFRRASVIRIP----arALIRCKEGYRGLRCDQF---
+>UniRef100_A0A6I9KGI0 pro-neuregulin-3, membrane-bound isoform-like n=1 Tax=Chrysochloris asiatica TaxID=185453 RepID=A0A6I9KGI0_CHRAS
+--------MHVFSDLETDFFTIFLMtlCPVKGFYEYRLTWRKSG---
+>UniRef100_UPI0005225AF4 pro-neuregulin-3, membrane-bound isoform n=1 Tax=Leptosomus discolor TaxID=188344 RepID=UPI0005225AF4
+-PGEEDPNARAVPRLRSHIESVLLCpfAAWRCYV-------------
+>UniRef100_UPI000938B943 pro-neuregulin-3, membrane-bound isoform n=1 Tax=Hipposideros armiger TaxID=186990 RepID=UPI000938B943
+-WSPQGGPTAVKPQSAVHAAAVVLIsvR--KCKEGYQGVRCDQF---
+>UniRef100_UPI00093C3511 pro-neuregulin-3, membrane-bound isoform n=1 Tax=Crocodylus porosus TaxID=8502 RepID=UPI00093C3511
+-MVSFMDVVETDDEPETGTGEPPLQraNSRRALQQVQIILQDNF---
+>UniRef100_UPI000B53DAD6 LOW QUALITY PROTEIN: pro-neuregulin-3, membrane-bound isoform n=1 Tax=Ictidomys tridecemlineatus TaxID=43179 RepID=UPI000B53DAD6
+-PI-QDEHEQNKNVGFESTLPVWEDkdGDCCCCALLA----------
+>UniRef100_UPI000C84373A LOW QUALITY PROTEIN: pro-neuregulin-3, membrane-bound isoform n=1 Tax=Dasypus novemcinctus TaxID=9361 RepID=UPI000C84373A
+-RVKATRFSKLRNQIAAF------ErfRPAQKYKDKDGLCCTLL---
+>UniRef100_UPI000DF0DC08 pro-neuregulin-3, membrane-bound isoform n=1 Tax=Manacus vitellinus TaxID=328815 RepID=UPI000DF0DC08
+-GSEKHPFLEELADPDLRASRICRSlaKTRRAETRFSpGLFSDAF---
+>UniRef100_A0A4Y2HAZ1 Sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1 n=1 Tax=Araneus ventricosus TaxID=182803 RepID=A0A4Y2HAZ1_ARAVE
+-----CDPSTALFIVSP--TGRDVTWKHREKSENSANNRDIK---
+>ERR1719491_1771739
+--CNEAKGVFCANDGTCGSyiIDGRQHEGCNCRQDYTGAHCQYS---
+>ERR1712194_148083
+---------------KCGSyiIDHLHYEGCHCDMEYFGAHGQYE---
+>tr|A0A2G8L5Y1|A0A2G8L5Y1_STIJA Putative fibropellin-3 OS=Stichopus japonicus GN=BSL78_07457 PE=4 SV=1
+---NTTNAFPILAQRRsV--RGRTKQLPVPLSGGYFGVHCEMK---
+>ERR1712071_631570
+-------HGELNSGINgC--EDKTNGFEWVCKPSFQGNLCQNT---
+>UniRef100_UPI000BBDD487 LOW QUALITY PROTEIN: von Willebrand factor D and EGF domain-containing protein-like n=1 Tax=Astyanax mexicanus TaxID=7994 RepID=UPI000BBDD487
+---------VMSSHSCSISCisneLQQLQEVKTLLTGEAGGWCIFHS--
+>ERR1719469_1539613
+--------------ANATTKTRtimHEDFGAGVNRVGPVIFCETDI--
+>UniRef100_A0A4W5Q5N9 EGF-like domain-containing protein n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5Q5N9_9TELE
+-----YESNPCEIGAACLN--------VLADESFSSADGEE----
+>688.fasta_scaffold2397663_1 # 294 # 422 # -1 # ID=2397663_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.512
+------SNfFPFRSGcrfvlpffmrcgwfyfaasrTVCTEHIILRLHNKSVELFFX----------
+>GraSoiStandDraft_27_1057306.scaffolds.fasta_scaffold4584430_1 # 2 # 217 # 1 # ID=4584430_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.657
+------QQFI-------LPLFSLKETLSNFFtPEREVPFTRPT---
+>UniRef100_G3R2I7 Coagulation factor XII n=1 Tax=Gorilla gorilla gorilla TaxID=9595 RepID=G3R2I7_GORGO
+------RQENRLAGGRVVCRE--GELSAgggxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxHCPVGYTGPFCDVD---
+>ERR1719329_2041278
+------AARTSEEGVVTT--VPVGEFVCLCDSGWKGP--------
+>UniRef100_A0A2T7NP26 Uncharacterized protein n=1 Tax=Pomacea canaliculata TaxID=400727 RepID=A0A2T7NP26_POMCA
+-----ARptlvrTAPSVKTSSTSTSatarTAMLVLTVKSVRMLllnhlvitqrtrllhsNNNNNNEE---
+>SRR5260221_8946670
+----PSQPTPWGQGGVCT--PQSDHVYCHCPAASTGMLCELPRFE
+>ERR1719223_1199888
+----GDHTPFCTNHGTCKEVLdehGEGQVQCHCKDNFVGEYCETLDLS
+>tr|A0A1I8CP43|A0A1I8CP43_9BILA Uncharacterized protein OS=Rhabditophanes sp. KR3021 PE=4 SV=1
+--CQLNITNSCGREGQCMSKR--SGNRCKCPEGWMGHGCRR----
+>UniRef100_A0A6G1S6M5 Cadherin EGF LAG seven-pass G-type receptor 2 n=1 Tax=Aceria tosichella TaxID=561515 RepID=A0A6G1S6M5_9ACAR
+------QPQSC-NGFPCQ--DSYGSLKCQCSEERIGRSCELI---
+>ERR1712020_540562
+--------KPCQNGGTCQV-NKA-QYTVIANNHMIIIIFIX----
+>ERR1711902_111707
+---------PCLNGGTCRV-NVIRIKYv-IRHARKIVFVSTLLP--
+>ERR1740123_2410179
+---------PCRNGGQCMV-SgyILRQYATERVYNFLTTEARHRR--
+>ERR1739848_165450
+---------PMSGGSQRRL------YL-HLRPRISWTSLRVQL--
+>ERR1719357_2094101
+------------YPGCKQG-TCDKPWECNCQSGWGGLFCDQDlN--
+>ERR1719195_2041632
+---------SDFQLHLLLP-RGLHRQEl-PAPLHRPCQLQLRLP--
+>UniRef100_A0A2B4S3Q8 Fibropellin-1 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4S3Q8_STYPI
+-------NMTTTEEPRV--EEKQPVEKKVVASKVSGTVKWFN---
+>UniRef100_UPI00117D7A13 uncharacterized protein LOC115424068 n=1 Tax=Sphaeramia orbicularis TaxID=375764 RepID=UPI00117D7A13
+-----------LHKTQCSDLKQKSQ---NCYTEFFTGKYMK----
+>UniRef100_A0A5A9NSX5 von Willebrand factor D and EGF domain-containing protein n=1 Tax=Triplophysa tibetana TaxID=1572043 RepID=A0A5A9NSX5_9TELE
+--------RGCFHTRFRF-----VVYIPSGLSIISSENISLI---
+>SRR5579872_3064098
+-------SQPCTDNGTC--VPTFASPSFHTflqcASTFS-LLSGT----
+>ERR1719419_2227166
+-----EGNIMCAPNGKCVKDDENGSHTCFCDQGYFGDRCEYYHP-
+>ERR1719209_666208
+-----P-VDPCKPTGLCLKDDEKETYTCVQRKPVQGPKX------
+>UniRef100_UPI0009E419D4 uncharacterized protein LOC110046871 n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E419D4
+-----LGSIPELPAHSCQEIKASEGKDSISSKYWLDPtgngtavllHCDmnlE----
+>UniRef100_A0A1I7SDC4 Uncharacterized protein n=1 Tax=Bursaphelenchus xylophilus TaxID=6326 RepID=A0A1I7SDC4_BURXY
+------TECNCSSSELCNQGPSTGSFKCISTQSSTDHVST-----
+>UniRef100_A0A2A2JU13 Uncharacterized protein n=1 Tax=Diploscapter pachys TaxID=2018661 RepID=A0A2A2JU13_9BILA
+----------TVLDWESQVDEVQVTFrTRKPTPEVTSTKST-----
+>tr|F6QPR5|F6QPR5_XENTR Crumbs 2, cell polarity complex component OS=Xenopus tropicalis GN=crb2 PE=4 SV=1
+-----LVVSPLILH--GG--KESYHYLYNCLATSSAALCIFF---
+>ERR1719166_58029
+-----GSGDLWS-q-IILN--HGvg--NYTCSCDl-GWTGWLCDLD---
+>tr|A8X3F7|A8X3F7_CAEBR Protein CBG06951 OS=Caenorhabditis briggsae GN=CBG06951 PE=4 SV=2
+------ISRYCQTGGYCEK---SNGGRCECPPGYKDPLVRYLHL-
+>tr|H3CXT8|H3CXT8_TETNG Crumbs family member 1, photoreceptor morphogenesis associated OS=Tetraodon nigroviridis PE=4 SV=1
+-----MPLRTSLNSATCP--DTRGNHTCQCWPEYPSAPSCDLT--
+>tr|A0A060Y9H6|A0A060Y9H6_ONCMY Uncharacterized protein OS=Oncorhynchus mykiss GN=GSONMT00011513001 PE=4 SV=1
+-----CLWlklkqcvSGNIERNVCV--LSMSYILSVSCPGFKGRQCEVDV--
+>UniRef100_UPI0007197E90 protein HEG homolog 1 n=1 Tax=Ceratotherium simum simum TaxID=73337 RepID=UPI0007197E90
+-----GRTQSHKHTESCTGSGFVKRLLhwimvllSATNSTWPCFLSSADV--
+>APCry1669192160_1035399.scaffolds.fasta_scaffold35922_2 # 50 # 370 # -1 # ID=35922_2;partial=00;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.430
+---DECTSYPCKNGAACLDSItdpsvGVDEYRCRCVAGYQGAECELDI--
+>UniRef100_A0A2K5EJC1 EMI domain-containing protein n=1 Tax=Aotus nancymaae TaxID=37293 RepID=A0A2K5EJC1_AOTNA
+----SCSRHPCQNGGHVI--KMELALPVPADILLLVDNCTIK---
+>UniRef100_UPI0003941622 multimerin-1 n=1 Tax=Zonotrichia albicollis TaxID=44394 RepID=UPI0003941622
+----YVPIVMNRGAELDW--EEIKSLKTAVKSVSEDPEDFIE---
+>UniRef100_UPI000B4F6BCB multimerin-1 n=1 Tax=Meriones unguiculatus TaxID=10047 RepID=UPI000B4F6BCB
+----FIERNQNRNSGEES--EDSLLSILFSNTSDRGTHSQ-----
+>UniRef100_A0A401NGV4 Uncharacterized protein (Fragment) n=1 Tax=Scyliorhinus torazame TaxID=75743 RepID=A0A401NGV4_SCYTO
+---VNGKIEFSYNVGggtvrlvtdqqvadgefhkifatrmgtvgsltvdNCT--NdrpaqfcfastpgigtertldldknsmVFGGIKSIDPillrpdqvktHDFIGCVKELQL--
+>SRR5262245_61506302
+---DECDPNPCKGmNVPCN--NLEGDFSCECPTTATGKICDIPRL-
+>UniRef100_UPI00077A6F54 uncharacterized protein LOC107342014 n=1 Tax=Acropora digitifera TaxID=70779 RepID=UPI00077A6F54
+---SACDKGPCKNNGTCQSGYTDKGYRCLCPPQWTSDHCEKDV--
+>UniRef100_UPI00077B2102 sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1-like isoform X2 n=1 Tax=Acropora digitifera TaxID=70779 RepID=UPI00077B2102
+---SACDKGRCKNNGTCQSGYTDKGYRCLCPPQWISDHCEQDV--
+>ETNmetMinimDraft_8_1059916.scaffolds.fasta_scaffold1297983_1 # 1 # 240 # -1 # ID=1297983_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.404
+----YLAk-QEKHNKGAELYFLTKGdfgIIMVNLTDW--FYLFSD----
+>GraSoiStandDraft_49_1057285.scaffolds.fasta_scaffold1328452_2 # 93 # 302 # 1 # ID=1328452_2;partial=01;start_type=GTG;rbs_motif=AGGAG;rbs_spacer=5-10bp;gc_cont=0.681
+----SLQqvtSVDREASVTWITHYRGKrqdSNSCNCCPSP-----------
+>UniRef100_A0A2B4RC77 Protein HEG-like 1 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4RC77_STYPI
+---NSCSSEPCGQSMPCINGFTEKRYICpRCQDGFMGERCEQDI--
+>UniRef100_A0A3M7SKE6 EGF-like domain-containing protein n=1 Tax=Brachionus plicatilis TaxID=10195 RepID=A0A3M7SKE6_BRAPC
+-PCPQNVPNPCLNSGKCFYTNLTRTIICECRPGYIDTFCRN----
+>ERR1712127_504769
+---DSCLNNPCLSGGTCITVKTiddRLDFTCVCLPVFLENTVNWL---
+>ERR1711917_119376
+-----C-LHSIIAQFTCTQ--VGDSYSCACTEDYQGRNCDR----
+>SRR4051812_47065091
+---DHCASSPCQQGTTCV--NGESGYTCVYPQAYVMCSAPT----
+>ERR1711871_1290845
+HTCHRCLPEPCLNGGVCTG-VQEAGFACKCWESWVGDMFQFK---
+>UniRef100_H9GF30 Uncharacterized protein n=1 Tax=Anolis carolinensis TaxID=28377 RepID=H9GF30_ANOCA
+---DACFGKPCYNNASCIGKEkkgehVGDSYECICPPLFAGKNCTE----
+>UniRef100_A0A1S0U7V0 Uncharacterized protein n=1 Tax=Loa loa TaxID=7209 RepID=A0A1S0U7V0_LOALO
+---ERCLPNPCENHAICEQ-TSLNDFHCHCRNGYYGKTCHST---
+>tr|A0A0C2DGF5|A0A0C2DGF5_9BILA Laminin G domain protein (Fragment) OS=Ancylostoma duodenale GN=ANCDUO_08191 PE=4 SV=1
+---SALVRVVQRLPGRKHP--ITETQHdpPIFVRSLPREQCEIA---
+>ERR1719391_22536
+----IAIQILVILAVRVSRKTPTVAFIAV-VQKASG---------
+>ERR1711862_202539
+----GkkCiAWDEIHADDEYFHDRRRRPWYITLPhEGLENNYCRN----
+>RhiMetStandDraft_4_1073278.scaffolds.fasta_scaffold3241233_2 # 125 # 262 # -1 # ID=3241233_2;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.717
+---DACLENnePCFPGVKCIN--LkSsggtGYKCGPCPAGYRGDGDTC----
+>HigsolmetaAR206D_1030411.scaffolds.fasta_scaffold07681_1 # 3 # 959 # 1 # ID=7681_1;partial=10;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.778
+---VSAC----DEKLTLVWLsrnriatqMSSLHYISSFPQSLSSRLE------
+>ERR1719204_326225
+---GDTFDLV---LGTCN--DSQSGSHASMSIRIFD---------
+>ERR1711871_1080783
+-----AYPSHAATEGCALG-CKSTGFSCTCPAGYDGDICQRR---
+>UniRef100_UPI0012B62056 uncharacterized protein LOC116302619 n=1 Tax=Actinia tenebrosa TaxID=6105 RepID=UPI0012B62056
+---NPCEKKPCKHRGKCVPFYTNYTYKCKCLEGTLGQDCQIPDF-
+>ERR1719277_668590
+--------------PTSV--HALPDIQEHTARQILMTVCRTY---
+>UniRef100_UPI000C057788 uncharacterized protein LOC111319452 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=UPI000C057788
+-----CRVQPCLNGGICQENCdvTGRRFLCHCPEVLWQLFSlvivlsnKRP---
+>SRR4029079_5404316
+---DDCAGRRGKNGVTCK--DLVNDFKCTCTGAWSGSTCQNAT--
+>SRR5690606_40669949
+---NDCSPNPCRNGGSCQ--DGVGTFTCSCVAPWSRSEEHTSE--
+>tr|F6SW42|F6SW42_ORNAN Coagulation factor XII OS=Ornithorhynchus anatinus GN=F12 PE=3 SV=1
+----KACSTPCVHGGPVQL--GILAVLG---SNLLSPFFFLN---
+>tr|A0A0M3ILU6|A0A0M3ILU6_ASCLU Uncharacterized protein OS=Ascaris lumbricoides PE=4 SV=1
+---APCSANPCGNEGTCLP-TGEHSFRRISVDGFDLPKTKQ----
+>UniRef100_A0A5B7CU62 Fibropellin-1 n=1 Tax=Portunus trituberculatus TaxID=210409 RepID=A0A5B7CU62_PORTR
+-RCDQCKALPCENGGTCRlrvrNGTYAVTPMCSCAPGYNGVSCTLS---
+>UniRef100_UPI000D0A3D1D neurocan core protein-like n=1 Tax=Oncorhynchus tshawytscha TaxID=74940 RepID=UPI000D0A3D1D
+------------MQTQIS--DRESNNVTTDDPTLAGaerrSKRRK----
+>SRR6218665_283096
+---NECASSPCQNGGACF--SNFGRLVRTRSGSFHGTGGAK----
+>tr|A0A1E1XP69|A0A1E1XP69_9ACAR Putative lpxtg-motif cell wall anchor domain protein OS=Amblyomma sculptum PE=2 SV=1
+----ICEsKTpVCHREATCEQG-KdYHSFYCNCPPKLTGPLCQREN--
+>APWor7970452823_1049283.scaffolds.fasta_scaffold100383_1 # 50 # 253 # -1 # ID=100383_1;partial=00;start_type=ATG;rbs_motif=AATAA;rbs_spacer=14bp;gc_cont=0.412
+----NILLLD-----LCEEILLLLLLLlllllLLLLLLLLLSFKQN----
+>UniRef100_A0A5F4CCY8 Uncharacterized protein n=2 Tax=Canis lupus familiaris TaxID=9615 RepID=A0A5F4CCY8_CANLF
+----PRESFPHKKNTTCM--KYENDYHCSCLPGFAGKNCEKV---
+>UniRef100_A0A6F9C590 Uncharacterized protein (Fragment) n=1 Tax=Coregonus sp. 'balchen' TaxID=861768 RepID=A0A6F9C590_9TELE
+----QCEGERMRRAGQCE--GERDERQaGQCLPGFSGKSCEEI---
+>UniRef100_UPI000C810BF9 protein eyes shut homolog n=1 Tax=Loxodonta africana TaxID=9785 RepID=UPI000C810BF9
+----THEIFSCVNVTC-V--KREEDHDSSCMPEFSGKNCKEA---
+>UniRef100_UPI000F7D5558 LOW QUALITY PROTEIN: protein eyes shut homolog n=1 Tax=Bos indicus x Bos taurus TaxID=30522 RepID=UPI000F7D5558
+----KSKISPLTASAWaglalaglimLA--RHTSGTTikeLSCMPRFTGKNXEKV---
+>ERR1711871_1189083
+-HCARCTNPPGwpypLDGLAFEpN-SNQTACVRSCPLGF-----------
+>CryGeyStandDraft_6_1057127.scaffolds.fasta_scaffold1011887_1 # 86 # 286 # -1 # ID=1011887_1;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.552
+------MQPSQQNGSTASP-VNVSGSWQSCPPGLTGPTCVTDV--
+>GraSoiStandDraft_48_1057284.scaffolds.fasta_scaffold3803908_1 # 3 # 242 # -1 # ID=3803908_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.717
+-PCSY--GQACEDSISLET-IVVDAYVCKCNDGYSGRNCERDV--
+>UniRef100_A0A5N3V3R8 Peptidase S1 domain-containing protein (Fragment) n=1 Tax=Muntiacus muntjak TaxID=9888 RepID=A0A5N3V3R8_MUNMU
+---------PPDQGLTLL--GRLQgtqvspSWAIYRRRP--RASCPDP---
+>UniRef100_UPI00109B8BF7 microfibril-associated glycoprotein 4 isoform X1 n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI00109B8BF7
+----SCTNpPPAHGGKNCSG---SHNETETC----NAQPCSV----
+>UniRef100_A0A6F9AQ73 Uncharacterized protein n=1 Tax=Coregonus sp. 'balchen' TaxID=861768 RepID=A0A6F9AQ73_9TELE
+-----ATGQIITSSLLDREARANYQLLVVATDGGQP---------
+>UniRef100_A0A2G8LNX4 Ap-cadherin n=1 Tax=Stichopus japonicus TaxID=307972 RepID=A0A2G8LNX4_STIJA
+----QSMPERC----EVY--DKFDDYECCVRRDFTGKDCDLKS--
+>UniRef100_H3CSG8 Uncharacterized protein n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=H3CSG8_TETNG
+-ICASYPGNPCLNGGTCM--DTKNGYRMKPGTKTTGCCC------
+>GraSoiStandDraft_41_1057321.scaffolds.fasta_scaffold11025064_1 # 2 # 247 # 1 # ID=11025064_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.695
+----A------------DAGAAAPVQVITATRNLKSQPFIPG---
+>APDOM4702015118_1054815.scaffolds.fasta_scaffold2239020_1 # 3 # 257 # 1 # ID=2239020_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.694
+----A------------DASPAAPVQVITATRNLKSQPFIPG---
+>ERR1712166_964641
+----PCSNdafiggsdnpgfpgsprNPCYNDVLCTNSADFTDFTCFCESEWTGMLCATRI--
+>UniRef100_H3CYG6 Aggrecan b n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=H3CYG6_TETNG
+---DLSYSGPTAPSlsiptPAVV--EEPEAVKGVCylqLPQSGWALEHTF---
+>UniRef100_A0A4U5PAI4 Uncharacterized protein n=1 Tax=Steinernema carpocapsae TaxID=34508 RepID=A0A4U5PAI4_STECR
+-LCTACERAPPCVHGHCI--SQLIGTECFCDYGYTGQKCEIM---
+>ERR1719163_702458
+---DPCATVECGKHSHCV--ATHNAATCKCDANWFGRKCDSR---
+>ERR1719376_316248
+---DECYYNPCNSKGICNITSIMPYYECTCNPPFYGSTCNYEH--
+>ERR1719461_2774894
+---AFCDSNPCHSTSTCIesISPNshgmSTGYSCSCPSNRIGKHCDLKT--
+>ERR1711865_288014
+---DECASGPCVHGSCMDNNEDiyipNAGYECTCTDGWVGENCAEDV--
+>ERR1719334_2765943
+----EWSecTKECGGGERFR--ERPYKPSGsrlWCSGGLAGNHTNID---
+>ERR1712025_1535515
+------NWAPGDDEPHCI--HNemdfGSSCTLKCAPGYELPAEVTD---
+>ERR1719162_2344896
+------SPCATDQFTACENSEDYLDFTCTCTNQFQGKTCNEV---
+>ETNmetMinimDraft_3_1059899.scaffolds.fasta_scaffold113113_3 # 874 # 993 # -1 # ID=113113_3;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.517
+----ARAGNPCMFGTRCE--NLENDYKCHCTLIgFSsGKHCDQN---
+>UniRef100_A0A1I7YHE1 Uncharacterized protein n=1 Tax=Steinernema glaseri TaxID=37863 RepID=A0A1I7YHE1_9BILA
+-----TMERSQPNGAEC-LPagMDTTEYFCECPPGFAGEFCEIDQ--
+>UniRef100_UPI0012B52CCC protocadherin-like wing polarity protein stan n=1 Tax=Actinia tenebrosa TaxID=6105 RepID=UPI0012B52CCC
+----KCHDQPCANNGMCVPNYKTNTYSCQCQCPHYGYNCEKG---
+>ERR1719309_518569
+----CCCCPPCCSCAAW---AVLSALAAASTRE---RWPPAT---
+>tr|M7B0N4|M7B0N4_CHEMY Cadherin EGF LAG seven-pass G-type receptor 1 OS=Chelonia mydas GN=UY3_11473 PE=4 SV=1
+---DLCYSNPCGNNGLCR--SREGGYTCECYEDYTDHHYWLD---
+>ERR1719184_520231
+---DSCETLECYYHGTCVDDNSTTGYYCLRDDNYSGDDCQY----
+>UniRef100_UPI00052180E5 basement membrane-specific heparan sulfate proteoglycan core protein n=1 Tax=Dryobates pubescens TaxID=118200 RepID=UPI00052180E5
+-VEGNVLTLPAVRH------EDAGVYACAAANrrgqpxxxxxxxxaerlvPYFGQTPRSF---
+>ERR1711962_1318945
+-TCNPCDSDPCQNGATCTAKFSsvgpdSQFPVCNCPPGWTGRYCETEEL-
+>ERR1711963_43141
+---GKCSK-KC-GGGTRTntreqkvS-SAHGGTECSGP------TKID----
+>UniRef100_A0A340YE51 LOW QUALITY PROTEIN: von Willebrand factor A domain-containing protein 2 n=1 Tax=Lipotes vexillifer TaxID=118797 RepID=A0A340YE51_LIPVE
+---NLCTPSPCMSEGTCVL--HNRSYCCECHDGREGPHCESRE--
+>UniRef100_A0A4X1T3M6 Uncharacterized protein n=1 Tax=Sus scrofa TaxID=9823 RepID=A0A4X1T3M6_PIG
+---GLPprwgpqpEPLPHYKDGSSSQ--LPGAFHLPgcvlhptltkpCRRHTSLFKVQSIE--
+>UniRef100_A0A6J2CX26 von Willebrand factor A domain-containing protein 2 isoform X5 n=1 Tax=Zalophus californianus TaxID=9704 RepID=A0A6J2CX26_ZALCA
+---RRAARCPDTTQLSCLitpwsL--SERHLTKSCERSWTPSCFSSP---
+>UniRef100_UPI0010F500B0 LOW QUALITY PROTEIN: von Willebrand factor A domain-containing protein 2 n=1 Tax=Monodon monoceros TaxID=40151 RepID=UPI0010F500B0
+---RHVAPAESLQEGSSCP--PPSRYQEGlgplgadrgpALSGASGPVRSFAC--
+>UniRef100_G1NHT4 EGF-like domain-containing protein n=1 Tax=Meleagris gallopavo TaxID=9103 RepID=G1NHT4_MELGA
+----LSSRTSNNWVSHG---GSLKGYINRGLtivlSCWKKRSCsgFLDV--
+>UniRef100_UPI000704488F protein HEG homolog 1 n=1 Tax=Pelodiscus sinensis TaxID=13735 RepID=UPI000704488F
+---NICSTNPCLHDGKCIITGVVGKHLCKCSPAWQGEDCSEDV--
+>ERR550534_762452
+---NPCESSPCGAGANCSS-NYGGGFFCACTDGSFEIDQGCAQ--
+>SRR5690348_10539800
+------CGDPCAANDICS--NGe-------CKPPPVGQVPGEP---
+>tr|L5L910|L5L910_PTEAL Agrin OS=Pteropus alecto GN=PAL_GLEAN10001769 PE=4 SV=1
+-VCCQgsv-VGGAEGLGSRVS--YKDTRFSCLPPVGRGCGECHRG---
+>tr|A0A287BPU0|A0A287BPU0_PIG Agrin OS=Sus scrofa GN=AGRN PE=1 SV=1
+-----grr-VRNPAGRTEALM--PLppgrperppaadpgargagsGRLVLCRPPLypGRGPPLPQRS---
+>tr|A0A147ABJ1|A0A147ABJ1_FUNHE Agrin OS=Fundulus heteroclitus PE=4 SV=1
+-PPVLqralpERRPLHPSAGRLR--VLLPSWFL---RGQLSDHHPRK---
+>UPI0008135ECF status=active
+----GISDSNIVISVSIFGFLfCmsvclfvclfvcwlvcvvfLLCFLCFIFFIFLIL--------
+>tr|A0A226NZH3|A0A226NZH3_COLVI Uncharacterized protein (Fragment) OS=Colinus virginianus GN=H355_007446 PE=4 SV=1
+---SSCNAsnkqDHCEHKYISFY--QTNHHSAIKEYSWHEDNVssnrlvffsgFLD---
+>UniRef100_A0A2G9UCF3 EGF-like domain protein (Fragment) n=1 Tax=Teladorsagia circumcincta TaxID=45464 RepID=A0A2G9UCF3_TELCI
+---RMSHINKCKYGNDCV--NGtckpiidgtIPGSTCTCIAGYEGARCDQDK--
+>ERR1719213_1106133
+-----FENNLCENG-ACVS-QTSGGYYCDCYSNWIGVLCEIS---
+>UniRef100_A0A0S7KUK6 Vitamin K-dependent protein S (Fragment) n=1 Tax=Poeciliopsis prolifica TaxID=188132 RepID=A0A0S7KUK6_9TELE
+----QCKPYPCYKEGSERCVDGQASFTCVCKPGWKGRRCEDDI--
+>APEBP8051073058_1049385.scaffolds.fasta_scaffold19016_2 # 370 # 933 # -1 # ID=19016_2;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.674
+----AETESALSGGKVQE--TGDAKQT--------GEDSEDT---
+>ERR1719510_1755107
+----ACTENACANSGDCTVKTDaadttAASRTCACEGDFKGDDCTVA---
+>ERR1719506_3646778
+----LCTQEDCSLRGAVAAfgyRSDPGGCACECTAGYSGSNCDTC---
+>UniRef100_UPI0015E1DE5A LOW QUALITY PROTEIN: cubilin n=1 Tax=Morone saxatilis TaxID=34816 RepID=UPI0015E1DE5A
+----SCSSNPCQNGGTCL--SLINSYHCVCPSNWAVSSILSYI--
+>UniRef100_V8NFG3 Agrin (Fragment) n=1 Tax=Ophiophagus hannah TaxID=8665 RepID=V8NFG3_OPHHA
+----PCWLGI-IGGGR--------GSQSGTGGLFSGfASFPPVL--
+>tr|A0A0L7L4X3|A0A0L7L4X3_9NEOP Uncharacterized protein (Fragment) OS=Operophtera brumata GN=OBRU01_15220 PE=4 SV=1
+----KASCDlngdgsVCRSGSQCV--ARKEGG-ILCQGCSIDAAYT-----
+>UniRef100_A0A433SYS5 EGF-like domain-containing protein n=1 Tax=Elysia chlorotica TaxID=188477 RepID=A0A433SYS5_ELYCH
+---EACQSNPCKDDWKCDLIDSGAGYVCSPK----SDSLDDDD--
+>ERR1719500_309847
+----PCTSGVimdpCneHQNNTCVASPDFTDYDCVCTDSYTGLDCKMP---
+>UniRef100_UPI0009E48945 uncharacterized protein LOC110055421 n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E48945
+----SRHKgdwwiggyenrpSPSHPAG-ETQGDGPQGtLTSPSFVIRghtfkflIGGGCA-----
+>UniRef100_UPI000A2A6660 uncharacterized protein LOC110236124 n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI000A2A6660
+----RCSSKPCPSNKfcypdfawdSFTCRDGHLSqwgpWSCTCPARRtrrcvtaenkEANDCG-----
+>UniRef100_UPI0013903E53 uncharacterized protein LOC5501627 isoform X1 n=2 Tax=Nematostella vectensis TaxID=45351 RepID=UPI0013903E53
+----TCYPsNPCEMMCSPSPCDRSVP-VCHSPGVAl--PKCG-----
+>ERR1719494_1026000
+---NECDSKPCENAGECT--DVEEGFSCSCVTQNRAKMLGN----
+>tr|A0A218UTD0|A0A218UTD0_9PASE von Willebrand factor A domain-containing protein 2 OS=Lonchura striata domestica GN=VWA2 PE=4 SV=1
+---YHKHNQtlvtPSHARmvaRVSQR-DWTDTTVSACWGMEETP--------
+>ERR1719187_1262701
+---------MV----ENV--LEFRMTSTACKPNWKGKTCSEPI--
+>tr|A0A238BTD4|A0A238BTD4_9BILA EGF-like domain protein OS=Onchocerca flexuosa GN=X798_05047 PE=4 SV=1
+---DECADNPCMNGATCI--DLYNKFMCLCPLHFEKSASFILK--
+>UniRef100_A0A315VBT7 Uncharacterized protein n=1 Tax=Gambusia affinis TaxID=33528 RepID=A0A315VBT7_GAMAF
+---PRYNRDSCRQRGTAVRivvmkvgrEQEAQCLGgVACSSGFLV-QLKLQ---
+>UniRef100_UPI001181583D mucin-17-like n=1 Tax=Sphaeramia orbicularis TaxID=375764 RepID=UPI001181583D
+---SAVRTGPGDAAGGYA--GLGCVWStmawtvSYCSIGYIAllKSDHRD---
+>UniRef100_UPI000BAF1415 uncharacterized protein LOC111116088 isoform X2 n=1 Tax=Crassostrea virginica TaxID=6565 RepID=UPI000BAF1415
+--CNsgtygiECNSICgyCLEGTSCF--HVDGTCLNGCDPGFIGAMCRKRVL-
+>UniRef100_UPI000BAFAA52 uncharacterized protein LOC111116087 isoform X1 n=1 Tax=Crassostrea virginica TaxID=6565 RepID=UPI000BAFAA52
+--CNsgtygiECNSTCgyCLDGTSCS--HIDGTCLNGCDPGFIGAMCRQRVL-
+>UniRef100_UPI000BB03F33 uncharacterized protein LOC111102569 isoform X1 n=1 Tax=Crassostrea virginica TaxID=6565 RepID=UPI000BB03F33
+--CNlgnfgeECKGTCghCLPHTSCS--HVDGTCISGCDPGYIGDMCTTRVL-
+>ERR1712172_487495
+---SQTAMLAQLQLNGqeesssklcrdhhhrhrdqnhRC--CKPRKLYGDHPDNENHLG-------
+>ERR1719436_1566046
+---AQSASTAQLKACRgnfsackqaeddgmkamsl----CAPQKQICSRPPR------------
+>ERR1719464_761722
+------------ADLQANLTTkieKIAVDTFVCPDGFWGENCQLD---
+>tr|W5JPQ0|W5JPQ0_ANODA Uncharacterized protein OS=Anopheles darlingi GN=AND_001841 PE=4 SV=1
+---CWFDGLTIRNGGTDQ--SPLIGTYCGDRRGEEFNGT---I--
+>UniRef100_A0A0D6M259 Reeler domain protein n=1 Tax=Ancylostoma ceylanicum TaxID=53326 RepID=A0A0D6M259_9BILA
+----TCrQANPCENGGKCLV--KdRQRWTCALTTLVLRIPRAG----
+>UniRef100_UPI000E415859 coagulation factor IX-like isoform X2 n=1 Tax=Carassius auratus TaxID=7957 RepID=UPI000E415859
+------------MEESAA--RAAAFASVSVLRSTAGRTVKQRCL-
+>UniRef100_A0A3P9KPN3 Uncharacterized protein n=1 Tax=Oryzias latipes TaxID=8090 RepID=A0A3P9KPN3_ORYLA
+---DPCVSRPCLNGALCSSL-PSGDLcqyICFTCIFFSFKLLKI----
+>ERR1719275_462236
+-LCHQCLPDNCQGGiyseaghGRCTN-HIGQGCPKKDVDA--DATAQDS---
+>ERR1719348_1303984
+----GCVTNPCFGSATCVPH--GDnAFTCKCGKEWLGEFCNLNN--
+>ERR1712142_206860
+----RLTATPPSTIEAEE--PRLTATPPSTIeaekprlTATPPSTIEA----
+>ERR1719334_2289410
+-----CTPDPCGGKGECKVKN-DqNDFECKREDNYGGRF-------
+>UniRef100_UPI000A2A9355 uncharacterized protein LOC110244806 n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI000A2A9355
+----MARXPE-MQGQXLPH-FALALFLVFLPGKVVGNLEKV----
+>SRR6185369_5834439
+---PadtfsdQPGSSSCTACGagTHQ--ENTGQTTCIVSP-------------
+>ERR1719471_1669286
+---ARPIL--MTVRQILA--AMVGSVKIllatssarAPSAGWASGARRTRR--
+>ERR1719367_1835697
+---QP-VRQIMM--NAAL--DLVIP--VGQPSVWTWRTdlnvtaEMVTQ--
+>ERR1719487_613301
+-LCHPCIPNPCDFLSSGRACLDLLPY--TCTSGFECPEDLsQA---
+>UniRef100_UPI0009E5F9C4 ficolin-3-like n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E5F9C4
+----QVLDVKGTSAITTEDAW-AHAmvtcFIASVLSYIAVNNVNEP---
+>ERR1719219_1601934
+--CESHGPEPCGIHGRCVSNPAIQDYECVCDKGWKGAECDEDI--
+>tr|S4RN61|S4RN61_PETMA Uncharacterized protein OS=Petromyzon marinus PE=4 SV=1
+---RVATSEVQKSGVTCIN-SWISmKLFCLLSAHsaaIPgGR--------
+>UniRef100_A0A183UT24 Uncharacterized protein n=1 Tax=Toxocara canis TaxID=6265 RepID=A0A183UT24_TOXCA
+----SAFQPMCTAGSHATAIE-PTGTKVNSASvGRESVTEGCRD--
+>SRR6185437_4765130
+----QQILEGQATCGACP--SilGGVDFQCICPPGYSGIQCQTD---
+>UniRef100_A0A6G0ZHI7 Pikachurin-like n=1 Tax=Aphis craccivora TaxID=307492 RepID=A0A6G0ZHI7_APHCR
+----KCTRSPCQHGGKCVN--ITKIiSYYFVNLCKYSTVYVI----
+>UniRef100_UPI0009A39B85 cadherin EGF LAG seven-pass G-type receptor 3-like n=1 Tax=Rhincodon typus TaxID=259920 RepID=UPI0009A39B85
+-----------MDTWRSH--ELQSGFI----NPFKGDHCEVDS--
+>SRR5690242_7177908
+-------LLQAQSGGVCTPCVQGTSCQIECDANVAGIFVC-----
+>ERR1711937_362884
+----RWKSNPCR-HRICH--GGLSPGSCFCDPDGK----------
+>UniRef100_A0A3M6T4E3 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6T4E3_9CNID
+----SVLQEMTTAVLTLSAAIPRVRTVVLVNRDIL------E---
+>ADurb_Cas_01_Slu_FD_contig_21_1441580_length_341_multi_6_in_0_out_0_1 # 1 # 339 # -1 # ID=121147_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.543
+----SCRDVQCQNGGACIT-AGSQNVQCSCQRGYRSTYCEHRV--
+>APCry1669189369_1035219.scaffolds.fasta_scaffold91303_2 # 486 # 656 # -1 # ID=91303_2;partial=01;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.298
+-----DSySASN-NSSILNEGQQDLRLPA---VSFFIQ--------
+>GraSoiStandDraft_40_1057318.scaffolds.fasta_scaffold4673192_1 # 1 # 225 # 1 # ID=4673192_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.604
+-----NSdYI-IFYSAlifvsfsvcpsaclfFCLFVYLLTRLLfvfcgspasfsavsltCILHPDYSSVYRY-----
+>ERR1712018_454255
+----PCNNGttWCLNKGQCVNALNSLTPPMSDGCRVDGGADVSvG---
+>UniRef100_V8N9U5 Christmas factor (Fragment) n=1 Tax=Ophiophagus hannah TaxID=8665 RepID=V8N9U5_OPHHA
+----TLVKKAYEGNSGAP--VVTERNNTWFLTGIMtcGTECTGE---
+>ERR1712218_359753
+---------PAANSSpassSVRKVKEtsleLVGLRLPLLASNW-SRCSF----
+>UniRef100_UPI00138FBDB4 uncharacterized protein LOC5522140 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FBDB4
+----TCGSSKCLSGSFCQTGYGEKNHRCMCKANLTGAHCDISK--
+>UniRef100_UPI00138FD7C7 uncharacterized protein LOC116607366 isoform X1 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FD7C7
+----ICSYSLCQDDKMCELNADGLTHNCKA------------K--
+>ERR1719512_555352
+---NGWKT--MRNFSPEM--HWRPLYEWRSLQgSWFHSE-------
+>SRR5688572_24259173
+---VSYEAAPCGVNADCV--GGTDGATCACGDDYVGNPEfgCTR---
+>SRR5688572_3711804
+---ESIvatagdceviagcaegapaiervpncpPIDPPDPEIGCA--DGEregfssmNKYpeIAGCSGGWSL---------
+>SRR6218665_259313
+----RLRYevpEDVHGGGddgePDM--MSEddPGYTCHCVPGFEGNNCEVNK--
+>UniRef100_A0A401SXR6 Uncharacterized protein n=1 Tax=Chiloscyllium punctatum TaxID=137246 RepID=A0A401SXR6_CHIPU
+---VSCFSDPCKHDSTCLP-SSDGTYHCICKQDFTEFCTPT----
+>ERR1719419_904871
+---NPCLNNYCKNNAACRPY-VGSFYQCDCQAGRTGRIPALNA--
+>UniRef100_UPI0010FCD881 uncharacterized protein LOC114973644 n=1 Tax=Acropora millepora TaxID=45264 RepID=UPI0010FCD881
+----PCSNLPCKNNGKCISLYGKKTATFAPARKYSQENT------
+>UniRef100_UPI0008FAA75C cadherin EGF LAG seven-pass G-type receptor 2-like n=1 Tax=Cyprinus carpio TaxID=7962 RepID=UPI0008FAA75C
+-----CITNPCLNGGSCVKltSVQRGEDSTVSQTFYHDSSVFQL---
+>ERR1719153_751304
+---PKEKGWFLGKPlETCDS--VCKRQNLICSEnEFAIHSNEQD---
+>ERR1712060_800204
+-----CKTGKSKD-gGLPVN--SNGVCEHFCSKkGYCGDGNAYK---
+>ERR1712212_1012516
+-----KCAN-----nEDCVA--FSGIFKKWCIGcDV---KLTAK---
+>UniRef100_A0A3M6U9T5 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6U9T5_9CNID
+-----CAQSPCKNTGTCQSDADECQLGSFTC--HAQANCVND---
+>ERR1712208_162195
+----SCYPLPFSGELSF--------MNGPLFSTFMENQFVL----
+>ERR1719187_1543492
+---ADQLT--EEQIAKFK--EEFSRFDKDGNGAIdfeefVEMEMMA----
+>ERR1719167_1230586
+-----GKCVMEQGRGECRGLSTAPFFKCVCLSGFWGRTCDW----
+>ERR1711988_1317490
+--CSECNVY---NFDHCNSYcDYRFDFTWQCFV-------------
+>UniRef100_A0A6G0IUW6 Protocadherin Fat 4 FAT tumor suppressor-like protein 4 Fat-like cadherin protein FAT-J n=1 Tax=Larimichthys crocea TaxID=215358 RepID=A0A6G0IUW6_LARCR
+---ESIRAEPVSFYLASG--NFEDMFHVEQLSGALTVENPL----
+>UniRef100_A0A668A5K6 Zonadhesin, like n=1 Tax=Myripristis murdjan TaxID=586833 RepID=A0A668A5K6_9TELE
+---GGAAgDEPQLHEGKYS--HfnplepAQTHLISFKTMGKKENCTKKA---
+>UniRef100_A0A1A6H5V8 Uncharacterized protein (Fragment) n=1 Tax=Neotoma lepida TaxID=56216 RepID=A0A1A6H5V8_NEOLE
+----RS-ALWVLMLDVAGP-ENWKRVFQTHPATCYRTI-------
+>ERR1719494_599390
+-------edaRTCKDSGSKCV--NSVGSFQCICKDGWKLVH--gsvcK----
+>UniRef100_UPI0014254E7F uncharacterized protein LOC117121521 n=1 Tax=Anneissia japonica TaxID=1529436 RepID=UPI0014254E7F
+---NECmeKSDDCSFNAMCI--NMIGSYACKCNSGYEGNgTSCED---
+>UniRef100_A0A6M2D3W8 Putative trypsin inhibitor like cysteine rich domain fat body overexpressed (Fragment) n=1 Tax=Rhipicephalus microplus TaxID=6941 RepID=A0A6M2D3W8_RHIMP
+---ESCSTSPCKNGQSCVKR-NDGSAECVCNASYEGRFCQYDV--
+>UniRef100_UPI0013905660 uncharacterized protein LOC116607126 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI0013905660
+----FTPQTVYTF--PLLANFTPAP-KILDSQAFWQRRCGE----
+>tr|A0A1I8JRW5|A0A1I8JRW5_9PLAT Uncharacterized protein OS=Macrostomum lignano PE=4 SV=1
+---NPCDSNPCRRGGTCVAGLangDPTNYTCLCKPGFQMVQKAFHagaidqdvkayggqsircqglrgaivsdvkayvgeaifrsdvkgyggkssdvkayggnrsdvkaygaidpdvkglrgashqmskayggqidqmsR--
+>ERR1719181_2028901
+--CADCAPKTAGSDGTCA--ACAAGQKADPP--------------
+>ERR550534_762452
+---ENTQGGNVEVEVISYDLETNYDYlylydgdsTTSVQIARVNGAGSNA---
+>ERR1719183_2414009
+--------DHCNGNGT-PKTGANvvdhgveCAGQCNCDSAWEGDNCESE---
+>UniRef100_A0A2K5BVI6 Uncharacterized protein n=1 Tax=Aotus nancymaae TaxID=37293 RepID=A0A2K5BVI6_AOTNA
+----PCVSLLCWKRGICP--NSSSAYTCECPKGSPSQNDETDV--
+>UniRef100_A0A383YV51 protein eyes shut homolog n=1 Tax=Balaenoptera acutorostrata scammoni TaxID=310752 RepID=A0A383YV51_BALAS
+----HCVSQSCWKGEISQ--NKSSAYILECTEGFLNQNCETNV--
+>UniRef100_A0A6F9C590 Uncharacterized protein (Fragment) n=1 Tax=Coregonus sp. 'balchen' TaxID=861768 RepID=A0A6F9C590_9TELE
+----ASVRRERGQAGQCE--EREGRQAVEgeergrqasVRKRERGRQASVRE--
+>ERR1719400_2895307
+-----YaGGRKCQNGGSCRVlesHDRVPTFKCECPIGYTASFCEIV---
+>ERR1719223_1196318
+---DECAFGKiCPNNAICQ--NTPGSFNCECKSGFKLTSHVfqscID---
+>SRR6266516_4391027
+------GHQLcQPQTSTCI--NTPGGYQCQCKPGFRDDG-ThkncLD---
+>ERR1719272_2539272
+---IALASrTQENHCGTCS--TGF---------SMTGSNACEDI--
+>SRR4051812_34008806
+---DDCAALPCGPHGSCT--DSHLGYACecepgygwsgmgacelwdgcvasgvacpsgaSCQQADAGYECHCP---
+>ERR550534_2534660
+----DIPEMLMLGSKSNL--TMKYSASSEQDSRFSAEKAV-----
+>ERR1719220_2477714
+-------SC-YDENQECS--SNTNDndnqenenNCGPCPEGMTGDGKT-----
+>tr|Q9NEG0|Q9NEG0_DROME EG:BACR25B3.10 protein OS=Drosophila melanogaster GN=trol PE=4 SV=1
+-LSLTCVGSGVPNPEVEWVNEmaLKrDLYSPPSNT----AIlKIYR---
+>tr|A0A1A9XA53|A0A1A9XA53_GLOFF Uncharacterized protein OS=Glossina fuscipes fuscipes PE=4 SV=1
+-KVHESLGDNVQQTGSVLRIMnarpDNrGVYLCIAENSAGHDQASTV---
+>UniRef100_UPI00138FBEA4 uncharacterized protein LOC116604603 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FBEA4
+---SPCAQNPCKNATECI--DlAGMEFKCACAKQQAGRLCQYNVI-
+>tr|K1R9J7|K1R9J7_CRAGI Fibrillin-3 OS=Crassostrea gigas GN=CGI_10018675 PE=4 SV=1
+-------TSPH------T--PPVtttqASYTQTTPLSSIHtppvtatteHKSNT----
+>UniRef100_A0A0L7LTJ7 Uncharacterized protein (Fragment) n=1 Tax=Operophtera brumata TaxID=104452 RepID=A0A0L7LTJ7_9NEOP
+---RPCASRPCNARGACLE--TAGGFLCQCNPSWTGKRCEALN--
+>SRR4051794_39623436
+----TNAPHAFDAGATCL--DLIGARECVCALGYEGTNCDINT--
+>ERR1712136_33509
+------KptPEPTKpptVDPTPMptpqpTMEPTMD-----------WNCTETE--
+>ERR1719161_240326
+-RL-FAPPGVAVGTGQCRNL-WSKGYECECPEGLSGPNCNA----
+>UniRef100_A0A553PML5 Uncharacterized protein n=1 Tax=Tigriopus californicus TaxID=6832 RepID=A0A553PML5_TIGCA
+-------SKTCCEMNKALSAMsGKGNTQEDSKfdfnLGFGGGDSPFG---
+>UniRef100_A0A444UJ23 Fibropellin-1 n=1 Tax=Acipenser ruthenus TaxID=7906 RepID=A0A444UJ23_ACIRT
+-----VRPVILVRTGLCV--EEVEldtfplGFHCQCAKGFAGPHCEINV--
+>ERR1711970_417191
+------ARETCQEEGANlvmpkT--KSINDFL---VSNWNGFWIGV----
+>ERR1712241_10185
+---DPCQQYPCQNNGVCNADFDaginPVPYTCQCKGNWAGKHCDVEV--
+>UniRef100_A0A1A8QRI7 FAT tumor suppressor homolog 4 (Fragment) n=1 Tax=Nothobranchius pienaari TaxID=704102 RepID=A0A1A8QRI7_9TELE
+----LEVKFRTRSKTGTLL-HFQESSNYTTIKLRNGNVHYI----
+>tr|W5LJP7|W5LJP7_ASTMX Uncharacterized protein OS=Astyanax mexicanus PE=4 SV=1
+----HSLYSSLV-----P--LIYSDTQTICFLQDMGFS-------
+>UniRef100_A0A016TXH2 Uncharacterized protein n=5 Tax=Ancylostomatidae TaxID=33278 RepID=A0A016TXH2_9BILA
+----SCAHHRCLHSSRCRNSNTLKGYECVCPKEYAGEYCQMRS--
+>UniRef100_A0A4E9FES7 UNC-52/Perlecan, putative n=5 Tax=Brugia malayi TaxID=6279 RepID=A0A4E9FES7_BRUMA
+----ACSLGLCQHNSICIPTNIHNGFVCDCSNvkGYEGEFCERKI--
+>SRR5689334_13833835
+---DDCPgaspicdVDRQSCEAYCD--RSHVVQPCTCPIGWMGPTCQQDV--
+>UniRef100_A0A2J8IMD7 GAS6 isoform 1 n=1 Tax=Pan troglodytes TaxID=9598 RepID=A0A2J8IMD7_PANTR
+----RRPADTAPRKGTQACQDLMGNFFCLCKAGWGGRLCDKDV--
+>UniRef100_A0A2K6K3G1 Growth arrest specific 6 n=1 Tax=Rhinopithecus bieti TaxID=61621 RepID=A0A2K6K3G1_RHIBE
+-------SKSASFPGSTVGLDDFRLGSSSCTDSRARTLCWKR---
+>UniRef100_A0A2Y9JCB0 growth arrest-specific protein 6 isoform X4 n=1 Tax=Enhydra lutris kenyoni TaxID=391180 RepID=A0A2Y9JCB0_ENHLU
+-------------MGLGSGAGPGANAASDAHPAYFPGASRPDlpR--
+>UniRef100_A0A3P8ZAQ0 Uncharacterized protein n=1 Tax=Esox lucius TaxID=8010 RepID=A0A3P8ZAQ0_ESOLU
+----RIQRDAVACTPDLDCNKSPVVDLFY-------------I--
+>UniRef100_Q4SHY3 Vitamin K-dependent protein S n=1 Tax=Tetraodon nigroviridis TaxID=99883 RepID=Q4SHY3_TETNG
+----WCNSPPFFpicflhqpsffffyfnrqrSVTSARRTRATKRAPCAAWTAWLRSSVCANP--
+>UniRef100_UPI0005F56E58 growth arrest-specific protein 6 isoform X1 n=1 Tax=Cercocebus atys TaxID=9531 RepID=UPI0005F56E58
+----EMSMNAARRMGAASRSATTSRAASTVPATAASSSPLTagPA--
+>UniRef100_UPI000CEACCEF LOW QUALITY PROTEIN: growth arrest-specific protein 6 n=1 Tax=Salvelinus alpinus TaxID=8036 RepID=UPI000CEACCEF
+-------FSHNRCSFSLAVLAKKGVFLVLPYPNLVSLS-------
+>ERR1700684_1840056
+----NCSSSsdACLNGECVfD--NSTLTEHCQCEPGFMGKFCQIDI--
+>ERR550519_3061527
+------NQTPVKTGAPALTTWMQLTPVHALHQDTWV--MTAKL--
+>ERR1719272_1082183
+----ALDQ----LSRVMAVELgpQKIRTNCVNPTGFTGKDCDID---
+>UniRef100_A0A444UJ23 Fibropellin-1 n=1 Tax=Acipenser ruthenus TaxID=7906 RepID=A0A444UJ23_ACIRT
+--CSLCTRAFDWTGADCIQ-DVNEREPNPCLKGFEGIHCEIDI--
+>SRR5689334_5986694
+-----------KLGGMSS--NLI---QLIVKIVFQGEMCDTDV--
+>UniRef100_UPI00109BE50D adhesion G protein-coupled receptor E1-like n=1 Tax=Exaiptasia pallida TaxID=1720309 RepID=UPI00109BE50D
+---DECLTKKCAADERCYsniqsITSTSCFNTVKCSSGYRwGSTSCIDM--
+>UniRef100_UPI0013906379 sushi, von Willebrand factor type A, EGF and pentraxin domain-containing protein 1 isoform X1 n=2 Tax=Nematostella vectensis TaxID=45351 RepID=UPI0013906379
+---SACGSKPCSKPFTCQEVLnsHDVLYTCNLNTDIK----------
+>ERR1712235_130887
+----DTYTPIPVIFGNTVETLKAGHYECTCSAGFTGDTCEETV--
+>ERR1719343_1891688
+-------ENQCEKSFSLT----YQKFESR--PFFLLV-LMYL---
+>ERR1719397_1281145
+-------S-----TNTMI--ATqkTRAKTEDC--GSTGPDCSLA---
+>UniRef100_A0A672QI99 Delta-like protein n=1 Tax=Sinocyclocheilus grahami TaxID=75366 RepID=A0A672QI99_SINGR
+-------SKTKHY-YRIR--GMHRHYNDPKFCGVCGLFSD-----
+>ERR1719378_2040405
+-----ACTTNCNNGSVQG--NQVDGCSCKCNSGWKGATCTA----
+>tr|U3KGE8|U3KGE8_FICAL Uncharacterized protein OS=Ficedula albicollis PE=4 SV=1
+----PPATESCLHEGHCVVAQagitagT------IPRLPWRSSGNFIE---
+>tr|H2ZW61|H2ZW61_LATCH Uncharacterized protein OS=Latimeria chalumnae PE=4 SV=1
+----TATTGKVSNGMDCTNT-sgedspwqlaVTHTYNVtrVIHLLSSIPQSFMT---
+>ERR1719468_254693
+-----CKTFPCKNDGVCEDL-GDFNFTDSIIFTWEGL--------
+>ERR1712168_1530175
+----ASISNPCLNYGACFASLtHPSKFVCTCRTGFSGKDCSKP---
+>tr|B3RZV5|B3RZV5_TRIAD Uncharacterized protein OS=Trichoplax adhaerens GN=TRIADDRAFT_57591 PE=4 SV=1
+----LCRTHAPWQNGACLW-TGPMSYNCNCSSGYTGKNCTKD---
+>ERR1719219_367257
+---PDfcaDNNGGCKNGATCMN-GRPDQADCQCQMGFEGADCGTP---
+>ERR1719362_695967
+----GgsatlqwvignphdsCDTTCSNQGSVCNAqelqnlnGQSVSLFNDkfrlagmdcsetfeHCVPGsncvawaspyvhkdhFvtrkcqAGSTPSV----
+>UniRef100_A0A060Y0G6 Uncharacterized protein n=1 Tax=Oncorhynchus mykiss TaxID=8022 RepID=A0A060Y0G6_ONCMY
+-----PYTSGCPAG----L-YPLHSQWFLMFLCFSFKSYNR----
+>UniRef100_A0A4Y2TSA1 EGF-like domain-containing protein n=1 Tax=Araneus ventricosus TaxID=182803 RepID=A0A4Y2TSA1_ARAVE
+-------ACNCGPDTNCTF--IDQGFfkpllkKCLCKPGHHEENGK-----
+>ERR550532_2998065
+-----CE-NTVDFSSTVFR-ENDPGYVCICGGGVTGENCDIP---
+>ERR1719500_980134
+----PCETNYCENGGSCVN-NaTFQGCACtSCFAGELCNQLLCP---
+>ERR1719195_1143260
+----PCSGLPCSHEAECVSVWPpTRpRHLCHCAPGYTGRRCQHR---
+>ERR1719204_1607981
+----ECWSRGCKRGGKCDI--CGDGSCCRIGRN-DGGGCD-----
+>UniRef100_A0A0M3JVA4 Multiple epidermal growth factor-like domains protein 6 (inferred by orthology to a human protein) n=1 Tax=Anisakis simplex TaxID=6269 RepID=A0A0M3JVA4_ANISI
+----NCTPELCHNGGTCVPVQNGTEQVCYCLEGFQGTRCQYgkyllNVN-
+>UniRef100_E3NPL4 Uncharacterized protein n=1 Tax=Caenorhabditis remanei TaxID=31234 RepID=E3NPL4_CAERE
+----IMEEHVYHRNTTTMnKYASVRRDLPERNVNMVRKK---DVN-
+>UniRef100_Q2PDK2 Plasminogen activator n=1 Tax=Xenopus laevis TaxID=8355 RepID=Q2PDK2_XENLA
+----DCTEQKCYNGGLCRQAVYSATICAAARAGLKETTVRQTH--
+>ERR1719210_2762942
+--CDKRSKNPCDPDntKYCQ--NKQNDYKCVCKPGWRGRKCLTK---
+>SRR5437762_10776737
+----FCTPNPCQNGRSEEH--TSELqspMYLVCRLLLEKKK-------
+>UniRef100_A0A2G9QCH3 Uncharacterized protein (Fragment) n=1 Tax=Lithobates catesbeianus TaxID=8400 RepID=A0A2G9QCH3_LITCT
+----SCSQNACYNGGTCKSLPQEPFYQCICPRHFNGLFCHILDY-
+>tr|A0A0B7BEM1|A0A0B7BEM1_9EUPU Uncharacterized protein OS=Arion vulgaris GN=ORF178712 PE=4 SV=1
+--NSTCSLQTCVNG-RCDI-TGDGLEYCKCYDGFSGATCETG---
+>UniRef100_A0A3M6UKR5 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6UKR5_9CNID
+---SPCNTDFCGKNMTCQAGYTSKGYRCMknitsTPLNFSNLVAK-----
+>UniRef100_A0A3M6UKY0 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6UKY0_9CNID
+----------LQKDTVVS-VHKDSGERIVTKVSMANPFCV-----
+>UniRef100_A0A3N0YVU2 Vitamin K-dependent protein S n=1 Tax=Anabarilius grahami TaxID=495550 RepID=A0A3N0YVU2_ANAGA
+-----------TSPGASCAAVRRASTHTTTSTAWVSITAQVTG--
+>UniRef100_UPI001068DE7E uncharacterized protein LOC114541572 isoform X1 n=1 Tax=Dendronephthya gigantea TaxID=151771 RepID=UPI001068DE7E
+----ECEKRSYQCNQNANCSNTPGSYSCQCQIGYkgNGKQC-NDI--
+>ERR1719219_558507
+------YRIPATEVEVARS--MTILSRVFCPPDRTGDRCERR---
+>UniRef100_R7V3Q1 Metalloendopeptidase (Fragment) n=1 Tax=Capitella teleta TaxID=283909 RepID=R7V3Q1_CAPTE
+--CRDDLRRPCLHGGYQD---PNDCSRCRCPDGFSGTFCEAL---
+>UniRef100_A0A3Q0KQD3 Hypotheical protein n=1 Tax=Schistosoma mansoni TaxID=6183 RepID=A0A3Q0KQD3_SCHMA
+-----CDSILCQNKGMCISSGDGKQFLCLCEYGWGGKYCTEPG--
+>UniRef100_A0A090MYE5 Epidermal growth factor-like domain-containing protein n=1 Tax=Strongyloides ratti TaxID=34506 RepID=A0A090MYE5_STRRB
+--CKETKFNPCKHESQCYYTNITSEYFCKCNECYSGQFCQDK---
+>UniRef100_A0A0K0ENM7 EGF-like domain-containing protein n=1 Tax=Strongyloides stercoralis TaxID=6248 RepID=A0A0K0ENM7_STRER
+--CEVTKYNPCMHDSQCYYTNMTSEYFCKCKKCYSGQFCQDK---
+>ERR1719431_2250549
+---NSCKPNARKNLRRLML-S----FWWTAVEALIALIA------
+>ERR1719400_809445
+----ECDPHPCRDYEICE--DRIASYYCRKVTCKTH---------
+>UniRef100_UPI00035A0670 neurogenic locus notch homolog protein 1-like n=1 Tax=Aplysia californica TaxID=6500 RepID=UPI00035A0670
+----PCFAQPCSNGGICQP-TSNTSHQCFCPLGFSDQNCSVLD--
+>SRR5882672_11712929
+-----TGMEPCLMcfpgtfsptvgatsctacsPGTFS--DETGAIACdPCPPGTYAPFTGSS---
+>Laugresu1bdmlbdd_1035124.scaffolds.fasta_scaffold00293_5 # 6794 # 9574 # -1 # ID=293_5;partial=00;start_type=ATG;rbs_motif=TAA;rbs_spacer=10bp;gc_cont=0.318
+----YLDSDPNVDGNNNW--RSL------IRKGSTaGTT-------
+>ERR1719188_22138
+---GSCSSAPYANNyAYCQ--QPIF---qsncCFCFGGTTAQ--------
+>ERR1711970_1151876
+-----MHLRGWLTGAKCDATrkfsptrkPGRPDYKCLCPANFRGRNCEN----
+>ERR1719453_2369794
+----VACtiFDDCTNHANSVSGdrGVGLGCQCTCSTGWEGSDCAQ----
+>UniRef100_A0A0L7LKF8 Slit protein (Fragment) n=1 Tax=Operophtera brumata TaxID=104452 RepID=A0A0L7LKF8_9NEOP
+-KCARVHEAGIARCAAPAAM-RDKLILSTHSGAF---LCTGQ---
+>UniRef100_A0A2W1BK68 Uncharacterized protein n=1 Tax=Helicoverpa armigera TaxID=29058 RepID=A0A2W1BK68_HELAM
+-SFRVAFQNLLKFlVALCFAI-LSILILSKFL--------------
+>ERR1719277_2240676
+----YCQlPGACDANANCE--EGQLKAVCTCKEGFHGDGKsCA----
+>tr|W4Z1T4|W4Z1T4_STRPU Uncharacterized protein OS=Strongylocentrotus purpuratus PE=4 SV=1
+-----CKHHVCTNGGACIGR--SRIKSHVSMPSWNTRL-------
+>tr|T1EH57|T1EH57_HELRO Uncharacterized protein OS=Helobdella robusta GN=20195907 PE=4 SV=1
+-------GFSFTTSSNC----TnLDgGFECKCKDGYVKSNSGSctD---
+>RhiMetdeSRZDD1v2_1073273.scaffolds.fasta_scaffold2472688_1 # 2 # 304 # -1 # ID=2472688_1;partial=10;start_type=GTG;rbs_motif=None;rbs_spacer=None;gc_cont=0.673
+-----EHSTSCNHGNKGLLRMEEMHIEFCDGTSWVRllnEkvpLNSS----
+>tr|G3X0B3|G3X0B3_SARHA Cadherin EGF LAG seven-pass G-type receptor 2 OS=Sarcophilus harrisii GN=CELSR2 PE=3 SV=1
+----GCKDNPLGNKKENR--REERGISSSCWAQFsggSGEHCEVS---
+>ERR1719466_519026
+------FLATLVISLGCLS--EAVffkdrfpgktlADLATCQDGYKLVGMrE-----
+>tr|A0A091U038|A0A091U038_PHALP Plasminogen activator OS=Phaethon lepturus GN=N335_04224 PE=3 SV=1
+-----CTRNKCYNGGQCSQAYYSPqLFICQCHQGFSGKQLTFcsicsD---
+>SRR5260364_103344
+-----KGKCEVLHSSQCRASGLQLprpaaplqapALTCVLQnlFLFQFENSFLL---
+>tr|F6X4X5|F6X4X5_MONDO Plasminogen activator, urokinase OS=Monodelphis domestica GN=PLAU PE=3 SV=2
+-----PGNCGCLNNGVCISYKYFSkIHRCSCPENFIGEHCEIG---
+>UniRef100_W4Z7Y7 Uncharacterized protein n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=W4Z7Y7_STRPU
+---EPCSYEPCRNGGTCSVSPDGIAWSCDCPMPYGGVLCER----
+>ERR1719183_2903984
+----GGKCTRDTNTTDKA--PITGAYACICAAGYEGADCGV----
+>SRR5689334_5191263
+-----NGTVPASV--TVL--PGARSASFVYTAGAIGS---VTI--
+>ERR1719183_1962566
+-TCANQNENACTDTEWCTV-VPGCD-THNDAN-------------
+>tr|A0A0P7UQV0|A0A0P7UQV0_9TELE Protocadherin Fat 2-like OS=Scleropages formosus GN=Z043_109513 PE=4 SV=1
+---EGCASGPCLNGGSCQEN-PVGGEFWCLHKAWKGYNAGN----
+>tr|A0A1L8GWK1|A0A1L8GWK1_XENLA Uncharacterized protein OS=Xenopus laevis GN=XELAEV_18016840mg PE=4 SV=1
+---GACTNEPCPADKICAEL-PNGGYACLSHSLFND----Q----
+>tr|S4RWD4|S4RWD4_PETMA Uncharacterized protein OS=Petromyzon marinus PE=4 SV=1
+---SSCPLDECEPGRRsRDV---------RARRVWDGTLCVdlrahlacvsvnprV----
+>ERR1719419_420040
+--------DTCDNGGTCFPQ-PSGGFLCECPSPNFSGMRCnnevmgipqamtgN----
+>tr|B7P8W6|B7P8W6_IXOSC Protocadherin fat, putative OS=Ixodes scapularis GN=8026349 PE=4 SV=1
+---TECLKTPTDHAANaCSKT------------HLCGHLCNG----
+>SRR6266511_3379526
+-----CDPlTYCANYGDGLG--RACGP---CPAGYTgsGETGCLD---
+>DeetaT_10_FD_contig_31_1238769_length_203_multi_5_in_0_out_0_1 # 1 # 201 # 1 # ID=1082929_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.527
+-----KKLLAIKppkahgpDNVPCRI-VKEFAYKLAVPITTIF---------
+>ERR1719318_2146845
+------C-GTC----TDNP--NGQGVTCACKGDFTGTTCRNS---
+>UniRef100_A0A3M6UTN9 Uncharacterized protein n=1 Tax=Pocillopora damicornis TaxID=46731 RepID=A0A3M6UTN9_9CNID
+----PCSSSPCQNKATCVTNYKYDSFE-LNTSQLVILIVD-----
+>UniRef100_UPI000C049B33 uncharacterized protein LOC111346492 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=UPI000C049B33
+----SMSVLQELKNAVKMPFATIPKVPITVHVNLDILEMD-----
+>UniRef100_A0A5J5N766 Uncharacterized protein n=1 Tax=Muntiacus reevesi TaxID=9886 RepID=A0A5J5N766_MUNRE
+----MCDHSPrARHTGMCL--ESVGRQE----DPTMNVTIFN----
+>ERR1711911_333812
+----ELFLSDEKNQGTCFDDDGRDRFSCECVGPFAGETCGI----
+>ERR1719350_250236
+------GSFLCMGGGKDRCIYdGAgrlvGVPHCLCTQGREGTYCERR---
+>ERR1719319_2043655
+------AGATAGAKNICRCMYdGSgrlvGAPRCLCTQGREGTYCERR---
+>ERR1719289_143435
+----SLQS----SVESCQ--------SSLENLRVDLSKCKLSK--
+>ERR1712130_823122
+----ECATAKTTSVGRTA--SARTrAWRKGRRdQSFVRMKERV----
+>ERR1719486_690139
+----ECVPNPSTS-------VWPTPASMEVAaTTLSDPSLVF----
+>ERR1719219_445411
+----ECALQDPCHHGTCQ--DTEGDYQCLCHqDFCG----------
+>UniRef100_UPI0012398A41 CUB and peptidase domain-containing protein 1-like n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=UPI0012398A41
+-----MVRHPWKFPVLlSR--RLQGGLLSKRLGQDKWTRYP-----
+>UniRef100_A0A1I7V0I9 Uncharacterized protein n=1 Tax=Caenorhabditis tropicalis TaxID=1561998 RepID=A0A1I7V0I9_9PELO
+----KLQIQSAPVQRVVHQV--LAQFLISNVILLMtfrrAHAMSD----
+>ERR1711988_1214380
+-------DG----GTNCE--DSHPncgtwagagecsknpvwmqencrvscqtcddgggq--SCVDHNdyceYWSTQgYCNAR---
+>ERR1712079_606411
+-------SGPIVTGRPGE--CIDGhskcsewasegecdknpiwmkencrvscgtcdggptpstpstggpptnpPGNCKDDNsrceEWAGKgECEAN---
+>tr|G3VPA2|G3VPA2_SARHA Protein S (alpha) OS=Sarcophilus harrisii GN=PROS1 PE=4 SV=1
+----QFHDAAQSQDTDRLCGESFATGldtlpwqqasrqgeklktqgvKNTILNSWSFSepghpfltvsrhalrvserSHCCPD--
+>ERR1719220_361338
+---DSGWSGFCE----CS--KNVAGKGCeSWVYENCNQACES----
+>ERR550534_1877772
+----TTTNNPA-------AVEWPSephvtkprkGVPAVFNYDFDDDDKDQ----
+>ERR550534_3171797
+----TITNKPV-------AVEWPSephvtkprkGVPAVFNYDFDDDDKDQ----
+>ERR1719199_1299230
+-----QPCQGCLNGGLRT--GSVagGNCGCVCPLGFTGARCADVV--
+>UniRef100_A0A0D6M259 Reeler domain protein n=1 Tax=Ancylostoma ceylanicum TaxID=53326 RepID=A0A0D6M259_9BILA
+---NECLQNKCRNAVECI--DKFDDYECVCEKESFNLSHFQ----
+>UniRef100_A0A0B2VLB7 Uncharacterized protein n=1 Tax=Toxocara canis TaxID=6265 RepID=A0A0B2VLB7_TOXCA
+----RCKENRCRNGGQCFVPlSGDRTPFCLCPNEYAGRDCDSH---
+>tr|A0A1B6J9M1|A0A1B6J9M1_9HEMI Uncharacterized protein (Fragment) OS=Homalodisca liturata GN=g.51043 PE=4 SV=1
+------DELRCPNRLTCQPHEFqCrdrscIDYSLKCNdvPDCADYSDED----
+>ERR1719312_1215531
+--CQTVGADACKNGAMCVSEAggveSGAKFTCYCAEGFEGKFCETA---
+>ERR1711935_764578
+------DVTTGHNDAIAGD-NDDTTGDNDVTTGdndaIAGDNDDT----
+>ERR550514_317680
+-------VDCGDHGSYTSD-VSSATGSCVCTDGWSGDSCEV----
+>ERR1712227_942942
+------DVGFCEHHDSRYN--DGNKDYPDCEDGVIDGDLEP----
+>ETNmetMinimDraft_23_1059889.scaffolds.fasta_scaffold648605_1 # 1 # 342 # -1 # ID=648605_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.330
+----WILeFFICRSSIL----------LYQTRNLITRFSLLV----
+>ERR1719361_566359
+---NECAAGtdECDSSADCH--NTDGGYECVCKQGYDGDGRVGG---
+>ERR1719174_2537623
+----ECLAAPRLDRTHLD--RTRSR-R--CRPPHR----------
+>UniRef100_A0A0N4VMS4 Uncharacterized protein n=1 Tax=Enterobius vermicularis TaxID=51028 RepID=A0A0N4VMS4_ENTVE
+-NCTACYSNPCLYGSKCTPVGItdYRqfHFRCDCPDDKAGKNCEVD---
+>UniRef100_A0A1I7U289 Uncharacterized protein n=1 Tax=Caenorhabditis tropicalis TaxID=1561998 RepID=A0A1I7U289_9PELO
+-QCSICSQPGLCNTGQCVPDSRfpWQYFYCVCPDNTSGRFCQNV---
+>UniRef100_A0A183CKC8 Uncharacterized protein n=1 Tax=Globodera pallida TaxID=36090 RepID=A0A183CKC8_GLOPA
+---DPCVTASCGQNGQCVRQQQSNSFFCQCVNSFTGPLCTEPV--
+>UniRef100_J9ER43 Uncharacterized protein n=1 Tax=Wuchereria bancrofti TaxID=6293 RepID=J9ER43_WUCBA
+---DPCLSNPCGHFGSCIRLPHSATFICNCSHGYSGTACKDRI--
+>tr|A0A2A4IZ35|A0A2A4IZ35_HELVI Uncharacterized protein OS=Heliothis virescens GN=B5V51_10161 PE=4 SV=1
+---TNCDHMTCYFGAHCTVRS--GLATCECGTTECpaadgPSVCGSD---
+>ERR1719412_392124
+-------GLSCTTGHCTVSVQKhsihshysihahSFQCAPNIDKGYAGMKCEIS---
+>ERR1739848_91380
+-------NEIVEEPATEAPLTTLAGPVD----LPELADQL-----
+>ERR1719507_2488246
+----TRCiVD---ESGLCLA--TEn------NPEFCDGEGNCVC---
+>ERR1712051_339680
+----ECTpVAK-LSTLVCEL--LKftaifqkgvwtildlRaNI-YPYPQPLMGPNgVKLP---
+>ERR1740128_194909
+----PWLiPTCVKNGGTCVN--L-rdSsHFRCSCTYEWQGRDCSDP---
+>tr|A0A1W5C9D4|A0A1W5C9D4_ANOGA AGAP009712-PA (Fragment) OS=Anopheles gambiae GN=AgaP_AGAP009712 PE=4 SV=1
+----DKFdY-TCSRwqympVGvgfeGCIR--NfkHnGiLYDLSHPGLSKGsaPGC-LY---
+>ERR1719322_1978295
+----VC-lDP----GTRCIV--DEagLcVATESNPEFCTGDNCVCS---
+>ERR1719460_985877
+----ACPENSNG---------QGVAAGCVCNAGFSGSIV------
+>ERR1719335_957026
+-------AHCKWNVHTCQTS-PCNGvncndgvcrvsgssYQCDCSSGYRGTHCESH---
+>UniRef100_A0A1C3KZT1 EGF-like membrane protein, putative n=1 Tax=Plasmodium malariae TaxID=5858 RepID=A0A1C3KZT1_PLAMA
+-PCSFPETNPCLN-GSCIFIIKLNRIICKCNNGWTQKDK------
+>ERR1719228_1971052
+---DKCQECGCKEIGSVNG-N-cdKKTGACTCKAKWFGDKC------
+>ERR1711965_301833
+---ADCTV---PCRQC-VS-G-tcdPTNGTCICFPGFAGGACGL----
+>UniRef100_A0A2B4R7Z1 Uncharacterized protein n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4R7Z1_STYPI
+------TYPLTESEVSNKVNSENNEHACNLNRQRFENMSSAAI--
+>UniRef100_A0A2B4R8L9 Uncharacterized protein n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4R8L9_STYPI
+------IFPLSQTSQIAALANEDDRLTYDILAYRVANIDRIQS--
+>tr|C3ZBW0|C3ZBW0_BRAFL Uncharacterized protein (Fragment) OS=Branchiostoma floridae GN=BRAFLDRAFT_201381 PE=4 SV=1
+--SGHYPffiilllrsltrvgssqiaFTPCFHAALSSGSTpeATVLNiclvgVHRCSLELQGRSDIVQK--
+>ERR1719495_1365071
+-----CSIIHVKMGNVLEKMEKPPLMMISIAFVQMVGKA------
+>SRR5206468_3831907
+----KVSNSGCISGHVAH--AND--FIAVaTDLDCKSLGCFP----
+>ERR1712012_1401948
+----PCDNI-YCQNGASPFIMETGICSCQCPPGFYGDNCEFS---
+>ERR550532_1591883
+---ASPTPPPVTTPAPT------------TPRPTPPPTPAP----
+>ERR1719409_2564774
+----DCAAgdtamcdhGTCENQVRVT--PASPAFTCNCHNGYEKptgtDMCTVD---
+>ERR1712168_10581
+---------RNMNNGICTitcadgfelK-YDQNEIICEDGDWFRGDTTE-----
+>ERR1719466_519026
+-----------KNGNQCAkyclkqllagekkdndnknivgsifkasqciCVRYNEPRFVEEAGT---FSCV-----
+>UniRef100_UPI0012AD5C79 protein eyes shut homolog n=1 Tax=Papio anubis TaxID=9555 RepID=UPI0012AD5C79
+-----DQENKSQHEAICE--DEINRPRCSCSLSYIGRLCVVN---
+>SRR4051812_24959588
+---VAGEGVPCTRLA--A--AGPRPDACVRAHWCSGGLCQTD---
+>SRR5271170_413209
+---PGGATNVCSGNGACSQ-NVTGSGVCSCYAGFGGPACQNKTS-
+>ERR1719209_2398967
+----SdeTlVWTPL-AGTEGS--AGLEEARCSAPVHLAGRGHGV----
+>ERR1719322_630416
+----ECSADFCYNNGKCIFDLRLNTSYCSCDVGFTGSTCSQ----
+>ERR1719397_1821317
+---------KAVNSGltgaailaWFV--NAEVTFVLALLPGGAGKKCQH----
+>tr|A0A158PHD7|A0A158PHD7_ANGCS Uncharacterized protein OS=Angiostrongylus costaricensis PE=4 SV=1
+---------SSLNFHSCN--ERFPRLECARQLVFLSFVCNS----
+>tr|S4R9X6|S4R9X6_PETMA Uncharacterized protein OS=Petromyzon marinus PE=4 SV=1
+---------PWQIGGRCV--DLLGAISSEHPPGFSKLLSVD----
+>tr|W4Y0J3|W4Y0J3_STRPU Uncharacterized protein OS=Strongylocentrotus purpuratus PE=3 SV=1
+----TVASIPALLKDglLDT--PLNS-----DEVTGARTNCEID---
+>ERR1719234_1089425
+----VRTRAPACPRRADT--PAFAT--RTTQETTA----------
+>UniRef100_F7AQY1 Cadherin EGF LAG seven-pass G-type receptor 1 n=1 Tax=Ornithorhynchus anatinus TaxID=9258 RepID=F7AQY1_ORNAN
+----ILKTQECGIQGLPRG--RDGRQAELCKIGETGgDSCDVN---
+>UniRef100_L5L910 Agrin n=1 Tax=Pteropus alecto TaxID=9402 RepID=L5L910_PTEAL
+--CQGSVVGGAEGLGSRVSY-KDTRFSCLPPVGRGCGECHRG---
+>UniRef100_A0A0P7ZA55 Protein eyes shut-like n=1 Tax=Scleropages formosus TaxID=113540 RepID=A0A0P7ZA55_SCLFO
+-----PSHHSLDNDTelectaiGTT--TDSENWFCKCPGLYSGKLCQLT---
+>tr|A0A1S3D175|A0A1S3D175_DIACI uncharacterized protein LOC103508436 OS=Diaphorina citri GN=LOC103508436 PE=4 SV=1
+---PDPASLSLTSDYACP--QGQVVVAPDcGKAGWTGSRCEKDI--
+>tr|A0A2B4R7A9|A0A2B4R7A9_STYPI Uncharacterized protein OS=Stylophora pistillata GN=AWC38_SpisGene21628 PE=4 SV=1
+----HDDSNTGGNEATR---QPDNGDKHIKAMGVHPGAVTR----
+>tr|A0A2B4RCJ9|A0A2B4RCJ9_STYPI Uncharacterized protein OS=Stylophora pistillata GN=AWC38_SpisGene21623 PE=4 SV=1
+----HDGSNTCGNEATR---EPDNGDKPIKAMGYILVQ-------
+>tr|A0A2B4RZE6|A0A2B4RZE6_STYPI Uncharacterized protein OS=Stylophora pistillata GN=AWC38_SpisGene12934 PE=4 SV=1
+----ATGTHNYSADAEC--NNSKGSFNCTCKLGYSGNVELA----
+>OM-RGC.v1.003917216 TARA_109_SRF_0.22-3_scaffold95585_1_gene69634	COG0624	K01438
+----GPGFCYISFFTTViLLLYPRSLNQVSSITM------------
+>tr|A0A0M3JUY3|A0A0M3JUY3_ANISI Uncharacterized protein OS=Anisakis simplex PE=4 SV=2
+---SPCMNDTCVEEGHCTAISmgHDGKYNCSCKHGWKGPRCAED---
+>ERR550534_3461311
+---TSVRHNLANTGALALR-rPPLATTRVPVLRNTREKTV------
+>ERR1712023_154489
+--------NNgMGNCQNAWRCENlTPGFKCFCKQGWVGLLCEEPE--
+>UniRef100_UPI000B90C4BC fibropellin-1-like isoform X1 n=1 Tax=Acanthaster planci TaxID=133434 RepID=UPI000B90C4BC
+-------DPAYSLDWSED--DISNSTHCQCIEEFDGplseqrvtqnnascvqcecapdSHCEIKL--
+>UniRef100_K7FSG0 Cadherin EGF LAG seven-pass G-type receptor 2 n=1 Tax=Pelodiscus sinensis TaxID=13735 RepID=K7FSG0_PELSI
+---QPCSRSPSqlGPHGMCC-----GAGAVWCWQRLTttpaaGEHCEVN---
+>ERR1719411_253710
+-------KTKCMNGGICT--PFFLDLMSVNAARILlVPNVK-----
+>UniRef100_A0A1A8JFC3 Slithomolog 3 (Fragment) n=1 Tax=Nothobranchius kuhntae TaxID=321403 RepID=A0A1A8JFC3_NOTKU
+----TGLQGRMFKGLSGL--KTLmlrsNQISCIDNSTFTGLSS------
+>ERR1719403_685070
+-----GTTRECSQHHECGD-----AkllckDQCTesqldRFDRFSAPTAEptastytpttS----
+>SRR5262245_47781944
+----VCGgvatscssrSFMCTSGYGCTSTSRCSGSPYSCYTRYSSTSCNAV---
+>UniRef100_A0A093NQZ2 Slit 1 protein (Fragment) n=1 Tax=Pygoscelis adeliae TaxID=9238 RepID=A0A093NQZ2_PYGAD
+-PCRPALPS-GMGQGELGT-VPWHPPHSHLSLLSQGRDCEV----
+>ERR1719273_1457145
+----ASSQNTCKDAPECAENGIEDEFACEIIPWAY----------
+>ERR1719162_2265505
+------------FADNTIVSAEVWDYYCACPETHIGKNCQIYK--
+>UniRef100_G3PX75 FAT atypical cadherin 2 n=1 Tax=Gasterosteus aculeatus TaxID=69293 RepID=G3PX75_GASAC
+----ACEGDPCQNDGVCEE-DASGGPQGYMCRCLPDARCHNR---
+>UniRef100_UPI0011B62DB0 protocadherin Fat 2 n=1 Tax=Gadus morhua TaxID=8049 RepID=UPI0011B62DB0
+----GCSPGLCLNEGVCEE-TAEGEPQCRCPGNHHGPRCSLA---
+>UniRef100_A0A087UMU6 Tenascin-X (Fragment) n=1 Tax=Stegodyphus mimosarum TaxID=407821 RepID=A0A087UMU6_STEMI
+-----CAECYCGSNSTCYF-DDLGARQCICNDGFKNLNGL-----
+>UniRef100_UPI0015AA8C7C neurogenic locus Notch protein-like isoform X1 n=1 Tax=Stegodyphus dumicola TaxID=202533 RepID=UPI0015AA8C7C
+-----CEECNCGSNSTCSF-DDNGAKQCICNERYKSFNGS-----
+>UniRef100_C3ZLR9 EGF-like domain-containing protein n=1 Tax=Branchiostoma floridae TaxID=7739 RepID=C3ZLR9_BRAFL
+--CKFSNSTTCQNNGTCT--TENGGFACTCTAFYRGRFCEESKL-
+>UniRef100_A0A3B1KBJ1 Uncharacterized protein n=1 Tax=Astyanax mexicanus TaxID=7994 RepID=A0A3B1KBJ1_ASTMX
+---SKCSSLPDIGTPNpAR--DLESEADLESESdrtesrnqdliltPPTKERCAC----
+>UniRef100_A0A4W5M5K4 EGF like repeats and discoidin domains 3 n=1 Tax=Hucho hucho TaxID=62062 RepID=A0A4W5M5K4_9TELE
+---GYDERGLWHSGNI-E--DVLAVNRSSERT--FTNTSQE----
+>UniRef100_A0A5A9P613 EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Triplophysa tibetana TaxID=1572043 RepID=A0A5A9P613_9TELE
+---HGLRQGFFKMFHI-Q--TRRALVKSIHDIHNIWACTAP----
+>UniRef100_A0A673WE43 Uncharacterized protein n=1 Tax=Salmo trutta TaxID=8032 RepID=A0A673WE43_SALTR
+---SETEMDYNRKSWTeegtmkSS--TVVENRTVDDEISLMKKECCP----
+>UniRef100_UPI000B4EA69E EGF-like repeat and discoidin I-like domain-containing protein 3 n=1 Tax=Meriones unguiculatus TaxID=10047 RepID=UPI000B4EA69E
+---SSLILCPYLVEVTYP--CFLWKLTLPCPTfPLFEEECSL----
+>ERR1712106_1207323
+----------AHGDINCI--PRVDGYECIATcgSGYRFTDGQ-----
+>ERR1719319_1616164
+---DDCLEQPCLLGGNCT--DLVNDYECSCPTDSPESGVRPR---
+>tr|A0A0C2FIR6|A0A0C2FIR6_9BILA EGF-like domain protein (Fragment) OS=Ancylostoma duodenale GN=ANCDUO_25132 PE=4 SV=1
+---RSYLSHYYLFLATCT--NLGASYHCACPLGFDGTHCEHN---
+>tr|A0A1I8HWF1|A0A1I8HWF1_9PLAT Uncharacterized protein OS=Macrostomum lignano PE=4 SV=1
+----PCQHSPCHPASACVVNSTSWGFQCLCPSGFVGDTCSIDV--
+>tr|A0A1I8FQ61|A0A1I8FQ61_9PLAT Uncharacterized protein OS=Macrostomum lignano PE=4 SV=1
+----PCAsNQPCLHGGLCRSFARHRHIRMRLRVRLVGPSLRAAA--
+>ERR1719204_2694776
+----ASDSTGQMLSDPYD--CS-vfyifdhigtkwakiNKMHCGPGTLWNAKISNCDW--
+>ERR1719435_443671
+---EwLTLTNDVGTAFATN--EYSGAYNATkaFKMQDIGDNAYW----
+>ERR550519_27299
+--------GECNKGLKCALPidrlhdryhsgtc-QDESTIHQCQLDFDGALCGYK---
+>ERR1719264_676304
+---GECHs--------TCRDVcgDETNPQVCNSCESADaadCIECGDN---
+>ERR1719435_591384
+----G------CS-QICG--RVDNKAICSCKGDYMLMKYkksckK-----
+>ERR1719483_84804
+------aFAIQTLVE-GKYV-NDAKQNRGECQLGWRGRNCEIHR--
+>ERR1719347_1568867
+------VKSILMTVKIMTA-R-MEEYAETCASGWEGRFCEV----
+>ERR1719350_1029737
+---DVCYDSPCRNGGTCSV-SSTGERRFVTRASIGH-FTTR----
+>ERR1719154_258919
+------LSKSCKK---WCC-FFMLICKCDCAAGWEGRTCQV----
+>ERR1719334_1213024
+-------RRSLSERGHVQ--ESGGDYYCDCGDEYLGRNCEEY---
+>tr|H2UTY6|H2UTY6_TAKRU Uncharacterized protein OS=Takifugu rubripes PE=4 SV=1
+------NCGRICKQGSCVQ--ASpVSFKCLCRSGgdFQDPPCE-----
+>tr|I3JTS1|I3JTS1_ORENI Uncharacterized protein OS=Oreochromis niloticus PE=4 SV=1
+------NCDSICENGTCLQ--ISpASFKCICDTGFSGKSHS-----
+>SRR5262245_30742128
+------YNSPCGPGKCID--TEDGKYRCDCSAvDYNGDHCEIF---
+>HubBroStandDraft_2_1064218.scaffolds.fasta_scaffold4738729_1 # 1 # 258 # -1 # ID=4738729_1;partial=11;start_type=Edge;rbs_motif=None;rbs_spacer=None;gc_cont=0.647
+-----TLTYEDIAGGSCS--FQRKWTA-KDQA---GNS-AS----
+>ERR1719261_2458658
+---DSYVPPedPCQNVACGS--HGsCYIGVCQCADGFS----------
+>ERR1712136_337294
+--------TWGRNGGRCLT-TPSGKFKCICSSFWTGEVCAIDI--
+>UniRef100_W4ZG15 Uncharacterized protein n=1 Tax=Strongylocentrotus purpuratus TaxID=7668 RepID=W4ZG15_STRPU
+----PGPTDPCEDGVNSLSA-SNDLcYYLKDPSGPFESCLEIV---
+>ERR1719354_400721
+---SECQSNPFFNSILTYDTKQKNHYECDCGIAYLGYNCDQP---
+>ERR1719376_578210
+---EQQESTVMLIS----RSANRILVKMEE-----GVMILNR---
+>SRR5690625_7716004
+------ELQPCQNGGTCAN-APDGSFTCTRSEEHTSELQSR----
+>UniRef100_A0A0Q3MB40 Cadherin, EGF LAG seven-pass G-type receptor 3 n=1 Tax=Amazona aestiva TaxID=12930 RepID=A0A0Q3MB40_AMAAE
+-----CHLNPCKNKSVCRRKpGSPLGYVCECGESFFGQYCEHR---
+>ERR1712243_479474
+---NECLYNPCHVHAHCT--NVAGSFTCTCNDGFSGDGLESCV--
+>UniRef100_UPI00138FB0BB lactadherin isoform X2 n=1 Tax=Nematostella vectensis TaxID=45351 RepID=UPI00138FB0BB
+----PCENlRNCSGLVKCKADYVNNTGACACPACFIGDACES----
+>tr|B4IDW6|B4IDW6_DROSE GM11273 OS=Drosophila sechellia GN=Dsec\GM11273 PE=4 SV=1
+-------PDTCENGGKCTSLSrEDGSFQCQCRQRVTSRSGGKN---
+>UniRef100_B5LVZ0 Delta-like protein n=1 Tax=Saccoglossus kowalevskii TaxID=10224 RepID=B5LVZ0_SACKO
+-----ATTYACTYVGMRL--D----FNILPMNTTVEQVCDA----
+>ERR1739847_59707
+---NPCNDNPCGINAVCFEL-DGDRYICRCPGCYTGDpfvrcdrsfDHEFLE--
+>UniRef100_A0A2B4SN89 Signal peptide, CUB and EGF-like domain-containing protein 1 n=1 Tax=Stylophora pistillata TaxID=50429 RepID=A0A2B4SN89_STYPI
+----ECSqgQHNCHVSATCQNTIGSFTCICPPDKVSDGTTCH-----
+>UniRef100_UPI0009E40480 uncharacterized protein LOC110040538 n=1 Tax=Orbicella faveolata TaxID=48498 RepID=UPI0009E40480
+----LCT------QFYCFQSFRLYFFLCNPIEISIFisiQSCYL----
+>tr|A0A1I8J6V7|A0A1I8J6V7_9PLAT Uncharacterized protein OS=Macrostomum lignano PE=4 SV=1
+-------MAQCLQIVMVVKSiLFVYYFHCCWLLG------------
+>ERR1719244_969826
+----SDDGHNAcsQSLVDCED--RFqGsHYLCDCIPVRRVLLDELN---
+>UniRef100_UPI000BAE9191 uncharacterized protein LOC111108110 n=1 Tax=Crassostrea virginica TaxID=6565 RepID=UPI000BAE9191
+-ECQDCSQYNCLHHGTCAD-SITSGPKCHCPKEWSGDHCEQRDF-
+>SRR3954466_6403034
+----ACVTMPCDPLTVCTN-TGPGTRTCgNCPDGYIGTGetgCAPI---
+>tr|A0A085LUT7|A0A085LUT7_9BILA Uncharacterized protein (Fragment) OS=Trichuris suis GN=M513_10363 PE=4 SV=1
+-----CKQDTCSNAGVCHNVTQKQSFYCRCNAGRTGKKCEVD---
+>SRR5688572_10793198
+----VCRGK--CSPAECI--DLWETYTCNCGSFYST-NCADA---
+>ERR1719468_917544
+-----CPVGLCKNHGDCIIDEIKNEYNVCAELDLLVSFAKPTL--
+>UniRef100_UPI0008FA47B7 LOW QUALITY PROTEIN: hepatocyte growth factor activator-like n=1 Tax=Cyprinus carpio TaxID=7962 RepID=UPI0008FA47B7
+----VCSRNRCENDGICRMIEATGEEVCGCTSGYTGQYCDIK---
+>tr|A0A0B6ZGW5|A0A0B6ZGW5_9EUPU Uncharacterized protein (Fragment) OS=Arion vulgaris GN=ORF64101 PE=4 SV=1
+----AprvTEPPPPPTKVVIR--SSPAPIVTEPAPTPPKEDTTK----
+>ERR1719494_21993
+-HCQVCREGYCLHQAKCQV-DQQGRPYCLCVGEWFGNRCESKN--
+>ERR1711935_316757
+----RCEAAPCLNNGKCLPGTNnlgQDVYDCECTSGFFEMFVNMT---
+>ERR1719483_1932371
+--DSPCNQTVFCIHGECTYNMTSGNATCDCEQGFEGDTCEDL---
+>UniRef100_UPI0008546CDC cadherin EGF LAG seven-pass G-type receptor 3-like n=1 Tax=Nanorana parkeri TaxID=125878 RepID=UPI0008546CDC
+-----------MAESKCI--VTNG-YSVVFRRqrihvmHVDGDNCEVD---
+>ERR1719494_757315
+---------LLKHPGKNV--SVvdpSTCNINVCPSGWTGRFCES----
+>tr|G7NYE4|G7NYE4_MACFA Uncharacterized protein OS=Macaca fascicularis GN=EGM_10430 PE=4 SV=1
+---KTQSRKHMLTARPS------PA----LRATWGSGFM------
+>tr|B3RS17|B3RS17_TRIAD Uncharacterized protein OS=Trichoplax adhaerens GN=TRIADDRAFT_54443 PE=4 SV=1
+----LAVKIYCCSNFTTT--EITPL-------WLKNIGCr------
+>ERR1719424_575669
+-PCPSTAQGVCDNHGECKLNIVKARNSCQCAASWTGEACDVE---
+>ERR1719387_187298
+-ECPRTQKGVCDGKGVCKTNKKD-gSKYCQCDESWTGRACDES---
+>UniRef100_UPI000B90CF5B uncharacterized protein LOC110975312 n=1 Tax=Acanthaster planci TaxID=133434 RepID=UPI000B90CF5B
+-HCDHCSSSPCLHNGTCVERPlqvGIEPFYCNCAARFTGANCETDT--
+>SRR5688572_420571
+---DECASDPCLDGRECM--NGPGGFECGACPAGFAAngaTECA----
+>ERR1719225_311269
+-----ISQNLPvNSAGHSQVylFVP----SRQVPPFWHMWLAQS----
+>ERR1719507_471249
+-----ISQNLLvKSAGHSHVymFVP----SRHVPPFWHMWLAQS----
+>ERR1719447_2245183
+-------SVLPSSPGNSARlnlwwhrctlkRLPVSNTTASMESAWK--FSEI----
+>ERR1719162_905930
+-----CFGStLNCNTGECTHNEAFDETFCTCPGGYTGDFCENE---
+>SRR4029434_2635208
+-----C-----LNINMCVCKDVYVGAVCVCV-cvnmriRFCGCTCAD----
+>UniRef100_A0A3P6TP09 Uncharacterized protein n=1 Tax=Litomosoides sigmodontis TaxID=42156 RepID=A0A3P6TP09_LITSI
+---------KKIYAKTMR--RATGQVNSsNCGKIHSGILCILI---
+>ERR1719219_415917
+---NECASEPCPAGIDCK--DEFGKWMCICPENRVGELCDEI---
+>SRR5207237_7849942
+---------TFMNGATCRN--VfiASRRNYTCFKCYWSSDVCSCD--
+>ERR1712203_995774
+---NVFPIHVCM-----V--AIVSTWSMDSAvnvmGRATQETCSQN---
+>BarGraIncu01121A_1022015.scaffolds.fasta_scaffold29469_1 # 56 # 460 # -1 # ID=29469_1;partial=00;start_type=ATG;rbs_motif=None;rbs_spacer=None;gc_cont=0.528
+-----FTLDGTLSG-NSLEA-TGessgidiitrgTfsedsntftgeivvVGFASCDVTFVRX--------
+>ERR550517_2090115
+----SCRt-NPCHNAGAAS--RDATASAVSAPAATTG---------
