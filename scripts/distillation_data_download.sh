@@ -23,7 +23,7 @@ AFDB_URL="https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/swissprot_cif_v4.
 OUTPUT_DIR="./data/afdb_data"
 
 MMCIF_OUTPUT_DIR="$OUTPUT_DIR/unfiltered_train_mmcifs"
-MSA_OUTPUT_DIR="$OUTPUT_DIR/data_caches/msa/train_msas"
+MSA_OUTPUT_DIR="$OUTPUT_DIR/data_caches/train"
 
 mkdir -p "$MMCIF_OUTPUT_DIR"
 mkdir -p "$MSA_OUTPUT_DIR"
