@@ -19,6 +19,7 @@ from alphafold3_pytorch import (
     MultiChainPermutationAlignment,
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
+    RigidFromReference3Points,
     ComputeAlignmentError,
     CentreRandomAugmentation,
     PairformerStack,
@@ -245,6 +246,13 @@ def test_rigid_from_three_points():
     rotation, _ = rigid_from_3_points((points, points, points))
     assert rotation.shape == (7, 11, 23, 3, 3)
 
+def test_rigid_from_reference_three_points():
+    rigid_from_reference_3_points = RigidFromReference3Points()
+
+    points = torch.randn(7, 11, 23, 3)
+    rotation, _ = rigid_from_reference_3_points((points, points, points))
+    assert rotation.shape == (7, 11, 23, 3, 3)
+
 def test_deriving_frames_for_ligands():
     points = torch.tensor([
         [1., 1., 1.],
@@ -357,12 +365,11 @@ def test_msa_module(
         loss = pairwise_out.sum()
         loss.backward()
 
-@pytest.mark.parametrize('serial,checkpoint', ((False, False), (True, False), (True, True)))
+@pytest.mark.parametrize('checkpoint', (False, True))
 @pytest.mark.parametrize('use_linear_attn', (False, True))
 @pytest.mark.parametrize('use_colt5_attn', (False, True))
 def test_diffusion_transformer(
     checkpoint,
-    serial,
     use_linear_attn,
     use_colt5_attn
 ):
@@ -374,7 +381,6 @@ def test_diffusion_transformer(
     diffusion_transformer = DiffusionTransformer(
         depth = 2,
         heads = 16,
-        serial = serial,
         checkpoint = checkpoint,
         use_linear_attn = use_linear_attn,
         use_colt5_attn = use_colt5_attn
@@ -1082,6 +1088,170 @@ def test_alphafold3_with_atom_and_bond_embeddings():
 
     assert loss.numel() == 1
 
+def test_alphafold3_with_plm_embeddings():
+    alphafold3 = Alphafold3(
+        num_atom_embeds=7,
+        num_atompair_embeds=3,
+        num_molecule_mods=0,
+        dim_atom_inputs=77,
+        dim_template_feats=108,
+        plm_embeddings="esm2_t33_650M_UR50D",
+    )
+
+    state_dict = alphafold3.state_dict()
+
+    assert not any([key.startswith('plms') for key in state_dict.keys()])
+
+    # mock inputs
+
+    seq_len = 16
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    atom_ids = torch.randint(0, 7, (2, atom_seq_len))
+    atompair_ids = torch.randint(0, 3, (2, atom_seq_len, atom_seq_len))
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
+    additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+    additional_token_feats = torch.randn(2, seq_len, 33)
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
+    molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    template_feats = torch.randn(2, 2, seq_len, seq_len, 108)
+    template_mask = torch.ones((2, 2)).bool()
+
+    msa = torch.randn(2, 7, seq_len, 32)
+    msa_mask = torch.ones((2, 7)).bool()
+
+    additional_msa_feats = torch.randn(2, 7, seq_len, 2)
+
+    # required for training, but omitted on inference
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    distogram_atom_indices = molecule_atom_lens - 1  # last atom, as an example
+
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+    # offset indices correctly
+
+    distogram_atom_indices += atom_offsets
+    molecule_atom_indices += atom_offsets
+
+    # alphafold3
+
+    loss = alphafold3(
+        num_recycling_steps=2,
+        atom_ids=atom_ids,
+        atompair_ids=atompair_ids,
+        atom_inputs=atom_inputs,
+        atompair_inputs=atompair_inputs,
+        molecule_ids=molecule_ids,
+        molecule_atom_lens=molecule_atom_lens,
+        is_molecule_types=is_molecule_types,
+        additional_molecule_feats=additional_molecule_feats,
+        additional_msa_feats=additional_msa_feats,
+        additional_token_feats=additional_token_feats,
+        msa=msa,
+        msa_mask=msa_mask,
+        templates=template_feats,
+        template_mask=template_mask,
+        atom_pos=atom_pos,
+        distogram_atom_indices=distogram_atom_indices,
+        molecule_atom_indices=molecule_atom_indices,
+        resolved_labels=resolved_labels,
+    )
+
+    assert loss.numel() == 1
+
+def test_alphafold3_with_nlm_embeddings():
+    alphafold3 = Alphafold3(
+        num_atom_embeds=7,
+        num_atompair_embeds=3,
+        num_molecule_mods=0,
+        dim_atom_inputs=77,
+        dim_template_feats=108,
+        nlm_embeddings="rinalmo",
+    )
+
+    state_dict = alphafold3.state_dict()
+
+    assert not any(
+        [key.startswith("nlms") for key in state_dict.keys()]
+    ), "The model should not have any NLM weights in its state dictionary."
+
+    # mock inputs
+
+    seq_len = 16
+    atom_seq_len = 32
+
+    molecule_atom_indices = torch.randint(0, 2, (2, seq_len)).long()
+    molecule_atom_lens = torch.full((2, seq_len), 2).long()
+
+    atom_offsets = exclusive_cumsum(molecule_atom_lens)
+
+    atom_ids = torch.randint(0, 7, (2, atom_seq_len))
+    atompair_ids = torch.randint(0, 3, (2, atom_seq_len, atom_seq_len))
+
+    atom_inputs = torch.randn(2, atom_seq_len, 77)
+    atompair_inputs = torch.randn(2, atom_seq_len, atom_seq_len, 5)
+
+    additional_molecule_feats = torch.randint(0, 2, (2, seq_len, 5))
+    additional_token_feats = torch.randn(2, seq_len, 33)
+    is_molecule_types = torch.randint(0, 2, (2, seq_len, IS_MOLECULE_TYPES)).bool()
+    molecule_ids = torch.randint(0, 32, (2, seq_len))
+
+    template_feats = torch.randn(2, 2, seq_len, seq_len, 108)
+    template_mask = torch.ones((2, 2)).bool()
+
+    msa = torch.randn(2, 7, seq_len, 32)
+    msa_mask = torch.ones((2, 7)).bool()
+
+    additional_msa_feats = torch.randn(2, 7, seq_len, 2)
+
+    # required for training, but omitted on inference
+
+    atom_pos = torch.randn(2, atom_seq_len, 3)
+    distogram_atom_indices = molecule_atom_lens - 1  # last atom, as an example
+
+    resolved_labels = torch.randint(0, 2, (2, atom_seq_len))
+
+    # offset indices correctly
+
+    distogram_atom_indices += atom_offsets
+    molecule_atom_indices += atom_offsets
+
+    # alphafold3
+
+    loss = alphafold3(
+        num_recycling_steps=2,
+        atom_ids=atom_ids,
+        atompair_ids=atompair_ids,
+        atom_inputs=atom_inputs,
+        atompair_inputs=atompair_inputs,
+        molecule_ids=molecule_ids,
+        molecule_atom_lens=molecule_atom_lens,
+        is_molecule_types=is_molecule_types,
+        additional_molecule_feats=additional_molecule_feats,
+        additional_msa_feats=additional_msa_feats,
+        additional_token_feats=additional_token_feats,
+        msa=msa,
+        msa_mask=msa_mask,
+        templates=template_feats,
+        template_mask=template_mask,
+        atom_pos=atom_pos,
+        distogram_atom_indices=distogram_atom_indices,
+        molecule_atom_indices=molecule_atom_indices,
+        resolved_labels=resolved_labels,
+    )
+
+    assert loss.numel() == 1
+
 # test creation from config
 
 def test_alphafold3_config():
@@ -1273,8 +1443,15 @@ def test_unresolved_protein_rasa():
 
     # rest of the test
 
-    mmcif_filepath = os.path.join("data", "test", "mmcifs", DATA_TEST_PDB_ID[1:3], f"{DATA_TEST_PDB_ID}-assembly1.cif")
-    pdb_input = PDBInput(mmcif_filepath)
+    mmcif_filepath = os.path.join(
+        "data",
+        "test",
+        "pdb_data",
+        "mmcifs",
+        DATA_TEST_PDB_ID[1:3],
+        f"{DATA_TEST_PDB_ID}-assembly1.cif",
+    )
+    pdb_input = PDBInput(mmcif_filepath, inference=True)
 
     mol_input = pdb_input_to_molecule_input(pdb_input)
     atom_input = molecule_to_atom_input(mol_input)

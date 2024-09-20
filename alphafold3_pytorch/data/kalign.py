@@ -49,7 +49,7 @@ def _realign_pdb_template_to_query(
     """Aligns template sequence to the query sequence.
 
     Adapted from:
-    https://github.com/aqlaboratory/openfold/blob/main/openfold/data/templates.py
+    https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/templates.py#L16
 
     :param query_sequence: The actual query sequence extracted from a query
         Biomolecule object.

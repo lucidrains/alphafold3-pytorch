@@ -6,9 +6,11 @@ import dataclasses
 import random
 import re
 import string
+
 from beartype.typing import Literal, Optional, Sequence, Tuple
 
 from alphafold3_pytorch.tensor_typing import typecheck
+from alphafold3_pytorch.utils.utils import not_exists
 
 DeletionMatrix = Sequence[Sequence[int]]
 
@@ -53,6 +55,21 @@ class Identifiers:
 
 
 @typecheck
+def get_msa_type(msa_chem_type: int) -> MSA_TYPE:
+    """Get the molecule type of a residue."""
+    if msa_chem_type == 0:
+        return "protein"
+    elif msa_chem_type == 1:
+        return "rna"
+    elif msa_chem_type == 2:
+        return "dna"
+    elif msa_chem_type == 3:
+        return "ligand"
+    else:
+        raise ValueError(f"Invalid MSA chemical type: {msa_chem_type}")
+
+
+@typecheck
 def _parse_sequence_identifier(msa_sequence_identifier: str) -> Identifiers:
     """Gets species from an msa sequence identifier.
 
@@ -87,13 +104,36 @@ def _extract_sequence_identifier(description: str) -> Optional[str]:
 
 
 @typecheck
+def _extract_sequence_accession_id(description: str) -> Optional[str]:
+    """Extracts sequence identifier from description.
+
+    Returns None if no match.
+    """
+    split_description = description.split()
+    if split_description:
+        return split_description[0].split(">")[-1]
+    else:
+        return None
+
+
+@typecheck
 def get_identifiers(description: str) -> Identifiers:
     """Computes extra MSA features from the description."""
     sequence_identifier = _extract_sequence_identifier(description)
-    if sequence_identifier is None:
+    if not_exists(sequence_identifier):
         return Identifiers()
     else:
         return _parse_sequence_identifier(sequence_identifier)
+
+
+@typecheck
+def get_accession_id(description: str) -> str:
+    """Computes extra MSA features from the description."""
+    sequence_accession_id = _extract_sequence_accession_id(description)
+    if not_exists(sequence_accession_id):
+        return ""
+    else:
+        return sequence_accession_id
 
 
 @dataclasses.dataclass(frozen=True)
@@ -118,6 +158,15 @@ class Msa:
     def __len__(self):
         """Returns the number of sequences in the MSA."""
         return len(self.sequences)
+
+    def __add__(self, other):
+        """Concatenates two MSAs."""
+        return Msa(
+            sequences=self.sequences + other.sequences,
+            deletion_matrix=self.deletion_matrix + other.deletion_matrix,
+            descriptions=self.descriptions + other.descriptions,
+            msa_type=self.msa_type,
+        )
 
     def truncate(self, max_seqs: int):
         """Truncates the MSA to the first `max_seqs` sequences."""

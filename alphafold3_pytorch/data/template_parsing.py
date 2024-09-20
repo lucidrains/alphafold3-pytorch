@@ -1,12 +1,13 @@
 import os
 from datetime import datetime
-from loguru import logger
-from beartype.typing import Any, Dict, List, Literal, Mapping, Tuple
 
 import numpy as np
 import polars as pl
 import torch
 import torch.nn.functional as F
+from beartype.typing import Any, Dict, List, Literal, Mapping, Tuple
+from einops import einsum
+from loguru import logger
 
 from alphafold3_pytorch.common.biomolecule import (
     Biomolecule,
@@ -20,15 +21,14 @@ from alphafold3_pytorch.life import (
     LIGANDS,
     RNA_NUCLEOTIDES,
 )
+from alphafold3_pytorch.tensor_typing import typecheck
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
 from alphafold3_pytorch.utils.model_utils import (
-    ExpressCoordinatesInFrame,
-    RigidFrom3Points,
+    RigidFromReference3Points,
     distance_to_dgram,
     get_frames_from_atom_pos,
 )
-from alphafold3_pytorch.tensor_typing import typecheck
-from alphafold3_pytorch.utils.utils import exists
+from alphafold3_pytorch.utils.utils import exists, not_exists
 
 # Constants
 
@@ -88,12 +88,12 @@ def parse_m8(
 
     # Filter the DataFrame to only include rows where
     # (1) the template ID does not contain any part of the query ID;
-    # (2) the template's identity is between 0.1 and 0.95, exclusively;
+    # (2) the template's identity is between 0.3 and 0.95, exclusively;
     # (3) the alignment length is greater than 0;
     # (4) the template's length is at least 10; and
     # (5) the number of templates is less than the (optional) maximum number of templates.
     df = df.filter(~pl.col("Template ID").str.contains(query_id))
-    df = df.filter((pl.col("Identity") > 0.1) & (pl.col("Identity") < 0.95))
+    df = df.filter((pl.col("Identity") > 0.3) & (pl.col("Identity") < 0.95))
     df = df.filter(pl.col("Alignment Length") > 0)
     df = df.filter((pl.col("Template End") - pl.col("Template Start")) >= 9)
     if exists(max_templates):
@@ -121,13 +121,8 @@ def parse_m8(
             template_release_date = extract_mmcif_metadata_field(
                 template_mmcif_object, "release_date"
             )
-            if not (
-                exists(template_cutoff_date)
-                and datetime.strptime(template_release_date, "%Y-%m-%d") <= template_cutoff_date
-            ):
+            if exists(template_cutoff_date) and datetime.strptime(template_release_date, "%Y-%m-%d") > template_cutoff_date:
                 continue
-            elif not exists(template_cutoff_date):
-                pass
             template_biomol = _from_mmcif_object(
                 template_mmcif_object, chain_ids=set(template_chain)
             )
@@ -140,6 +135,161 @@ def parse_m8(
     return template_biomols
 
 
+@typecheck
+def parse_hhr(
+    hhr_filepath: str,
+    template_type: TEMPLATE_TYPE,
+    query_id: str,
+    mmcif_dir: str,
+    max_templates: int | None = None,
+    num_templates: int | None = None,
+    template_cutoff_date: datetime | None = None,
+    randomly_sample_num_templates: bool = False,
+    verbose: bool = False,
+) -> List[Tuple[Biomolecule, TEMPLATE_TYPE]]:
+    """Parse an HHR file and return a list of template Biomolecule objects.
+    :param hhr_filepath: The path to the HHR file.
+    :param template_type: The type of template to parse.
+    :param query_id: The ID of the query sequence.
+    :param mmcif_dir: The directory containing mmCIF files.
+    :param max_templates: The (optional) maximum number of templates to return.
+    :param num_templates: The (optional) number of templates to return.
+    :param template_cutoff_date: The (optional) cutoff date for templates.
+    :param randomly_sample_num_templates: Whether to randomly sample the number of templates to
+        return.
+    :param verbose: Whether to log verbose output.
+    :return: A list of template Biomolecule objects and their template types.
+    """
+    # Define the column names and types.
+    schema = {
+        "No": pl.Int32,
+        "Hit": pl.Utf8,
+        "Prob": pl.Float64,
+        "E-value": pl.Float64,
+        "P-value": pl.Float64,
+        "Score": pl.Float64,
+        "SS": pl.Float64,
+        "Cols": pl.Int32,
+        "Query HMM": pl.Utf8,
+        "Template HMM": pl.Utf8,
+    }
+
+    # Identify how many rows to parse.
+    rows = []
+    rows_found = False
+    with open(hhr_filepath, "r") as f:
+        for line in f:
+            if line.startswith(" No Hit"):
+                rows_found = True
+            elif line.startswith("No 1"):
+                rows_found = False
+
+            if rows_found and not line.startswith(" No Hit") and line.strip():
+                line_parts = line.strip().split()
+
+                # NOTE: The `Hit` and `Template HMM` columns may contain spaces.
+                if len(line_parts) > 10:
+                    num_hit_parts = len(line_parts) - 10
+                    line_parts = (
+                        [line_parts[0], " ".join(line_parts[1 : 1 + num_hit_parts])]
+                        + line_parts[1 + num_hit_parts : -2]
+                        + [" ".join(line_parts[-2:])]
+                    )
+
+                rows.append(line_parts)
+
+    assert len(rows) > 0, f"No parseable rows found in HHR file {hhr_filepath}."
+
+    # Read the HHR file as a DataFrame.
+    try:
+        df = pl.DataFrame(rows, schema=schema, orient="row")
+    except Exception as e:
+        if verbose:
+            logger.warning(f"Skipping loading HHR file {hhr_filepath} due to: {e}")
+        return []
+
+    # Add shortcut columns to the DataFrame.
+    df = df.with_columns(
+        [
+            # `Identity` is `Cols` divided by the second integer in `Query HMM`
+            (
+                pl.col("Cols")
+                / pl.col("Query HMM").map_elements(
+                    lambda x: int(x.split("-")[1]), return_dtype=pl.Float64
+                )
+            ).alias("Identity"),
+            # `Template Start` extracted from `Template HMM`
+            pl.col("Template HMM")
+            .map_elements(lambda x: extract_template_hmm_range(x)[0], return_dtype=pl.Int32)
+            .alias("Template Start"),
+            # `Template End` extracted from `Template HMM`
+            pl.col("Template HMM")
+            .map_elements(lambda x: extract_template_hmm_range(x)[1], return_dtype=pl.Int32)
+            .alias("Template End"),
+        ]
+    )
+
+    # Filter the DataFrame to only include rows where
+    # (1) the template hit ID does not contain any part of the query ID;
+    # (2) the template's identity is between 0.3 and 0.95, exclusively;
+    # (3) the alignment length is greater than 0;
+    # (4) the template's length is at least 10; and
+    # (5) the number of templates is less than the (optional) maximum number of templates.
+    df = df.filter(~pl.col("Hit").str.contains(query_id.upper()))
+    df = df.filter((pl.col("Identity") > 0.3) & (pl.col("Identity") < 0.95))
+    df = df.filter(pl.col("Cols") > 0)
+    df = df.filter((pl.col("Template End") - pl.col("Template Start")) >= 9)
+    if exists(max_templates):
+        df = df.head(max_templates)
+
+    # Select the number of templates to return.
+    if len(df) and exists(num_templates) and randomly_sample_num_templates:
+        df = df.sample(min(len(df), num_templates))
+    elif exists(num_templates):
+        df = df.head(num_templates)
+
+    # Load each template chain as a Biomolecule object.
+    template_biomols = []
+    for i in range(len(df)):
+        row = df[i]
+        row_template_id = row["Hit"].item().lower()
+        template_id, template_chain = row_template_id.split(" ")[0].split("_")
+        template_fpath = os.path.join(mmcif_dir, template_id[1:3], f"{template_id}-assembly1.cif")
+        if not os.path.exists(template_fpath):
+            continue
+        try:
+            template_mmcif_object = mmcif_parsing.parse_mmcif_object(
+                template_fpath, row_template_id
+            )
+            template_release_date = extract_mmcif_metadata_field(
+                template_mmcif_object, "release_date"
+            )
+            if (
+                exists(template_cutoff_date)
+                and datetime.strptime(template_release_date, "%Y-%m-%d") > template_cutoff_date
+            ):
+                continue
+            template_biomol = _from_mmcif_object(
+                template_mmcif_object, chain_ids=set(template_chain.upper())
+            )
+            if len(template_biomol.atom_positions):
+                template_biomols.append((template_biomol, template_type))
+        except Exception as e:
+            if verbose:
+                logger.warning(f"Skipping loading template {template_id} due to: {e}")
+
+    return template_biomols
+
+
+def extract_template_hmm_range(template_hmm: str):
+    """Extract the start and end indices of the template HMM range.
+    :param template_hmm: The template HMM range string.
+    :return: A tuple containing the start and end indices of the template HMM range.
+    """
+    start, end = template_hmm.split("-")
+    return int(start), int(end.split()[0])  # Split further to remove the parenthesis
+
+
 def _extract_template_features(
     template_biomol: Biomolecule,
     mapping: Mapping[int, int],
@@ -150,6 +300,7 @@ def _extract_template_features(
     num_distogram_bins: int = 39,
     distance_bins: List[float] = torch.linspace(3.25, 50.75, 39).float(),
     verbose: bool = False,
+    eps: float = 1e-20,
 ) -> Dict[str, Any]:
     """Parse atom positions in the target structure and align with the query.
 
@@ -158,7 +309,7 @@ def _extract_template_features(
     alignment mapping provided.
 
     Adapted from:
-    https://github.com/aqlaboratory/openfold/blob/main/openfold/data/templates.py
+    https://github.com/aqlaboratory/openfold/blob/6f63267114435f94ac0604b6d89e82ef45d94484/openfold/data/templates.py#L16
 
     :param template_biomol: `Biomolecule` representing the template.
     :param mapping: Dictionary mapping indices in the query sequence to indices in
@@ -173,6 +324,7 @@ def _extract_template_features(
     :param distance_bins: List of floats representing the bins for the distance
         histogram (i.e., distogram).
     :param verbose: Whether to log verbose output.
+    :param eps: A small value to prevent division by zero.
 
     :return: A dictionary containing the extra features derived from the template
         structure.
@@ -302,7 +454,7 @@ def _extract_template_features(
             filter_colinear_pos=True,
         )
         for token_index, frame_token_indices in enumerate(template_three_atom_indices_for_frame):
-            if not exists(frame_token_indices):
+            if not_exists(frame_token_indices):
                 # Track invalid ligand frames.
                 if (new_frame_token_indices[token_index] == -1).any():
                     template_backbone_frame_atom_mask[token_index] = False
@@ -380,17 +532,25 @@ def _extract_template_features(
         template_three_atom_indices_for_frame.unsqueeze(-1).expand(-1, -1, 3),
     )
 
-    rigid_from_three_points = RigidFrom3Points()
-    template_backbone_frames, _ = rigid_from_three_points(
+    rigid_from_reference_3_points = RigidFromReference3Points()
+    template_backbone_frames, template_backbone_points = rigid_from_reference_3_points(
         template_backbone_frame_atom_positions.unbind(-2)
     )
 
-    express_coordinates_in_frame = ExpressCoordinatesInFrame()
-    template_unit_vector = express_coordinates_in_frame(
-        template_token_center_atom_positions.unsqueeze(0),
-        template_backbone_frames.unsqueeze(0),
-        pairwise=True,
-    ).squeeze(0)
+    inv_template_backbone_frames = template_backbone_frames.transpose(-1, -2)
+    template_backbone_vec = einsum(
+        inv_template_backbone_frames,
+        template_backbone_points.unsqueeze(-2) - template_backbone_points.unsqueeze(-3),
+        "n i j, m n j -> m n i",
+    )
+    template_inv_distance_scalar = torch.rsqrt(eps + torch.sum(template_backbone_vec**2, dim=-1))
+    template_inv_distance_scalar = (
+        template_inv_distance_scalar * template_backbone_frame_mask.unsqueeze(-1)
+    )
+
+    # NOTE: The unit vectors are initially of shape (j, i, 3), so they need to be transposed
+    template_unit_vector = template_backbone_vec * template_inv_distance_scalar.unsqueeze(-1)
+    template_unit_vector = template_unit_vector.transpose(-3, -2)
 
     return {
         "template_restype": template_restype.float(),

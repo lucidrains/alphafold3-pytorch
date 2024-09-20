@@ -1,13 +1,13 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.4.50"
+version = "0.5.26"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
     { name = "Alex Morehead", email = "alex.morehead@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 license = { file = "LICENSE" }
 keywords = [
     'artificial intelligence',
@@ -20,7 +20,7 @@ classifiers=[
     'Intended Audience :: Developers',
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
     'License :: OSI Approved :: MIT License',
-    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
 ]
 
 dependencies = [
@@ -33,9 +33,10 @@ dependencies = [
     "einx>=0.2.2",
     "ema-pytorch>=0.5.0",
     "environs",
-    "lion-pytorch",
+    "lion-pytorch>=0.2.2",
     "joblib",
     "gemmi>=0.6.6",
+    "fair-esm",
     "fastapi",
     "frame-averaging-pytorch>=0.0.18",
     "gradio",
@@ -43,6 +44,7 @@ dependencies = [
     "huggingface_hub>=0.21.4",
     "jaxtyping>=0.2.28",
     "lightning>=2.2.5",
+    "multimolecule",
     "numpy>=1.23.5",
     "polars>=1.1.0",
     "pdbeccdutils>=0.8.5",
@@ -51,6 +53,8 @@ dependencies = [
     "rdkit>=2023.9.6",
     "retrying",
     "scikit-learn>=1.5.0",
+    "scipy==1.13.1",
+    "sentencepiece",
     "sh>=2.0.7",
     "shortuuid",
     "tensorboard",
@@ -60,6 +64,7 @@ dependencies = [
     'torch_geometric',
     "torch>=2.1",
     "tqdm>=4.66.4",
+    "transformers[torch]",
     "loguru",
 ]
 
@@ -70,12 +75,14 @@ Repository = "https://github.com/lucidrains/alphafold3-pytorch"
 [project.optional-dependencies]
 examples = []
 test = [
+    "ruff>=0.4.2",
     "pytest",
     "pytest-shard",
 ]
 
 [project.scripts]
 alphafold3_pytorch = "alphafold3_pytorch.cli:cli"
+alphafold3_pytorch_app = "alphafold3_pytorch.app:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -89,9 +96,10 @@ pythonpath = [
 [tool.ruff]
 line-length = 1000
 
-ignore = [
+lint.ignore = [
     "F722", # for jaxtyping shape annotation
-    "F401"
+    "F401",
+    "F821"
 ]
 
 [tool.hatch.metadata]

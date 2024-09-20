@@ -21,6 +21,7 @@ from alphafold3_pytorch.common import (
     rna_constants,
 )
 from alphafold3_pytorch.data import mmcif_parsing
+from alphafold3_pytorch.life import HUMAN_AMINO_ACIDS, RNA_NUCLEOTIDES, DNA_NUCLEOTIDES
 from alphafold3_pytorch.tensor_typing import IntType, typecheck
 from alphafold3_pytorch.utils.data_utils import deep_merge_dicts, is_polymer
 from alphafold3_pytorch.utils.utils import exists, np_mode
@@ -459,10 +460,10 @@ class Biomolecule:
         if exists(chain_1) and exists(chain_2):
             crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
         elif exists(chain_1) or exists(chain_2):
-            crop_fn_weights = [contiguous_weight, spatial_weight + spatial_interface_weight, 0.0]
+            crop_fn_weights = [contiguous_weight, spatial_weight, 0.0]
         else:
             crop_fn_weights = [
-                contiguous_weight + spatial_weight + spatial_interface_weight,
+                contiguous_weight,
                 0.0,
                 0.0,
             ]
@@ -1324,6 +1325,523 @@ def to_mmcif(
             raise ValueError(
                 "Residue types array contains entries with too many biomolecule types."
             )
+        # Iterate over all "pseudoresidues" associated with a parent residue.
+        for atom_name_, pos_, mask_, b_factor_ in zip(
+            res_atom_names, res_atom_positions, res_atom_mask, res_b_factors
+        ):
+            # Iterate over each atom in a (pseudo)residue.
+            for atom_name, pos, mask, b_factor in zip(atom_name_, pos_, mask_, b_factor_):
+                if mask < 0.5:
+                    continue
+                type_symbol = atom_id_to_type(atom_name)
+
+                unique_atom_indices[atom_name] += 1
+                atom_index_postfix = "" if is_polymer_residue else unique_atom_indices[atom_name]
+                unique_atom_name = (
+                    atom_name
+                    if exists(unique_res_atom_names)
+                    else f"{atom_name}{atom_index_postfix}"
+                )
+
+                mmcif_dict["_atom_site.group_PDB"].append(
+                    "ATOM" if is_polymer_residue else "HETATM"
+                )
+                mmcif_dict["_atom_site.id"].append(str(atom_index))
+                mmcif_dict["_atom_site.type_symbol"].append(type_symbol)
+                mmcif_dict["_atom_site.label_atom_id"].append(unique_atom_name)
+                mmcif_dict["_atom_site.label_alt_id"].append(".")
+                mmcif_dict["_atom_site.label_comp_id"].append(res_name_3)
+                mmcif_dict["_atom_site.label_asym_id"].append(chain_ids[unique_chain_index[i]])
+                mmcif_dict["_atom_site.label_entity_id"].append(
+                    label_asym_id_to_entity_id[chain_ids[unique_chain_index[i]]]
+                )
+                mmcif_dict["_atom_site.label_seq_id"].append(str(unique_residue_index[i]))
+                mmcif_dict["_atom_site.pdbx_PDB_ins_code"].append(".")
+                mmcif_dict["_atom_site.Cartn_x"].append(f"{pos[0]:.3f}")
+                mmcif_dict["_atom_site.Cartn_y"].append(f"{pos[1]:.3f}")
+                mmcif_dict["_atom_site.Cartn_z"].append(f"{pos[2]:.3f}")
+                mmcif_dict["_atom_site.occupancy"].append("1.00")
+                mmcif_dict["_atom_site.B_iso_or_equiv"].append(f"{b_factor:.2f}")
+                mmcif_dict["_atom_site.auth_seq_id"].append(str(unique_residue_index[i]))
+                mmcif_dict["_atom_site.auth_comp_id"].append(res_name_3)
+                mmcif_dict["_atom_site.auth_asym_id"].append(chain_ids[unique_chain_index[i]])
+                mmcif_dict["_atom_site.auth_atom_id"].append(unique_atom_name)
+                mmcif_dict["_atom_site.pdbx_PDB_model_num"].append("1")
+
+                atom_index += 1
+
+    init_metadata_dict = (
+        remove_metadata_fields_by_prefixes(orig_mmcif_metadata, MMCIF_PREFIXES_TO_DROP_POST_AF3)
+        if insert_alphafold_mmcif_metadata
+        else remove_metadata_fields_by_prefixes(
+            orig_mmcif_metadata, MMCIF_PREFIXES_TO_DROP_POST_PARSING
+        )
+    )
+    metadata_dict = mmcif_metadata.add_metadata_to_mmcif(
+        mmcif_dict, insert_alphafold_mmcif_metadata=insert_alphafold_mmcif_metadata
+    )
+    init_metadata_dict.update(metadata_dict)
+    init_metadata_dict.update(mmcif_dict)
+
+    return _create_mmcif_string(init_metadata_dict)
+
+
+@typecheck
+def to_inference_mmcif(
+    biomol: Biomolecule,
+    file_id: str,
+    gapless_poly_seq: bool = True,
+    insert_alphafold_mmcif_metadata: bool = True,
+    unique_res_atom_names: Optional[List[Tuple[List[List[str]], str, int]]] = None,
+) -> str:
+    """Converts a `AlphaFold3Input`-derived `Biomolecule` instance to an mmCIF string. Clone of 
+    to_mmcif with dedicated support for template-free biomolecules.
+
+    WARNING 1: When gapless_poly_seq is True, the _pdbx_poly_seq_scheme is filled
+      with unknown residues for any missing residue indices in the range
+      from min(1, min(residue_index)) to max(residue_index).
+      E.g. for a biomolecule object with positions for (majority) protein residues
+      2 (MET), 3 (LYS), 6 (GLY), this method would set the _pdbx_poly_seq_scheme to:
+      1 UNK
+      2 MET
+      3 LYS
+      4 UNK
+      5 UNK
+      6 GLY
+      This is done to preserve the residue numbering.
+
+    WARNING 2: Converting ground truth mmCIF file to Biomolecule and then back to
+      mmCIF using this method will convert all non-standard residue types to the
+      corresponding unknown residue type of the residue's chemical type (e.g., RNA).
+      If you need this behaviour, you need to store more mmCIF metadata in the
+      Biomolecule object (e.g. all fields except for the _atom_site loop).
+
+    WARNING 3: Converting ground truth mmCIF file to Biomolecule and then back to
+      mmCIF using this method will not retain the original chain indices and will
+      instead install author chain IDs.
+
+    WARNING 4: In case of multiple identical chains, they are assigned different
+      `_atom_site.label_entity_id` values.
+
+    :param biomol: A biomolecule to convert to mmCIF string.
+    :param file_id: The file ID (usually the PDB ID) to be used in the mmCIF.
+    :param gapless_poly_seq: If True, the polymer output will contain gapless residue indices.
+    :param insert_alphafold_mmcif_metadata: If True, insert metadata fields
+        referencing AlphaFold in the output mmCIF file.
+    :param unique_res_atom_names: A dictionary mapping each author chain ID to a list of lists
+        of lists of atom names for each "pseudoresidue" of each unique residue. If None, the
+        atom names are assumed to be the same for all residues of the same chemical type (e.g., RNA).
+        This is used to group "pseudoresidues" (e.g., ligand atoms) by parent residue.
+
+    :return: A valid mmCIF string.
+
+    :raise:
+      ValueError: If amino-acid or nucleotide residue types array contains entries with
+      too many biomolecule types.
+    """
+    atom_positions = biomol.atom_positions
+    restype = biomol.restype
+    atom_mask = biomol.atom_mask
+    residue_index = biomol.residue_index.astype(np.int32)
+    chain_index = biomol.chain_index.astype(np.int32)
+    b_factors = biomol.b_factors
+    chemid = biomol.chemid
+    chemtype = biomol.chemtype
+    bonds = biomol.bonds
+    author_cri_to_new_cri = biomol.author_cri_to_new_cri
+    entity_id_to_chain_ids = biomol.entity_to_chain
+    mmcif_to_author_chain_ids = biomol.mmcif_to_author_chain
+    orig_mmcif_metadata = biomol.mmcif_metadata
+
+    # Via unique chain-residue indexing, ensure that each ligand residue
+    # is represented by only a single atom for all logic except atom site parsing.
+    chain_residue_index = np.array(
+        [f"{chain_index[i]}_{residue_index[i]}" for i in range(residue_index.shape[0])]
+    )
+    _, unique_indices = np.unique(chain_residue_index, return_index=True)
+    
+    # Use .sort() not sorted() to avoid returning a list of np arrays of size 1,
+    unique_indices.sort()
+    
+    unique_restype = restype[unique_indices]
+    unique_residue_index = residue_index[unique_indices]
+    unique_chain_index = chain_index[unique_indices]
+    unique_chemid = chemid[unique_indices]
+    unique_chemtype = chemtype[unique_indices]
+    
+    # Construct a mapping from integer chain indices to chain ID strings.
+    chain_ids = {}
+    for chain_id in np.unique(unique_chain_index):  # np.unique gives sorted output.
+
+        chain_ids[chain_id] = _int_id_to_str_id(chain_id + 1)
+    mmcif_dict = collections.defaultdict(list)
+
+    mmcif_dict["data_"] = file_id.upper()
+    mmcif_dict["_entry.id"] = file_id.upper()
+
+    label_asym_id_to_entity_id = {}
+    unique_polymer_entity_pdbx_strand_ids = set()
+    # Entity and chain information.
+    for entity_id, entity_chain_ids in entity_id_to_chain_ids.items():
+        assert len(entity_chain_ids) > 0, f"Entity {entity_id} must contain at least one chain."
+        entity_types = []
+        polymer_entity_types = []
+        polymer_entity_pdbx_strand_ids = []
+        for chain_id in entity_chain_ids:
+            # Determine the (majority) chemical type of the chain.         
+            res_chemindex = np_mode(unique_chemtype[unique_chain_index == chain_id])[0].item()
+            residue_constants = get_residue_constants(res_chem_index=res_chemindex)
+            # Add all chain information to the _struct_asym table.
+            label_asym_id_to_entity_id[chain_ids[chain_id]] = str(entity_id)
+            mmcif_dict["_struct_asym.id"].append(chain_ids[chain_id])
+            mmcif_dict["_struct_asym.entity_id"].append(str(entity_id))
+            # Collect entity information for each chain.
+            entity_types.append(residue_constants.POLYMER_CHAIN)
+            # Collect only polymer information for each chain.
+            if res_chemindex < 3:
+                polymer_entity_types.append(residue_constants.BIOMOLECULE_CHAIN)
+                polymer_entity_pdbx_strand_ids.append(chain_ids[chain_id])
+                unique_polymer_entity_pdbx_strand_ids.add(chain_ids[chain_id])
+
+        # Generate the _entity table, labeling the entity's (majority) type.
+        entity_type = np_mode(np.array(entity_types))[0].item()
+        mmcif_dict["_entity.id"].append(str(entity_id))
+        mmcif_dict["_entity.type"].append(entity_type)
+        # Add information about the polymer entities to the _entity_poly table,
+        # labeling each polymer entity's (majority) type.
+        if polymer_entity_types:
+            polymer_entity_type = np_mode(np.array(polymer_entity_types))[0].item()
+            mmcif_dict["_entity_poly.entity_id"].append(str(entity_id))
+            mmcif_dict["_entity_poly.type"].append(polymer_entity_type)
+            mmcif_dict["_entity_poly.pdbx_strand_id"].append(
+                ",".join(polymer_entity_pdbx_strand_ids)
+            )
+
+    # Bioassembly information.
+    # Export latest data for the _pdbx_struct_assembly_gen table.
+    pdbx_struct_assembly_oligomeric_count = collections.defaultdict(int)
+    pdbx_struct_assembly_gen_assembly_ids = orig_mmcif_metadata.get(
+        "_pdbx_struct_assembly_gen.assembly_id", []
+    )
+    pdbx_struct_assembly_gen_oper_expressions = orig_mmcif_metadata.get(
+        "_pdbx_struct_assembly_gen.oper_expression", []
+    )
+    pdbx_struct_assembly_gen_asym_id_lists = orig_mmcif_metadata.get(
+        "_pdbx_struct_assembly_gen.asym_id_list", []
+    )
+    if any(
+        len(item) > 0
+        for item in (
+            pdbx_struct_assembly_gen_assembly_ids,
+            pdbx_struct_assembly_gen_oper_expressions,
+            pdbx_struct_assembly_gen_asym_id_lists,
+        )
+    ):
+        # Sanity-check the lengths of the _pdbx_struct_assembly_gen table entries.
+        assert (
+            len(pdbx_struct_assembly_gen_assembly_ids)
+            == len(pdbx_struct_assembly_gen_oper_expressions)
+            == len(pdbx_struct_assembly_gen_asym_id_lists)
+        ), f"Mismatched lengths ({len(pdbx_struct_assembly_gen_assembly_ids)}, {len(pdbx_struct_assembly_gen_oper_expressions)}, {len(pdbx_struct_assembly_gen_asym_id_lists)}) for _pdbx_struct_assembly_gen table entries."
+    for assembly_id, oper_expression, asym_id_list in zip(
+        pdbx_struct_assembly_gen_assembly_ids,
+        pdbx_struct_assembly_gen_oper_expressions,
+        pdbx_struct_assembly_gen_asym_id_lists,
+    ):
+        author_asym_ids = []
+        for asym_id in asym_id_list.split(","):
+            if asym_id not in mmcif_to_author_chain_ids:
+                continue
+            author_asym_id = chain_ids[mmcif_to_author_chain_ids[asym_id]]
+            if author_asym_id in unique_polymer_entity_pdbx_strand_ids:
+                author_asym_ids.append(author_asym_id)
+        if not author_asym_ids:
+            continue
+        # In original order, remove any duplicate author chains arising from the many-to-one mmCIF-to-author chain mapping.
+        author_asym_ids = list(dict.fromkeys(author_asym_ids))
+        mmcif_dict["_pdbx_struct_assembly_gen.assembly_id"].append(str(assembly_id))
+        mmcif_dict["_pdbx_struct_assembly_gen.oper_expression"].append(str(oper_expression))
+        mmcif_dict["_pdbx_struct_assembly_gen.asym_id_list"].append(",".join(author_asym_ids))
+        pdbx_struct_assembly_oligomeric_count[assembly_id] += sum(
+            # Only count polymer entities in the oligomeric count.
+            asym_id in unique_polymer_entity_pdbx_strand_ids
+            for asym_id in author_asym_ids
+        )
+    # Export latest data for the _pdbx_struct_assembly table.
+    pdbx_struct_assembly_gen_ids = set(mmcif_dict["_pdbx_struct_assembly_gen.assembly_id"])
+    pdbx_struct_assembly_ids = orig_mmcif_metadata.get("_pdbx_struct_assembly.id", [])
+    pdbx_struct_assembly_details = orig_mmcif_metadata.get("_pdbx_struct_assembly.details", [])
+    if any(
+        len(item) > 0
+        for item in (
+            pdbx_struct_assembly_ids,
+            pdbx_struct_assembly_details,
+        )
+    ):
+        # Sanity-check the lengths of the _pdbx_struct_assembly table entries.
+        assert len(pdbx_struct_assembly_ids) == len(
+            pdbx_struct_assembly_details
+        ), f"Mismatched lengths ({len(pdbx_struct_assembly_ids)}, {len(pdbx_struct_assembly_details)}) for _pdbx_struct_assembly table entries."
+    for assembly_id, assembly_details in zip(
+        pdbx_struct_assembly_ids,
+        pdbx_struct_assembly_details,
+    ):
+        if assembly_id not in pdbx_struct_assembly_gen_ids:
+            continue
+        mmcif_dict["_pdbx_struct_assembly.id"].append(str(assembly_id))
+        mmcif_dict["_pdbx_struct_assembly.details"].append(str(assembly_details))
+        mmcif_dict["_pdbx_struct_assembly.oligomeric_details"].append(
+            "?"
+        )  # NOTE: After chain filtering, we cannot assume the oligmeric state.
+        mmcif_dict["_pdbx_struct_assembly.oligomeric_count"].append(
+            str(pdbx_struct_assembly_oligomeric_count[assembly_id])
+        )
+
+    # Populate the _struct_conn table.
+    # For ligands and metals bonds are not always provided, therefore first check if bonds are present.
+    if bonds:
+        for bond in bonds:
+            # Skip bonds between residues that have previously been filtered out.
+            ptnr1_key = (
+                bond.ptnr1_auth_asym_id,
+                bond.ptnr1_auth_comp_id,
+                int(bond.ptnr1_auth_seq_id),
+            )
+            ptnr2_key = (
+                bond.ptnr2_auth_asym_id,
+                bond.ptnr2_auth_comp_id,
+                int(bond.ptnr2_auth_seq_id),
+            )
+            if ptnr1_key not in author_cri_to_new_cri or ptnr2_key not in author_cri_to_new_cri:
+                continue
+            # Partner 1
+            ptnr1_mapping = author_cri_to_new_cri[ptnr1_key]
+            mmcif_dict["_struct_conn.ptnr1_auth_seq_id"].append(
+                str(ptnr1_mapping[2])
+            )  # Reindex ptnr1 residue ID.
+            mmcif_dict["_struct_conn.ptnr1_auth_comp_id"].append(bond.ptnr1_auth_comp_id)
+            mmcif_dict["_struct_conn.ptnr1_auth_asym_id"].append(bond.ptnr1_auth_asym_id)
+            mmcif_dict["_struct_conn.ptnr1_label_atom_id"].append(bond.ptnr1_label_atom_id)
+            mmcif_dict["_struct_conn.pdbx_ptnr1_label_alt_id"].append(bond.pdbx_ptnr1_label_alt_id)
+            # Partner 2
+            ptnr2_mapping = author_cri_to_new_cri[ptnr2_key]
+            mmcif_dict["_struct_conn.ptnr2_auth_seq_id"].append(
+                str(ptnr2_mapping[2])
+            )  # Reindex ptnr2 residue ID.
+            mmcif_dict["_struct_conn.ptnr2_auth_comp_id"].append(bond.ptnr2_auth_comp_id)
+            mmcif_dict["_struct_conn.ptnr2_auth_asym_id"].append(bond.ptnr2_auth_asym_id)
+            mmcif_dict["_struct_conn.ptnr2_label_atom_id"].append(bond.ptnr2_label_atom_id)
+            mmcif_dict["_struct_conn.pdbx_ptnr2_label_alt_id"].append(bond.pdbx_ptnr2_label_alt_id)
+            # Connection metadata
+            mmcif_dict["_struct_conn.pdbx_leaving_atom_flag"].append(bond.pdbx_leaving_atom_flag)
+            mmcif_dict["_struct_conn.pdbx_dist_value"].append(bond.pdbx_dist_value)
+            mmcif_dict["_struct_conn.pdbx_role"].append(bond.pdbx_role)
+            mmcif_dict["_struct_conn.conn_type_id"].append(bond.conn_type_id)
+
+    # Populate the _chem_comp table.
+    # Check if present, and if so, add the relevant information.
+    if biomol.chem_comp_table:
+        for chem_comp in biomol.chem_comp_table:
+            mmcif_dict["_chem_comp.id"].append(chem_comp.id)
+            mmcif_dict["_chem_comp.formula"].append(chem_comp.formula)
+            mmcif_dict["_chem_comp.formula_weight"].append(chem_comp.formula_weight)
+            mmcif_dict["_chem_comp.mon_nstd_flag"].append(chem_comp.mon_nstd_flag)
+            mmcif_dict["_chem_comp.name"].append(chem_comp.name)
+            mmcif_dict["_chem_comp.type"].append(chem_comp.type)
+    chem_comp_ids = set(mmcif_dict["_chem_comp.id"])
+
+    # For denovo structures, we manually add the _chem_comp table entries.
+    for chain_id, (res_ids, chemids, chemindices) in _get_chain_seq(
+        unique_restype,
+        unique_residue_index,
+        unique_chain_index,
+        unique_chemid,
+        unique_chemtype,
+        gapless=gapless_poly_seq,
+        non_polymer_only=False,
+    ).items():
+        
+        for res_id, res_chemid, res_chemindex in zip(res_ids, chemids, chemindices):
+            mmcif_dict["_pdbx_poly_seq_scheme.asym_id"].append(chain_ids[chain_id])
+            mmcif_dict["_pdbx_poly_seq_scheme.entity_id"].append(
+                label_asym_id_to_entity_id[chain_ids[chain_id]]
+            )
+            mmcif_dict["_pdbx_poly_seq_scheme.seq_id"].append(str(res_id))
+            mmcif_dict["_pdbx_poly_seq_scheme.auth_seq_num"].append(str(res_id))
+            mmcif_dict["_pdbx_poly_seq_scheme.pdb_seq_num"].append(str(res_id))
+            mmcif_dict["_pdbx_poly_seq_scheme.mon_id"].append(res_chemid)
+            mmcif_dict["_pdbx_poly_seq_scheme.auth_mon_id"].append(res_chemid)
+            mmcif_dict["_pdbx_poly_seq_scheme.pdb_mon_id"].append(res_chemid)
+            mmcif_dict["_pdbx_poly_seq_scheme.hetero"].append("n")
+
+            # Add relevant missing polymer residue types to the _chem_comp table.
+            residue_constants = get_residue_constants(res_chem_index=res_chemindex)
+            
+            # TODO: When ligand, metal, and non-canoical support is better, this can be made more elegant.
+            if res_chemid != residue_constants.unk_restype and res_chemid not in chem_comp_ids:
+                
+                chem_comp_ids.add(res_chemid)
+                mmcif_dict["_chem_comp.id"].append(res_chemid)
+                
+                if res_chemid == 'UNK':
+                    one_letter = 'X'
+                else:
+                    one_letter = residue_constants.restype_3to1[res_chemid]
+
+                # Amino Acid
+                if res_chemindex == 0:
+                    mmcif_dict["_chem_comp.formula"].append(HUMAN_AMINO_ACIDS[one_letter]['smile'])
+                    mmcif_dict["_chem_comp.formula_weight"].append("?") # This can be updated with a more accurate value
+                    mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                    mmcif_dict["_chem_comp.name"].append("AMINO ACID RESIDUE")
+                    mmcif_dict["_chem_comp.type"].append("peptide linking")
+
+                # RNA
+                elif res_chemindex == 1:
+                    mmcif_dict["_chem_comp.formula"].append(RNA_NUCLEOTIDES[one_letter]['smile'])
+                    mmcif_dict["_chem_comp.formula_weight"].append("?") # This can be updated with a more accurate value
+                    mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                    mmcif_dict["_chem_comp.name"].append("RNA RESIDUE")
+                    mmcif_dict["_chem_comp.type"].append("nucleotide linking")
+
+                # DNA
+                elif res_chemindex == 2:
+                    mmcif_dict["_chem_comp.formula"].append(DNA_NUCLEOTIDES[one_letter]['smile'])
+                    mmcif_dict["_chem_comp.formula_weight"].append("?") # This can be updated with a more accurate value
+                    mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                    mmcif_dict["_chem_comp.name"].append("DNA RESIDUE")
+                    mmcif_dict["_chem_comp.type"].append("nucleotide linking")
+
+                # Unknown
+                else:
+                    mmcif_dict["_chem_comp.formula"].append("?")
+                    mmcif_dict["_chem_comp.formula_weight"].append("?")
+                    mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                    mmcif_dict["_chem_comp.name"].append(residue_constants.unk_chemname)
+                    mmcif_dict["_chem_comp.type"].append(residue_constants.unk_chemtype)
+            
+            if res_chemid == residue_constants.unk_restype and res_chemid not in chem_comp_ids:        
+                chem_comp_ids.add(residue_constants.unk_restype)
+                mmcif_dict["_chem_comp.id"].append(residue_constants.unk_restype)
+                mmcif_dict["_chem_comp.formula"].append("?")
+                mmcif_dict["_chem_comp.formula_weight"].append("?")
+                mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                mmcif_dict["_chem_comp.name"].append(residue_constants.unk_chemname)
+                mmcif_dict["_chem_comp.type"].append(residue_constants.unk_chemtype)
+
+    # Add the non-polymer residues to the _pdbx_nonpoly_scheme table.
+    for chain_id, (res_ids, chemids, chemindices) in _get_chain_seq(
+        unique_restype,
+        unique_residue_index,
+        unique_chain_index,
+        unique_chemid,
+        unique_chemtype,
+        gapless=False,
+        non_polymer_only=True,
+    ).items():
+        for res_id, res_chemid, res_chemindex in zip(res_ids, chemids, chemindices):
+            mmcif_dict["_pdbx_nonpoly_scheme.asym_id"].append(chain_ids[chain_id])
+            mmcif_dict["_pdbx_nonpoly_scheme.entity_id"].append(
+                label_asym_id_to_entity_id[chain_ids[chain_id]]
+            )
+            mmcif_dict["_pdbx_nonpoly_scheme.auth_seq_num"].append(str(res_id))
+            mmcif_dict["_pdbx_nonpoly_scheme.pdb_seq_num"].append(str(res_id))
+            mmcif_dict["_pdbx_nonpoly_scheme.auth_mon_id"].append(res_chemid)
+            mmcif_dict["_pdbx_nonpoly_scheme.pdb_mon_id"].append(res_chemid)
+
+            # Add relevant missing non-polymer residue types to the _chem_comp table.
+            residue_constants = get_residue_constants(res_chem_index=res_chemindex)
+            if res_chemid == residue_constants.unk_restype and res_chemid not in chem_comp_ids:
+                chem_comp_ids.add(residue_constants.unk_restype)
+                mmcif_dict["_chem_comp.id"].append(residue_constants.unk_restype)
+                mmcif_dict["_chem_comp.formula"].append("?")    # TODO: This can be updated with a more accurate value
+                mmcif_dict["_chem_comp.formula_weight"].append("?") # TODO: This can be updated with a more accurate value
+                mmcif_dict["_chem_comp.mon_nstd_flag"].append("no")
+                mmcif_dict["_chem_comp.name"].append(residue_constants.unk_chemname)
+                mmcif_dict["_chem_comp.type"].append(residue_constants.unk_chemtype)
+
+    # Add all atom sites.
+    if exists(unique_res_atom_names):
+        unique_res_atom_names = [item[0] for item in unique_res_atom_names]
+        assert len(unique_res_atom_names) == len(
+            unique_restype
+        ), f"Unique residue atom names array must have the same length ({len(unique_res_atom_names)}) as the unique residue types array ({len(unique_restype)})."
+    atom_index = 1
+    
+    for i in range(unique_restype.shape[0]):
+        # Determine the chemical type of the residue.
+        res_chemindex = unique_chemtype[i]
+        is_polymer_residue = (res_chemindex < 3).item()
+        residue_constants = get_residue_constants(res_chem_index=res_chemindex)
+        res_name_3 = unique_chemid[i]
+        # Group "pseudoresidues" (e.g., ligand atoms) by parent residue.
+        unique_atom_indices = collections.defaultdict(int)
+        res_atom_positions = atom_positions[
+            (chain_index == unique_chain_index[i]) & (residue_index == unique_residue_index[i])
+        ]
+        res_atom_mask = atom_mask[
+            (chain_index == unique_chain_index[i]) & (residue_index == unique_residue_index[i])
+        ]
+        res_b_factors = b_factors[
+            (chain_index == unique_chain_index[i]) & (residue_index == unique_residue_index[i])
+        ]
+
+        # Special case for metal ions.
+        if unique_restype[i] == 32:
+            
+            res_atom_names = (
+                unique_res_atom_names[i]
+                if exists(unique_res_atom_names)
+                else [residue_constants.atom_types for _ in range(len(res_atom_positions))]
+            )
+            assert len(res_atom_positions) == len(
+                res_atom_names
+            ), "Residue positions array and residue atom names array must have the same length."
+
+            pos = res_atom_positions[0][-1]
+            mmcif_dict["_atom_site.group_PDB"].append("ATOM")
+            mmcif_dict["_atom_site.id"].append(str(atom_index))
+            mmcif_dict["_atom_site.type_symbol"].append(type_symbol)
+            mmcif_dict["_atom_site.label_atom_id"].append(unique_atom_name)
+            mmcif_dict["_atom_site.label_alt_id"].append(".")
+            mmcif_dict["_atom_site.label_comp_id"].append(res_name_3)
+            mmcif_dict["_atom_site.label_asym_id"].append(chain_ids[unique_chain_index[i]])
+            mmcif_dict["_atom_site.label_entity_id"].append(
+                label_asym_id_to_entity_id[chain_ids[unique_chain_index[i]]]
+            )
+            mmcif_dict["_atom_site.label_seq_id"].append(str(unique_residue_index[i]))
+            mmcif_dict["_atom_site.pdbx_PDB_ins_code"].append(".")
+            
+            mmcif_dict["_atom_site.Cartn_x"].append(f"{pos[0]:.3f}")
+            mmcif_dict["_atom_site.Cartn_y"].append(f"{pos[1]:.3f}")
+            mmcif_dict["_atom_site.Cartn_z"].append(f"{pos[2]:.3f}")
+            mmcif_dict["_atom_site.occupancy"].append("1.00")
+            mmcif_dict["_atom_site.B_iso_or_equiv"].append(f"{b_factor:.2f}")
+            mmcif_dict["_atom_site.auth_seq_id"].append(str(unique_residue_index[i]))
+            mmcif_dict["_atom_site.auth_comp_id"].append(res_name_3)
+            mmcif_dict["_atom_site.auth_asym_id"].append(chain_ids[unique_chain_index[i]])
+            mmcif_dict["_atom_site.auth_atom_id"].append(unique_atom_name)
+            mmcif_dict["_atom_site.pdbx_PDB_model_num"].append("1")
+            atom_index += 1
+            continue
+        
+        if (unique_restype[i] - residue_constants.min_restype_num) <= len(
+            residue_constants.restypes
+        ):
+            res_atom_names = (
+                unique_res_atom_names[i]
+                if exists(unique_res_atom_names)
+                else [residue_constants.atom_types for _ in range(len(res_atom_positions))]
+            )
+            assert len(res_atom_positions) == len(
+                res_atom_names
+            ), "Residue positions array and residue atom names array must have the same length."
+        else:
+            # This breaks on metal ions so we have a hacky fix for that below.
+            if unique_restype[i] != 32:
+                raise ValueError(
+                    "Residue types array contains entries with too many biomolecule types."
+                )
         # Iterate over all "pseudoresidues" associated with a parent residue.
         for atom_name_, pos_, mask_, b_factor_ in zip(
             res_atom_names, res_atom_positions, res_atom_mask, res_b_factors

@@ -1,4 +1,7 @@
 from __future__ import annotations
+from functools import partial
+import importlib.metadata
+import torch
 import numpy as np
 
 from beartype import beartype
@@ -57,6 +60,37 @@ ResidueType = Residue | DisorderedResidue
 ChainType = Chain
 TokenType = AtomType | ResidueType
 
+# some more colocated environmental stuff
+
+def package_available(package_name: str) -> bool:
+    """Check if a package is available in your environment.
+
+    :param package_name: The name of the package to be checked.
+    :return: `True` if the package is available. `False` otherwise.
+    """
+    try:
+        importlib.metadata.version(package_name)
+        return True
+    except importlib.metadata.PackageNotFoundError:
+        return False
+
+# maybe deespeed checkpoint, and always use non reentrant checkpointing
+
+DEEPSPEED_CHECKPOINTING = env.bool('DEEPSPEED_CHECKPOINTING', False)
+
+if DEEPSPEED_CHECKPOINTING:
+    assert package_available("deepspeed"), "DeepSpeed must be installed for checkpointing."
+
+    import deepspeed
+
+    checkpoint = deepspeed.checkpointing.checkpoint
+else:
+    checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
+
+# check is github ci
+
+IS_GITHUB_CI = env.bool('IS_GITHUB_CI', False)
+
 # use env variable TYPECHECK to control whether to use beartype + jaxtyping
 
 should_typecheck = env.bool('TYPECHECK', False)
@@ -84,5 +118,7 @@ __all__ = [
     typecheck,
     should_typecheck,
     beartype_isinstance,
-    IS_DEBUGGING
+    checkpoint,
+    IS_DEBUGGING,
+    IS_GITHUB_CI
 ]
