@@ -7,7 +7,7 @@ from alphafold3_pytorch.utils.utils import exists
 
 def test_msa_loading():
     """Test an MSA-featurized PDBDataset constructed using a WeightedPDBSampler."""
-    data_test = Path("data", "test")
+    data_test = Path("data", "test", "pdb_data")
     data_test_mmcif_dir = data_test / "mmcifs"
     data_test_clusterings_dir = data_test / "data_caches" / "clusterings"
     data_test_msa_dir = data_test / "data_caches" / "msa" / "msas"
@@ -40,7 +40,7 @@ def test_msa_loading():
         folder=data_test_mmcif_dir,
         sampler=sampler,
         sample_type="default",
-        crop_size=128,
+        crop_size=4,
         msa_dir=str(data_test_msa_dir),
         sample_only_pdb_ids=test_ids,
         training=False,
