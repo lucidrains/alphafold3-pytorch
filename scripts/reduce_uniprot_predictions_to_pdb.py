@@ -2,18 +2,17 @@ import glob
 import gzip
 import os
 import shutil
-import timeout_decorator
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Pool
 
 import polars as pl
+import timeout_decorator
 from beartype.typing import Dict, Set, Tuple
 from tqdm import tqdm
 
 from alphafold3_pytorch.data import mmcif_parsing
 from alphafold3_pytorch.utils.data_utils import extract_mmcif_metadata_field
-
 
 PROCESS_ARCHIVE_MAX_SECONDS_PER_INPUT = 15
 
