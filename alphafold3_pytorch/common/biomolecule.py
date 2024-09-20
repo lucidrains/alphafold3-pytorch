@@ -460,10 +460,10 @@ class Biomolecule:
         if exists(chain_1) and exists(chain_2):
             crop_fn_weights = [contiguous_weight, spatial_weight, spatial_interface_weight]
         elif exists(chain_1) or exists(chain_2):
-            crop_fn_weights = [contiguous_weight, spatial_weight + spatial_interface_weight, 0.0]
+            crop_fn_weights = [contiguous_weight, spatial_weight, 0.0]
         else:
             crop_fn_weights = [
-                contiguous_weight + spatial_weight + spatial_interface_weight,
+                contiguous_weight,
                 0.0,
                 0.0,
             ]
