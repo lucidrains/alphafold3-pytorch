@@ -17,7 +17,7 @@ from alphafold3_pytorch import (
 
 DATA_TEST_PDB_ID = '209d'
 
-TEST_FOLDER = Path("./data/test/data_caches/clusterings/")
+TEST_FOLDER = Path("data", "test", "pdb_data", "data_caches", "clusterings")
 
 INTERFACE_MAPPING_PATH = str(TEST_FOLDER / "interface_cluster_mapping.csv")
 
