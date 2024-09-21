@@ -7463,6 +7463,7 @@ class Alphafold3(Module):
             # determine which mask to use for confidence head labels
 
             label_mask = atom_mask
+            label_pairwise_mask = to_pairwise_mask(mask)
 
             # cross entropy losses
 
@@ -7498,14 +7499,14 @@ class Alphafold3(Module):
                     f"pae_labels shape {pae_labels.shape[-1]} does not match "
                     f"ch_logits.pae shape {ch_logits.pae.shape[-1]}"
                 )
-                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, pairwise_mask, ignore)
+                pae_loss = cross_entropy_with_weight(ch_logits.pae, pae_labels, confidence_weight, label_pairwise_mask, ignore)
 
             if exists(pde_labels):
                 assert pde_labels.shape[-1] == ch_logits.pde.shape[-1], (
                     f"pde_labels shape {pde_labels.shape[-1]} does not match "
                     f"ch_logits.pde shape {ch_logits.pde.shape[-1]}"
                 )
-                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, pairwise_mask, ignore)
+                pde_loss = cross_entropy_with_weight(ch_logits.pde, pde_labels, confidence_weight, label_pairwise_mask, ignore)
 
             if exists(plddt_labels):
                 assert plddt_labels.shape[-1] == ch_logits.plddt.shape[-1], (
