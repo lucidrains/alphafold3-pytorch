@@ -113,6 +113,7 @@ def make_msa_features(
     msas: Dict[str, msa_parsing.Msa],
     chain_id_to_residue: Dict[str, Dict[str, List[int]]],
     num_msa_one_hot: int,
+    tab_separated_alignment_headers: bool = False,
     ligand_chemtype_index: int = 3,
 ) -> List[Dict[str, np.ndarray]]:
     """
@@ -122,6 +123,7 @@ def make_msa_features(
     :param msas: The mapping of chain IDs to lists of MSAs for each chain.
     :param chain_id_to_residue: The mapping of chain IDs to residue information.
     :param num_msa_one_hot: The number of one-hot classes for MSA features.
+    :param tab_separated_alignment_headers: Whether the alignment headers are tab-separated.
     :param ligand_chemtype_index: The index of the ligand in the chemical type list.
     :return: The MSA chain feature dictionaries.
     """
@@ -215,7 +217,10 @@ def make_msa_features(
             deletion_matrix.append(msa_deletion_values)
 
             # Parse species ID for MSA pairing if possible.
-            species_id = msa_parsing.get_identifiers(msa.descriptions[sequence_index]).species_id
+            species_id = msa_parsing.get_identifiers(
+                description=msa.descriptions[sequence_index],
+                tab_separated_alignment_headers=tab_separated_alignment_headers,
+            ).species_id
 
             if sequence_index == 0:
                 species_id = "-1"  # Tag target sequence for filtering.

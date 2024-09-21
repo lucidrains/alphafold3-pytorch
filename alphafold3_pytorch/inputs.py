@@ -2776,6 +2776,7 @@ def load_msa_from_msa_dir(
         msas,
         chain_id_to_residue,
         num_msa_one_hot=NUM_MSA_ONE_HOT,
+        tab_separated_alignment_headers=not distillation,
     )
     unique_entity_ids = set(chain["entity_id"][0] for chain in chains)
 

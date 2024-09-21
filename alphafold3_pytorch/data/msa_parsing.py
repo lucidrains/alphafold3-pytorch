@@ -70,19 +70,33 @@ def get_msa_type(msa_chem_type: int) -> MSA_TYPE:
 
 
 @typecheck
+def _parse_species_identifier(description: str) -> Identifiers:
+    """Gets species from an MSA sequence identifier.
+
+    The sequence identifier in this instance has a tab-separated format,
+    except for the query identifier which is not linked to a species.
+
+    :param description: a sequence identifier.
+    :return: An `Identifiers` instance with species_id. These
+        can be empty in the case where no identifier was found.
+    """
+    split_description = description.split("\t")
+    if len(split_description) > 1:
+        return Identifiers(species_id=split_description[-1].strip())
+    return Identifiers()
+
+
+@typecheck
 def _parse_sequence_identifier(msa_sequence_identifier: str) -> Identifiers:
-    """Gets species from an msa sequence identifier.
+    """Gets species from an MSA sequence identifier.
 
     The sequence identifier has the format specified by
     _UNIPROT_TREMBL_ENTRY_NAME_PATTERN or _UNIPROT_SWISSPROT_ENTRY_NAME_PATTERN.
     An example of a sequence identifier: `tr|A0A146SKV9|A0A146SKV9_FUNHE`
 
-    Args:
-      msa_sequence_identifier: a sequence identifier.
-
-    Returns:
-      An `Identifiers` instance with species_id. These
-      can be empty in the case where no identifier was found.
+    :param msa_sequence_identifier: a sequence identifier.
+    :return: An `Identifiers` instance with species_id. These
+        can be empty in the case where no identifier was found.
     """
     matches = re.search(_UNIPROT_PATTERN, msa_sequence_identifier.strip())
     if matches:
@@ -94,7 +108,8 @@ def _parse_sequence_identifier(msa_sequence_identifier: str) -> Identifiers:
 def _extract_sequence_identifier(description: str) -> Optional[str]:
     """Extracts sequence identifier from description.
 
-    Returns None if no match.
+    :param description: a sequence description.
+    :return: The sequence identifier.
     """
     split_description = description.split()
     if split_description:
@@ -104,36 +119,24 @@ def _extract_sequence_identifier(description: str) -> Optional[str]:
 
 
 @typecheck
-def _extract_sequence_accession_id(description: str) -> Optional[str]:
-    """Extracts sequence identifier from description.
+def get_identifiers(
+    description: str, tab_separated_alignment_headers: bool = False
+) -> Identifiers:
+    """Computes extra MSA features from the description.
 
-    Returns None if no match.
+    :param description: The description of the sequence.
+    :param tab_separated_alignment_headers: Whether the alignment headers are tab-separated.
+    :return: An `Identifiers` instance with species_id. These can be empty in the case
+        where no identifier was found.
     """
-    split_description = description.split()
-    if split_description:
-        return split_description[0].split(">")[-1]
+    if tab_separated_alignment_headers:
+        return _parse_species_identifier(description)
     else:
-        return None
-
-
-@typecheck
-def get_identifiers(description: str) -> Identifiers:
-    """Computes extra MSA features from the description."""
-    sequence_identifier = _extract_sequence_identifier(description)
-    if not_exists(sequence_identifier):
-        return Identifiers()
-    else:
-        return _parse_sequence_identifier(sequence_identifier)
-
-
-@typecheck
-def get_accession_id(description: str) -> str:
-    """Computes extra MSA features from the description."""
-    sequence_accession_id = _extract_sequence_accession_id(description)
-    if not_exists(sequence_accession_id):
-        return ""
-    else:
-        return sequence_accession_id
+        sequence_identifier = _extract_sequence_identifier(description)
+        if not_exists(sequence_identifier):
+            return Identifiers()
+        else:
+            return _parse_sequence_identifier(sequence_identifier)
 
 
 @dataclasses.dataclass(frozen=True)
