@@ -1134,7 +1134,6 @@ def molecule_lengthed_molecule_input_to_atom_input(
         if mol_is_one_token_per_atom:
             coordinates = []
 
-            has_bond = torch.zeros(num_atoms, num_atoms).bool()
             bonds = mol.GetBonds()
             num_bonds = len(bonds)
 
@@ -1150,6 +1149,8 @@ def molecule_lengthed_molecule_input_to_atom_input(
                 )
 
             if num_bonds > 0:
+                has_bond = torch.zeros(num_atoms, num_atoms).bool()
+
                 coordinates = tensor(coordinates).long()
 
                 # has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
@@ -1163,8 +1164,8 @@ def molecule_lengthed_molecule_input_to_atom_input(
 
                 # / ein.set_at
 
-            row_col_slice = slice(offset, offset + num_atoms)
-            token_bonds[row_col_slice, row_col_slice] = has_bond
+                row_col_slice = slice(offset, offset + num_atoms)
+                token_bonds[row_col_slice, row_col_slice] = has_bond
 
         offset += num_atoms if mol_is_one_token_per_atom else 1
 
@@ -3572,13 +3573,14 @@ def pdb_input_to_molecule_input(
             # construct ligand and modified polymer chain token bonds
 
             coordinates = []
-            updates = []
 
             ligand = molecules[ligand_offset]
             num_atoms = ligand.GetNumAtoms()
-            has_bond = torch.zeros(num_atoms, num_atoms).bool()
 
-            for bond in ligand.GetBonds():
+            bonds = ligand.GetBonds()
+            num_bonds = len(bonds)
+
+            for bond in bonds:
                 atom_start_index = bond.GetBeginAtomIdx()
                 atom_end_index = bond.GetEndAtomIdx()
 
@@ -3589,15 +3591,24 @@ def pdb_input_to_molecule_input(
                     ]
                 )
 
-                updates.extend([True, True])
+            if num_bonds > 0:
+                has_bond = torch.zeros(num_atoms, num_atoms).bool()
 
-            coordinates = tensor(coordinates).long()
-            updates = tensor(updates).bool()
+                coordinates = tensor(coordinates).long()
 
-            has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+                # has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
 
-            row_col_slice = slice(polymer_offset, polymer_offset + num_atoms)
-            token_bonds[row_col_slice, row_col_slice] = has_bond
+                has_bond_stride = tensor(has_bond.stride())
+                flattened_coordinates = (coordinates * has_bond_stride).sum(dim = -1)
+                packed_has_bond, unpack_has_bond = pack_one(has_bond, '*')
+
+                packed_has_bond[flattened_coordinates] = True
+                has_bond = unpack_has_bond(packed_has_bond, '*')
+
+                # / einx.set_at
+
+                row_col_slice = slice(polymer_offset, polymer_offset + num_atoms)
+                token_bonds[row_col_slice, row_col_slice] = has_bond
 
             polymer_offset += num_atoms
             ligand_offset += 1
