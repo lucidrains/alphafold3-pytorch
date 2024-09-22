@@ -28,7 +28,6 @@ dependencies = [
     "awscliv2>=2.3.1",
     "beartype",
     "biopython>=1.83",
-    "choosenim-install",
     "click>=8.1",
     "CoLT5-attention>=0.11.0",
     "einops>=0.8.0",
