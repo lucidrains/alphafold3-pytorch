@@ -101,6 +101,9 @@ except sh.ErrorReturnCode_1:
     HAS_NIM = False
     NIM_VERSION = None
 
+USE_NIM = env.bool('USE_NIM', HAS_NIM)
+
+assert not (USE_NIM and not HAS_NIM), 'you cannot use Nim if it is not available'
 assert not HAS_NIM or version.parse(NIM_VERSION) >= version.parse('2.0.8'), 'nim version must be 2.0.8 or above'
 
 # check is github ci
@@ -136,5 +139,6 @@ __all__ = [
     beartype_isinstance,
     checkpoint,
     IS_DEBUGGING,
-    IS_GITHUB_CI
+    IS_GITHUB_CI,
+    USE_NIM
 ]
