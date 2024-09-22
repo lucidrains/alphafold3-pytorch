@@ -28,7 +28,8 @@ jobs:
       with:
         nim-version: '2.0.8'
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-      run: nimble install nimpy
+      run: |
+        nimble install nimpy
     - name: Install dependencies
       run: |
         python -m pip install uv
