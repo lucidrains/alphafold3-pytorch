@@ -1,6 +1,10 @@
 from __future__ import annotations
+
+import sh
 from functools import partial
 import importlib.metadata
+from packaging import version
+
 import torch
 import numpy as np
 
@@ -86,6 +90,18 @@ if DEEPSPEED_CHECKPOINTING:
     checkpoint = deepspeed.checkpointing.checkpoint
 else:
     checkpoint = partial(torch.utils.checkpoint.checkpoint, use_reentrant = False)
+
+# whether to use Nim or not, depending on if available and version is adequate
+
+try:
+    sh.which('nim')
+    HAS_NIM = True
+    NIM_VERSION = sh.nim(eval = 'echo NimVersion', hints = 'off')
+except sh.ErrorReturnCode_1:
+    HAS_NIM = False
+    NIM_VERSION = None
+
+assert not HAS_NIM or version.parse(NIM_VERSION) >= version.parse('2.0.8'), 'nim version must be 2.0.8 or above'
 
 # check is github ci
 

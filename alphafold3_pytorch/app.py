@@ -3,20 +3,19 @@ from pathlib import Path
 
 import secrets
 import shutil
-import gradio as gr
-from gradio_molecule3d import Molecule3D
 from Bio.PDB import PDBIO
 
 from alphafold3_pytorch import Alphafold3, Alphafold3Input
 
 # constants
+
 model = None
 cache_path = None
 pdb_writer = PDBIO()
 
-
 # main fold function
-def fold(entities, request: gr.Request):
+
+def fold(entities, request):
     proteins = []
     rnas = []
     dnas = []
@@ -59,9 +58,9 @@ def fold(entities, request: gr.Request):
 
     return str(output_path)
 
-
 # gradio
-def delete_cache(request: gr.Request):
+
+def delete_cache(request):
     if not request.session_hash:
         return
 
@@ -71,6 +70,9 @@ def delete_cache(request: gr.Request):
 
 
 def start_gradio_app():
+    import gradio as gr
+    from gradio_molecule3d import Molecule3D
+
     with gr.Blocks(delete_cache=(600, 3600)) as gradio_app:
         entities = gr.State([])
 
