@@ -28,6 +28,7 @@ jobs:
       with:
         nim-version: '2.0.8'
         repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Nimpy
       run: |
         nimble install nimpy
     - name: Install dependencies
