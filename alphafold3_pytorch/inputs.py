@@ -264,7 +264,7 @@ def hard_validate_atom_indices_ascending(
 
         # NOTE: this is a relaxed assumption, i.e., that if empty, all -1, or only one molecule, then it passes the test
 
-        if present_indices.numel() == 0 or present_indices.shape[-1] <= 1:
+        if present_indices.numel() == 0 or present_indices.shape[0] <= 1:
             continue
 
         difference = einx.subtract(
