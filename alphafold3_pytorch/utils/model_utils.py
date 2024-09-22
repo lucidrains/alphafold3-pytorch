@@ -4,7 +4,7 @@ from beartype.typing import Callable, List, Tuple, Union
 import einx
 import torch
 import torch.nn.functional as F
-from einops import einsum, pack, rearrange, reduce, repeat, unpack
+from einops import einsum, pack, unpack, rearrange, reduce, repeat
 from torch import Tensor
 from torch.nn import Module
 
@@ -16,6 +16,17 @@ from alphafold3_pytorch.utils.utils import default, exists
 Shape = Union[Tuple[int, ...], List[int]]
 
 # helper functions
+
+# einops related
+
+def pack_one(t, pattern):
+    packed, ps = pack([t], pattern)
+
+    def unpack_one(to_unpack, unpack_pattern = None):
+        unpacked, = unpack(to_unpack, ps, default(unpack_pattern, pattern))
+        return unpacked
+
+    return packed, unpack_one
 
 # default scheduler used in paper w/ warmup
 

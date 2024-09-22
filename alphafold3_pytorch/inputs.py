@@ -51,17 +51,20 @@ from alphafold3_pytorch.common import (
     rna_constants,
     ligand_constants
 )
+
 from alphafold3_pytorch.common.biomolecule import (
     Biomolecule,
     _from_mmcif_object,
     get_residue_constants,
 )
+
 from alphafold3_pytorch.data import (
     mmcif_parsing,
     msa_pairing,
     msa_parsing,
     template_parsing,
 )
+
 from alphafold3_pytorch.data.data_pipeline import (
     FeatureDict,
     get_assembly,
@@ -70,7 +73,9 @@ from alphafold3_pytorch.data.data_pipeline import (
     make_template_features,
     merge_chain_features,
 )
+
 from alphafold3_pytorch.data.weighted_pdb_sampler import WeightedPDBSampler
+
 from alphafold3_pytorch.life import (
     ATOM_BONDS,
     ATOMS,
@@ -82,6 +87,7 @@ from alphafold3_pytorch.life import (
     reverse_complement,
     reverse_complement_tensor,
 )
+
 from alphafold3_pytorch.utils.data_utils import (
     PDB_INPUT_RESIDUE_MOLECULE_TYPE,
     extract_mmcif_metadata_field,
@@ -91,6 +97,7 @@ from alphafold3_pytorch.utils.data_utils import (
     is_polymer,
     make_one_hot,
 )
+
 from alphafold3_pytorch.utils.model_utils import (
     distance_to_dgram,
     exclusive_cumsum,
@@ -99,8 +106,11 @@ from alphafold3_pytorch.utils.model_utils import (
     offset_only_positive,
     remove_consecutive_duplicate,
     to_pairwise_mask,
+    pack_one
 )
+
 from alphafold3_pytorch.tensor_typing import Bool, Float, Int, typecheck
+
 from alphafold3_pytorch.utils.utils import default, exists, first, not_exists
 
 from alphafold3_pytorch.attention import (
@@ -788,9 +798,17 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
             coordinates = tensor(coordinates).long()
             updates = tensor(updates).long()
 
-            mol_atompair_ids = einx.set_at(
-                "[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates
-            )
+            # mol_atompair_ids = einx.set_at("[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates)
+
+            molpair_strides = mol_atompair_ids.stride()
+            flattened_coordinates = (coordinates * molpair_strides).sum(dim = -1)
+
+            packed_atompair_ids, unpack_one = pack_one(mol_atompair_ids, '*')
+            packed_atompair_ids[flattened_coordinates] = updates
+
+            mol_atompair_ids = unpack_one(packed_atompair_ids)
+
+            # /einx.set_at
 
             row_col_slice = slice(offset, offset + num_atoms)
             atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
@@ -1110,7 +1128,6 @@ def molecule_lengthed_molecule_input_to_atom_input(
 
         if mol_is_one_token_per_atom:
             coordinates = []
-            updates = []
 
             has_bond = torch.zeros(num_atoms, num_atoms).bool()
 
@@ -1125,12 +1142,18 @@ def molecule_lengthed_molecule_input_to_atom_input(
                     ]
                 )
 
-                updates.extend([True, True])
-
             coordinates = tensor(coordinates).long()
-            updates = tensor(updates).bool()
 
-            has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+            # has_bond = einx.set_at("[h w], c [2], c -> [h w]", has_bond, coordinates, updates)
+
+            has_bond_stride = has_bond.stride()
+            flattened_coordinates = (coordinates * has_bond_stride).sum(dim = -1)
+            packed_has_bond, unpack_has_bond = pack_one(has_bond, '*')
+
+            packed_has_bond[flattened_coordinates] = True
+            has_bond = unpack_one(packed_has_bond, '*')
+
+            # / ein.set_at
 
             row_col_slice = slice(offset, offset + num_atoms)
             token_bonds[row_col_slice, row_col_slice] = has_bond
@@ -1279,9 +1302,7 @@ def molecule_lengthed_molecule_input_to_atom_input(
             coordinates = tensor(coordinates).long()
             updates = tensor(updates).long()
 
-            mol_atompair_ids = einx.set_at(
-                "[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates
-            )
+            # mol_atompair_ids = einx.set_at("[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates)
 
             row_col_slice = slice(offset, offset + num_atoms)
             atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
