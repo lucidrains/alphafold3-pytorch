@@ -773,7 +773,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
             bonds = mol.GetBonds()
             num_bonds = len(bonds)
 
-            for bond in has_bonds:
+            for bond in bonds:
                 atom_start_index = bond.GetBeginAtomIdx()
                 atom_end_index = bond.GetEndAtomIdx()
 
