@@ -104,7 +104,8 @@ from alphafold3_pytorch.utils.model_utils import (
     ExpressCoordinatesInFrame,
     RigidFrom3Points,
     RigidFromReference3Points,
-    calculate_weighted_rigid_align_weights
+    calculate_weighted_rigid_align_weights,
+    pack_one
 )
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram
@@ -249,15 +250,6 @@ def max_neg_value(t: Tensor):
 
 def dict_to_device(d, device):
     return tree_map(lambda t: t.to(device) if is_tensor(t) else t, d)
-
-def pack_one(t, pattern):
-    packed, ps = pack([t], pattern)
-
-    def unpack_one(to_unpack, unpack_pattern = None):
-        unpacked, = unpack(to_unpack, ps, default(unpack_pattern, pattern))
-        return unpacked
-
-    return packed, unpack_one
 
 def exclusive_cumsum(t, dim = -1):
     return t.cumsum(dim = dim) - t
