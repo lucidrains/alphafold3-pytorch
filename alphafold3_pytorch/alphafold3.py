@@ -2782,7 +2782,7 @@ class ElucidatedAtomDiffusion(Module):
         return_loss_breakdown = False,
         single_structure_input=False,
         verbose=None,
-        filepaths: List[str] | Tuple[str] | None = None,
+        filepath: List[str] | Tuple[str] | None = None,
     ) -> ElucidatedAtomDiffusionReturn:
         verbose = default(verbose, self.verbose)
 
@@ -2865,7 +2865,7 @@ class ElucidatedAtomDiffusion(Module):
                 )
             except Exception as e:
                 # NOTE: For many (random) unit test inputs, permutation alignment can be unstable
-                logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepaths}' if exists(filepaths) else ''} due to: {e}")
+                logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepath}' if exists(filepath) else ''} due to: {e}")
 
         # main diffusion mse loss
 
@@ -6499,7 +6499,8 @@ class Alphafold3(Module):
         max_conf_resolution: float = 4.0,
         hard_validate: bool = False,
         verbose: bool | None = None,
-        filepaths: List[str] | Tuple[str] | None = None
+        chains: Int["b 2"] | None = None,
+        filepath: List[str] | Tuple[str] | None = None,
     ) -> (
         Float['b m 3'] |
         List[Structure] |
@@ -7140,7 +7141,7 @@ class Alphafold3(Module):
                 ligand_loss_weight = self.ligand_loss_weight,
                 single_structure_input = single_structure_input,
                 verbose = verbose,
-                filepaths = filepaths,
+                filepath = filepath,
             )
 
         # confidence head
@@ -7221,7 +7222,7 @@ class Alphafold3(Module):
                         )
                     except Exception as e:
                         # NOTE: For many (random) unit test inputs, permutation alignment can be unstable
-                        logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepaths}' if exists(filepaths) else ''} due to: {e}")
+                        logger.warning(f"Skipping multi-chain permutation alignment {f'for {filepath}' if exists(filepath) else ''} due to: {e}")
 
                 assert exists(
                     distogram_atom_indices
