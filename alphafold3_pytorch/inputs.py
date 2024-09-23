@@ -776,6 +776,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     i = mol_input
 
     molecules = i.molecules
+    molecule_ids = i.molecule_ids
     atom_lens = i.molecule_token_pool_lens
     extract_atom_feats_fn = i.extract_atom_feats_fn
     extract_atompair_feats_fn = i.extract_atompair_feats_fn
