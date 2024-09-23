@@ -1312,10 +1312,6 @@ def molecule_lengthed_molecule_input_to_atom_input(
     atompair_ids = None
 
     if i.add_atompair_ids:
-        atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
-        num_atom_bond_types = len(atom_bond_index)
-
-        other_index = len(ATOM_BONDS) + 1
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
 
@@ -1326,56 +1322,34 @@ def molecule_lengthed_molecule_input_to_atom_input(
 
         for (
             mol,
+            mol_id,
             is_first_mol_in_chain,
             is_chainable_biomolecule,
             src_tgt_atom_indices,
             offset,
         ) in zip(
             molecules,
+            molecule_ids,
             is_first_mol_in_chains,
             is_chainable_biomolecules,
             i.src_tgt_atom_indices,
             offsets,
         ):
-            coordinates = []
-            updates = []
 
-            num_atoms = mol.GetNumAtoms()
-            mol_atompair_ids = torch.zeros(num_atoms, num_atoms).long()
+            maybe_cached_get_atompair_ids = maybe_cache(
+                get_atompair_ids,
+                cache = ATOMPAIR_IDS_CACHE,
+                key = f'{mol_id}:{i.directed_bonds}',
+                should_cache = is_chainable_biomolecule
+            )
 
-            for bond in mol.GetBonds():
-                atom_start_index = bond.GetBeginAtomIdx()
-                atom_end_index = bond.GetEndAtomIdx()
-
-                coordinates.extend(
-                    [
-                        [atom_start_index, atom_end_index],
-                        [atom_end_index, atom_start_index],
-                    ]
-                )
-
-                bond_type = bond.GetBondType()
-                bond_id = atom_bond_index.get(bond_type, other_index) + 1
-
-                # default to symmetric bond type (undirected atom bonds)
-
-                bond_to = bond_from = bond_id
-
-                # if allowing for directed bonds, assume num_atompair_embeds = (2 * num_atom_bond_types) + 1
-                # offset other edge by num_atom_bond_types
-
-                if i.directed_bonds:
-                    bond_from += num_atom_bond_types
-
-                updates.extend([bond_to, bond_from])
-
-            coordinates = tensor(coordinates).long()
-            updates = tensor(updates).long()
+            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed = i.directed_bonds)
 
             # mol_atompair_ids = einx.set_at("[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates)
 
-            row_col_slice = slice(offset, offset + num_atoms)
-            atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
+            if exists(mol_atompair_ids) and mol_atompair_ids.numel() > 0:
+                row_col_slice = slice(offset, offset + num_atoms)
+                atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
 
             # if is chainable biomolecule
             # and not the first biomolecule in the chain, add a single covalent bond between first atom of incoming biomolecule and the last atom of the last biomolecule
