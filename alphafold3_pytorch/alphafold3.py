@@ -2782,7 +2782,7 @@ class ElucidatedAtomDiffusion(Module):
         return_loss_breakdown = False,
         single_structure_input=False,
         verbose=None,
-        filepaths: List[str] | None = None,
+        filepaths: List[str] | Tuple[str] | None = None,
     ) -> ElucidatedAtomDiffusionReturn:
         verbose = default(verbose, self.verbose)
 
@@ -6485,7 +6485,7 @@ class Alphafold3(Module):
         distance_labels: Int['b n n'] | Int['b m m'] | None = None,
         resolved_labels: Int['b m'] | None = None,
         resolution: Float[' b'] | None = None,
-        token_constraints: Int['b n n dac'] | None = None,
+        token_constraints: Float['b n n dac'] | None = None,
         return_loss_breakdown = False,
         return_loss: bool = None,
         return_all_diffused_atom_pos: bool = False,
@@ -6499,7 +6499,7 @@ class Alphafold3(Module):
         max_conf_resolution: float = 4.0,
         hard_validate: bool = False,
         verbose: bool | None = None,
-        filepaths: List[str] | None = None
+        filepaths: List[str] | Tuple[str] | None = None
     ) -> (
         Float['b m 3'] |
         List[Structure] |
