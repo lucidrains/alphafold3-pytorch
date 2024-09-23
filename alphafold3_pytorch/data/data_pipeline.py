@@ -175,13 +175,18 @@ def make_msa_features(
 
             polymer_residue_index = -1
 
+            chemtype_constants_cache = {}
+
             for idx, (chemtype, residue_index) in enumerate(
                 zip(chain_chemtype, chain_residue_index)
             ):
                 is_polymer = chemtype < ligand_chemtype_index
                 is_ligand = not is_polymer
 
-                chem_residue_constants = get_residue_constants(res_chem_index=chemtype)
+                if chemtype not in chemtype_constants_cache:
+                    chemtype_constants_cache[chemtype] = get_residue_constants(res_chem_index=chemtype)
+
+                chem_residue_constants = chemtype_constants_cache[chemtype]
 
                 # NOTE: For modified polymer residues, we only increment the polymer residue index
                 # when the current (atomized) modified polymer residue's atom sequence ends.
