@@ -3983,7 +3983,7 @@ def pdb_input_to_molecule_input(
 def compute_pocket_constraint(
     token_dists: Float["n n"],  # type: ignore
     token_parent_ids: Int[" n"],  # type: ignore
-    unique_token_parent_ids: Int[" n"],  # type: ignore
+    unique_token_parent_ids: Int[" p"],  # type: ignore
     theta_p_range: Tuple[float, float],
     geom_distr: torch.distributions.Geometric,
 ) -> Float["n n"]:  # type: ignore
@@ -4060,7 +4060,7 @@ def compute_contact_constraint(
 def compute_docking_constraint(
     token_dists: Float["n n"],  # type: ignore
     token_parent_ids: Int[" n"],  # type: ignore
-    unique_token_parent_ids: Int[" n"],  # type: ignore
+    unique_token_parent_ids: Int[" p"],  # type: ignore
     dist_bins: Float["bins"],  # type: ignore
     geom_distr: torch.distributions.Geometric,
 ) -> Float["n n bins"]:  # type: ignore
