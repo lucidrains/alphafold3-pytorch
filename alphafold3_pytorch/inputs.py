@@ -217,7 +217,7 @@ HAS_BOND_CACHE = dict()
 
 @typecheck
 def maybe_cache(
-    fn,
+    fn: Callable,
     *,
     cache: dict,
     key: str | None,
