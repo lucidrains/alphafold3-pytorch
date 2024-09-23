@@ -221,7 +221,7 @@ def maybe_cache(
     cache: dict,
     key: str,
     should_cache: bool = True
-):
+) -> Callable:
 
     if not should_cache:
         return fn
