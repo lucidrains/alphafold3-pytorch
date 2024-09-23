@@ -240,6 +240,8 @@ def maybe_cache(
 
 # get atompair bonds functions
 
+ATOM_BOND_INDEX = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
+
 @typecheck
 def get_atompair_ids(
     mol: Mol,
@@ -255,6 +257,9 @@ def get_atompair_ids(
     bonds = mol.GetBonds()
     num_bonds = len(bonds)
 
+    num_atom_bond_types = len(ATOM_BOND_INDEX)
+    other_index = len(ATOM_BONDS) + 1
+
     for bond in bonds:
         atom_start_index = bond.GetBeginAtomIdx()
         atom_end_index = bond.GetEndAtomIdx()
@@ -267,7 +272,7 @@ def get_atompair_ids(
         )
 
         bond_type = bond.GetBondType()
-        bond_id = atom_bond_index.get(bond_type, other_index) + 1
+        bond_id = ATOM_BOND_INDEX.get(bond_type, other_index) + 1
 
         # default to symmetric bond type (undirected atom bonds)
 
@@ -825,10 +830,6 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     atompair_ids = None
 
     if i.add_atompair_ids:
-        atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
-        num_atom_bond_types = len(atom_bond_index)
-
-        other_index = len(ATOM_BONDS) + 1
 
         atompair_ids = torch.zeros(total_atoms, total_atoms).long()
 
