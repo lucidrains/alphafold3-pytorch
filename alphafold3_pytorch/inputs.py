@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import redirect_stderr
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
-from functools import partial
+from functools import partial, wraps
 from io import StringIO
 from itertools import groupby
 from pathlib import Path
@@ -867,15 +867,15 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
                 get_atompair_ids,
                 cache = ATOMPAIR_IDS_CACHE,
                 key = f'{mol_id}:{i.directed_bonds}',
-                should_cache = is_chainable_biomolecule
+                should_cache = is_chainable_biomolecule.item()
             )
 
-            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed = i.directed_bonds)
+            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed_bonds = i.directed_bonds)
 
             # /einx.set_at
 
             if exists(mol_atompair_ids) and mol_atompair_ids.numel() > 0:
-
+                num_atoms = mol.GetNumAtoms()
                 row_col_slice = slice(offset, offset + num_atoms)
                 atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
 
@@ -1340,14 +1340,15 @@ def molecule_lengthed_molecule_input_to_atom_input(
                 get_atompair_ids,
                 cache = ATOMPAIR_IDS_CACHE,
                 key = f'{mol_id}:{i.directed_bonds}',
-                should_cache = is_chainable_biomolecule
+                should_cache = is_chainable_biomolecule.item()
             )
 
-            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed = i.directed_bonds)
+            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed_bonds = i.directed_bonds)
 
             # mol_atompair_ids = einx.set_at("[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates)
 
             if exists(mol_atompair_ids) and mol_atompair_ids.numel() > 0:
+                num_atoms = mol.GetNumAtoms()
                 row_col_slice = slice(offset, offset + num_atoms)
                 atompair_ids[row_col_slice, row_col_slice] = mol_atompair_ids
 
