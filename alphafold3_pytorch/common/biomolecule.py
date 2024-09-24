@@ -1,5 +1,5 @@
-from __future__ import annotations
 """A generic `Biomolecule` data structure for parsing macromolecular structures."""
+from __future__ import annotations
 
 import collections
 import dataclasses
