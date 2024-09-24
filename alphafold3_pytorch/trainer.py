@@ -603,8 +603,7 @@ class Trainer:
                 # reduce valid loss breakdown
 
                 if self.distributed_eval:
-                    # just assume each machine sees same number of batches for now
-                    valid_loss_breakdown = self.fabric.all_reduce(valid_loss_breakdown, reduce_op = 'mean')
+                    valid_loss_breakdown = self.fabric.all_reduce(valid_loss_breakdown, reduce_op = 'sum')
 
                 # log
 
@@ -649,8 +648,7 @@ class Trainer:
             # reduce
 
             if self.distributed_eval:
-                # just assume each machine sees same number of batches for now
-                test_loss_breakdown = self.fabric.all_reduce(test_loss_breakdown, reduce_op = 'mean')
+                test_loss_breakdown = self.fabric.all_reduce(test_loss_breakdown, reduce_op = 'sum')
 
             # log
 
