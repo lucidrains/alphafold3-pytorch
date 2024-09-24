@@ -2166,6 +2166,7 @@ class PDBInput:
     add_atom_ids: bool = False
     add_atompair_ids: bool = False
     directed_bonds: bool = False
+    custom_atoms: List[str]| None = None
     training: bool = False
     inference: bool = False
     distillation: bool = False
