@@ -20,6 +20,7 @@ from alphafold3_pytorch import (
 
 from alphafold3_pytorch.data.data_pipeline import *
 from alphafold3_pytorch.data.data_pipeline import make_mmcif_features
+
 from alphafold3_pytorch.common.biomolecule import (
     Biomolecule,
     _from_mmcif_object,
@@ -33,6 +34,7 @@ from alphafold3_pytorch.tensor_typing import IS_GITHUB_CI
 from alphafold3_pytorch.data import mmcif_writing, mmcif_parsing
 
 from alphafold3_pytorch.life import (
+    ATOMS,
     reverse_complement,
     reverse_complement_tensor
 )
@@ -84,6 +86,8 @@ def test_alphafold3_input(
     directed_bonds
 ):
 
+    CUSTOM_ATOMS = list({*ATOMS, 'Na', 'Fe', 'Si', 'F', 'K'})
+
     alphafold3_input = Alphafold3Input(
         proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
         ds_dna = ['ACGTT'],
@@ -95,7 +99,8 @@ def test_alphafold3_input(
         ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
         add_atom_ids = True,
         add_atompair_ids = True,
-        directed_bonds = directed_bonds
+        directed_bonds = directed_bonds,
+        custom_atoms = CUSTOM_ATOMS
     )
 
     batched_atom_input = alphafold3_inputs_to_batched_atom_input(alphafold3_input)
@@ -107,7 +112,7 @@ def test_alphafold3_input(
     alphafold3 = Alphafold3(
         dim_atom_inputs = 3,
         dim_atompair_inputs = 5,
-        num_atom_embeds = 47,
+        num_atom_embeds = len(CUSTOM_ATOMS),
         num_atompair_embeds = num_atom_bond_types + 1, # 0 is for no bond
         atoms_per_window = 27,
         dim_template_feats = 108,
@@ -187,17 +192,17 @@ def test_alphafold3_input_to_mmcif(tmp_path):
     """Test the Inference I/O Pipeline. This codifies the data_pipeline.py file used for training."""
     
     alphafold3_input = Alphafold3Input(
-    proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
-    ds_dna = ['ACGTT'],
-    ds_rna = ['GCCAU', 'CCAGU'],
-    ss_dna = ['GCCTA'],
-    ss_rna = ['CGCAUA'],
-    metal_ions = ['Na', 'Na', 'Fe'],
-    misc_molecule_ids = ['Phospholipid'],
-    ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
-    add_atom_ids = True,
-    add_atompair_ids = True,
-    directed_bonds = True
+        proteins = ['MLEICLKLVGCKSKKGLSSSSSCYLEEALQRPVASDF', 'MGKCRGLRTARKLRSHRRDQKWHDKQYKKAHLGTALKANPFGGASHAKGIVLEKVGVEAKQPNSAIRKCVRVQLIKNGKKITAFVPNDGCLNFIEENDEVLVAGFGRKGHAVGDIPGVRFKVVKVANVSLLALYKGKKERPRS'],
+        ds_dna = ['ACGTT'],
+        ds_rna = ['GCCAU', 'CCAGU'],
+        ss_dna = ['GCCTA'],
+        ss_rna = ['CGCAUA'],
+        metal_ions = ['Na', 'Na', 'Fe'],
+        misc_molecule_ids = ['Phospholipid'],
+        ligands = ['CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5'],
+        add_atom_ids = True,
+        add_atompair_ids = True,
+        directed_bonds = True
     )
     
     test_biomol = alphafold3_input_to_biomolecule(alphafold3_input, atom_positions=torch.randn(261, 47, 3).numpy())
@@ -328,7 +333,7 @@ def test_atompos_input():
             atom_encoder_depth = 1,
             token_transformer_depth = 1,
             atom_decoder_depth = 1,
-        )
+        ),
     )
 
     loss = alphafold3(**batched_atom_input.model_forward_dict())

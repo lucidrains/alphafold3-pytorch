@@ -761,7 +761,7 @@ class MoleculeInput:
     directed_bonds: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
-
+    custom_atoms: List[str]| None = None
 
 @typecheck
 def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
@@ -803,7 +803,9 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
     atom_ids = None
 
     if i.add_atom_ids:
-        atom_index = {symbol: i for i, symbol in enumerate(ATOMS)}
+        atom_list = default(i.custom_atoms, ATOMS)
+
+        atom_index = {symbol: i for i, symbol in enumerate(atom_list)}
 
         atom_ids = []
 
@@ -1101,6 +1103,7 @@ class MoleculeLengthMoleculeInput:
     directed_bonds: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
+    custom_atoms: List[str]| None = None
 
 
 @typecheck
@@ -1264,7 +1267,9 @@ def molecule_lengthed_molecule_input_to_atom_input(
     atom_ids = None
 
     if i.add_atom_ids:
-        atom_index = {symbol: i for i, symbol in enumerate(ATOMS)}
+        atom_list = default(i.custom_atoms, ATOMS)
+
+        atom_index = {symbol: i for i, symbol in enumerate(atom_list)}
 
         atom_ids = []
 
@@ -1547,7 +1552,7 @@ class Alphafold3Input:
     directed_bonds: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
-
+    custom_atoms: List[str] | None = None
 
 @typecheck
 def map_int_or_string_indices_to_mol(
@@ -1994,6 +1999,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
         directed_bonds=i.directed_bonds,
         extract_atom_feats_fn=i.extract_atom_feats_fn,
         extract_atompair_feats_fn=i.extract_atompair_feats_fn,
+        custom_atoms=i.custom_atoms
     )
 
     return molecule_input
@@ -3975,6 +3981,7 @@ def pdb_input_to_molecule_input(
         directed_bonds=i.directed_bonds,
         extract_atom_feats_fn=i.extract_atom_feats_fn,
         extract_atompair_feats_fn=i.extract_atompair_feats_fn,
+        custom_atoms=i.custom_atoms
     )
 
     return molecule_input
