@@ -1,3 +1,4 @@
+from __future__ import annotations
 """A generic `Biomolecule` data structure for parsing macromolecular structures."""
 
 import collections
@@ -5,7 +6,7 @@ import dataclasses
 import functools
 import io
 import random
-from functools import partial
+from functools import partial, lru_cache
 from types import ModuleType
 from beartype.typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -553,11 +554,14 @@ def create_spatial_crop_masks(
     return m_ks
 
 
+@lru_cache(maxsize = 512)
 @typecheck
 def get_residue_constants(
-    res_chem_type: Optional[str] = None, res_chem_index: Optional[IntType] = None
+    res_chem_type: str | None = None,
+    res_chem_index: IntType | None = None
 ) -> ModuleType:
     """Returns the corresponding residue constants for a given residue chemical type."""
+
     assert exists(res_chem_type) or exists(
         res_chem_index
     ), "Either `res_chem_type` or `res_chem_index` must be provided."
