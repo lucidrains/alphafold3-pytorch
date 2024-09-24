@@ -2822,6 +2822,7 @@ def load_msa_from_msa_dir(
             # (since we don't have a precise mapping from AFDB UniProt accession IDs to PDB chain IDs), whereas for the original
             # PDB examples, we can directly identify the corresponding MSAs.
             msa_fpaths = []
+            msa_fpath_pattern = ""
             if exists(msa_dir):
                 msa_fpath_pattern = (
                     os.path.join(msa_dir, f"{pdb_id.split('-assembly1')[0]}_*", "a3m", "*.a3m")
@@ -2880,7 +2881,7 @@ def load_msa_from_msa_dir(
         if chain_id not in msas:
             if verbose:
                 logger.warning(
-                    f"Failed to load any MSAs for chain {chain_id} of file {file_id} due to: {e}. A dummy MSA will be installed for this chain."
+                    f"Failed to load any MSAs for chain {chain_id} of file {file_id}. A dummy MSA will be installed for this chain."
                 )
             msas[chain_id] = dummy_msa
 
@@ -2948,6 +2949,7 @@ def load_templates_from_templates_dir(
             # (since we don't have a precise mapping from AFDB UniProt accession IDs to PDB chain IDs),
             # whereas for the original PDB examples, we can directly identify the corresponding templates.
             template_fpaths = []
+            template_fpath_pattern = ""
             if exists(templates_dir):
                 template_fpath_pattern = (
                     os.path.join(
