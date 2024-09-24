@@ -241,11 +241,10 @@ def maybe_cache(
 
 # get atompair bonds functions
 
-ATOM_BOND_INDEX = {symbol: (idx + 1) for idx, symbol in enumerate(ATOM_BONDS)}
-
 @typecheck
 def get_atompair_ids(
     mol: Mol,
+    atom_bonds: List[str],
     directed_bonds: bool
 ) -> Int['m m'] | None:
 
@@ -258,8 +257,10 @@ def get_atompair_ids(
     bonds = mol.GetBonds()
     num_bonds = len(bonds)
 
-    num_atom_bond_types = len(ATOM_BOND_INDEX)
-    other_index = len(ATOM_BONDS) + 1
+    atom_bond_index = {symbol: (idx + 1) for idx, symbol in enumerate(atom_bonds)}
+
+    num_atom_bond_types = len(atom_bond_index)
+    other_index = len(atom_bond_index) + 1
 
     for bond in bonds:
         atom_start_index = bond.GetBeginAtomIdx()
@@ -273,7 +274,7 @@ def get_atompair_ids(
         )
 
         bond_type = bond.GetBondType()
-        bond_id = ATOM_BOND_INDEX.get(bond_type, other_index) + 1
+        bond_id = atom_bond_index.get(bond_type, other_index) + 1
 
         # default to symmetric bond type (undirected atom bonds)
 
@@ -761,7 +762,8 @@ class MoleculeInput:
     directed_bonds: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
-    custom_atoms: List[str]| None = None
+    custom_atoms: List[str] | None = None
+    custom_bonds: List[str] | None = None
 
 @typecheck
 def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
@@ -891,6 +893,8 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
         prev_mol = None
         prev_src_tgt_atom_indices = None
 
+        atom_bonds = default(i.custom_bonds, ATOM_BONDS)
+
         for (
             mol,
             mol_id,
@@ -914,7 +918,7 @@ def molecule_to_atom_input(mol_input: MoleculeInput) -> AtomInput:
                 should_cache = is_chainable_biomolecule.item()
             )
 
-            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed_bonds = i.directed_bonds)
+            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, atom_bonds, directed_bonds = i.directed_bonds)
 
             # /einx.set_at
 
@@ -1103,7 +1107,8 @@ class MoleculeLengthMoleculeInput:
     directed_bonds: bool = False
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
-    custom_atoms: List[str]| None = None
+    custom_atoms: List[str] | None = None
+    custom_bonds: List[str] | None = None
 
 
 @typecheck
@@ -1354,6 +1359,8 @@ def molecule_lengthed_molecule_input_to_atom_input(
         prev_mol = None
         prev_src_tgt_atom_indices = None
 
+        atom_bonds = default(i.custom_bonds, ATOM_BONDS)
+
         for (
             mol,
             mol_id,
@@ -1377,7 +1384,7 @@ def molecule_lengthed_molecule_input_to_atom_input(
                 should_cache = is_chainable_biomolecule.item()
             )
 
-            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, directed_bonds = i.directed_bonds)
+            mol_atompair_ids = maybe_cached_get_atompair_ids(mol, atom_bonds, directed_bonds = i.directed_bonds)
 
             # mol_atompair_ids = einx.set_at("[h w], c [2], c -> [h w]", mol_atompair_ids, coordinates, updates)
 
@@ -1553,6 +1560,7 @@ class Alphafold3Input:
     extract_atom_feats_fn: Callable[[Atom], Float["m dai"]] = default_extract_atom_feats_fn  # type: ignore
     extract_atompair_feats_fn: Callable[[Mol], Float["m m dapi"]] = default_extract_atompair_feats_fn  # type: ignore
     custom_atoms: List[str] | None = None
+    custom_bonds: List[str] | None = None
 
 @typecheck
 def map_int_or_string_indices_to_mol(
@@ -1999,7 +2007,8 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
         directed_bonds=i.directed_bonds,
         extract_atom_feats_fn=i.extract_atom_feats_fn,
         extract_atompair_feats_fn=i.extract_atompair_feats_fn,
-        custom_atoms=i.custom_atoms
+        custom_atoms=i.custom_atoms,
+        custom_bonds=i.custom_bonds
     )
 
     return molecule_input
@@ -2166,7 +2175,8 @@ class PDBInput:
     add_atom_ids: bool = False
     add_atompair_ids: bool = False
     directed_bonds: bool = False
-    custom_atoms: List[str]| None = None
+    custom_atoms: List[str] | None = None
+    custom_bonds: List[str] | None = None
     training: bool = False
     inference: bool = False
     distillation: bool = False
@@ -3982,7 +3992,8 @@ def pdb_input_to_molecule_input(
         directed_bonds=i.directed_bonds,
         extract_atom_feats_fn=i.extract_atom_feats_fn,
         extract_atompair_feats_fn=i.extract_atompair_feats_fn,
-        custom_atoms=i.custom_atoms
+        custom_atoms=i.custom_atoms,
+        custom_bonds=i.custom_bonds
     )
 
     return molecule_input
