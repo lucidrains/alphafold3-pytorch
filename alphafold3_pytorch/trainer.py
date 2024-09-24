@@ -171,6 +171,7 @@ class Trainer:
         checkpoint_folder: str = './checkpoints',
         overwrite_checkpoints: bool = False,
         fabric_kwargs: dict = dict(),
+        distributed_eval: bool = True,
         fp16: bool = False,
         use_ema: bool = True,
         ema_kwargs: dict = dict(
@@ -201,10 +202,16 @@ class Trainer:
         self.fabric = fabric
         fabric.launch()
 
+        # whether evaluating only on root node or not
+        # to save on each machine keeping track of EMA
+
+        self.distributed_eval = distributed_eval
+        self.will_eval_or_test = self.is_main or distributed_eval
+
         # exponential moving average
 
         self.ema_model = None
-        self.has_ema = self.is_main and use_ema
+        self.has_ema = self.will_eval_or_test and use_ema
 
         if self.has_ema:
             self.ema_model = EMA(
@@ -282,16 +289,18 @@ class Trainer:
         self.valid_every = valid_every
 
         self.needs_valid = exists(valid_dataset)
+        self.valid_dataloader = None
 
-        if self.needs_valid and self.is_main:
+        if self.needs_valid and self.will_eval_or_test:
             self.valid_dataset_size = len(valid_dataset)
             self.valid_dataloader = DataLoader_(valid_dataset, batch_size = batch_size)
 
         # testing dataloader on EMA model
 
         self.needs_test = exists(test_dataset)
+        self.test_dataloader = None
 
-        if self.needs_test and self.is_main:
+        if self.needs_test and self.will_eval_or_test:
             self.test_dataset_size = len(test_dataset)
             self.test_dataloader = DataLoader_(test_dataset, batch_size = batch_size)
 
@@ -305,6 +314,12 @@ class Trainer:
         self.model, self.optimizer = fabric.setup(self.model, self.optimizer)
 
         fabric.setup_dataloaders(self.dataloader)
+
+        if exists(self.valid_dataloader) and self.distributed_eval:
+            fabric.setup_dataloaders(self.valid_dataloader)
+
+        if exists(self.test_dataloader) and self.distributed_eval:
+            fabric.setup_dataloaders(self.test_dataloader)
 
         # scheduler
 
@@ -555,7 +570,7 @@ class Trainer:
             # maybe validate, for now, only on main with EMA model
 
             if (
-                self.is_main and
+                self.will_eval_or_test and
                 self.needs_valid and
                 divisible_by(self.steps, self.valid_every)
             ):
@@ -585,6 +600,12 @@ class Trainer:
 
                 valid_loss_breakdown = {f'valid_{k}':v for k, v in valid_loss_breakdown.items()}
 
+                # reduce valid loss breakdown
+
+                if self.distributed_eval:
+                    # just assume each machine sees same number of batches for now
+                    valid_loss_breakdown = self.fabric.all_reduce(valid_loss_breakdown, reduce_op = 'mean')
+
                 # log
 
                 self.log(**valid_loss_breakdown)
@@ -598,7 +619,7 @@ class Trainer:
 
         # maybe test
 
-        if self.is_main and self.needs_test:
+        if self.will_eval_or_test and self.needs_test:
             eval_model = default(self.ema_model, self.model)
 
             with torch.no_grad(), to_device_and_back(eval_model, self.device):
@@ -624,6 +645,12 @@ class Trainer:
             # prepend test_ to all losses for logging
 
             test_loss_breakdown = {f'test_{k}':v for k, v in test_loss_breakdown.items()}
+
+            # reduce
+
+            if self.distributed_eval:
+                # just assume each machine sees same number of batches for now
+                test_loss_breakdown = self.fabric.all_reduce(test_loss_breakdown, reduce_op = 'mean')
 
             # log
 
