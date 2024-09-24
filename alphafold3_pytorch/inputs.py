@@ -2881,7 +2881,7 @@ def load_msa_from_msa_dir(
         if chain_id not in msas:
             if verbose:
                 logger.warning(
-                    f"Failed to load any MSAs for chain {chain_id} of file {file_id} due to: {e}. A dummy MSA will be installed for this chain."
+                    f"Failed to load any MSAs for chain {chain_id} of file {file_id}. A dummy MSA will be installed for this chain."
                 )
             msas[chain_id] = dummy_msa
 
