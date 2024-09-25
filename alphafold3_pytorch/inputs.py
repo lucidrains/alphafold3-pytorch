@@ -2826,7 +2826,7 @@ def load_msa_from_msa_dir(
             msa_fpath_pattern = ""
             if exists(msa_dir):
                 msa_fpath_pattern = (
-                    os.path.join(msa_dir, f"{pdb_id.split('-assembly1')[0]}_*", "a3m", "*.a3m*")
+                    os.path.join(msa_dir, f"{pdb_id.split('-assembly1')[0]}_*", "a3m*")
                     if distillation
                     else os.path.join(msa_dir, f"{file_id}{chain_id}_*.a3m*")
                 )
