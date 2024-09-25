@@ -1,12 +1,9 @@
 # Package
 
-version       = "0.1.0"
+version       = "0.0.1"
 author        = "Phil Wang"
-description   = "Alphafold3"
+description   = "Alphafold3 Utils"
 license       = "MIT"
-srcDir        = "alphafold3_pytorch"
-bin           = @["alphafold3_pytorch"]
-
 
 # Dependencies
 
