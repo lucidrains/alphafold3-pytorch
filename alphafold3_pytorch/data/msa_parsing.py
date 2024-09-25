@@ -7,6 +7,9 @@ import random
 import re
 import string
 
+import hashlib
+from cachetools import cached, LRUCache
+
 from beartype.typing import Literal, Optional, Sequence, Tuple
 
 from alphafold3_pytorch.tensor_typing import typecheck
@@ -117,7 +120,11 @@ def _extract_sequence_identifier(description: str) -> Optional[str]:
     else:
         return None
 
+def _get_identifiers_make_key(description, tab_separated_alignment_headers):
+    md5_digest = hashlib.md5(description.encode()).hexdigest()
+    return f'{md5_digest}:{tab_separated_alignment_headers}'
 
+@cached(cache = LRUCache(maxsize = 512), key = _get_identifiers_make_key)
 @typecheck
 def get_identifiers(
     description: str, tab_separated_alignment_headers: bool = False
