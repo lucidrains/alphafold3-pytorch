@@ -769,7 +769,7 @@ def parse_mmcif_object(
         with gzip.open(filepath, "r") as f:
             mmcif_string = f.read()
     else:
-        with gzip.open(filepath, "r") as f:
+        with open(filepath, "r") as f:
             mmcif_string = f.read()
 
     parsing_result = parse(
