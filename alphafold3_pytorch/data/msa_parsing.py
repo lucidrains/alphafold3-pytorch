@@ -6,6 +6,7 @@ import dataclasses
 import random
 import re
 import string
+import binascii
 
 import hashlib
 from cachetools import cached, LRUCache
@@ -273,3 +274,20 @@ def parse_a3m(a3m_string: str, msa_type: MSA_TYPE) -> Msa:
         descriptions=descriptions,
         msa_type=msa_type,
     )
+
+@typecheck
+def is_gzip_file(f: str) -> bool:
+    """Checks whether an input file (i.e an a3m MSA file) is gzipped
+
+    Method copied from Phispy see https://github.com/linsalrob/PhiSpy/blob/master/PhiSpyModules/helper_functions.py
+
+    This is an elegant solution to test whether a file is gzipped by reading the first two characters.
+
+    Args:
+        f (str): The file to test.
+
+    Returns:
+        bool: True if the file is gzip compressed, otherwise False.
+    """
+    with open(f, "rb") as i:
+        return binascii.hexlify(i.read(2)) == b"1f8b"

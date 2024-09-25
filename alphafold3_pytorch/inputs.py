@@ -4,6 +4,7 @@ import copy
 import glob
 import json
 import os
+import gzip
 import random
 import statistics
 import traceback
@@ -2844,11 +2845,19 @@ def load_msa_from_msa_dir(
                 # into the MSAs as unknown amino acid residues.
                 chain_msas = []
                 for msa_fpath in msa_fpaths:
-                    with open(msa_fpath, "r") as f:
-                        msa = f.read()
-                        msa = msa_parsing.parse_a3m(msa, chain_msa_type)
-                        if len(chain_sequence) == len(msa.sequences[0]):
-                            chain_msas.append(msa)
+                    if msa_parsing.is_gzip_file(msa_fpath): 
+                        with gzip.open(msa_fpath, "r") as f:
+                            msa = f.read()
+                            msa = msa_parsing.parse_a3m(msa, chain_msa_type)
+                            if len(chain_sequence) == len(msa.sequences[0]):
+                                chain_msas.append(msa)
+                    else:
+                        with open(msa_fpath, "r") as f:
+                            msa = f.read()
+                            msa = msa_parsing.parse_a3m(msa, chain_msa_type)
+                            if len(chain_sequence) == len(msa.sequences[0]):
+                                chain_msas.append(msa)
+
 
                 if not chain_msas:
                     raise ValueError(
