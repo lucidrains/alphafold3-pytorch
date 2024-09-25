@@ -2206,7 +2206,7 @@ class PDBInput:
                 raise FileNotFoundError(f"mmCIF file not found: {self.mmcif_filepath}.")
             if not (self.mmcif_filepath.endswith(".cif") or self.mmcif_filepath.endswith(".cif.gz")):
                 raise ValueError(
-                    f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` file extension."
+                    f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` or `.cif.gz` file extension."
                 )
         elif not exists(self.biomol):
             raise ValueError("Either an mmCIF file or a `Biomolecule` object must be provided.")
