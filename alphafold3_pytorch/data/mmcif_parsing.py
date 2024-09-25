@@ -5,6 +5,7 @@ import functools
 import io
 import itertools
 import logging
+import gzip
 from collections import defaultdict
 from operator import itemgetter
 from beartype.typing import Any, Mapping, Optional, Sequence, Set, Tuple
@@ -14,7 +15,7 @@ from Bio import PDB
 from Bio.Data import PDBData
 
 from alphafold3_pytorch.utils.data_utils import is_polymer, is_water, matrix_rotate
-
+from alphafold3_pytorch.data.msa_parsing import is_gzip_file
 # Type aliases:
 ChainId = str
 PdbHeader = Mapping[str, Any]
@@ -763,8 +764,13 @@ def parse_mmcif_object(
     filepath: str, file_id: str, auth_chains: bool = True, auth_residues: bool = True
 ) -> MmcifObject:
     """Parse an mmCIF file into an `MmcifObject` containing a BioPython `Structure` object as well as associated metadata."""
-    with open(filepath, "r") as f:
-        mmcif_string = f.read()
+
+    if is_gzip_file(filepath):
+        with gzip.open(filepath, "r") as f:
+            mmcif_string = f.read()
+    else:
+        with open(filepath, "r") as f:
+            mmcif_string = f.read()
 
     parsing_result = parse(
         file_id=file_id,

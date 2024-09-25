@@ -4,6 +4,7 @@ import copy
 import glob
 import json
 import os
+import gzip
 import random
 import statistics
 import traceback
@@ -2203,9 +2204,9 @@ class PDBInput:
         if exists(self.mmcif_filepath):
             if not os.path.exists(self.mmcif_filepath):
                 raise FileNotFoundError(f"mmCIF file not found: {self.mmcif_filepath}.")
-            if not self.mmcif_filepath.endswith(".cif"):
+            if not (self.mmcif_filepath.endswith(".cif") or self.mmcif_filepath.endswith(".cif.gz")):
                 raise ValueError(
-                    f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` file extension."
+                    f"mmCIF file `{self.mmcif_filepath}` must have a `.cif` or `.cif.gz` file extension."
                 )
         elif not exists(self.biomol):
             raise ValueError("Either an mmCIF file or a `Biomolecule` object must be provided.")
@@ -2825,9 +2826,9 @@ def load_msa_from_msa_dir(
             msa_fpath_pattern = ""
             if exists(msa_dir):
                 msa_fpath_pattern = (
-                    os.path.join(msa_dir, f"{pdb_id.split('-assembly1')[0]}_*", "a3m", "*.a3m")
+                    os.path.join(msa_dir, f"{pdb_id.split('-assembly1')[0]}_*", "a3m*")
                     if distillation
-                    else os.path.join(msa_dir, f"{file_id}{chain_id}_*.a3m")
+                    else os.path.join(msa_dir, f"{file_id}{chain_id}_*.a3m*")
                 )
                 msa_fpaths = glob.glob(msa_fpath_pattern)
 
@@ -2844,11 +2845,19 @@ def load_msa_from_msa_dir(
                 # into the MSAs as unknown amino acid residues.
                 chain_msas = []
                 for msa_fpath in msa_fpaths:
-                    with open(msa_fpath, "r") as f:
-                        msa = f.read()
-                        msa = msa_parsing.parse_a3m(msa, chain_msa_type)
-                        if len(chain_sequence) == len(msa.sequences[0]):
-                            chain_msas.append(msa)
+                    if msa_parsing.is_gzip_file(msa_fpath): 
+                        with gzip.open(msa_fpath, "r") as f:
+                            msa = f.read()
+                            msa = msa_parsing.parse_a3m(msa, chain_msa_type)
+                            if len(chain_sequence) == len(msa.sequences[0]):
+                                chain_msas.append(msa)
+                    else:
+                        with open(msa_fpath, "r") as f:
+                            msa = f.read()
+                            msa = msa_parsing.parse_a3m(msa, chain_msa_type)
+                            if len(chain_sequence) == len(msa.sequences[0]):
+                                chain_msas.append(msa)
+
 
                 if not chain_msas:
                     raise ValueError(
@@ -4304,13 +4313,13 @@ class PDBDataset(Dataset):
             sampler_pdb_ids = set(self.sampler.mappings.get_column("pdb_id").to_list())
             self.files = {
                 os.path.splitext(os.path.basename(filepath.name))[0]: filepath
-                for filepath in folder.glob(os.path.join("**", "*.cif"))
+                for filepath in folder.glob(os.path.join("**", "*.cif*"))
                 if os.path.splitext(os.path.basename(filepath.name))[0] in sampler_pdb_ids
             }
         else:
             self.files = {
                 os.path.splitext(os.path.basename(file.name))[0]: file
-                for file in folder.glob(os.path.join("**", "*.cif"))
+                for file in folder.glob(os.path.join("**", "*.cif*"))
             }
 
         if exists(filter_out_pdb_ids):
@@ -4484,7 +4493,7 @@ class PDBDistillationDataset(Dataset):
 
         self.files = {
             os.path.splitext(os.path.basename(file.name))[0]: file
-            for file in folder.glob(os.path.join("**", "*.cif"))
+            for file in folder.glob(os.path.join("**", "*.cif*"))
             if os.path.splitext(os.path.basename(file.name))[0].split("-")[1]
             in self.uniprot_to_pdb_id_mapping
         }
