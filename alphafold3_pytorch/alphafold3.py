@@ -5762,11 +5762,11 @@ class ComputeModelSelectionScore(Module):
 
         radius = 1.
 
-        atom_rel_pos = einx.subtract('i c, j c-> i j c', atom_pos, atom_pos)
+        atom_rel_pos = einx.subtract('i c, j c -> i j c', atom_pos, atom_pos)
 
         surface_dots = radius * unit_surface_dots
 
-        dist_from_surface_dots_sq = (einx.subtract('i j c, sd c -> i sd j c') ** 2).sum(dim = -1)
+        dist_from_surface_dots_sq = einx.subtract('i j c, sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
 
         free = reduce(dist_from_surface_dots_sq > radius, 'i sd j -> i sd', 'all')
 
