@@ -5271,6 +5271,7 @@ class ComputeModelSelectionScore(Module):
         is_fine_tuning: bool = False,
         weight_dict_config: dict = None,
         dssp_path: str = "mkdssp",
+        use_inhouse_rsa_calculation: bool = False
     ):
         super().__init__()
         self.compute_confidence_score = ComputeConfidenceScore(eps=eps)
@@ -5285,9 +5286,11 @@ class ComputeModelSelectionScore(Module):
         self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
 
         self.dssp_path = dssp_path
+        self.use_inhouse_rsa_calculation = use_inhouse_rsa_calculation
+
 
     @property
-    def can_calculate_unresolved_protein_rasa(self):
+    def is_mkdssp_available(self):
         """Check if `mkdssp` is available.
 
         :return: True if `mkdssp` is available
@@ -5297,6 +5300,10 @@ class ComputeModelSelectionScore(Module):
             return True
         except sh.ErrorReturnCode_1:
             return False
+
+    @property
+    def can_calculate_unresolved_protein_rasa(self):
+        return self.is_mkdssp_available or self.use_inhouse_rsa_calculation
 
     @typecheck
     def compute_gpde(
@@ -5674,6 +5681,87 @@ class ComputeModelSelectionScore(Module):
         return unresolved_rasa.mean()
 
     @typecheck
+    def _compute_unresolved_rasa(
+        self,
+        unresolved_cid: int,
+        unresolved_residue_mask: Bool[" n"],  
+        asym_id: Int[" n"],  
+        molecule_ids: Int[" n"],  
+        molecule_atom_lens: Int[" n"],  
+        atom_pos: Float["m 3"],  
+        atom_mask: Bool[" m"],  
+    ) -> Float[""]:  
+        """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
+
+        unresolved_cid: asym_id for protein chains with unresolved residues
+        unresolved_residue_mask: True for unresolved residues, False for resolved residues
+        asym_id: asym_id for each residue
+        molecule_ids: molecule_ids for each residue
+        molecule_atom_lens: number of atoms for each residue
+        atom_pos: [m 3] atom positions
+        atom_mask: True for valid atoms, False for missing/padding atoms
+        :return: unresolved RASA
+        """
+
+        assert self.can_calculate_unresolved_protein_rasa, "`mkdssp` needs to be installed"
+
+        residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
+
+        device = atom_pos.device
+        dtype = atom_pos.dtype
+        num_atom = atom_pos.shape[0]
+
+        chain_mask = asym_id == unresolved_cid
+        chain_unresolved_residue_mask = unresolved_residue_mask[chain_mask]
+        chain_asym_id = asym_id[chain_mask]
+        chain_molecule_ids = molecule_ids[chain_mask]
+        chain_molecule_atom_lens = molecule_atom_lens[chain_mask]
+
+        chain_mask_to_atom = torch.repeat_interleave(chain_mask, molecule_atom_lens)
+
+        # if there's padding in num atom
+        num_pad = num_atom - molecule_atom_lens.sum()
+        if num_pad > 0:
+            chain_mask_to_atom = F.pad(chain_mask_to_atom, (0, num_pad), value=False)
+
+        chain_atom_pos = atom_pos[chain_mask_to_atom]
+        chain_atom_mask = atom_mask[chain_mask_to_atom]
+
+        structure = protein_structure_from_feature(
+            chain_asym_id,
+            chain_molecule_ids,
+            chain_molecule_atom_lens,
+            chain_atom_pos,
+            chain_atom_mask,
+        )
+
+        # write custom RSA function here
+
+        raise NotImplementedError
+
+        rasa = []
+        aatypes = []
+        for residue in structure.get_residues():
+            rsa = float(dssp_dict.get((residue.get_full_id()[2], residue.id))[3])
+            rasa.append(rsa)
+
+            aatype = dssp_dict.get((residue.get_full_id()[2], residue.id))[1]
+            aatypes.append(residue_constants.restype_order[aatype])
+
+        rasa = torch.tensor(rasa, dtype=dtype, device=device)
+        aatypes = torch.tensor(aatypes, device=device).int()
+
+        unresolved_aatypes = aatypes[chain_unresolved_residue_mask]
+        unresolved_molecule_ids = chain_molecule_ids[chain_unresolved_residue_mask]
+
+        assert torch.equal(
+            unresolved_aatypes, unresolved_molecule_ids
+        ), "aatype not match for input feature and structure"
+        unresolved_rasa = rasa[chain_unresolved_residue_mask]
+
+        return unresolved_rasa.mean()
+
+    @typecheck
     def compute_unresolved_rasa(
         self,
         unresolved_cid: List[int],
@@ -5707,8 +5795,16 @@ class ComputeModelSelectionScore(Module):
         weight = weight_dict.get("unresolved", {}).get("unresolved", None)
         assert weight, "Weight not found for unresolved"
 
+        # for migrating to a rewritten computation of RSA
+        # to remove mkdssp dependency for model selection
+
+        if self.use_inhouse_rsa_calculation:
+            compute_unresolved_rasa_function = self._inhouse_compute_unresolved_rasa
+        else:
+            compute_unresolved_rasa_function = self._compute_unresolved_rasa
+
         unresolved_rasa = [
-            self._compute_unresolved_rasa(*args)
+            compute_unresolved_rasa_function(*args)
             for args in zip(
                 unresolved_cid,
                 unresolved_residue_mask,
