@@ -5681,7 +5681,7 @@ class ComputeModelSelectionScore(Module):
         return unresolved_rasa.mean()
 
     @typecheck
-    def _compute_unresolved_rasa(
+    def _inhouse_compute_unresolved_rasa(
         self,
         unresolved_cid: int,
         unresolved_residue_mask: Bool[" n"],  
@@ -5689,7 +5689,8 @@ class ComputeModelSelectionScore(Module):
         molecule_ids: Int[" n"],  
         molecule_atom_lens: Int[" n"],  
         atom_pos: Float["m 3"],  
-        atom_mask: Bool[" m"],  
+        atom_mask: Bool[" m"],
+        fibonacci_sphere_n = 200 # they use 200 in mkdssp
     ) -> Float[""]:  
         """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
 
@@ -5737,7 +5738,25 @@ class ComputeModelSelectionScore(Module):
 
         # write custom RSA function here
 
-        raise NotImplementedError
+        # first constitute the fibonacci sphere
+
+        num_surface_dots = fibonacci_sphere_n * 2. + 1
+        golden_ratio = 1. + math.sqrt(5.) / 2
+
+        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
+
+        lat = torch.asin((2. * arange) / num_surface_dots)
+        lon = torch.fmod(arange, golden_ratio) * 2 * math.pi / golden_ratio
+
+        surface_dots = torch.stack((
+            lon.sin() * lat.cos(),
+            lon.cos() * lat.cos(),
+            lat.sin()
+        ), dim = -1)
+
+        weight = (4. * math.pi) / num_surface_dots
+
+        # rest of logic written by @xluo
 
         rasa = []
         aatypes = []
