@@ -5307,7 +5307,7 @@ class ComputeModelSelectionScore(Module):
             1.4      # 5 - water
         ])
 
-        self.register_buffer('atom_radii', atom_type_radii)
+        self.register_buffer('atom_radii', atom_type_radii, persistent = False)
 
     @property
     def is_mkdssp_available(self):
