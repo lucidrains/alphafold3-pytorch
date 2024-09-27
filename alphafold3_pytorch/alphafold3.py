@@ -5286,8 +5286,19 @@ class ComputeModelSelectionScore(Module):
         self.register_buffer('lddt_thresholds', torch.tensor([0.5, 1.0, 2.0, 4.0]))
 
         self.dssp_path = dssp_path
+
         self.use_inhouse_rsa_calculation = use_inhouse_rsa_calculation
 
+        atom_type_radii = tensor([
+            1.65,    # 0 - nitrogen
+            1.87,    # 1 - carbon alpha
+            1.76,    # 2 - carbon
+            1.4,     # 3 - oxygen
+            1.8,     # 4 - side atoms
+            1.4      # 5 - water
+        ])
+
+        self.register_buffer('atom_radii', atom_type_radii)
 
     @property
     def is_mkdssp_available(self):
