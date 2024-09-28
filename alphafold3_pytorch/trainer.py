@@ -219,6 +219,7 @@ class Trainer:
                 beta = ema_decay,
                 include_online_model = False,
                 allow_different_devices = True,
+                coerce_dtype = True,
                 **ema_kwargs
             )
 
