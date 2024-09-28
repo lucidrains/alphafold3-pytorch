@@ -37,7 +37,6 @@ from alphafold3_pytorch import (
     ComputeRankingScore,
     ConfidenceHeadLogits,
     ComputeModelSelectionScore,
-    ComputeModelSelectionScore,
     collate_inputs_to_batched_atom_input,
     alphafold3_inputs_to_batched_atom_input,
 )

@@ -5708,6 +5708,77 @@ class ComputeModelSelectionScore(Module):
         return unresolved_rasa.mean()
 
     @typecheck
+    def calc_atom_access_surface_score(
+        self,
+        atom_pos: Float['m 3'],
+        atom_type: Int[' m'],
+        fibonacci_sphere_n = 200, # they use 200 in mkdssp, but can be tailored for efficiency
+        atom_distance_min_thres = 1e-4
+    ) -> Float['m']:
+
+        atom_radii: Float[' m'] = self.atom_radii[atom_type]
+
+        water_radii = self.atom_radii[-1]
+
+        # atom radii is always summed with water radii
+
+        atom_radii += water_radii
+        atom_radii_sq = atom_radii.pow(2) # always use square of radii or distance for comparison - save on sqrt
+
+        # write custom RSA function here
+
+        # first constitute the fibonacci sphere
+
+        num_surface_dots = fibonacci_sphere_n * 2 + 1
+        golden_ratio = 1. + sqrt(5.) / 2
+        weight = (4. * pi) / num_surface_dots
+
+        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
+
+        lat = torch.asin((2. * arange) / num_surface_dots)
+        lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
+
+        # ein:
+        # sd - surface dots
+        # c - coordinate (3)
+        # i, j - source and target atom
+
+        unit_surface_dots: Float['sd 3'] = torch.stack((
+            lon.sin() * lat.cos(),
+            lon.cos() * lat.cos(),
+            lat.sin()
+        ), dim = -1)
+
+        # first get atom relative positions + distance
+        # for determining whether to include pairs of atom in calculation for the `free` adjective
+
+        atom_rel_pos = einx.subtract('j c, i c -> i j c', atom_pos, atom_pos)
+        atom_rel_dist_sq = atom_rel_pos.pow(2).sum(dim = -1)
+
+        max_distance_include = einx.add('i, j -> i j', atom_radii, atom_radii).pow(2)
+
+        include_in_free_calc = (
+            (atom_rel_dist_sq < max_distance_include) &
+            (atom_rel_dist_sq > atom_distance_min_thres)
+        )
+
+        # overall logic
+
+        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii, unit_surface_dots)
+
+        dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
+
+        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii_sq, dist_from_surface_dots_sq)
+
+        target_atom_close_or_not_included = einx.logical_or('i sd j, i j -> i sd j', target_atom_close_to_surface_dots, ~include_in_free_calc)
+
+        is_free = reduce(target_atom_close_or_not_included, 'i sd j -> i sd', 'all') # basically the most important line, calculating whether an atom is free by some distance measure
+
+        score = reduce(is_free.float() * weight, 'm sd -> m', 'sum')
+
+        return score * atom_radii_sq
+
+    @typecheck
     def _inhouse_compute_unresolved_rasa(
         self,
         unresolved_cid: int,
@@ -5717,8 +5788,7 @@ class ComputeModelSelectionScore(Module):
         molecule_atom_lens: Int[" n"],  
         atom_pos: Float["m 3"],  
         atom_mask: Bool[" m"],
-        fibonacci_sphere_n = 200, # they use 200 in mkdssp, but can be tailored for efficiency
-        atom_distance_min_thres = 1e-4
+        **rsa_calc_kwargs
     ) -> Float[""]:  
         """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
         using inhouse rebuilt RSA calculation
@@ -5778,73 +5848,19 @@ class ComputeModelSelectionScore(Module):
         structure_atom_pos: Float[' m 3'] = tensor(structure_atom_pos)
         structure_atom_type_for_radii: Int[' m'] = tensor(structure_atom_type_for_radii)
 
-        atom_radii: Float[' m'] = self.atom_radii[structure_atom_type_for_radii]
+        # per atom rsa calculation
 
-        water_radii = self.atom_radii[-1]
-
-        # atom radii is always summed with water radii
-
-        atom_radii += water_radii
-        atom_radii_sq = atom_radii.pow(2) # always use square of radii or distance for comparison - save on sqrt
-
-        # write custom RSA function here
-
-        # first constitute the fibonacci sphere
-
-        num_surface_dots = fibonacci_sphere_n * 2 + 1
-        golden_ratio = 1. + sqrt(5.) / 2
-        weight = (4. * pi) / num_surface_dots
-
-        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
-
-        lat = torch.asin((2. * arange) / num_surface_dots)
-        lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
-
-        # ein:
-        # sd - surface dots
-        # c - coordinate (3)
-        # i, j - source and target atom
-
-        unit_surface_dots: Float['sd 3'] = torch.stack((
-            lon.sin() * lat.cos(),
-            lon.cos() * lat.cos(),
-            lat.sin()
-        ), dim = -1)
-
-        # first get atom relative positions + distance
-        # for determining whether to include pairs of atom in calculation for the `free` adjective
-
-        atom_rel_pos = einx.subtract('j c, i c -> i j c', structure_atom_pos, structure_atom_pos)
-        atom_rel_dist_sq = atom_rel_pos.pow(2).sum(dim = -1)
-
-        max_distance_include = einx.add('i, j -> i j', atom_radii, atom_radii).pow(2)
-
-        include_in_free_calc = (
-            (atom_rel_dist_sq < max_distance_include) &
-            (atom_rel_dist_sq > atom_distance_min_thres)
+        per_atom_access_surface_score = self.calc_atom_access_surface_score(
+            structure_atom_pos,
+            structure_atom_type_for_radii,
+            **rsa_calc_kwargs
         )
-
-        # overall logic
-
-        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii, unit_surface_dots)
-
-        dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
-
-        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii_sq, dist_from_surface_dots_sq)
-
-        target_atom_close_or_not_included = einx.logical_or('i sd j, i j -> i sd j', target_atom_close_to_surface_dots, ~include_in_free_calc)
-
-        is_free = reduce(target_atom_close_or_not_included, 'i sd j -> i sd', 'all') # basically the most important line, calculating whether an atom is free by some distance measure
-
-        score = reduce(is_free.float() * weight, 'm sd -> m', 'sum')
-
-        per_atom_accessible_surface_score = score * atom_radii_sq
 
         # sum up all surface scores for atoms per residue
         # the final score seems to be the average of the rsa across all residues (selected by `chain_unresolved_residue_mask`)
 
         rasa, mask = sum_pool_with_lens(
-            rearrange(per_atom_accessible_surface_score, '... -> 1 ... 1'),
+            rearrange(per_atom_access_surface_score, '... -> 1 ... 1'),
             rearrange(chain_molecule_atom_lens, '... -> 1 ...')
         )
 
