@@ -5800,7 +5800,10 @@ class ComputeModelSelectionScore(Module):
         lat = torch.asin((2. * arange) / num_surface_dots)
         lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
 
-        # ein: sd - surface dots
+        # ein:
+        # sd - surface dots
+        # c - coordinate (3)
+        # i, j - source and target atom
 
         unit_surface_dots: Float['sd 3'] = torch.stack((
             lon.sin() * lat.cos(),
@@ -5809,21 +5812,20 @@ class ComputeModelSelectionScore(Module):
         ), dim = -1)
 
         # overall logic
-        # assume radius of 1 for all atoms for starters - in algorithm, radius is different depending on backbone + sidechain atoms
-
-        radius = 1.
 
         atom_rel_pos = einx.subtract('i c, j c -> i j c', structure_atom_pos, structure_atom_pos)
 
-        surface_dots = radius * unit_surface_dots
+        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii, unit_surface_dots)
 
-        dist_from_surface_dots_sq = einx.subtract('i j c, sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
+        dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
 
-        free = reduce(dist_from_surface_dots_sq > radius, 'i sd j -> i sd', 'all')
+        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii, dist_from_surface_dots_sq)
+
+        free = reduce(target_atom_close_to_surface_dots, 'i sd j -> i sd', 'all')
 
         score = reduce(free.float() * weight, 'm sd -> m', 'sum')
 
-        per_atom_accessible_surface_score = score * radius ** 2
+        per_atom_accessible_surface_score = score * atom_radii.pow(2)
 
         # sum up all surface scores for atoms per residue
         # the final score seems to be the average of the rsa across all residues (selected by `chain_unresolved_residue_mask`)
