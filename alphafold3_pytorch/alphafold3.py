@@ -107,7 +107,7 @@ from alphafold3_pytorch.utils.model_utils import (
     calculate_weighted_rigid_align_weights,
     pack_one
 )
-from alphafold3_pytorch.utils.utils import get_gpu_type
+from alphafold3_pytorch.utils.utils import get_gpu_type, not_exists
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram
 
