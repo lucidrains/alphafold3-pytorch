@@ -5734,10 +5734,6 @@ class ComputeModelSelectionScore(Module):
 
         assert self.can_calculate_unresolved_protein_rasa, "`mkdssp` needs to be installed"
 
-        residue_constants = get_residue_constants(res_chem_index=IS_PROTEIN)
-
-        device = atom_pos.device
-        dtype = atom_pos.dtype
         num_atom = atom_pos.shape[0]
 
         chain_mask = asym_id == unresolved_cid
@@ -5817,7 +5813,7 @@ class ComputeModelSelectionScore(Module):
 
         atom_rel_pos = einx.subtract('i c, j c -> i j c', structure_atom_pos, structure_atom_pos)
 
-        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii, unit_surface_dots)
+        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii + water_radii, unit_surface_dots)
 
         dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
 
