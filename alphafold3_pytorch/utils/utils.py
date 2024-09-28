@@ -1,3 +1,5 @@
+import torch
+
 import numpy as np
 
 from beartype.typing import Any, Iterable, List
@@ -61,3 +63,17 @@ def np_mode(x: np.ndarray) -> Any:
     values, counts = np.unique(x, return_counts=True)
     m = counts.argmax()
     return values[m], counts[m]
+
+
+def get_gpu_type() -> str:
+    """Return the type of GPU detected: NVIDIA, ROCm, or Unknown."""
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0).lower()
+        if "nvidia" in device_name:
+            return "NVIDIA GPU detected"
+        elif "amd" in device_name or "gfx" in device_name:
+            return "ROCm GPU detected"
+        else:
+            return "Unknown GPU type"
+    else:
+        return "No GPU available"
