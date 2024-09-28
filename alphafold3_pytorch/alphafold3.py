@@ -345,6 +345,17 @@ def mean_pool_with_lens(
     lens: Int['b n']
 ) -> Float['b n d']:
 
+    summed, mask = sum_pool_with_lens(feats, lens)
+    avg = einx.divide('b n d, b n', summed, lens.clamp(min = 1))
+    avg = einx.where('b n, b n d, -> b n d', mask, avg, 0.)
+    return avg
+
+@typecheck
+def sum_pool_with_lens(
+    feats: Float['b m d'],
+    lens: Int['b n']
+) -> tuple[Float['b n d'], Bool['b n']]:
+
     seq_len = feats.shape[1]
 
     mask = lens > 0
@@ -364,9 +375,7 @@ def mean_pool_with_lens(
     # subtract cumsum at one index from the previous one
     summed = sel_cumsum[:, 1:] - sel_cumsum[:, :-1]
 
-    avg = einx.divide('b n d, b n', summed, lens.clamp(min = 1))
-    avg = einx.where('b n, b n d, -> b n d', mask, avg, 0.)
-    return avg
+    return summed, mask
 
 @typecheck
 def mean_pool_fixed_windows_with_mask(
@@ -5271,6 +5280,7 @@ class ComputeModelSelectionScore(Module):
         is_fine_tuning: bool = False,
         weight_dict_config: dict = None,
         dssp_path: str = "mkdssp",
+        use_inhouse_rsa_calculation: bool = False
     ):
         super().__init__()
         self.compute_confidence_score = ComputeConfidenceScore(eps=eps)
@@ -5286,8 +5296,28 @@ class ComputeModelSelectionScore(Module):
 
         self.dssp_path = dssp_path
 
+        self.use_inhouse_rsa_calculation = use_inhouse_rsa_calculation
+
+        atom_type_radii = tensor([
+            1.65,    # 0 - nitrogen
+            1.87,    # 1 - carbon alpha
+            1.76,    # 2 - carbon
+            1.4,     # 3 - oxygen
+            1.8,     # 4 - side atoms
+            1.4      # 5 - water
+        ])
+
+        self.atom_type_index = dict(
+            N = 0,
+            CA = 1,
+            C = 2,
+            O = 3
+        ) # rest go to 4 (side chain atom)
+
+        self.register_buffer('atom_radii', atom_type_radii, persistent = False)
+
     @property
-    def can_calculate_unresolved_protein_rasa(self):
+    def is_mkdssp_available(self):
         """Check if `mkdssp` is available.
 
         :return: True if `mkdssp` is available
@@ -5297,6 +5327,10 @@ class ComputeModelSelectionScore(Module):
             return True
         except sh.ErrorReturnCode_1:
             return False
+
+    @property
+    def can_calculate_unresolved_protein_rasa(self):
+        return self.is_mkdssp_available or self.use_inhouse_rsa_calculation
 
     @typecheck
     def compute_gpde(
@@ -5674,6 +5708,155 @@ class ComputeModelSelectionScore(Module):
         return unresolved_rasa.mean()
 
     @typecheck
+    def _inhouse_compute_unresolved_rasa(
+        self,
+        unresolved_cid: int,
+        unresolved_residue_mask: Bool[" n"],  
+        asym_id: Int[" n"],  
+        molecule_ids: Int[" n"],  
+        molecule_atom_lens: Int[" n"],  
+        atom_pos: Float["m 3"],  
+        atom_mask: Bool[" m"],
+        fibonacci_sphere_n = 200, # they use 200 in mkdssp, but can be tailored for efficiency
+        atom_distance_min_thres = 1e-4
+    ) -> Float[""]:  
+        """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
+        using inhouse rebuilt RSA calculation
+
+        unresolved_cid: asym_id for protein chains with unresolved residues
+        unresolved_residue_mask: True for unresolved residues, False for resolved residues
+        asym_id: asym_id for each residue
+        molecule_ids: molecule_ids for each residue
+        molecule_atom_lens: number of atoms for each residue
+        atom_pos: [m 3] atom positions
+        atom_mask: True for valid atoms, False for missing/padding atoms
+        :return: unresolved RASA
+        """
+
+        assert self.can_calculate_unresolved_protein_rasa, "`mkdssp` needs to be installed"
+
+        num_atom = atom_pos.shape[0]
+
+        chain_mask = asym_id == unresolved_cid
+        chain_unresolved_residue_mask = unresolved_residue_mask[chain_mask]
+        chain_asym_id = asym_id[chain_mask]
+        chain_molecule_ids = molecule_ids[chain_mask]
+        chain_molecule_atom_lens = molecule_atom_lens[chain_mask]
+
+        chain_mask_to_atom = torch.repeat_interleave(chain_mask, molecule_atom_lens)
+
+        # if there's padding in num atom
+        num_pad = num_atom - molecule_atom_lens.sum()
+        if num_pad > 0:
+            chain_mask_to_atom = F.pad(chain_mask_to_atom, (0, num_pad), value=False)
+
+        chain_atom_pos = atom_pos[chain_mask_to_atom]
+        chain_atom_mask = atom_mask[chain_mask_to_atom]
+
+        structure = protein_structure_from_feature(
+            chain_asym_id,
+            chain_molecule_ids,
+            chain_molecule_atom_lens,
+            chain_atom_pos,
+            chain_atom_mask,
+        )
+
+        # use the structure as source of truth, matching what xluo did
+
+        structure_atom_pos = []
+        structure_atom_type_for_radii = []
+        side_atom_index = len(self.atom_type_index)
+
+        for atom in structure.get_atoms():
+
+            one_atom_pos = list(atom.get_vector())
+            one_atom_type = self.atom_type_index.get(atom.name, side_atom_index)
+
+            structure_atom_pos.append(one_atom_pos)
+            structure_atom_type_for_radii.append(one_atom_type)
+
+        structure_atom_pos: Float[' m 3'] = tensor(structure_atom_pos)
+        structure_atom_type_for_radii: Int[' m'] = tensor(structure_atom_type_for_radii)
+
+        atom_radii: Float[' m'] = self.atom_radii[structure_atom_type_for_radii]
+
+        water_radii = self.atom_radii[-1]
+
+        # atom radii is always summed with water radii
+
+        atom_radii += water_radii
+        atom_radii_sq = atom_radii.pow(2) # always use square of radii or distance for comparison - save on sqrt
+
+        # write custom RSA function here
+
+        # first constitute the fibonacci sphere
+
+        num_surface_dots = fibonacci_sphere_n * 2 + 1
+        golden_ratio = 1. + sqrt(5.) / 2
+        weight = (4. * pi) / num_surface_dots
+
+        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
+
+        lat = torch.asin((2. * arange) / num_surface_dots)
+        lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
+
+        # ein:
+        # sd - surface dots
+        # c - coordinate (3)
+        # i, j - source and target atom
+
+        unit_surface_dots: Float['sd 3'] = torch.stack((
+            lon.sin() * lat.cos(),
+            lon.cos() * lat.cos(),
+            lat.sin()
+        ), dim = -1)
+
+        # first get atom relative positions + distance
+        # for determining whether to include pairs of atom in calculation for the `free` adjective
+
+        atom_rel_pos = einx.subtract('j c, i c -> i j c', structure_atom_pos, structure_atom_pos)
+        atom_rel_dist_sq = atom_rel_pos.pow(2).sum(dim = -1)
+
+        max_distance_include = einx.add('i, j -> i j', atom_radii, atom_radii).pow(2)
+
+        include_in_free_calc = (
+            (atom_rel_dist_sq < max_distance_include) &
+            (atom_rel_dist_sq > atom_distance_min_thres)
+        )
+
+        # overall logic
+
+        surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii, unit_surface_dots)
+
+        dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
+
+        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii_sq, dist_from_surface_dots_sq)
+
+        target_atom_close_or_not_included = einx.logical_or('i sd j, i j -> i sd j', target_atom_close_to_surface_dots, ~include_in_free_calc)
+
+        is_free = reduce(target_atom_close_or_not_included, 'i sd j -> i sd', 'all') # basically the most important line, calculating whether an atom is free by some distance measure
+
+        score = reduce(is_free.float() * weight, 'm sd -> m', 'sum')
+
+        per_atom_accessible_surface_score = score * atom_radii_sq
+
+        # sum up all surface scores for atoms per residue
+        # the final score seems to be the average of the rsa across all residues (selected by `chain_unresolved_residue_mask`)
+
+        rasa, mask = sum_pool_with_lens(
+            rearrange(per_atom_accessible_surface_score, '... -> 1 ... 1'),
+            rearrange(chain_molecule_atom_lens, '... -> 1 ...')
+        )
+
+        rasa = einx.where('b n, b n d, -> b n d', mask, rasa, 0.)
+
+        rasa = rearrange(rasa, '1 n 1 -> n')
+
+        unresolved_rasa = rasa[chain_unresolved_residue_mask]
+
+        return unresolved_rasa.mean()
+
+    @typecheck
     def compute_unresolved_rasa(
         self,
         unresolved_cid: List[int],
@@ -5707,8 +5890,16 @@ class ComputeModelSelectionScore(Module):
         weight = weight_dict.get("unresolved", {}).get("unresolved", None)
         assert weight, "Weight not found for unresolved"
 
+        # for migrating to a rewritten computation of RSA
+        # to remove mkdssp dependency for model selection
+
+        if self.use_inhouse_rsa_calculation:
+            compute_unresolved_rasa_function = self._inhouse_compute_unresolved_rasa
+        else:
+            compute_unresolved_rasa_function = self._compute_unresolved_rasa
+
         unresolved_rasa = [
-            self._compute_unresolved_rasa(*args)
+            compute_unresolved_rasa_function(*args)
             for args in zip(
                 unresolved_cid,
                 unresolved_residue_mask,

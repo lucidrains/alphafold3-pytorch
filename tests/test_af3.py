@@ -60,6 +60,7 @@ from alphafold3_pytorch.alphafold3 import (
 from alphafold3_pytorch.inputs import (
     IS_MOLECULE_TYPES,
     IS_PROTEIN,
+    IS_PROTEIN_INDEX,
     atom_ref_pos_to_atompair_inputs,
     molecule_to_atom_input,
     pdb_input_to_molecule_input,
@@ -1469,39 +1470,62 @@ def test_unresolved_protein_rasa():
         DATA_TEST_PDB_ID[1:3],
         f"{DATA_TEST_PDB_ID}-assembly1.cif",
     )
+
     pdb_input = PDBInput(mmcif_filepath, inference=True)
 
     mol_input = pdb_input_to_molecule_input(pdb_input)
     atom_input = molecule_to_atom_input(mol_input)
     batched_atom_input = collate_inputs_to_batched_atom_input([atom_input], atoms_per_window=27)
-    batched_atom_input_dict = batched_atom_input.dict()
 
-    res_idx, token_idx, asym_id, entity_id, sym_id = batched_atom_input_dict['additional_molecule_feats'].unbind(dim = -1)
+    molecule_atom_lens = batched_atom_input.molecule_atom_lens
+    is_molecule_types = batched_atom_input.is_molecule_types
+
+    is_protein = is_molecule_types[0, ..., IS_PROTEIN_INDEX]
+
+    # random crop for inhouse for now
+    # todo - remove this and make efficient
+    is_protein[200:] = False
+
+    atom_is_from_protein = torch.repeat_interleave(is_protein, molecule_atom_lens[0])
+
+    res_idx, token_idx, asym_id, entity_id, sym_id = batched_atom_input.additional_molecule_feats.unbind(dim = -1)
 
     cid = 1
     res_chem_index = get_cid_molecule_type(
         cid,
         asym_id[0],
-        batched_atom_input_dict['is_molecule_types'][0])
+        is_molecule_types[0]
+    )
 
     # only support protein for unresolved protein calculate
     assert res_chem_index == IS_PROTEIN
 
     unresolved_residue_mask = torch.randint(0, 2, asym_id.shape).bool()
 
-    compute_model_selection_score = ComputeModelSelectionScore()
+    compute_model_selection_score = ComputeModelSelectionScore(
+        use_inhouse_rsa_calculation = True
+    )
 
     if not compute_model_selection_score.can_calculate_unresolved_protein_rasa:
         pytest.skip("mkdssp not available for calculating unresolved protein rasa")
+
+    # only test with protein
+
+    unresolved_residue_mask = unresolved_residue_mask[:, is_protein]
+    asym_id = asym_id[:, is_protein]
+    molecule_ids = batched_atom_input.molecule_ids[:, is_protein]
+    atom_pos = batched_atom_input.atom_pos[:, atom_is_from_protein]
+    missing_atom_mask = batched_atom_input.missing_atom_mask[:, atom_is_from_protein]
+    molecule_atom_lens = molecule_atom_lens[:, is_protein]
 
     unresolved_rasa = compute_model_selection_score.compute_unresolved_rasa(
         unresolved_cid=[1],
         unresolved_residue_mask=unresolved_residue_mask,
         asym_id = asym_id,
-        molecule_ids=batched_atom_input_dict['molecule_ids'],
-        molecule_atom_lens=batched_atom_input_dict['molecule_atom_lens'],
-        atom_pos=batched_atom_input_dict['atom_pos'],
-        atom_mask=~batched_atom_input_dict['missing_atom_mask'])
+        molecule_ids=molecule_ids,
+        molecule_atom_lens=molecule_atom_lens,
+        atom_pos=atom_pos,
+        atom_mask=~missing_atom_mask)
 
 def test_readme1():
     alphafold3 = Alphafold3(dim_atom_inputs=77, dim_template_feats=108)
