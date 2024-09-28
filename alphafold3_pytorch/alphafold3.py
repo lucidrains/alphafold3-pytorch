@@ -5713,6 +5713,7 @@ class ComputeModelSelectionScore(Module):
         fibonacci_sphere_n = 200 # they use 200 in mkdssp
     ) -> Float[""]:  
         """Compute the unresolved relative solvent accessible surface area (RASA) for proteins.
+        using inhouse rebuilt RSA calculation
 
         unresolved_cid: asym_id for protein chains with unresolved residues
         unresolved_residue_mask: True for unresolved residues, False for resolved residues
@@ -5761,13 +5762,13 @@ class ComputeModelSelectionScore(Module):
         # first constitute the fibonacci sphere
 
         num_surface_dots = fibonacci_sphere_n * 2 + 1
-        golden_ratio = 1. + math.sqrt(5.) / 2
-        weight = (4. * math.pi) / num_surface_dots
+        golden_ratio = 1. + sqrt(5.) / 2
+        weight = (4. * pi) / num_surface_dots
 
         arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
 
         lat = torch.asin((2. * arange) / num_surface_dots)
-        lon = torch.fmod(arange, golden_ratio) * 2 * math.pi / golden_ratio
+        lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
 
         # ein: sd - surface dots
 
@@ -5792,36 +5793,20 @@ class ComputeModelSelectionScore(Module):
 
         score = reduce(free.float() * weight, 'm sd -> m', 'sum')
 
-        per_atom_accessible_surface_score = reduce(score * radius ** 2, 'm sd -> m')
+        per_atom_accessible_surface_score = score * radius ** 2
 
         # sum up all surface scores for atoms per residue
         # the final score seems to be the average of the rsa across all residues (selected by `chain_unresolved_residue_mask`)
 
         rasa, mask = sum_pool_with_lens(
-            rearrange(per_atom_accessible_surface_score, '... -> 1 ...'),
+            rearrange(per_atom_accessible_surface_score, '... -> 1 ... 1'),
             rearrange(chain_molecule_atom_lens, '... -> 1 ...')
         )
 
-        rasa = einx.where('b n, b n, -> b n', mask, rasa, 0.)
+        rasa = einx.where('b n, b n d, -> b n d', mask, rasa, 0.)
 
-        rasa = rearrange(rasa, '1 ... -> ...')
+        rasa = rearrange(rasa, '1 n 1 -> n')
 
-        # rest written by @xluo
-
-        aatypes = []
-        for residue in structure.get_residues():
-
-            aatype = dssp_dict.get((residue.get_full_id()[2], residue.id))[1]
-            aatypes.append(residue_constants.restype_order[aatype])
-
-        aatypes = torch.tensor(aatypes, device=device).int()
-
-        unresolved_aatypes = aatypes[chain_unresolved_residue_mask]
-        unresolved_molecule_ids = chain_molecule_ids[chain_unresolved_residue_mask]
-
-        assert torch.equal(
-            unresolved_aatypes, unresolved_molecule_ids
-        ), "aatype not match for input feature and structure"
         unresolved_rasa = rasa[chain_unresolved_residue_mask]
 
         return unresolved_rasa.mean()
