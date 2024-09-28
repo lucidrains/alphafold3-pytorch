@@ -5811,7 +5811,7 @@ class ComputeModelSelectionScore(Module):
 
         # overall logic
 
-        atom_rel_pos = einx.subtract('i c, j c -> i j c', structure_atom_pos, structure_atom_pos)
+        atom_rel_pos = einx.subtract('j c, i c -> i j c', structure_atom_pos, structure_atom_pos)
 
         surface_dots = einx.multiply('m, sd c -> m sd c', atom_radii + water_radii, unit_surface_dots)
 
