@@ -5307,6 +5307,13 @@ class ComputeModelSelectionScore(Module):
             1.4      # 5 - water
         ])
 
+        self.atom_type_index = dict(
+            N = 0,
+            CA = 1,
+            C = 2,
+            O = 3
+        ) # rest go to 4 (side chain atom)
+
         self.register_buffer('atom_radii', atom_type_radii, persistent = False)
 
     @property
@@ -5757,6 +5764,29 @@ class ComputeModelSelectionScore(Module):
             chain_atom_mask,
         )
 
+        # use the structure as source of truth, matching what xluo did
+
+        structure_atom_pos = []
+        structure_atom_type_for_radii = []
+        side_atom_index = len(self.atom_type_index)
+
+        for atom in structure.get_atoms():
+
+            one_atom_pos = list(atom.get_vector())
+            one_atom_type = self.atom_type_index.get(atom.name, side_atom_index)
+
+            structure_atom_pos.append(one_atom_pos)
+            structure_atom_type_for_radii.append(one_atom_type)
+
+        structure_atom_pos: Float[' m 3'] = tensor(structure_atom_pos)
+        structure_atom_type_for_radii: Int[' m'] = tensor(structure_atom_type_for_radii)
+
+        atom_radii: Float[' m'] = self.atom_radii[structure_atom_type_for_radii]
+
+        # they use the water molecule radii for some stuff
+
+        water_radii = self.atom_radii[-1]
+
         # write custom RSA function here
 
         # first constitute the fibonacci sphere
@@ -5783,7 +5813,7 @@ class ComputeModelSelectionScore(Module):
 
         radius = 1.
 
-        atom_rel_pos = einx.subtract('i c, j c -> i j c', atom_pos, atom_pos)
+        atom_rel_pos = einx.subtract('i c, j c -> i j c', structure_atom_pos, structure_atom_pos)
 
         surface_dots = radius * unit_surface_dots
 
