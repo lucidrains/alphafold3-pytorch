@@ -5783,6 +5783,8 @@ class ComputeModelSelectionScore(Module):
 
         atom_radii: Float[' m'] = self.atom_radii[structure_atom_type_for_radii]
 
+        atom_radii_sq = atom_radii.pow(2) # they use square of distance / radius to save on sqrt
+
         # they use the water molecule radii for some stuff
 
         water_radii = self.atom_radii[-1]
@@ -5819,13 +5821,13 @@ class ComputeModelSelectionScore(Module):
 
         dist_from_surface_dots_sq = einx.subtract('i j c, i sd c -> i sd j c', atom_rel_pos, surface_dots).pow(2).sum(dim = -1)
 
-        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii, dist_from_surface_dots_sq)
+        target_atom_close_to_surface_dots = einx.less('j, i sd j -> i sd j', atom_radii_sq, dist_from_surface_dots_sq)
 
         free = reduce(target_atom_close_to_surface_dots, 'i sd j -> i sd', 'all')
 
         score = reduce(free.float() * weight, 'm sd -> m', 'sum')
 
-        per_atom_accessible_surface_score = score * atom_radii.pow(2)
+        per_atom_accessible_surface_score = score * atom_radii_sq
 
         # sum up all surface scores for atoms per residue
         # the final score seems to be the average of the rsa across all residues (selected by `chain_unresolved_residue_mask`)
