@@ -178,7 +178,8 @@ class Attention(Module):
         num_memory_kv: int = 0,
         enable_attn_softclamp = False,
         attn_softclamp_value = 50.,
-        init_gate_bias = -2.
+        init_gate_bias = -2.,
+        softmax_full_precision = False
     ):
         super().__init__()
         """
@@ -201,6 +202,7 @@ class Attention(Module):
             window_size = window_size,
             enable_attn_softclamp = enable_attn_softclamp,
             attn_softclamp_value = attn_softclamp_value,
+            softmax_full_precision = softmax_full_precision
         )
 
         self.split_heads = Rearrange('b n (h d) -> b h n d', h = heads)
@@ -279,7 +281,8 @@ class Attend(Module):
         window_size = None,
         scale: float | None = None,
         enable_attn_softclamp = False,
-        attn_softclamp_value = 50.
+        attn_softclamp_value = 50.,
+        softmax_full_precision = False
     ):
         super().__init__()
         """
@@ -308,6 +311,9 @@ class Attend(Module):
 
         self.enable_attn_softclamp = enable_attn_softclamp
         self.attn_softclamp_value = attn_softclamp_value
+
+        # whether to use full precision for softmax
+        self.softmax_full_precision = softmax_full_precision
 
     @typecheck
     def local_attn(
@@ -505,9 +511,16 @@ class Attend(Module):
                 mask, sim, max_neg_value(sim)
             )
 
+        # attention cast float32 - in case there are instabilities with float16
+
+        softmax_kwargs = dict()
+
+        if self.softmax_full_precision:
+            softmax_kwargs.update(dtype = torch.float32)
+
         # attention
 
-        attn = sim.softmax(dim = -1, dtype = torch.float32)
+        attn = sim.softmax(dim = -1, **softmax_kwargs)
         attn = attn.to(dtype)
 
         attn = self.attn_dropout(attn)
