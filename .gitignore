@@ -1,6 +1,11 @@
 .env
 logs/
 
+# Nim related
+nimcache/
+nimblecache/
+htmldocs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
