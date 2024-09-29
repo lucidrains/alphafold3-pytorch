@@ -5701,11 +5701,12 @@ class ComputeModelSelectionScore(Module):
 
         max_included = include_in_free_calc.long().sum(dim = -1).amax()
 
-        include_indices = include_in_free_calc.long().topk(max_included, dim = -1).indices
+        include_in_free_calc, include_indices = include_in_free_calc.long().topk(max_included, dim = -1)
 
-        include_in_free_calc = einx.get_at('i [m], i j -> i j', include_in_free_calc, include_indices)
-        atom_rel_pos = einx.get_at('i [m] c, i j -> i j c', atom_rel_pos, include_indices)
-        target_atom_radii_sq = einx.get_at('[m], i j -> i j', atom_radii_sq, include_indices)
+        # atom_rel_pos = einx.get_at('i [m] c, i j -> i j c', atom_rel_pos, include_indices)
+
+        atom_rel_pos = atom_rel_pos.gather(1, repeat(include_indices, 'i j -> i j c', c = 3))
+        target_atom_radii_sq = atom_radii_sq[include_indices]
 
         # overall logic
 
