@@ -25,7 +25,7 @@ def get_chain_count(molecule_type: CLUSTERING_RESIDUE_MOLECULE_TYPE) -> Tuple[in
 
     Example:
         n_prot, n_nuc, n_ligand = get_chain_count("protein")
-    """   
+    """
     if molecule_type == "protein":
         return 1, 0, 0
     if molecule_type == "rna":

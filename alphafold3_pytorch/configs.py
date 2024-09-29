@@ -167,7 +167,7 @@ class TrainerConfig(BaseModelWithExtra):
     ema_decay: float
     lr: float
     clip_grad_norm: int | float
-    accelerator: str 
+    accelerator: str
     checkpoint_prefix: str
     checkpoint_every: int
     checkpoint_folder: str

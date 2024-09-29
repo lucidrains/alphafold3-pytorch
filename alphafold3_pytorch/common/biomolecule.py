@@ -1398,7 +1398,7 @@ def to_inference_mmcif(
     insert_alphafold_mmcif_metadata: bool = True,
     unique_res_atom_names: Optional[List[Tuple[List[List[str]], str, int]]] = None,
 ) -> str:
-    """Converts a `AlphaFold3Input`-derived `Biomolecule` instance to an mmCIF string. Clone of 
+    """Converts a `AlphaFold3Input`-derived `Biomolecule` instance to an mmCIF string. Clone of
     to_mmcif with dedicated support for template-free biomolecules.
 
     WARNING 1: When gapless_poly_seq is True, the _pdbx_poly_seq_scheme is filled
@@ -1492,7 +1492,7 @@ def to_inference_mmcif(
         polymer_entity_types = []
         polymer_entity_pdbx_strand_ids = []
         for chain_id in entity_chain_ids:
-            # Determine the (majority) chemical type of the chain.         
+            # Determine the (majority) chemical type of the chain.
             res_chemindex = np_mode(unique_chemtype[unique_chain_index == chain_id])[0].item()
             residue_constants = get_residue_constants(res_chem_index=res_chemindex)
             # Add all chain information to the _struct_asym table.
@@ -1724,7 +1724,7 @@ def to_inference_mmcif(
                     mmcif_dict["_chem_comp.name"].append(residue_constants.unk_chemname)
                     mmcif_dict["_chem_comp.type"].append(residue_constants.unk_chemtype)
             
-            if res_chemid == residue_constants.unk_restype and res_chemid not in chem_comp_ids:        
+            if res_chemid == residue_constants.unk_restype and res_chemid not in chem_comp_ids:
                 chem_comp_ids.add(residue_constants.unk_restype)
                 mmcif_dict["_chem_comp.id"].append(residue_constants.unk_restype)
                 mmcif_dict["_chem_comp.formula"].append("?")

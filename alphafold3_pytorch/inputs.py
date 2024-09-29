@@ -2028,10 +2028,10 @@ def alphafold3_inputs_to_batched_atom_input(
 
 @typecheck
 def alphafold3_input_to_biomolecule(
-    af3_input: Alphafold3Input, 
+    af3_input: Alphafold3Input,
     atom_positions: np.ndarray
 ) -> Biomolecule:
-    """This function converts an AlphaFold3 Input into a Biomolecule object. 
+    """This function converts an AlphaFold3 Input into a Biomolecule object.
 
     :param af3_input: The AlphaFold3Input Object for Multi-Domain Biomolecules
     :param atom_positions: The sampled or reference atom coordinates of shape [num_res, repr_dimension (47), 3]
@@ -2039,19 +2039,19 @@ def alphafold3_input_to_biomolecule(
     """
     af3_atom_input = molecule_lengthed_molecule_input_to_atom_input(alphafold3_input_to_molecule_lengthed_molecule_input(af3_input))
 
-    # Ensure that the atom positions are of the correct shape 
+    # Ensure that the atom positions are of the correct shape
     if atom_positions is not None:
         assert atom_positions.shape[0] == len(af3_atom_input.molecule_ids), "Please ensure that the atoms are of the shape [num_res, repr, 3]"
         assert atom_positions.shape[-1] == 3, "Please ensure that the atoms are of the shape [num_res, repr, 3]"
 
     ### Step 1. Get the various intermediate inputs
-    # Hacky solution: Need to double up on ligand because metal constants dont exist yet 
+    # Hacky solution: Need to double up on ligand because metal constants dont exist yet
     ALL_restypes = np.concatenate([
-                                    amino_acid_constants.restype_atom47_to_compact_atom, 
-                                    rna_constants.restype_atom47_to_compact_atom, 
-                                    dna_constants.restype_atom47_to_compact_atom, 
+                                    amino_acid_constants.restype_atom47_to_compact_atom,
+                                    rna_constants.restype_atom47_to_compact_atom,
+                                    dna_constants.restype_atom47_to_compact_atom,
                                     ligand_constants.restype_atom47_to_compact_atom,
-                                    ligand_constants.restype_atom47_to_compact_atom, 
+                                    ligand_constants.restype_atom47_to_compact_atom,
                                     ], axis=0)
     molecule_ids = af3_atom_input.molecule_ids.cpu().numpy()
     restype_to_atom = np.array([ALL_restypes[mol_idx] for mol_idx in molecule_ids])
@@ -2075,7 +2075,7 @@ def alphafold3_input_to_biomolecule(
             residue_name = get_residue_constants(res_chem_index=molecule_type).resnames[residue_idx]
             atom_names.append(res_to_atom[residue_name][atom_idx])
         else:
-            # TODO: See if there is a way to add in metals as separate to the ligands 
+            # TODO: See if there is a way to add in metals as separate to the ligands
             atom_name = get_residue_constants(res_chem_index=molecule_type).restype_name_to_compact_atom_names["UNL"][atom_idx]
             atom_names.append(atom_name)
     
@@ -2148,7 +2148,7 @@ def alphafold3_input_to_biomolecule(
         b_factors=b_factors,
         chemid=chemids,
         chemtype=chemtypes,
-        bonds=None, 
+        bonds=None,
         unique_res_atom_names=None, # TODO: Need to find how to use the ligand information here
         author_cri_to_new_cri=None,
         chem_comp_table=None,
