@@ -1501,12 +1501,7 @@ def test_unresolved_protein_rasa():
 
     unresolved_residue_mask = torch.randint(0, 2, asym_id.shape).bool()
 
-    compute_model_selection_score = ComputeModelSelectionScore(
-        use_inhouse_rsa_calculation = True
-    )
-
-    if not compute_model_selection_score.can_calculate_unresolved_protein_rasa:
-        pytest.skip("mkdssp not available for calculating unresolved protein rasa")
+    compute_model_selection_score = ComputeModelSelectionScore()
 
     # only test with protein
 
