@@ -107,6 +107,7 @@ from alphafold3_pytorch.utils.model_utils import (
     calculate_weighted_rigid_align_weights,
     pack_one
 )
+from alphafold3_pytorch.utils.utils import get_gpu_type, not_exists
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram
 
@@ -208,8 +209,8 @@ is_molecule_types: [*, 5]
 
 # NOTE: for some types of (e.g., AMD ROCm) GPUs, this represents
 # the maximum number of elements that can be processed simultaneously
-# by backpropagation for a given loss tensor
-MAX_ELEMENTS_FOR_BACKPROP = int(2e8)
+# for a given tensor. For reference, see https://github.com/pytorch/pytorch/issues/136291.
+MAX_CONCURRENT_TENSOR_ELEMENTS = int(2e9) if "ROCm" in get_gpu_type() else float("inf")
 
 LinearNoBias = partial(Linear, bias = False)
 
@@ -756,24 +757,15 @@ class TriangleMultiplication(Module):
 # triangle is axial attention w/ itself projected for bias
 
 class AttentionPairBias(Module):
-    def __init__(
-        self,
-        *,
-        heads,
-        dim_pairwise,
-        window_size = None,
-        num_memory_kv = 0,
-        **attn_kwargs
-    ):
+    """An Attention module with pair bias computation."""
+
+    def __init__(self, *, heads, dim_pairwise, window_size=None, num_memory_kv=0, **attn_kwargs):
         super().__init__()
 
         self.window_size = window_size
 
         self.attn = Attention(
-            heads = heads,
-            window_size = window_size,
-            num_memory_kv = num_memory_kv,
-            **attn_kwargs
+            heads=heads, window_size=window_size, num_memory_kv=num_memory_kv, **attn_kwargs
         )
 
         # line 8 of Algorithm 24
@@ -781,22 +773,27 @@ class AttentionPairBias(Module):
         to_attn_bias_linear = LinearNoBias(dim_pairwise, heads)
         nn.init.zeros_(to_attn_bias_linear.weight)
 
-        self.to_attn_bias = nn.Sequential(
-            nn.LayerNorm(dim_pairwise),
-            to_attn_bias_linear,
-            Rearrange('b ... h -> b h ...')
-        )
+        self.to_attn_bias_norm = nn.LayerNorm(dim_pairwise)
+        self.to_attn_bias = nn.Sequential(to_attn_bias_linear, Rearrange("b ... h -> b h ..."))
 
     @typecheck
     def forward(
         self,
-        single_repr: Float['b n ds'],
+        single_repr: Float["b n ds"],  # type: ignore
         *,
-        pairwise_repr: Float['b n n dp'] | Float['b nw w (w*2) dp'],
-        attn_bias: Float['b n n'] | Float['b nw w (w*2)'] | None = None,
-        **kwargs
-    ) -> Float['b n ds']:
+        pairwise_repr: Float["b n n dp"] | Float["b nw w (w*2) dp"],  # type: ignore
+        attn_bias: Float["b n n"] | Float["b nw w (w*2)"] | None = None,  # type: ignore
+        **kwargs,
+    ) -> Float["b n ds"]:  # type: ignore
+        """Perform the forward pass.
 
+        :param single_repr: The single representation tensor.
+        :param pairwise_repr: The pairwise representation tensor.
+        :param attn_bias: The attention bias tensor.
+        :return: The output tensor.
+        """
+        b, dp = pairwise_repr.shape[0], pairwise_repr.shape[-1]
+        dtype, device = pairwise_repr.dtype, pairwise_repr.device
         w, has_window_size = self.window_size, exists(self.window_size)
 
         # take care of windowing logic
@@ -811,27 +808,42 @@ class AttentionPairBias(Module):
 
         if has_window_size:
             if not windowed_pairwise:
-                pairwise_repr = full_pairwise_repr_to_windowed(pairwise_repr, window_size = w)
+                pairwise_repr = full_pairwise_repr_to_windowed(pairwise_repr, window_size=w)
             if exists(attn_bias):
-                attn_bias = full_attn_bias_to_windowed(attn_bias, window_size = w)
+                attn_bias = full_attn_bias_to_windowed(attn_bias, window_size=w)
         else:
-            assert not windowed_pairwise, 'cannot pass in windowed pairwise repr if no window_size given to AttentionPairBias'
-            assert not exists(windowed_attn_bias) or not windowed_attn_bias, 'cannot pass in windowed attention bias if no window_size set for AttentionPairBias'
+            assert (
+                not windowed_pairwise
+            ), "Cannot pass in windowed pairwise representation if no `window_size` given to `AttentionPairBias`."
+            assert (
+                not_exists(windowed_attn_bias) or not windowed_attn_bias
+            ), "Cannot pass in windowed attention bias if no `window_size` is set for `AttentionPairBias`."
 
         # attention bias preparation with further addition from pairwise repr
 
         if exists(attn_bias):
-            attn_bias = rearrange(attn_bias, 'b ... -> b 1 ...')
+            attn_bias = rearrange(attn_bias, "b ... -> b 1 ...")
         else:
-            attn_bias = 0.
+            attn_bias = 0.0
 
-        attn_bias = self.to_attn_bias(pairwise_repr) + attn_bias
+        if pairwise_repr.numel() > MAX_CONCURRENT_TENSOR_ELEMENTS:
+            # create a stub tensor and normalize it to maintain gradients to `to_attn_bias_norm`
+            stub_pairwise_repr = torch.zeros((b, dp), dtype=dtype, device=device)
+            stub_attn_bias_norm = self.to_attn_bias_norm(stub_pairwise_repr) * 0.0
 
-        out = self.attn(
-            single_repr,
-            attn_bias = attn_bias,
-            **kwargs
-        )
+            # adjust `attn_bias_norm` dimensions to match `pairwise_repr`
+            attn_bias_norm = pairwise_repr + (
+                stub_attn_bias_norm[:, None, None, None, :]
+                if windowed_pairwise
+                else stub_attn_bias_norm[:, None, None, :]
+            )
+
+            # apply bias transformation
+            attn_bias = self.to_attn_bias(attn_bias_norm) + attn_bias
+        else:
+            attn_bias = self.to_attn_bias(self.to_attn_bias_norm(pairwise_repr)) + attn_bias
+
+        out = self.attn(single_repr, attn_bias=attn_bias, **kwargs)
 
         return out
 
@@ -2919,7 +2931,7 @@ class ElucidatedAtomDiffusion(Module):
             bond_losses = F.mse_loss(denoised_cdist, normalized_cdist, reduction = 'none')
             bond_losses = bond_losses * loss_weights
 
-            if atompair_mask.sum() > MAX_ELEMENTS_FOR_BACKPROP:
+            if atompair_mask.sum() > MAX_CONCURRENT_TENSOR_ELEMENTS:
                 if verbose:
                     logger.info("Subsetting atom pairs for backprop within EDM")
                 
@@ -2928,7 +2940,7 @@ class ElucidatedAtomDiffusion(Module):
                 flat_atompair_mask_indices = torch.arange(atompair_mask.numel(), device=self.device)[atompair_mask.view(-1)]
                 num_true_atompairs = flat_atompair_mask_indices.size(0)
 
-                num_atompairs_to_ignore = num_true_atompairs - MAX_ELEMENTS_FOR_BACKPROP
+                num_atompairs_to_ignore = num_true_atompairs - MAX_CONCURRENT_TENSOR_ELEMENTS
                 ignored_atompair_indices = flat_atompair_mask_indices[torch.randperm(num_true_atompairs)[:num_atompairs_to_ignore]]
                 
                 atompair_mask.view(-1)[ignored_atompair_indices] = False
