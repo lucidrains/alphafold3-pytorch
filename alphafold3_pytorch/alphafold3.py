@@ -5705,6 +5705,7 @@ class ComputeModelSelectionScore(Module):
 
         # atom_rel_pos = einx.get_at('i [m] c, i j -> i j c', atom_rel_pos, include_indices)
 
+        include_in_free_calc = include_in_free_calc.bool()
         atom_rel_pos = atom_rel_pos.gather(1, repeat(include_indices, 'i j -> i j c', c = 3))
         target_atom_radii_sq = atom_radii_sq[include_indices]
 
