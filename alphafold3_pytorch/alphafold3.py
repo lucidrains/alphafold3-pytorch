@@ -5319,6 +5319,10 @@ class ComputeModelSelectionScore(Module):
 
         self.register_buffer('atom_radii', atom_type_radii, persistent = False)
 
+    @property
+    def device(self):
+        return self.atom_radii.device
+
     @typecheck
     def compute_gpde(
         self,
@@ -5629,10 +5633,10 @@ class ComputeModelSelectionScore(Module):
             structure_atom_pos.append(one_atom_pos)
             structure_atom_type_for_radii.append(one_atom_type)
 
-        structure_atom_pos: Float['m 3'] = tensor(structure_atom_pos)
-        structure_atom_type_for_radii: Int['m'] = tensor(structure_atom_type_for_radii)
+        structure_atom_pos: Float['m 3'] = tensor(structure_atom_pos, device = self.device)
+        structure_atom_type_for_radii: Int['m'] = tensor(structure_atom_type_for_radii, device = self.device)
 
-        structure_atoms_per_residue: Int['n'] = tensor([len([*residue.get_atoms()]) for residue in structure.get_residues()]).long()
+        structure_atoms_per_residue: Int['n'] = tensor([len([*residue.get_atoms()]) for residue in structure.get_residues()], device = self.device).long()
 
         return self.calc_atom_access_surface_score(
             atom_pos = structure_atom_pos,
@@ -5668,7 +5672,7 @@ class ComputeModelSelectionScore(Module):
         golden_ratio = 1. + sqrt(5.) / 2
         weight = (4. * pi) / num_surface_dots
 
-        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
+        arange = torch.arange(-fibonacci_sphere_n, fibonacci_sphere_n + 1, device = self.device) # for example, N = 3 -> [-3, -2, -1, 0, 1, 2, 3]
 
         lat = torch.asin((2. * arange) / num_surface_dots)
         lon = torch.fmod(arange, golden_ratio) * 2 * pi / golden_ratio
