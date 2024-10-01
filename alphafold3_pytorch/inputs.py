@@ -3121,8 +3121,7 @@ def pdb_input_to_molecule_input(
 
     if (
         i.distillation
-        and not_exists(i.chains)
-        or (exists(i.chains) and not (exists(i.chains[0]) or exists(i.chains[1])))
+        and (not_exists(i.chains) or (exists(i.chains) and not (exists(i.chains[0]) or exists(i.chains[1]))))
     ):
         chain_id_1, chain_id_2 = i.chains if exists(i.chains) else (None, None)
 
