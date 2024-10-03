@@ -663,7 +663,6 @@ class ConditionWrapper(Module):
         self.adaptive_norm = AdaptiveLayerNorm(dim = dim, dim_cond = dim_cond)
 
         adaln_zero_gamma_linear = Linear(dim_cond, dim)
-        nn.init.zeros_(adaln_zero_gamma_linear.weight)
         nn.init.constant_(adaln_zero_gamma_linear.bias, adaln_zero_bias_init_value)
 
         self.to_adaln_zero_gamma = nn.Sequential(
