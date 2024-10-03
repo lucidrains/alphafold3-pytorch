@@ -767,11 +767,8 @@ class AttentionPairBias(Module):
 
         # line 8 of Algorithm 24
 
-        to_attn_bias_linear = LinearNoBias(dim_pairwise, heads)
-        nn.init.zeros_(to_attn_bias_linear.weight)
-
         self.to_attn_bias_norm = nn.LayerNorm(dim_pairwise)
-        self.to_attn_bias = nn.Sequential(to_attn_bias_linear, Rearrange("b ... h -> b h ..."))
+        self.to_attn_bias = nn.Sequential(LinearNoBias(dim_pairwise, heads), Rearrange("b ... h -> b h ..."))
 
     @typecheck
     def forward(
