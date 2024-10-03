@@ -7,7 +7,7 @@ license       = "MIT"
 
 # Dependencies
 
-requires "nim >= 2.0.8"
+requires "nim >= 2.2.0"
 requires "nimpy >= 0.2.0"
 requires "arraymancer"
 requires "malebolgia"
