@@ -529,7 +529,7 @@ class Transition(Module):
         self,
         *,
         dim,
-        expansion_factor = 4
+        expansion_factor = 2
     ):
         super().__init__()
         dim_inner = int(dim * expansion_factor)
@@ -2018,32 +2018,32 @@ class DiffusionTransformer(Module):
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
 
-        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask)
+        inputs = (noised_repr, None, single_repr, pairwise_repr, mask, windowed_mask)
 
         wrapped_layers = []
 
         def efficient_attn_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask = inputs
                 noised_repr = fn(noised_repr, mask = mask) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                return noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask
             return inner
 
         def attn_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
-                noised_repr = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr_biased = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask)
+                return noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask
             return inner
 
         def transition_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
-                noised_repr = fn(noised_repr, cond = single_repr) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr = fn(noised_repr, cond = single_repr) + noised_repr_biased
+                return noised_repr, noised_repr_biased, single_repr, pairwise_repr, mask, windowed_mask
             return inner
 
         for linear_attn, colt5_attn, attn, transition in self.layers:
@@ -2082,18 +2082,18 @@ class DiffusionTransformer(Module):
             if exists(colt5_attn):
                 noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
 
-            noised_repr = attn(
+            noised_repr_biased = attn(
                 noised_repr,
                 cond = single_repr,
                 pairwise_repr = pairwise_repr,
                 mask = mask,
                 windowed_mask = windowed_mask
-            ) + noised_repr
+            )
 
             noised_repr = transition(
                 noised_repr,
                 cond = single_repr
-            ) + noised_repr
+            ) + noised_repr_biased
 
         return noised_repr
 
