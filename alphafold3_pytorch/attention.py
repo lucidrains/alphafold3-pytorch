@@ -178,7 +178,6 @@ class Attention(Module):
         num_memory_kv: int = 0,
         enable_attn_softclamp = False,
         attn_softclamp_value = 50.,
-        init_gate_bias = -2.,
         softmax_full_precision = False
     ):
         super().__init__()
@@ -224,11 +223,7 @@ class Attention(Module):
         self.to_gates = None
 
         if gate_output:
-            gate_linear = nn.Linear(dim, dim_inner)
-            nn.init.zeros_(gate_linear.weight)
-            nn.init.constant_(gate_linear.bias, init_gate_bias)
-
-            self.to_gates = gate_linear
+            self.to_gates = nn.Sequential(nn.Linear(dim, dim_inner, bias = False), nn.Sigmoid())
 
     @typecheck
     def forward(
@@ -266,7 +261,7 @@ class Attention(Module):
 
         if exists(self.to_gates):
             gates = self.to_gates(seq)
-            out = out * gates.sigmoid()
+            out = out * gates
 
         # combine heads
 
