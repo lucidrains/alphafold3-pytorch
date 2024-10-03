@@ -622,7 +622,7 @@ class AdaptiveLayerNorm(Module):
         dim_cond
     ):
         super().__init__()
-        self.norm = nn.LayerNorm(dim, elementwise_affine = False)
+        self.norm = nn.LayerNorm(dim, elementwise_affine = False, bias = False)
         self.norm_cond = nn.LayerNorm(dim_cond, bias = False)
 
         self.to_gamma = nn.Sequential(
