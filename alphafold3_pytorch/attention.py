@@ -1,5 +1,6 @@
 from __future__ import annotations
 from beartype.typing import NamedTuple, Tuple
+from functools import partial
 
 import torch
 from torch import nn, Tensor
@@ -17,6 +18,10 @@ from alphafold3_pytorch.tensor_typing import (
     Bool,
     typecheck
 )
+
+# alias
+
+LinearNoBias = partial(nn.Linear, bias = False)
 
 # helpers
 
@@ -208,8 +213,8 @@ class Attention(Module):
         self.merge_heads = Rearrange('b h n d -> b n (h d)')
 
         self.to_q = nn.Linear(dim, dim_inner, bias = query_bias)
-        self.to_kv = nn.Linear(dim, dim_inner * 2, bias = False)
-        self.to_out = nn.Linear(dim_inner, dim, bias = False)
+        self.to_kv = LinearNoBias(dim, dim_inner * 2)
+        self.to_out = LinearNoBias(dim_inner, dim)
 
         self.memory_kv = None
 
@@ -223,7 +228,7 @@ class Attention(Module):
         self.to_gates = None
 
         if gate_output:
-            self.to_gates = nn.Sequential(nn.Linear(dim, dim_inner, bias = False), nn.Sigmoid())
+            self.to_gates = nn.Sequential(LinearNoBias(dim, dim_inner), nn.Sigmoid())
 
     @typecheck
     def forward(
