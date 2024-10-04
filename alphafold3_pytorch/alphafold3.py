@@ -529,7 +529,7 @@ class Transition(Module):
         self,
         *,
         dim,
-        expansion_factor = 4
+        expansion_factor = 2
     ):
         super().__init__()
         dim_inner = int(dim * expansion_factor)
