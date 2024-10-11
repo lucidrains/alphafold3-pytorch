@@ -20,7 +20,7 @@ DeletionMatrix = Sequence[Sequence[int]]
 
 # Constants
 
-MSA_TYPE = Literal["protein", "dna", "rna"]
+MSA_TYPE = Literal["protein", "dna", "rna", "ligand"]
 
 # Utilities for extracting identifiers from MSA sequence descriptions.
 
