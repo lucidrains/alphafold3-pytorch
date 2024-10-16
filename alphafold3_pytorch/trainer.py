@@ -178,6 +178,7 @@ class Trainer:
             use_foreach = True
         ),
         ema_on_cpu = False,
+        ema_update_model_with_ema_every: int | None = None,
         use_adam_atan2: bool = False,
         use_lion: bool = False,
         use_torch_compile: bool = False
@@ -220,6 +221,7 @@ class Trainer:
                 include_online_model = False,
                 allow_different_devices = True,
                 coerce_dtype = True,
+                update_model_with_ema_every = ema_update_model_with_ema_every,
                 **ema_kwargs
             )
 

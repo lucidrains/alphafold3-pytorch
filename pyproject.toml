@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.6.2"
+version = "0.6.3"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
@@ -33,7 +33,7 @@ dependencies = [
     "CoLT5-attention>=0.11.0",
     "einops>=0.8.0",
     "einx>=0.2.2",
-    "ema-pytorch>=0.6.4",
+    "ema-pytorch>=0.7.0",
     "environs",
     "lion-pytorch>=0.2.2",
     "joblib",
