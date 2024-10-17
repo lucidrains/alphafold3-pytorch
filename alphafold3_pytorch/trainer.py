@@ -209,10 +209,14 @@ class Trainer:
         self.distributed_eval = distributed_eval
         self.will_eval_or_test = self.is_main or distributed_eval
 
+        # using "switch" ema
+
+        self.switch_ema = exists(ema_update_model_with_ema_every)
+
         # exponential moving average
 
         self.ema_model = None
-        self.has_ema = self.will_eval_or_test and use_ema
+        self.has_ema = (self.will_eval_or_test or self.switch_ema) and use_ema
 
         if self.has_ema:
             self.ema_model = EMA(
