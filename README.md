@@ -494,3 +494,23 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:267657558}
 }
 ```
+
+```bibtex
+@article{Nguyen2023MitigatingOI,
+    title   = {Mitigating Over-smoothing in Transformers via Regularized Nonlocal Functionals},
+    author  = {Tam Nguyen and Tan M. Nguyen and Richard G. Baraniuk},
+    journal = {ArXiv},
+    year    = {2023},
+    volume  = {abs/2312.00751},
+    url     = {https://api.semanticscholar.org/CorpusID:264300597}
+}
+```
+
+```bibtex
+@inproceedings{Zhou2024ValueRL,
+    title   = {Value Residual Learning For Alleviating Attention Concentration In Transformers},
+    author  = {Zhanchao Zhou and Tianyi Wu and Zhiyun Jiang and Zhenzhong Lan},
+    year    = {2024},
+    url     = {https://api.semanticscholar.org/CorpusID:273532030}
+}
+```

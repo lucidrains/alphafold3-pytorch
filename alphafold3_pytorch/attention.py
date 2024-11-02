@@ -237,14 +237,28 @@ class Attention(Module):
         mask: Bool['b n']| None = None,
         context: Float['b j d'] | None = None,
         windowed_mask: Bool['b nw w (w*2)'] | None = None,
-        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None
+        attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None,
+        return_values: bool = False,
+        value_residual: Float['b j dh'] | None = None,
 
-    ) -> Float['b i d']:
+    ) -> (
+        Float['b i d'] |
+        tuple[Float['b i d'], Float['b j _']]
+    ):
 
         q = self.to_q(seq)
 
         context_seq = default(context, seq)
         k, v = self.to_kv(context_seq).chunk(2, dim = -1)
+
+        # handle value residual
+
+        orig_v = v
+
+        if exists(value_residual):
+            v = 0.5 * (v + value_residual)
+
+        # split heads
 
         q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
 
@@ -270,7 +284,14 @@ class Attention(Module):
 
         # combine heads
 
-        return self.to_out(out)
+        out = self.to_out(out)
+
+        # maybe return values
+
+        if not return_values:
+            return out
+
+        return out, orig_v
 
 # the main attention function
 

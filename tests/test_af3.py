@@ -302,10 +302,12 @@ def test_centre_random_augmentation():
 @pytest.mark.parametrize('checkpoint', (True, False))
 @pytest.mark.parametrize('recurrent_depth', (1, 2))
 @pytest.mark.parametrize('enable_attn_softclamp', (True, False))
+@pytest.mark.parametrize('add_value_residual', (True, False))
 def test_pairformer(
     checkpoint,
     recurrent_depth,
-    enable_attn_softclamp
+    enable_attn_softclamp,
+    add_value_residual
 ):
     single = torch.randn(2, 16, 384).requires_grad_()
     pairwise = torch.randn(2, 16, 16, 128).requires_grad_()
@@ -316,6 +318,7 @@ def test_pairformer(
         num_register_tokens = 4,
         recurrent_depth = recurrent_depth,
         checkpoint = checkpoint,
+        add_value_residual = add_value_residual,
         pair_bias_attn_kwargs = dict(
             enable_attn_softclamp = enable_attn_softclamp
         )
@@ -368,10 +371,12 @@ def test_msa_module(
 @pytest.mark.parametrize('checkpoint', (False, True))
 @pytest.mark.parametrize('use_linear_attn', (False, True))
 @pytest.mark.parametrize('use_colt5_attn', (False, True))
+@pytest.mark.parametrize('add_value_residual', (False, True))
 def test_diffusion_transformer(
     checkpoint,
     use_linear_attn,
-    use_colt5_attn
+    use_colt5_attn,
+    add_value_residual
 ):
 
     single = torch.randn(2, 16, 384).requires_grad_()
@@ -383,7 +388,8 @@ def test_diffusion_transformer(
         heads = 16,
         checkpoint = checkpoint,
         use_linear_attn = use_linear_attn,
-        use_colt5_attn = use_colt5_attn
+        use_colt5_attn = use_colt5_attn,
+        add_value_residual = add_value_residual
     )
 
     single_out = diffusion_transformer(
