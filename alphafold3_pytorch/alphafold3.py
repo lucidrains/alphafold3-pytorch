@@ -678,13 +678,26 @@ class ConditionWrapper(Module):
         *,
         cond: Float['b n dc'],
         **kwargs
-    ) -> Float['b n d']:
+    ) -> (
+        Float['b n d'] |
+        tuple[Float['b n d'], Float['b _ _']]
+    ):
         x = self.adaptive_norm(x, cond = cond)
 
         out = self.fn(x, **kwargs)
 
+        tuple_output = isinstance(out, tuple)
+
+        if tuple_output:
+            out, *rest = out
+
         gamma = self.to_adaln_zero_gamma(cond)
-        return out * gamma
+        out = out * gamma
+
+        if tuple_output:
+            out = (out, *rest)
+
+        return out
 
 # triangle multiplicative module
 # seems to be unchanged from alphafold2
@@ -762,7 +775,10 @@ class AttentionPairBias(Module):
         self.window_size = window_size
 
         self.attn = Attention(
-            heads=heads, window_size=window_size, num_memory_kv=num_memory_kv, **attn_kwargs
+            heads = heads,
+            window_size = window_size,
+            num_memory_kv = num_memory_kv,
+            **attn_kwargs
         )
 
         # line 8 of Algorithm 24
@@ -777,8 +793,14 @@ class AttentionPairBias(Module):
         *,
         pairwise_repr: Float["b n n dp"] | Float["b nw w (w*2) dp"],  # type: ignore
         attn_bias: Float["b n n"] | Float["b nw w (w*2)"] | None = None,  # type: ignore
+        return_values: bool = False,
+        value_residual: Float['b _ _'] | None = None,
         **kwargs,
-    ) -> Float["b n ds"]:  # type: ignore
+    ) -> (
+        Float['b n ds'] |
+        tuple[Float['b n ds'], Float['b _ _']]
+    ):  # type: ignore
+
         """Perform the forward pass.
 
         :param single_repr: The single representation tensor.
@@ -837,9 +859,22 @@ class AttentionPairBias(Module):
         else:
             attn_bias = self.to_attn_bias(self.to_attn_bias_norm(pairwise_repr)) + attn_bias
 
-        out = self.attn(single_repr, attn_bias=attn_bias, **kwargs)
+        # attention
 
-        return out
+        out, values = self.attn(
+            single_repr,
+            attn_bias = attn_bias,
+            value_residual = value_residual,
+            return_values = True,
+            **kwargs
+        )
+
+        # whether to return values for value residual learning
+
+        if not return_values:
+            return out
+
+        return out, values
 
 class TriangleAttention(Module):
     def __init__(
@@ -1915,9 +1950,9 @@ class DiffusionTransformer(Module):
         attn_num_memory_kv = False,
         trans_expansion_factor = 2,
         num_register_tokens = 0,
-        add_residual = True,
         use_linear_attn = False,
         checkpoint = False,
+        add_value_residual = False,
         linear_attn_kwargs = dict(
             heads = 8,
             dim_head = 16
@@ -1997,7 +2032,7 @@ class DiffusionTransformer(Module):
 
         self.layers = layers
 
-        self.add_residual = add_residual
+        self.add_value_residual = add_value_residual
 
         self.has_registers = num_register_tokens > 0
         self.num_registers = num_register_tokens
@@ -2018,32 +2053,37 @@ class DiffusionTransformer(Module):
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
 
-        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask)
+        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask, None)
 
         wrapped_layers = []
 
         def efficient_attn_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
                 noised_repr = fn(noised_repr, mask = mask) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual
             return inner
 
         def attn_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
-                noised_repr = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
+                attn_out, attn_values = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask, value_residual = maybe_value_residual, return_values = True)
+                noised_repr = attn_out + noised_repr
+
+                if self.add_value_residual:
+                    maybe_value_residual = default(maybe_value_residual, attn_values)
+
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual
             return inner
 
         def transition_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
-                noised_repr, single_repr, pairwise_repr, mask, windowed_mask = inputs
+                noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
                 noised_repr = fn(noised_repr, cond = single_repr) + noised_repr
-                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask
+                return noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual
             return inner
 
         for linear_attn, colt5_attn, attn, transition in self.layers:
@@ -2074,6 +2114,8 @@ class DiffusionTransformer(Module):
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
 
+        value_residual = None
+
         for linear_attn, colt5_attn, attn, transition in self.layers:
 
             if exists(linear_attn):
@@ -2082,13 +2124,20 @@ class DiffusionTransformer(Module):
             if exists(colt5_attn):
                 noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
 
-            noised_repr = attn(
+            attn_out, attn_values = attn(
                 noised_repr,
                 cond = single_repr,
                 pairwise_repr = pairwise_repr,
                 mask = mask,
-                windowed_mask = windowed_mask
-            ) + noised_repr
+                windowed_mask = windowed_mask,
+                return_values = True,
+                value_residual = value_residual
+            )
+
+            noised_repr = noised_repr + attn_out
+
+            if self.add_value_residual:
+                value_residual = default(value_residual, attn_values)
 
             noised_repr = transition(
                 noised_repr,
