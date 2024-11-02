@@ -256,7 +256,7 @@ class Attention(Module):
         orig_v = v
 
         if exists(value_residual):
-            v = v + value_residual
+            v = 0.5 * (v + value_residual)
 
         # split heads
 
