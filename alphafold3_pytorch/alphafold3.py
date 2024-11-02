@@ -607,7 +607,10 @@ class PreLayerNorm(Module):
         self,
         x: Float['... n d'],
         **kwargs
-    ) -> Float['... n d']:
+    ) -> (
+        Float['... n d'] |
+        tuple[Float['... n d'] | Any]
+    ):
 
         x = self.norm(x)
         return self.fn(x, **kwargs)
@@ -1395,6 +1398,7 @@ class PairformerStack(Module):
         dropout_row_prob = 0.25,
         num_register_tokens = 0,
         checkpoint = False,
+        add_value_residual = False,
         pairwise_block_kwargs: dict = dict(),
         pair_bias_attn_kwargs: dict = dict()
     ):
@@ -1430,6 +1434,8 @@ class PairformerStack(Module):
 
         self.layers = layers
 
+        self.add_value_residual = add_value_residual
+
         # checkpointing
 
         self.checkpoint = checkpoint
@@ -1458,6 +1464,8 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
+        value_residual = None
+
         for _ in range(self.recurrent_depth):
             for (
                 pairwise_block,
@@ -1467,7 +1475,13 @@ class PairformerStack(Module):
 
                 pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
 
-                single_repr = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
+                attn_out, attn_values = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = value_residual)
+
+                single_repr = single_repr + attn_out
+
+                if self.add_value_residual:
+                    value_residual = default(value_residual, attn_values)
+
                 single_repr = single_transition(single_repr) + single_repr
 
         return single_repr, pairwise_repr
@@ -1482,30 +1496,35 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
-        inputs = (single_repr, pairwise_repr, mask)
+        inputs = (single_repr, pairwise_repr, mask, None)
 
         def pairwise_block_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask = inputs
+                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
                 pairwise_repr = layer(pairwise_repr = pairwise_repr, mask = mask)
-                return single_repr, pairwise_repr, mask
+                return single_repr, pairwise_repr, mask, maybe_value_residual
             return inner
 
         def pair_bias_attn_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask = inputs
-                single_repr = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask) + single_repr
-                return single_repr, pairwise_repr, mask
+                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
+                attn_out, attn_values = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = maybe_value_residual)
+                single_repr = single_repr + attn_out
+
+                if self.add_value_residual:
+                    maybe_value_residual = default(maybe_value_residual, attn_values)
+
+                return single_repr, pairwise_repr, mask, maybe_value_residual
             return inner
 
         def single_transition_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask = inputs
+                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
                 single_repr = layer(single_repr) + single_repr
-                return single_repr, pairwise_repr, mask
+                return single_repr, pairwise_repr, mask, maybe_value_residual
             return inner
 
         wrapped_layers = []
@@ -1524,7 +1543,7 @@ class PairformerStack(Module):
         for layer in wrapped_layers:
             inputs = checkpoint(layer, inputs)
 
-        single_repr, pairwise_repr, _ = inputs
+        single_repr, pairwise_repr, *_ = inputs
         return single_repr, pairwise_repr
 
     @typecheck
