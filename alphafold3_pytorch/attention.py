@@ -374,11 +374,11 @@ class Attend(Module):
         # just do radius of 1 for now
         # perhaps not even necessary, and could try shifted windows (a la Swin)
 
-        k, v = tuple(pad_at_dim(t, (1, 0), dim = -2) for t in (k, v))
-        mask = F.pad(mask, (1, 0), value = False)
+        k, v = tuple(pad_at_dim(t, (1, 0), dim = -3) for t in (k, v))
+        mask = pad_at_dim(mask, (1, 0), dim = -2, value = False)
 
-        k, v = tuple(torch.cat((t[..., :-1, :], t[..., 1:, :]), dim = -2) for t in (k, v))
-        mask = torch.cat((mask[..., :-1], mask[..., 1:]), dim = -1)
+        k, v = tuple(torch.cat((t[..., :-1, :, :], t[..., 1:, :, :]), dim = -2) for t in (k, v))
+        mask = torch.cat((mask[..., :-1, :], mask[..., 1:, :]), dim = -1)
 
         # handle attention bias (inefficiently)
 
