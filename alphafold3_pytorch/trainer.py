@@ -40,6 +40,7 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
 from lion_pytorch.foreach import Lion
 from adam_atan2_pytorch.foreach import AdamAtan2
+from adam_atan2_pytorch.adopt_atan2 import AdoptAtan2
 
 from ema_pytorch import EMA
 
@@ -180,6 +181,7 @@ class Trainer:
         ema_on_cpu = False,
         ema_update_model_with_ema_every: int | None = None,
         use_adam_atan2: bool = False,
+        use_adopt_atan2: bool = False,
         use_lion: bool = False,
         use_torch_compile: bool = False
     ):
@@ -247,11 +249,14 @@ class Trainer:
         if not exists(optimizer):
             optimizer_klass = Adam
 
-            assert at_most_one_of(use_adam_atan2, use_lion)
+            assert at_most_one_of(use_adam_atan2, use_adopt_atan2, use_lion)
 
             if use_adam_atan2:
                 default_adam_kwargs.pop('eps', None)
                 optimizer_klass = AdamAtan2
+            elif use_adopt_atan2:
+                default_adam_kwargs.pop('eps', None)
+                optimizer_klass = AdoptAtan2
             elif use_lion:
                 default_adam_kwargs.pop('eps', None)
                 optimizer_klass = Lion
