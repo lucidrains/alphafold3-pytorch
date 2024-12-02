@@ -40,6 +40,9 @@ def pack_one(t, pattern):
 def unpack_one(t, ps, pattern):
     return unpack(t, ps, pattern)[0]
 
+def log(t, eps = 1e-20):
+    return t.clamp(min = eps).log()
+
 def softclamp(t, value):
     return (t / value).tanh() * value
 
@@ -181,6 +184,7 @@ class Attention(Module):
         query_bias = True,
         window_size = None,
         num_memory_kv: int = 0,
+        laser = False,
         enable_attn_softclamp = False,
         attn_softclamp_value = 50.,
         softmax_full_precision = False
@@ -222,6 +226,10 @@ class Attention(Module):
             self.memory_kv = nn.Parameter(torch.zeros(2, heads, num_memory_kv, dim_head))
             nn.init.normal_(self.memory_kv, std = 0.02)
 
+        # laser attention
+
+        self.laser = laser
+
         # gating of value
         # allows attention to attend to nothing
 
@@ -262,6 +270,12 @@ class Attention(Module):
 
         q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
 
+        # maybe laser
+
+        if self.laser:
+            v_max = v.amax(dim = -2, keepdim = True)
+            v = (v - v_max).exp()
+
         # attention
 
         out = self.attend(
@@ -271,6 +285,11 @@ class Attention(Module):
             windowed_mask = windowed_mask,
             memory_kv = self.memory_kv
         )
+
+        # maybe laser
+
+        if self.laser:
+            out = log(out) + v_max
 
         # merge heads
 
