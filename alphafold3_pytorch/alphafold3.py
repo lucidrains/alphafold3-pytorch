@@ -907,8 +907,12 @@ class TriangleAttention(Module):
         self,
         pairwise_repr: Float['b n n d'],
         mask: Bool['b n'] | None = None,
+        return_values = False,
         **kwargs
-    ) -> Float['b n n d']:
+    ) -> (
+        Float['b n n d'] |
+        tuple[Float['b n n d'], Tensor]
+    ):
 
         if self.need_transpose:
             pairwise_repr = rearrange(pairwise_repr, 'b i j d -> b j i d')
@@ -923,10 +927,11 @@ class TriangleAttention(Module):
 
         pairwise_repr, unpack_one = pack_one(pairwise_repr, '* n d')
 
-        out = self.attn(
+        out, values = self.attn(
             pairwise_repr,
             mask = mask,
             attn_bias = attn_bias,
+            return_values = True,
             **kwargs
         )
 
@@ -935,7 +940,12 @@ class TriangleAttention(Module):
         if self.need_transpose:
             out = rearrange(out, 'b j i d -> b i j d')
 
-        return self.dropout(out)
+        out = self.dropout(out)
+
+        if not return_values:
+            return out
+
+        return out, values
 
 # PairwiseBlock
 # used in both MSAModule and Pairformer
@@ -978,15 +988,27 @@ class PairwiseBlock(Module):
         self,
         *,
         pairwise_repr: Float['b n n d'],
-        mask: Bool['b n'] | None = None
+        mask: Bool['b n'] | None = None,
+        value_residuals: tuple[Tensor, Tensor] | None = None,
+        return_values = False,
     ):
         pairwise_repr = self.tri_mult_outgoing(pairwise_repr, mask = mask) + pairwise_repr
         pairwise_repr = self.tri_mult_incoming(pairwise_repr, mask = mask) + pairwise_repr
-        pairwise_repr = self.tri_attn_starting(pairwise_repr, mask = mask) + pairwise_repr
-        pairwise_repr = self.tri_attn_ending(pairwise_repr, mask = mask) + pairwise_repr
+
+        attn_start_value_residual, attn_end_value_residual = default(value_residuals, (None, None))
+
+        attn_start_out, attn_start_values = self.tri_attn_starting(pairwise_repr, mask = mask, value_residual = attn_start_value_residual, return_values = True)
+        pairwise_repr = attn_start_out + pairwise_repr
+
+        attn_end_out, attn_end_values = self.tri_attn_ending(pairwise_repr, mask = mask, value_residual = attn_end_value_residual, return_values = True)
+        pairwise_repr = attn_end_out + pairwise_repr
 
         pairwise_repr = self.pairwise_transition(pairwise_repr) + pairwise_repr
-        return pairwise_repr
+
+        if not return_values:
+            return pairwise_repr
+
+        return pairwise_repr, (attn_start_values, attn_end_values)
 
 # msa module
 
@@ -1465,6 +1487,7 @@ class PairformerStack(Module):
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
         value_residual = None
+        pairwise_value_residuals = None
 
         for _ in range(self.recurrent_depth):
             for (
@@ -1473,7 +1496,7 @@ class PairformerStack(Module):
                 single_transition
             ) in self.layers:
 
-                pairwise_repr = pairwise_block(pairwise_repr = pairwise_repr, mask = mask)
+                pairwise_repr, pairwise_attn_values = pairwise_block(pairwise_repr = pairwise_repr, mask = mask, value_residuals = pairwise_value_residuals, return_values = True)
 
                 attn_out, attn_values = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = value_residual)
 
@@ -1481,6 +1504,7 @@ class PairformerStack(Module):
 
                 if self.add_value_residual:
                     value_residual = default(value_residual, attn_values)
+                    pairwise_value_residuals = default(pairwise_value_residuals, pairwise_attn_values)
 
                 single_repr = single_transition(single_repr) + single_repr
 
@@ -4493,7 +4517,7 @@ class ConfidenceHead(Module):
         num_pae_bins = 64,
         pairformer_depth = 4,
         pairformer_kwargs: dict = dict(),
-        checkpoint=False
+        checkpoint = False
     ):
         super().__init__()
 
