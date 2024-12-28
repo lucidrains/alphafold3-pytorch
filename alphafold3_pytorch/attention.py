@@ -184,8 +184,6 @@ class Attention(Module):
         query_bias = True,
         window_size = None,
         num_memory_kv: int = 0,
-        laser = False,
-        laser_softclamp_value = 15.,
         enable_attn_softclamp = False,
         attn_softclamp_value = 50.,
         softmax_full_precision = False,
@@ -211,8 +209,6 @@ class Attention(Module):
             dropout = dropout,
             window_size = window_size,
             enable_attn_softclamp = enable_attn_softclamp,
-            laser = laser,
-            laser_softclamp_value = laser_softclamp_value,
             attn_softclamp_value = attn_softclamp_value,
             softmax_full_precision = softmax_full_precision
         )
@@ -322,8 +318,6 @@ class Attend(Module):
     def __init__(
         self,
         dropout = 0.,
-        laser = False,
-        laser_softclamp_value = 15.,
         window_size = None,
         scale: float | None = None,
         enable_attn_softclamp = False,
@@ -351,11 +345,6 @@ class Attend(Module):
         self.window_size = window_size
 
         self.attn_dropout = nn.Dropout(dropout)
-
-        # laser attention
-
-        self.laser = laser
-        self.laser_softclamp_value = laser_softclamp_value
 
         # softclamp attention logits
         # being adopted by a number of recent llms (gemma, grok)
@@ -477,19 +466,9 @@ class Attend(Module):
 
         attn = sim.softmax(dim = -1)
 
-        # maybe laser
-
-        if self.laser:
-            v = softclamp(v, self.laser_softclamp_value)
-
         # aggregate
 
         out = einsum(attn, v, "... i j, ... j d -> ... i d")
-
-        # maybe laser
-
-        if self.laser:
-            out = log(out)
 
         # un-window the output
 
@@ -586,19 +565,8 @@ class Attend(Module):
 
         attn = self.attn_dropout(attn)
 
-        # maybe laser
-
-        if self.laser:
-            v_max = v.amax(dim = -2, keepdim = True)
-            v = (v - v_max).exp()
-
         # aggregate values
 
         out = einsum(attn, v, "b h i j, b h j d -> b h i d")
-
-        # maybe laser
-
-        if self.laser:
-            out = log(out) + v_max
 
         return out
