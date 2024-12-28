@@ -1430,10 +1430,18 @@ class PairformerStack(Module):
         num_register_tokens = 0,
         checkpoint = False,
         add_value_residual = False,
+        num_residual_streams = 1,
         pairwise_block_kwargs: dict = dict(),
         pair_bias_attn_kwargs: dict = dict()
     ):
         super().__init__()
+
+        # residual / hyper connections
+
+        init_hyper_conn, self.expand_streams, self.reduce_streams = HyperConnections.get_init_and_expand_reduce_stream_functions(num_residual_streams, disable = num_residual_streams == 1)
+
+        # layers
+
         layers = ModuleList([])
 
         pair_bias_attn_kwargs = dict(
@@ -1463,8 +1471,8 @@ class PairformerStack(Module):
 
             layers.append(ModuleList([
                 pairwise_block,
-                single_pre_ln(pair_bias_attn),
-                single_pre_ln(single_transition),
+                init_hyper_conn(dim = dim_single, branch = single_pre_ln(pair_bias_attn)),
+                init_hyper_conn(dim = dim_single, branch = single_pre_ln(single_transition)),
             ]))
 
         self.layers = layers
@@ -1499,6 +1507,8 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
+        single_repr = self.expand_streams(single_repr)
+
         for _ in range(self.recurrent_depth):
 
             value_residual = None
@@ -1512,15 +1522,15 @@ class PairformerStack(Module):
 
                 pairwise_repr, pairwise_attn_values = pairwise_block(pairwise_repr = pairwise_repr, mask = mask, value_residuals = pairwise_value_residuals, return_values = True)
 
-                attn_out, attn_values = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = value_residual)
-
-                single_repr = single_repr + attn_out
+                single_repr, attn_values = pair_bias_attn(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = value_residual)
 
                 if self.add_value_residual:
                     value_residual = default(value_residual, attn_values)
                     pairwise_value_residuals = default(pairwise_value_residuals, pairwise_attn_values)
 
-                single_repr = single_transition(single_repr) + single_repr
+                single_repr = single_transition(single_repr)
+
+        single_repr = self.reduce_streams(single_repr)
 
         return single_repr, pairwise_repr
 
@@ -1550,8 +1560,7 @@ class PairformerStack(Module):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
                 single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals  = inputs
-                attn_out, attn_values = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = maybe_value_residual)
-                single_repr = single_repr + attn_out
+                single_repr, attn_values = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = maybe_value_residual)
 
                 if self.add_value_residual:
                     maybe_value_residual = default(maybe_value_residual, attn_values)
@@ -1563,7 +1572,7 @@ class PairformerStack(Module):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
                 single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals = inputs
-                single_repr = layer(single_repr) + single_repr
+                single_repr = layer(single_repr)
                 return single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals
             return inner
 
@@ -1579,6 +1588,8 @@ class PairformerStack(Module):
             wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
             wrapped_layers.append(single_transition_wrapper(single_transition))
 
+        single_repr = self.expand_streams(single_repr)
+
         for _ in range(self.recurrent_depth):
             inputs = (single_repr, pairwise_repr, mask, None, None)
 
@@ -1586,6 +1597,8 @@ class PairformerStack(Module):
                 inputs = checkpoint(layer, inputs)
 
             single_repr, pairwise_repr, *_ = inputs
+
+        single_repr = self.reduce_streams(single_repr)
 
         return single_repr, pairwise_repr
 
