@@ -372,11 +372,13 @@ def test_msa_module(
 @pytest.mark.parametrize('use_linear_attn', (False, True))
 @pytest.mark.parametrize('use_colt5_attn', (False, True))
 @pytest.mark.parametrize('add_value_residual', (False, True))
+@pytest.mark.parametrize('num_residual_streams', (1, 4))
 def test_diffusion_transformer(
     checkpoint,
     use_linear_attn,
     use_colt5_attn,
-    add_value_residual
+    add_value_residual,
+    num_residual_streams
 ):
 
     single = torch.randn(2, 16, 384).requires_grad_()
@@ -389,7 +391,8 @@ def test_diffusion_transformer(
         checkpoint = checkpoint,
         use_linear_attn = use_linear_attn,
         use_colt5_attn = use_colt5_attn,
-        add_value_residual = add_value_residual
+        add_value_residual = add_value_residual,
+        num_residual_streams = num_residual_streams
     )
 
     single_out = diffusion_transformer(

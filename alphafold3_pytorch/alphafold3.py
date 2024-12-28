@@ -111,18 +111,19 @@ from alphafold3_pytorch.utils.utils import get_gpu_type, not_exists
 
 from alphafold3_pytorch.utils.model_utils import distance_to_dgram
 
+# personal libraries
+
 from frame_averaging_pytorch import FrameAverage
 
 from taylor_series_linear_attention import TaylorSeriesLinearAttn
 
 from colt5_attention import ConditionalRoutedAttention
 
-import einx
-from einops import rearrange, repeat, reduce, einsum, pack, unpack
-from einops.layers.torch import Rearrange
+from hyper_connections import HyperConnections
+
+# other external libs
 
 from tqdm import tqdm
-
 from loguru import logger
 
 from importlib.metadata import version
@@ -131,6 +132,12 @@ from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
 
 from Bio.PDB.Structure import Structure
 from Bio.PDB.StructureBuilder import StructureBuilder
+
+# einstein notation related
+
+import einx
+from einops import rearrange, repeat, reduce, einsum, pack, unpack
+from einops.layers.torch import Rearrange
 
 """
 global ein notation:
@@ -2008,6 +2015,7 @@ class DiffusionTransformer(Module):
         use_linear_attn = False,
         checkpoint = False,
         add_value_residual = False,
+        num_residual_streams = 1,
         linear_attn_kwargs = dict(
             heads = 8,
             dim_head = 16
@@ -2026,6 +2034,12 @@ class DiffusionTransformer(Module):
 
         dim_single_cond = default(dim_single_cond, dim)
 
+        # hyper connections
+
+        init_hyper_conn, self.expand_streams, self.reduce_streams = HyperConnections.get_init_and_expand_reduce_stream_functions(num_residual_streams, disable = num_residual_streams == 1)
+
+        # layers
+
         layers = ModuleList([])
 
         for i in range(depth):
@@ -2042,6 +2056,8 @@ class DiffusionTransformer(Module):
                     **linear_attn_kwargs
                 )
 
+                linear_attn = init_hyper_conn(dim = dim, branch = linear_attn)
+
             colt5_attn = None
 
             if use_colt5_attn:
@@ -2050,6 +2066,8 @@ class DiffusionTransformer(Module):
                     has_light_attn = False,
                     **colt5_attn_kwargs
                 )
+
+                colt5_attn = init_hyper_conn(dim = dim, branch = colt5_attn)
 
             accept_value_residual = add_value_residual and not is_first
 
@@ -2083,8 +2101,8 @@ class DiffusionTransformer(Module):
             layers.append(ModuleList([
                 linear_attn,
                 colt5_attn,
-                conditionable_pair_bias,
-                conditionable_transition
+                init_hyper_conn(dim = dim, branch = conditionable_pair_bias),
+                init_hyper_conn(dim = dim, branch = conditionable_transition)
             ]))
 
         self.checkpoint = checkpoint
@@ -2112,15 +2130,13 @@ class DiffusionTransformer(Module):
         windowed_mask: Bool['b nw w (w*2)'] | None = None
     ):
 
-        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask, None)
-
         wrapped_layers = []
 
         def efficient_attn_wrapper(fn):
             @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
-                noised_repr = fn(noised_repr, mask = mask) + noised_repr
+                noised_repr = fn(noised_repr, mask = mask)
                 return noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual
             return inner
 
@@ -2128,8 +2144,7 @@ class DiffusionTransformer(Module):
             @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
-                attn_out, attn_values = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask, value_residual = maybe_value_residual, return_values = True)
-                noised_repr = attn_out + noised_repr
+                noised_repr, attn_values = fn(noised_repr, cond = single_repr, pairwise_repr = pairwise_repr, mask = mask, windowed_mask = windowed_mask, value_residual = maybe_value_residual, return_values = True)
 
                 if self.add_value_residual:
                     maybe_value_residual = default(maybe_value_residual, attn_values)
@@ -2141,9 +2156,11 @@ class DiffusionTransformer(Module):
             @wraps(fn)
             def inner(inputs):
                 noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual = inputs
-                noised_repr = fn(noised_repr, cond = single_repr) + noised_repr
+                noised_repr = fn(noised_repr, cond = single_repr)
                 return noised_repr, single_repr, pairwise_repr, mask, windowed_mask, maybe_value_residual
             return inner
+
+        # wrap layers
 
         for linear_attn, colt5_attn, attn, transition in self.layers:
 
@@ -2156,10 +2173,19 @@ class DiffusionTransformer(Module):
             wrapped_layers.append(attn_wrapper(attn))
             wrapped_layers.append(transition_wrapper(transition))
 
+        # forward
+
+        noised_repr = self.expand_streams(noised_repr)
+
+        inputs = (noised_repr, single_repr, pairwise_repr, mask, windowed_mask, None)
+
         for layer in wrapped_layers:
             inputs = checkpoint(layer, inputs)
 
         noised_repr, *_ = inputs
+
+        noised_repr = self.reduce_streams(noised_repr)
+
         return noised_repr
 
     @typecheck
@@ -2175,15 +2201,17 @@ class DiffusionTransformer(Module):
 
         value_residual = None
 
+        noised_repr = self.expand_streams(noised_repr)
+
         for linear_attn, colt5_attn, attn, transition in self.layers:
 
             if exists(linear_attn):
-                noised_repr = linear_attn(noised_repr, mask = mask) + noised_repr
+                noised_repr = linear_attn(noised_repr, mask = mask)
 
             if exists(colt5_attn):
-                noised_repr = colt5_attn(noised_repr, mask = mask) + noised_repr
+                noised_repr = colt5_attn(noised_repr, mask = mask)
 
-            attn_out, attn_values = attn(
+            noised_repr, attn_values = attn(
                 noised_repr,
                 cond = single_repr,
                 pairwise_repr = pairwise_repr,
@@ -2193,15 +2221,15 @@ class DiffusionTransformer(Module):
                 value_residual = value_residual
             )
 
-            noised_repr = noised_repr + attn_out
-
             if self.add_value_residual:
                 value_residual = default(value_residual, attn_values)
 
             noised_repr = transition(
                 noised_repr,
                 cond = single_repr
-            ) + noised_repr
+            )
+
+        noised_repr = self.reduce_streams(noised_repr)
 
         return noised_repr
 
