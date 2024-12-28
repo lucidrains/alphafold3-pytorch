@@ -303,11 +303,13 @@ def test_centre_random_augmentation():
 @pytest.mark.parametrize('recurrent_depth', (1, 2))
 @pytest.mark.parametrize('enable_attn_softclamp', (True, False))
 @pytest.mark.parametrize('add_value_residual', (True, False))
+@pytest.mark.parametrize('num_residual_streams', (1, 4))
 def test_pairformer(
     checkpoint,
     recurrent_depth,
     enable_attn_softclamp,
-    add_value_residual
+    add_value_residual,
+    num_residual_streams
 ):
     single = torch.randn(2, 16, 384).requires_grad_()
     pairwise = torch.randn(2, 16, 16, 128).requires_grad_()
@@ -319,6 +321,7 @@ def test_pairformer(
         recurrent_depth = recurrent_depth,
         checkpoint = checkpoint,
         add_value_residual = add_value_residual,
+        num_residual_streams = num_residual_streams,
         pair_bias_attn_kwargs = dict(
             enable_attn_softclamp = enable_attn_softclamp
         )
