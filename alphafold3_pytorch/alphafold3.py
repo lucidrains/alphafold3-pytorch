@@ -683,7 +683,7 @@ class ConditionWrapper(Module):
         **kwargs
     ) -> (
         Float['b n d'] |
-        tuple[Float['b n d'], Float['b _ _']]
+        tuple[Float['b n d'], Float['b _ _ _']]
     ):
         x = self.adaptive_norm(x, cond = cond)
 
@@ -797,11 +797,11 @@ class AttentionPairBias(Module):
         pairwise_repr: Float["b n n dp"] | Float["b nw w (w*2) dp"],  # type: ignore
         attn_bias: Float["b n n"] | Float["b nw w (w*2)"] | None = None,  # type: ignore
         return_values: bool = False,
-        value_residual: Float['b _ _'] | None = None,
+        value_residual: Float['b _ _ _'] | None = None,
         **kwargs,
     ) -> (
         Float['b n ds'] |
-        tuple[Float['b n ds'], Float['b _ _']]
+        tuple[Float['b n ds'], Float['b _ _ _']]
     ):  # type: ignore
 
         """Perform the forward pass.
@@ -961,6 +961,7 @@ class PairwiseBlock(Module):
         tri_attn_heads = 4,
         dropout_row_prob = 0.25,
         dropout_col_prob = 0.25,
+        accept_value_residual = False
     ):
         super().__init__()
 
@@ -974,7 +975,8 @@ class PairwiseBlock(Module):
         tri_attn_kwargs = dict(
             dim = dim_pairwise,
             heads = tri_attn_heads,
-            dim_head = tri_attn_dim_head
+            dim_head = tri_attn_dim_head,
+            accept_value_residual = accept_value_residual
         )
 
         self.tri_mult_outgoing = pre_ln(TriangleMultiplication(mix = 'outgoing', dropout = dropout_row_prob, dropout_type = 'row', **tri_mult_kwargs))
@@ -1436,16 +1438,20 @@ class PairformerStack(Module):
             **pair_bias_attn_kwargs
         )
 
-        for _ in range(depth):
+        for i in range(depth):
+
+            is_first = i == 0
+            accept_value_residual = add_value_residual and not is_first
 
             single_pre_ln = partial(PreLayerNorm, dim = dim_single)
 
             pairwise_block = PairwiseBlock(
                 dim_pairwise = dim_pairwise,
+                accept_value_residual = accept_value_residual,
                 **pairwise_block_kwargs
             )
 
-            pair_bias_attn = AttentionPairBias(**pair_bias_attn_kwargs)
+            pair_bias_attn = AttentionPairBias(accept_value_residual = accept_value_residual, **pair_bias_attn_kwargs)
             single_transition = Transition(dim = dim_single)
 
             layers.append(ModuleList([
@@ -1486,10 +1492,11 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
-        value_residual = None
-        pairwise_value_residuals = None
-
         for _ in range(self.recurrent_depth):
+
+            value_residual = None
+            pairwise_value_residuals = None
+
             for (
                 pairwise_block,
                 pair_bias_attn,
@@ -1520,54 +1527,59 @@ class PairformerStack(Module):
 
     ) -> Tuple[Float['b n ds'], Float['b n n dp']]:
 
-        inputs = (single_repr, pairwise_repr, mask, None)
-
         def pairwise_block_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
-                pairwise_repr = layer(pairwise_repr = pairwise_repr, mask = mask)
-                return single_repr, pairwise_repr, mask, maybe_value_residual
+                single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals = inputs
+                pairwise_repr, pairwise_attn_values = layer(pairwise_repr = pairwise_repr, mask = mask, value_residuals = maybe_pairwise_value_residuals, return_values = True)
+
+                if self.add_value_residual:
+                    maybe_pairwise_value_residuals = default(maybe_pairwise_value_residuals, pairwise_attn_values)
+
+                return single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals
             return inner
 
         def pair_bias_attn_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
+                single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals  = inputs
                 attn_out, attn_values = layer(single_repr, pairwise_repr = pairwise_repr, mask = mask, return_values = True, value_residual = maybe_value_residual)
                 single_repr = single_repr + attn_out
 
                 if self.add_value_residual:
                     maybe_value_residual = default(maybe_value_residual, attn_values)
 
-                return single_repr, pairwise_repr, mask, maybe_value_residual
+                return single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals
             return inner
 
         def single_transition_wrapper(layer):
             @wraps(layer)
             def inner(inputs, *args, **kwargs):
-                single_repr, pairwise_repr, mask, maybe_value_residual = inputs
+                single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals = inputs
                 single_repr = layer(single_repr) + single_repr
-                return single_repr, pairwise_repr, mask, maybe_value_residual
+                return single_repr, pairwise_repr, mask, maybe_value_residual, maybe_pairwise_value_residuals
             return inner
 
         wrapped_layers = []
 
+        for (
+            pairwise_block,
+            pair_bias_attn,
+            single_transition
+        ) in self.layers:
+
+            wrapped_layers.append(pairwise_block_wrapper(pairwise_block))
+            wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
+            wrapped_layers.append(single_transition_wrapper(single_transition))
+
         for _ in range(self.recurrent_depth):
-            for (
-                pairwise_block,
-                pair_bias_attn,
-                single_transition
-            ) in self.layers:
+            inputs = (single_repr, pairwise_repr, mask, None, None)
 
-                wrapped_layers.append(pairwise_block_wrapper(pairwise_block))
-                wrapped_layers.append(pair_bias_attn_wrapper(pair_bias_attn))
-                wrapped_layers.append(single_transition_wrapper(single_transition))
+            for layer in wrapped_layers:
+                inputs = checkpoint(layer, inputs)
 
-        for layer in wrapped_layers:
-            inputs = checkpoint(layer, inputs)
+            single_repr, pairwise_repr, *_ = inputs
 
-        single_repr, pairwise_repr, *_ = inputs
         return single_repr, pairwise_repr
 
     @typecheck
@@ -2016,7 +2028,8 @@ class DiffusionTransformer(Module):
 
         layers = ModuleList([])
 
-        for _ in range(depth):
+        for i in range(depth):
+            is_first = i == 0
 
             linear_attn = None
 
@@ -2038,12 +2051,15 @@ class DiffusionTransformer(Module):
                     **colt5_attn_kwargs
                 )
 
+            accept_value_residual = add_value_residual and not is_first
+
             pair_bias_attn = AttentionPairBias(
                 dim = dim,
                 dim_pairwise = dim_pairwise,
                 heads = heads,
                 window_size = attn_window_size,
                 num_memory_kv = attn_num_memory_kv,
+                accept_value_residual = accept_value_residual,
                 **attn_pair_bias_kwargs
             )
 

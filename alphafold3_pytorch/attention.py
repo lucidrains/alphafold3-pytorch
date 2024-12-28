@@ -188,7 +188,8 @@ class Attention(Module):
         laser_softclamp_value = 15.,
         enable_attn_softclamp = False,
         attn_softclamp_value = 50.,
-        softmax_full_precision = False
+        softmax_full_precision = False,
+        accept_value_residual = False
     ):
         super().__init__()
         """
@@ -237,6 +238,18 @@ class Attention(Module):
         if gate_output:
             self.to_gates = nn.Sequential(LinearNoBias(dim, dim_inner), nn.Sigmoid())
 
+        # learned value residual mixing
+        # even greater improvements on top of value residual learning, discovered by open source community
+
+        self.accept_value_residual = accept_value_residual
+
+        if accept_value_residual:
+            self.to_value_residual_mix = nn.Sequential(
+                LinearNoBias(dim, heads),
+                Rearrange('b n h -> b h n 1'),
+                nn.Sigmoid()
+            )
+
     @typecheck
     def forward(
         self,
@@ -246,11 +259,11 @@ class Attention(Module):
         windowed_mask: Bool['b nw w (w*2)'] | None = None,
         attn_bias: Float['... i j'] | Float['... nw w (w*2)'] | None = None,
         return_values: bool = False,
-        value_residual: Float['b j dh'] | None = None,
+        value_residual: Float['b h j dh'] | None = None,
 
     ) -> (
         Float['b i d'] |
-        tuple[Float['b i d'], Float['b j _']]
+        tuple[Float['b i d'], Float['b h j dh']]
     ):
 
         q = self.to_q(seq)
@@ -258,16 +271,19 @@ class Attention(Module):
         context_seq = default(context, seq)
         k, v = self.to_kv(context_seq).chunk(2, dim = -1)
 
+        # split heads
+
+        q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
+
         # handle value residual
 
         orig_v = v
 
+        assert not (self.accept_value_residual ^ exists(value_residual))
+
         if exists(value_residual):
-            v = 0.5 * (v + value_residual)
-
-        # split heads
-
-        q, k, v = tuple(self.split_heads(t) for t in (q, k, v))
+            mix = self.to_value_residual_mix(seq)
+            v = v.lerp(value_residual, mix)
 
         # attention
 
