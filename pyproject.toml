@@ -1,6 +1,6 @@
 [project]
 name = "alphafold3-pytorch"
-version = "0.7.7"
+version = "0.7.8"
 description = "Alphafold 3 - Pytorch"
 authors = [
     { name = "Phil Wang", email = "lucidrains@gmail.com" },
@@ -41,7 +41,7 @@ dependencies = [
     "fair-esm",
     "fastapi",
     "frame-averaging-pytorch>=0.0.18",
-    "hyper-connections>=0.0.21",
+    "hyper-connections>=0.0.23",
     "gradio",
     "gradio_molecule3d",
     "huggingface_hub>=0.21.4",
