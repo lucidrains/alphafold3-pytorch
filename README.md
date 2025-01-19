@@ -525,3 +525,12 @@ docker run -v .:/data --gpus all -it af3
     url     = {https://api.semanticscholar.org/CorpusID:272987528}
 }
 ```
+
+```bibtex
+@inproceedings{Ma2025InferenceTimeSF,
+    title   = {Inference-Time Scaling for Diffusion Models beyond Scaling Denoising Steps},
+    author  = {Nanye Ma and Shangyuan Tong and Haolin Jia and Hexiang Hu and Yu-Chuan Su and Mingda Zhang and Xuan Yang and Yandong Li and T. Jaakkola and Xuhui Jia and Saining Xie},
+    year    = {2025},
+    url     = {https://api.semanticscholar.org/CorpusID:275570556}
+}
+```
