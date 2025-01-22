@@ -2835,6 +2835,7 @@ class ElucidatedAtomDiffusion(Module):
         use_tqdm_pbar = True,
         tqdm_pbar_title = 'sampling time step',
         return_all_timesteps = False,
+        verifier: Module | None = None,
         **network_condition_kwargs
     ) -> Float['b m 3'] | Float['ts b m 3']:
 
@@ -6770,6 +6771,7 @@ class Alphafold3(Module):
         num_recycling_steps: int = 1,
         diffusion_add_bond_loss: bool = False,
         diffusion_add_smooth_lddt_loss: bool = False,
+        diffusion_verifier: Module | None = None,
         distogram_atom_indices: Int['b n'] | None = None,
         molecule_atom_indices: Int['b n'] | None = None, # the 'token centre atoms' mentioned in the paper, unsure where it is used in the architecture
         num_sample_steps: int | None = None,
@@ -7187,7 +7189,8 @@ class Alphafold3(Module):
                 pairwise_trunk = pairwise,
                 pairwise_rel_pos_feats = relative_position_encoding,
                 molecule_atom_lens = molecule_atom_lens,
-                return_all_timesteps = return_all_diffused_atom_pos
+                return_all_timesteps = return_all_diffused_atom_pos,
+                verifier = diffusion_verifier
             )
 
             if exists(atom_mask):
