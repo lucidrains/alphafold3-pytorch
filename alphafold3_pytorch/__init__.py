@@ -4,14 +4,11 @@ from alphafold3_pytorch.attention import (
     full_pairwise_repr_to_windowed
 )
 
+from alphafold3_pytorch.modules.diffusion import *
+
+from alphafold3_pytorch.modules.embedders import *
+
 from alphafold3_pytorch.alphafold3 import (
-    RelativePositionEncoding,
-    SmoothLDDTLoss,
-    WeightedRigidAlign,
-    MultiChainPermutationAlignment,
-    ComputeAlignmentError,
-    CentreRandomAugmentation,
-    TemplateEmbedder,
     PreLayerNorm,
     AdaptiveLayerNorm,
     ConditionWrapper,
@@ -23,10 +20,6 @@ from alphafold3_pytorch.alphafold3 import (
     Transition,
     MSAModule,
     PairformerStack,
-    DiffusionTransformer,
-    DiffusionModule,
-    ElucidatedAtomDiffusion,
-    InputFeatureEmbedder,
     ConfidenceHead,
     DistogramHead,
     Alphafold3,
