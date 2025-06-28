@@ -16,6 +16,8 @@ A fork with full Lightning + Hydra support is being maintained by <a href="https
 
 A visualization of the molecules of life used in the repository can be seen and interacted with <a href="https://colab.research.google.com/drive/1S9TD8WmS1Gjgwjo9xyEYTbdxgMVVZcQe?usp=sharing">here</a>
 
+An optimized version leveraging Triton kernels is available in [MegaFold](https://github.com/Supercomputing-System-AI-Lab/MegaFold/), from Hoa La and Ahan Gupta
+
 ## Appreciation
 
 - <a href="https://github.com/joseph-c-kim">Joseph</a> for contributing the Relative Positional Encoding and the Smooth LDDT Loss!
