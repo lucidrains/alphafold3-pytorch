@@ -1085,8 +1085,8 @@ class MoleculeLengthMoleculeInput:
     token_bonds: Bool["n n"] | None = None  # type: ignore
     one_token_per_atom: List[bool] | None = None
     is_molecule_mod: Bool["n num_mods"] | Bool[" n"] | None = None  # type: ignore
-    molecule_atom_indices: List[int | None] | None = None
-    distogram_atom_indices: List[int | None] | None = None
+    molecule_atom_indices: List[int | None] | Int[" b"] | None = None
+    distogram_atom_indices: List[int | None] | Int[" b"] | None = None
     atom_indices_for_frame: List[Tuple[int, int, int] | None] | None = None
     missing_atom_indices: List[Int[" _"] | None] | None = None  # type: ignore
     missing_token_indices: List[Int[" _"] | None] | None = None  # type: ignore
