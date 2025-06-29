@@ -503,7 +503,7 @@ class BatchedAtomInput:
     resolution: Float[" b"] | None = None  # type: ignore
     token_constraints: Float["b n n dac"] | None = None  # type: ignore
     chains: Int["b 2"] | None = None  # type: ignore
-    filepath: List[str] | None = None
+    filepath: List[str] | Tuple[str, ...] | None = None
 
     def dict(self):
         """Return the dataclass as a dictionary."""
@@ -736,11 +736,11 @@ class MoleculeInput:
     molecule_ids: Int[" n"]  # type: ignore
     additional_molecule_feats: Int[f"n {ADDITIONAL_MOLECULE_FEATS}"]  # type: ignore
     is_molecule_types: Bool[f"n {IS_MOLECULE_TYPES}"]  # type: ignore
-    src_tgt_atom_indices: Int["n 2"]  # type: ignore
+    src_tgt_atom_indices: Int["n 2"] | List[List[int]]  # type: ignore
     token_bonds: Bool["n n"]  # type: ignore
     is_molecule_mod: Bool["n num_mods"] | Bool[" n"] | None = None  # type: ignore
-    molecule_atom_indices: List[int | None] | None = None  # type: ignore
-    distogram_atom_indices: List[int | None] | None = None  # type: ignore
+    molecule_atom_indices: List[int | None] | Int[" n"] | None = None  # type: ignore
+    distogram_atom_indices: List[int | None] | Int[" n"] | None = None  # type: ignore
     atom_indices_for_frame: Int["n 3"] | None = None  # type: ignore
     missing_atom_indices: List[Int[" _"] | None] | None = None  # type: ignore
     missing_token_indices: List[Int[" _"] | None] | None = None  # type: ignore
@@ -1085,8 +1085,8 @@ class MoleculeLengthMoleculeInput:
     token_bonds: Bool["n n"] | None = None  # type: ignore
     one_token_per_atom: List[bool] | None = None
     is_molecule_mod: Bool["n num_mods"] | Bool[" n"] | None = None  # type: ignore
-    molecule_atom_indices: List[int | None] | None = None
-    distogram_atom_indices: List[int | None] | None = None
+    molecule_atom_indices: List[int | None] | Int[" n"] | None = None
+    distogram_atom_indices: List[int | None] | Int[" n"] | None = None
     atom_indices_for_frame: List[Tuple[int, int, int] | None] | None = None
     missing_atom_indices: List[Int[" _"] | None] | None = None  # type: ignore
     missing_token_indices: List[Int[" _"] | None] | None = None  # type: ignore
@@ -2178,8 +2178,8 @@ class PDBInput:
     directed_bonds: bool = False
     custom_atoms: List[str] | None = None
     custom_bonds: List[str] | None = None
-    training: bool = False
-    inference: bool = False
+    training: bool | None = None
+    inference: bool | None = None
     distillation: bool = False
     distillation_multimer_sampling_ratio: float = 2.0 / 3.0
     distillation_pdb_ids: List[str] | None = None

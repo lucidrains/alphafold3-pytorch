@@ -36,9 +36,9 @@ def cli(
     assert checkpoint_path.exists(), f'AlphaFold 3 checkpoint must exist at {str(checkpoint_path)}'
 
     alphafold3_input = Alphafold3Input(
-        proteins = protein,
-        ss_rna = rna,
-        ss_dna = dna,
+        proteins = list(protein),
+        ss_rna = list(rna),
+        ss_dna = list(dna),
     )
 
     alphafold3 = Alphafold3.init_and_load(checkpoint_path)
