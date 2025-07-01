@@ -1770,7 +1770,7 @@ def alphafold3_input_to_molecule_lengthed_molecule_input(
 
             # NOTE: since `Alphafold3Input` is only used for inference, we can safely assume that
             # the middle atom frame of each ligand molecule is a suitable representative frame for the ligand
-            atom_indices_for_frame.append(frames[len(frames) // 2].tolist())
+            atom_indices_for_frame.append(tuple(frames[len(frames) // 2].tolist()))
 
             ligand_atom_pos_offset += num_ligand_atoms
 
