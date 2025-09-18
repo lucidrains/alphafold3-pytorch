@@ -52,18 +52,16 @@ RINALMO_MASK_TOKEN = "-"  # nosec
 class RiNALMoWrapper(Module):
     """A wrapper for the RiNALMo model to provide NLM embeddings."""
 
-    def __init__(self):
+    def __init__(self, variant: str = "rinalmo-giga"):
         super().__init__()
         from multimolecule import RiNALMoModel, RnaTokenizer
 
         self.register_buffer("dummy", tensor(0), persistent=False)
 
-        self.tokenizer = RnaTokenizer.from_pretrained(
-            "multimolecule/rinalmo", replace_T_with_U=False
-        )
-        self.model = RiNALMoModel.from_pretrained("multimolecule/rinalmo")
+        self.tokenizer = RnaTokenizer.from_pretrained("multimolecule/" + variant, replace_T_with_U=False)
+        self.model = RiNALMoModel.from_pretrained("multimolecule/" + variant)
 
-        self.embed_dim = 1280
+        self.embed_dim = self.model.config.hidden_size
 
     @torch.no_grad()
     @typecheck
