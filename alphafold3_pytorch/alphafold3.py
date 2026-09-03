@@ -2913,6 +2913,17 @@ class ElucidatedAtomDiffusion(Module):
         device = default(device, self.device)
 
         N = num_sample_steps
+        if N < 1:
+            raise ValueError('num_sample_steps must be greater than zero')
+
+        # The Karras interpolation uses ``N - 1`` intervals.  A one-step
+        # sampler is still useful for smoke tests and fast preview inference,
+        # and should perform one denoising update from sigma_max to zero
+        # rather than produce a NaN schedule from division by zero.
+        if N == 1:
+            sigmas = torch.tensor((self.sigma_max,), device = device, dtype = self.dtype)
+            return F.pad(sigmas, (0, 1), value = 0.) * self.sigma_data
+
         inv_rho = 1 / self.rho
 
         steps = torch.arange(num_sample_steps, device = device, dtype = self.dtype)
