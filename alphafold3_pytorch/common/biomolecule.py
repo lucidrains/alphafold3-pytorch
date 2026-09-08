@@ -1802,6 +1802,16 @@ def to_inference_mmcif(
                 res_atom_names
             ), "Residue positions array and residue atom names array must have the same length."
 
+            atom_name = res_atom_names[0][-1]
+            type_symbol = atom_id_to_type(atom_name)
+            unique_atom_indices[atom_name] += 1
+            atom_index_postfix = "" if is_polymer_residue else unique_atom_indices[atom_name]
+            unique_atom_name = (
+                atom_name
+                if exists(unique_res_atom_names)
+                else f"{atom_name}{atom_index_postfix}"
+            )
+            b_factor = res_b_factors[0][-1]
             pos = res_atom_positions[0][-1]
             mmcif_dict["_atom_site.group_PDB"].append("ATOM")
             mmcif_dict["_atom_site.id"].append(str(atom_index))
